@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 7 - Implement P0 Agents |
-| Last completed task | Task 6 - Implement Trace Logger |
+| Current task | Task 8 - Implement LangGraph Workflow |
+| Last completed task | Task 7 - Implement P0 Agents |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, and trace logger done; P0 agents pending | `[~]` scaffold, seed, metric, schema, validator, executor, and trace logger tests passing | `[~]` README and status doc updated through Task 6 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, and P0 agents done; LangGraph workflow pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, and P0 agent tests passing | `[~]` README and status doc updated through Task 7 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -44,7 +44,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 4 - Implement SQL Validator | `[x]` `tools/sql_validator.py` | `[x]` safety, multi-statement, schema, limit, metric, and sensitive field tests | `[x]` validator rules documented in README | `[x]` Done |
 | Task 5 - Implement SQL Executor | `[x]` `tools/sql_executor.py` | `[x]` SELECT success, row cap, non-SELECT rejection, database error, missing DB, and multi-statement tests | `[x]` executor contract documented in README | `[x]` Done |
 | Task 6 - Implement Trace Logger | `[x]` `tools/trace_logger.py`, `logs/traces/` | `[x]` append, failure/retry, save trace, and write-failure tests | `[x]` trace fields and usage documented in README | `[x]` Done |
-| Task 7 - Implement P0 Agents | `[ ]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[ ]` structured output and boundary tests | `[ ]` document Agent/Tool responsibilities | `[ ]` Not started |
+| Task 7 - Implement P0 Agents | `[x]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[x]` structured output, tool boundary, SQL generation, review, fix, and insight tests | `[x]` Agent/Tool responsibilities documented in README | `[x]` Done |
 | Task 8 - Implement LangGraph Workflow | `[ ]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[ ]` success, blocked SQL, one-retry repair tests | `[ ]` document workflow edges | `[ ]` Not started |
 | Task 9 - Implement Streamlit Demo | `[ ]` glass-box app sections | `[ ]` import/smoke test and manual launch check | `[ ]` README demo section | `[ ]` Not started |
 | Task 10 - Implement P0 Eval | `[ ]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[ ]` eval runner and report tests | `[ ]` README eval result summary | `[ ]` Not started |
@@ -55,8 +55,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[ ]` User can enter a Chinese business question in Streamlit.
 - `[x]` System calls `get_database_schema()` against the real SQLite schema.
 - `[x]` System calls `retrieve_metric_definition()` for GMV and related metrics.
-- `[ ]` SQL Generator produces SELECT SQL.
-- `[ ]` SQL Reviewer calls `validate_sql()`.
+- `[x]` SQL Generator produces SELECT SQL.
+- `[x]` SQL Reviewer calls `validate_sql()`.
 - `[ ]` Dangerous SQL is rejected before `run_sql()`.
 - `[x]` SQL Executor calls `run_sql()` against SQLite.
 - `[ ]` Failed SQL execution enters Error Fix Agent once.
@@ -103,6 +103,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 7 verification:
+
+```bash
+python3 -m pytest tests/test_p0_agents.py
+python3 -m pytest
+python3 -c 'from agents.supervisor import initialize_run; from agents.schema_agent import run_schema_agent; from agents.metric_agent import run_metric_agent; from agents.sql_generator import run_sql_generator; from agents.sql_reviewer import run_sql_reviewer; import json; state=initialize_run("最近 30 天销售额最高的 5 个商品是什么？", run_id="run_manual", session_id="session_manual"); state=run_schema_agent(state, "data/ecommerce.db"); state=run_metric_agent(state); state=run_sql_generator(state); state=run_sql_reviewer(state); print(json.dumps({"generated_sql": state["generated_sql"], "approved": state["review_result"]["approved"], "trace_nodes": [event["node"] for event in state["trace"]]}, ensure_ascii=False, indent=2))'
+```
+
+Result: P0 agents initialize run state, call schema/metric/review tools through clear boundaries, generate parseable SELECT SQL, reject dangerous SQL through `validate_sql()`, repair the known `oi.price` column error once without executing SQL, and generate insight text only from `execution_result`.
 
 Task 6 verification:
 

@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 6 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, and trace logger for P0 SQL workflow development; agents, workflow, Streamlit integration, and eval cases will be added in later P0 tasks.
+Task 7 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, and P0 Agent layer for SQL workflow development; LangGraph workflow, Streamlit integration, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -151,6 +151,38 @@ state = append_trace(state, {
     "latency_ms": 12,
 })
 print(save_trace("run_001", state["trace"], session_id="session_001"))
+```
+
+## P0 Agents
+
+P0 agents are lightweight state-transforming modules. They return structured dictionaries and keep the Agent/Tool boundary clear: agents orchestrate state and reasoning, while tools perform schema lookup, metric retrieval, SQL validation, SQL execution, and trace persistence.
+
+Implemented modules:
+
+- `agents.supervisor.initialize_run()` initializes run/session state.
+- `agents.schema_agent.run_schema_agent()` calls `get_database_schema()`.
+- `agents.metric_agent.run_metric_agent()` calls `retrieve_metric_definition()`.
+- `agents.sql_generator.run_sql_generator()` generates structured SELECT SQL output.
+- `agents.sql_reviewer.run_sql_reviewer()` calls `validate_sql()`.
+- `agents.error_fixer.run_error_fix_agent()` repairs one deterministic P0 SQL error class.
+- `agents.insight_agent.run_insight_agent()` answers only from `execution_result`.
+
+Example:
+
+```python
+from agents.metric_agent import run_metric_agent
+from agents.schema_agent import run_schema_agent
+from agents.sql_generator import run_sql_generator
+from agents.sql_reviewer import run_sql_reviewer
+from agents.supervisor import initialize_run
+
+state = initialize_run("最近 30 天销售额最高的 5 个商品是什么？")
+state = run_schema_agent(state, "data/ecommerce.db")
+state = run_metric_agent(state)
+state = run_sql_generator(state)
+state = run_sql_reviewer(state)
+print(state["sql_generation"])
+print(state["review_result"])
 ```
 
 ## Run Demo
