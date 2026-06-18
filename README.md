@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 5 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, and SQL executor for P0 SQL workflow development; trace logging, agents, workflow, and eval cases will be added in later P0 tasks.
+Task 6 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, and trace logger for P0 SQL workflow development; agents, workflow, Streamlit integration, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -116,6 +116,41 @@ ORDER BY gmv DESC
 LIMIT 5
 """
 print(run_sql("data/ecommerce.db", sql))
+```
+
+## Trace Logger
+
+The trace logger records node and tool-call events for each Agent run. `append_trace()` adds normalized events to state without mutating the original state, and `save_trace()` writes structured JSON artifacts to `logs/traces/{run_id}.json`.
+
+Required trace fields:
+
+- `run_id`
+- `session_id`
+- `node`
+- `tool_name`
+- `tool_input_summary`
+- `tool_output_summary`
+- `status`
+- `latency_ms`
+- `error_type`
+- `retry_count`
+- `timestamp`
+
+Example:
+
+```python
+from tools.trace_logger import append_trace, save_trace
+
+state = {"run_id": "run_001", "session_id": "session_001", "trace": []}
+state = append_trace(state, {
+    "node": "sql_executor",
+    "tool_name": "run_sql",
+    "tool_input_summary": "SELECT 1",
+    "tool_output_summary": "1 row returned",
+    "status": "success",
+    "latency_ms": 12,
+})
+print(save_trace("run_001", state["trace"], session_id="session_001"))
 ```
 
 ## Run Demo

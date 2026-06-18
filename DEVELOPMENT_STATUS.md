@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 This file is the living development tracker for InsightFlow Agent. Update it after every completed task, test milestone, or scope change.
 
@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 6 - Implement Trace Logger |
-| Last completed task | Task 5 - Implement SQL Executor |
+| Current task | Task 7 - Implement P0 Agents |
+| Last completed task | Task 6 - Implement Trace Logger |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, and SQL executor done; trace logger pending | `[~]` scaffold, seed, metric, schema, validator, and executor tests passing | `[~]` README and status doc updated through Task 5 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, and trace logger done; P0 agents pending | `[~]` scaffold, seed, metric, schema, validator, executor, and trace logger tests passing | `[~]` README and status doc updated through Task 6 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -43,7 +43,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 3 - Implement Schema Tool | `[x]` `tools/schema_tool.py` | `[x]` normal DB, empty DB, missing DB, schema_text, and trace-ready output tests | `[x]` schema tool usage documented in README | `[x]` Done |
 | Task 4 - Implement SQL Validator | `[x]` `tools/sql_validator.py` | `[x]` safety, multi-statement, schema, limit, metric, and sensitive field tests | `[x]` validator rules documented in README | `[x]` Done |
 | Task 5 - Implement SQL Executor | `[x]` `tools/sql_executor.py` | `[x]` SELECT success, row cap, non-SELECT rejection, database error, missing DB, and multi-statement tests | `[x]` executor contract documented in README | `[x]` Done |
-| Task 6 - Implement Trace Logger | `[ ]` `tools/trace_logger.py`, `logs/traces/` | `[ ]` append and save trace tests | `[ ]` document trace fields | `[ ]` Not started |
+| Task 6 - Implement Trace Logger | `[x]` `tools/trace_logger.py`, `logs/traces/` | `[x]` append, failure/retry, save trace, and write-failure tests | `[x]` trace fields and usage documented in README | `[x]` Done |
 | Task 7 - Implement P0 Agents | `[ ]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[ ]` structured output and boundary tests | `[ ]` document Agent/Tool responsibilities | `[ ]` Not started |
 | Task 8 - Implement LangGraph Workflow | `[ ]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[ ]` success, blocked SQL, one-retry repair tests | `[ ]` document workflow edges | `[ ]` Not started |
 | Task 9 - Implement Streamlit Demo | `[ ]` glass-box app sections | `[ ]` import/smoke test and manual launch check | `[ ]` README demo section | `[ ]` Not started |
@@ -103,6 +103,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 6 verification:
+
+```bash
+python3 -m pytest tests/test_trace_logger.py
+python3 -m pytest
+python3 -c 'from tools.trace_logger import append_trace, save_trace; import json, tempfile; state={"run_id":"run_manual","session_id":"session_manual","trace":[]}; state=append_trace(state, {"node":"sql_executor","tool_name":"run_sql","tool_input_summary":"SELECT 1","tool_output_summary":"1 row returned","status":"success","latency_ms":1}); result=save_trace("run_manual", state["trace"], trace_dir=tempfile.mkdtemp(), session_id="session_manual", status="success"); print(json.dumps(result, ensure_ascii=False, indent=2))'
+```
+
+Result: trace events are appended without mutating the original state, required trace fields are normalized, failure and retry details are preserved, traces save as JSON files, and write failures return structured `success: false` payloads with trace-ready events.
 
 Task 5 verification:
 
