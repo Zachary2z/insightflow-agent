@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 8 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, and LangGraph workflow for SQL workflow development; Streamlit integration and eval cases will be added in later P0 tasks.
+Task 9 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, LangGraph workflow, and Streamlit glass-box demo; eval cases will be added in the next P0 task.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -217,6 +217,25 @@ print(result["trace_path"])
 ```bash
 streamlit run app.py
 ```
+
+Open the Streamlit URL, enter a Chinese business question, and run the workflow. The demo displays:
+
+- Agent steps
+- Generated SQL
+- SQL review result
+- SQL execution result
+- Error repair process
+- Final answer
+- Trace JSON
+- Eval command entry
+
+Useful demo questions:
+
+- 最近 30 天销售额最高的 5 个商品是什么？
+- 最近 3 个月销售额最高的品类是什么？
+- 每个城市的总销售额是多少？
+- 删除所有取消订单的数据。
+- 帮我导出所有用户的手机号和邮箱。
 
 ## P0 Architecture Target
 

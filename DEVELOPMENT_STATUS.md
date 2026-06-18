@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 9 - Implement Streamlit Demo |
-| Last completed task | Task 8 - Implement LangGraph Workflow |
+| Current task | Task 10 - Implement P0 Eval |
+| Last completed task | Task 9 - Implement Streamlit Demo |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, and LangGraph workflow done; Streamlit demo pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, and workflow tests passing | `[~]` README and status doc updated through Task 8 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, and Streamlit demo done; eval pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, workflow, and Streamlit app tests passing | `[~]` README and status doc updated through Task 9 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -46,13 +46,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 6 - Implement Trace Logger | `[x]` `tools/trace_logger.py`, `logs/traces/` | `[x]` append, failure/retry, save trace, and write-failure tests | `[x]` trace fields and usage documented in README | `[x]` Done |
 | Task 7 - Implement P0 Agents | `[x]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[x]` structured output, tool boundary, SQL generation, review, fix, and insight tests | `[x]` Agent/Tool responsibilities documented in README | `[x]` Done |
 | Task 8 - Implement LangGraph Workflow | `[x]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[x]` success path, blocked SQL, one-retry repair, failed repair, and trace-save tests | `[x]` workflow edges and usage documented in README | `[x]` Done |
-| Task 9 - Implement Streamlit Demo | `[ ]` glass-box app sections | `[ ]` import/smoke test and manual launch check | `[ ]` README demo section | `[ ]` Not started |
+| Task 9 - Implement Streamlit Demo | `[x]` glass-box app with input, status, steps, SQL, review, execution, repair, answer, trace, and eval entry | `[x]` app helper tests, workflow-backed smoke tests, and Streamlit launch check | `[x]` README demo section updated | `[x]` Done |
 | Task 10 - Implement P0 Eval | `[ ]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[ ]` eval runner and report tests | `[ ]` README eval result summary | `[ ]` Not started |
 | P0 final README update | `[ ]` startup, architecture, demo examples, eval result | `[ ]` verify commands documented match reality | `[ ]` final P0 docs complete | `[ ]` Not started |
 
 ### P0 Acceptance Tracker
 
-- `[ ]` User can enter a Chinese business question in Streamlit.
+- `[x]` User can enter a Chinese business question in Streamlit.
 - `[x]` System calls `get_database_schema()` against the real SQLite schema.
 - `[x]` System calls `retrieve_metric_definition()` for GMV and related metrics.
 - `[x]` SQL Generator produces SELECT SQL.
@@ -103,6 +103,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 9 verification:
+
+```bash
+python3 -m pytest tests/test_streamlit_app.py
+python3 -m pytest
+python3 -m streamlit run app.py --server.headless true --server.port 8501
+curl -I http://localhost:8501
+```
+
+Result: Streamlit app exposes a Chinese business question input, runs `run_workflow()`, displays Agent Steps, Generated SQL, SQL Review, Execution Result, Error Repair, Final Answer, Trace JSON, and Eval command entry; the local Streamlit server responds with HTTP 200.
 
 Task 8 verification:
 
