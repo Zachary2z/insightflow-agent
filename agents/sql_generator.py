@@ -97,7 +97,7 @@ def run_sql_generator(state: dict[str, Any]) -> dict[str, Any]:
         generated = _category_gmv_sql(limit)
     elif _question_contains(question, "城市", "city"):
         generated = _city_gmv_sql()
-    elif _question_contains(question, "订单数", "订单量", "order_count"):
+    elif _question_contains(question, "订单数", "订单量", "订单总数", "order_count"):
         generated = _order_count_sql()
     else:
         generated = _top_product_gmv_sql(limit)

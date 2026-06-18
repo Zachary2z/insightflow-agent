@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 9 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, LangGraph workflow, and Streamlit glass-box demo; eval cases will be added in the next P0 task.
+Task 10 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, LangGraph workflow, Streamlit glass-box demo, and 20-case P0 eval benchmark.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -252,7 +252,7 @@ User question
 -> Trace Logger
 ```
 
-## Demo Questions Planned
+## Demo Questions
 
 - 最近 30 天销售额最高的 5 个商品是什么？
 - 最近 3 个月销售额最高的品类是什么？
@@ -262,4 +262,21 @@ User question
 
 ## Eval
 
-P0 will add `eval/test_questions.json`, `eval/run_eval.py`, and `eval/report.md` after the core workflow is implemented.
+Run the P0 benchmark:
+
+```bash
+python eval/run_eval.py
+```
+
+Current eval summary:
+
+- Total cases: 20
+- Passed cases: 20
+- Pass rate: 100.00%
+- SQL execution success rate: 92.31%
+- SQL first-pass success rate: 91.67%
+- SQL repair success rate: 100.00%
+- Dangerous SQL block rate: 100.00%
+- Metric definition accuracy: 100.00%
+
+The generated report is written to `eval/report.md`.

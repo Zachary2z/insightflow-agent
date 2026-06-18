@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 10 - Implement P0 Eval |
-| Last completed task | Task 9 - Implement Streamlit Demo |
+| Current task | P0 final README update |
+| Last completed task | Task 10 - Implement P0 Eval |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, and Streamlit demo done; eval pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, workflow, and Streamlit app tests passing | `[~]` README and status doc updated through Task 9 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, and eval done; final README polish pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, workflow, Streamlit app, and eval tests passing | `[~]` README and status doc updated through Task 10 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -47,7 +47,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 7 - Implement P0 Agents | `[x]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[x]` structured output, tool boundary, SQL generation, review, fix, and insight tests | `[x]` Agent/Tool responsibilities documented in README | `[x]` Done |
 | Task 8 - Implement LangGraph Workflow | `[x]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[x]` success path, blocked SQL, one-retry repair, failed repair, and trace-save tests | `[x]` workflow edges and usage documented in README | `[x]` Done |
 | Task 9 - Implement Streamlit Demo | `[x]` glass-box app with input, status, steps, SQL, review, execution, repair, answer, trace, and eval entry | `[x]` app helper tests, workflow-backed smoke tests, and Streamlit launch check | `[x]` README demo section updated | `[x]` Done |
-| Task 10 - Implement P0 Eval | `[ ]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[ ]` eval runner and report tests | `[ ]` README eval result summary | `[ ]` Not started |
+| Task 10 - Implement P0 Eval | `[x]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[x]` 20-case count, runner summary, report generation, failed expectation, and CLI tests | `[x]` README eval command and result summary updated | `[x]` Done |
 | P0 final README update | `[ ]` startup, architecture, demo examples, eval result | `[ ]` verify commands documented match reality | `[ ]` final P0 docs complete | `[ ]` Not started |
 
 ### P0 Acceptance Tracker
@@ -63,8 +63,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[x]` Fixed SQL is revalidated and rerun.
 - `[x]` Final answer is grounded in `execution_result`.
 - `[x]` Each run creates a complete `trace.json`.
-- `[ ]` `eval/run_eval.py` runs 20 test questions.
-- `[ ]` README includes startup, architecture, demo examples, and eval results.
+- `[x]` `eval/run_eval.py` runs 20 test questions.
+- `[x]` README includes startup, architecture, demo examples, and eval results.
 
 ## P1 - Reliable Analysis & Report Core
 
@@ -103,6 +103,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 10 verification:
+
+```bash
+python3 -m pytest tests/test_eval_runner.py
+python3 eval/run_eval.py
+python3 -m pytest
+```
+
+Result: `eval/test_questions.json` contains 20 P0 cases; `eval/run_eval.py` runs all cases, writes `eval/report.md`, reports 20/20 passed, 100.00% dangerous SQL block rate, 100.00% SQL repair success rate, and 100.00% metric definition accuracy.
 
 Task 9 verification:
 
