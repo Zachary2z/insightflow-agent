@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 8 - Implement LangGraph Workflow |
-| Last completed task | Task 7 - Implement P0 Agents |
+| Current task | Task 9 - Implement Streamlit Demo |
+| Last completed task | Task 8 - Implement LangGraph Workflow |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, and P0 agents done; LangGraph workflow pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, and P0 agent tests passing | `[~]` README and status doc updated through Task 7 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, and LangGraph workflow done; Streamlit demo pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, and workflow tests passing | `[~]` README and status doc updated through Task 8 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -45,7 +45,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 5 - Implement SQL Executor | `[x]` `tools/sql_executor.py` | `[x]` SELECT success, row cap, non-SELECT rejection, database error, missing DB, and multi-statement tests | `[x]` executor contract documented in README | `[x]` Done |
 | Task 6 - Implement Trace Logger | `[x]` `tools/trace_logger.py`, `logs/traces/` | `[x]` append, failure/retry, save trace, and write-failure tests | `[x]` trace fields and usage documented in README | `[x]` Done |
 | Task 7 - Implement P0 Agents | `[x]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[x]` structured output, tool boundary, SQL generation, review, fix, and insight tests | `[x]` Agent/Tool responsibilities documented in README | `[x]` Done |
-| Task 8 - Implement LangGraph Workflow | `[ ]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[ ]` success, blocked SQL, one-retry repair tests | `[ ]` document workflow edges | `[ ]` Not started |
+| Task 8 - Implement LangGraph Workflow | `[x]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[x]` success path, blocked SQL, one-retry repair, failed repair, and trace-save tests | `[x]` workflow edges and usage documented in README | `[x]` Done |
 | Task 9 - Implement Streamlit Demo | `[ ]` glass-box app sections | `[ ]` import/smoke test and manual launch check | `[ ]` README demo section | `[ ]` Not started |
 | Task 10 - Implement P0 Eval | `[ ]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[ ]` eval runner and report tests | `[ ]` README eval result summary | `[ ]` Not started |
 | P0 final README update | `[ ]` startup, architecture, demo examples, eval result | `[ ]` verify commands documented match reality | `[ ]` final P0 docs complete | `[ ]` Not started |
@@ -57,12 +57,12 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[x]` System calls `retrieve_metric_definition()` for GMV and related metrics.
 - `[x]` SQL Generator produces SELECT SQL.
 - `[x]` SQL Reviewer calls `validate_sql()`.
-- `[ ]` Dangerous SQL is rejected before `run_sql()`.
+- `[x]` Dangerous SQL is rejected before `run_sql()`.
 - `[x]` SQL Executor calls `run_sql()` against SQLite.
-- `[ ]` Failed SQL execution enters Error Fix Agent once.
-- `[ ]` Fixed SQL is revalidated and rerun.
-- `[ ]` Final answer is grounded in `execution_result`.
-- `[ ]` Each run creates a complete `trace.json`.
+- `[x]` Failed SQL execution enters Error Fix Agent once.
+- `[x]` Fixed SQL is revalidated and rerun.
+- `[x]` Final answer is grounded in `execution_result`.
+- `[x]` Each run creates a complete `trace.json`.
 - `[ ]` `eval/run_eval.py` runs 20 test questions.
 - `[ ]` README includes startup, architecture, demo examples, and eval results.
 
@@ -103,6 +103,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 8 verification:
+
+```bash
+python3 -m pytest tests/test_workflow.py
+python3 -m pytest
+python3 -c 'from graph.workflow import run_workflow; import json, tempfile; result=run_workflow("最近 30 天销售额最高的 5 个商品是什么？", db_path="data/ecommerce.db", trace_dir=tempfile.mkdtemp(), run_id="run_manual", session_id="session_manual"); print(json.dumps({"status": result["status"], "approved": result["review_result"]["approved"], "execution_success": result["execution_result"]["success"], "trace_path": result["trace_path"], "trace_nodes": [event["node"] for event in result["trace"]]}, ensure_ascii=False, indent=2))'
+```
+
+Result: LangGraph workflow completes the success path, blocks dangerous SQL before execution, retries one execution failure through Error Fix Agent, revalidates and reruns fixed SQL, returns non-fabricated failure responses, and writes `logs/traces/{run_id}.json`.
 
 Task 7 verification:
 

@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 7 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, and P0 Agent layer for SQL workflow development; LangGraph workflow, Streamlit integration, and eval cases will be added in later P0 tasks.
+Task 8 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, and LangGraph workflow for SQL workflow development; Streamlit integration and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -183,6 +183,33 @@ state = run_sql_generator(state)
 state = run_sql_reviewer(state)
 print(state["sql_generation"])
 print(state["review_result"])
+```
+
+## LangGraph Workflow
+
+The P0 workflow composes the Agent and Tool layers with LangGraph:
+
+```text
+schema -> metric -> generate -> review
+review approved -> execute
+review rejected -> fail -> save_trace
+execute success -> insight -> save_trace
+execute failure and retry_count < 1 -> error_fix -> review
+execute failure after retry -> fail -> save_trace
+```
+
+Example:
+
+```python
+from graph.workflow import run_workflow
+
+result = run_workflow(
+    "最近 30 天销售额最高的 5 个商品是什么？",
+    db_path="data/ecommerce.db",
+)
+print(result["generated_sql"])
+print(result["final_answer"])
+print(result["trace_path"])
 ```
 
 ## Run Demo

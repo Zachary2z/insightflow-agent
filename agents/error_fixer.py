@@ -29,6 +29,15 @@ def _fix_known_column_error(sql: str, error: str, schema: dict[str, Any]) -> tup
     return None
 
 
+def _fix_known_runtime_error(sql: str, error: str) -> tuple[str, str] | None:
+    if "no such function: missing_price" in error.lower() and "missing_price(oi.unit_price)" in sql:
+        return (
+            sql.replace("missing_price(oi.unit_price)", "oi.unit_price"),
+            "SQLite reported missing_price as an unknown function; use oi.unit_price directly.",
+        )
+    return None
+
+
 def run_error_fix_agent(state: dict[str, Any]) -> dict[str, Any]:
     retry_count = int(state.get("retry_count") or 0)
     sql = state.get("generated_sql", "")
@@ -46,6 +55,8 @@ def run_error_fix_agent(state: dict[str, Any]) -> dict[str, Any]:
         status = "error"
     else:
         fix = _fix_known_column_error(sql, error, state.get("database_schema", {}))
+        if fix is None:
+            fix = _fix_known_runtime_error(sql, error)
         if fix is None:
             output = {
                 "success": False,
