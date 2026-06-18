@@ -1,0 +1,91 @@
+gmv:
+  name: "销售额"
+  aliases:
+    - "销售额"
+    - "gmv"
+    - "GMV"
+    - "成交额"
+    - "收入"
+  formula: "SUM(order_items.quantity * order_items.unit_price)"
+  required_filters:
+    - "orders.status = 'paid'"
+  exclude_status:
+    - "cancelled"
+    - "refunded"
+  required_tables:
+    - "orders"
+    - "order_items"
+  description: "Paid order gross merchandise value calculated from order item quantity and unit price."
+
+order_count:
+  name: "订单量"
+  aliases:
+    - "订单量"
+    - "订单数"
+    - "订单数量"
+    - "order count"
+  formula: "COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  exclude_status:
+    - "cancelled"
+    - "refunded"
+  required_tables:
+    - "orders"
+  description: "Number of distinct paid orders."
+
+aov:
+  name: "客单价"
+  aliases:
+    - "客单价"
+    - "平均订单金额"
+    - "aov"
+    - "AOV"
+  formula: "SUM(order_items.quantity * order_items.unit_price) / COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  exclude_status:
+    - "cancelled"
+    - "refunded"
+  required_tables:
+    - "orders"
+    - "order_items"
+  description: "Average order value for paid orders."
+
+category_gmv:
+  name: "品类销售额"
+  aliases:
+    - "品类销售额"
+    - "品类gmv"
+    - "品类 GMV"
+    - "品类"
+  formula: "SUM(order_items.quantity * order_items.unit_price)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+    - "products"
+    - "categories"
+  group_by:
+    - "categories.category_name"
+  description: "GMV grouped by category."
+
+product_sales:
+  name: "商品销量"
+  aliases:
+    - "商品销量"
+    - "销量"
+    - "销售量"
+    - "商品"
+    - "产品"
+  formula: "SUM(order_items.quantity)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+    - "products"
+  group_by:
+    - "products.product_name"
+  description: "Paid item quantity grouped by product."

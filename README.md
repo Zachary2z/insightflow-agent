@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 1 is complete. The project now has a deterministic SQLite ecommerce database for P0 SQL workflow development; tools, agents, workflow, and eval cases will be added in later P0 tasks.
+Task 2 is complete. The project now has a deterministic SQLite ecommerce database and metric definitions for P0 SQL workflow development; schema tooling, agents, workflow, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -47,6 +47,24 @@ This creates `data/ecommerce.db` with the P0 ecommerce schema:
 - `order_items`: 1,336 rows
 - `products`: 36 rows
 - `categories`: 6 rows
+
+## Metric Definitions
+
+Metric definitions live in `data/metrics.yaml` and can be retrieved with `retrieve_metric_definition()`.
+
+P0 metrics:
+
+- `gmv`: sales amount, using `SUM(order_items.quantity * order_items.unit_price)`
+- `order_count`: paid order count
+- `aov`: average order value
+- `category_gmv`: category-level GMV
+- `product_sales`: product-level paid item quantity
+
+Example:
+
+```bash
+python -c "from tools.metric_tool import retrieve_metric_definition; print(retrieve_metric_definition('最近 30 天销售额最高的 5 个商品是什么？'))"
+```
 
 ## Run Demo
 
