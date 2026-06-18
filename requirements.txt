@@ -1,0 +1,12 @@
+langgraph
+langchain-core
+langchain-openai
+streamlit
+python-dotenv
+pydantic
+sqlparse
+sqlglot
+pandas
+SQLAlchemy
+PyYAML
+pytest

@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+tmp/
+logs/traces/*.json
+reports/charts/*
+reports/markdown/*
+!logs/traces/.gitkeep
+!reports/charts/.gitkeep
+!reports/markdown/.gitkeep
