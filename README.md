@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 4 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, and SQL validator for P0 SQL workflow development; SQL execution, agents, workflow, and eval cases will be added in later P0 tasks.
+Task 5 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, and SQL executor for P0 SQL workflow development; trace logging, agents, workflow, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -96,6 +96,26 @@ ORDER BY sales DESC
 LIMIT 5
 """
 print(validate_sql(sql, schema, metric))
+```
+
+## SQL Executor
+
+The SQL executor runs approved SELECT statements against SQLite and returns structured execution results. It rejects non-SELECT SQL, caps returned rows with `max_rows`, captures database errors, and emits a trace-ready event.
+
+```python
+from tools.sql_executor import run_sql
+
+sql = """
+SELECT p.product_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+JOIN products p ON oi.product_id = p.id
+WHERE o.status = 'paid'
+GROUP BY p.product_name
+ORDER BY gmv DESC
+LIMIT 5
+"""
+print(run_sql("data/ecommerce.db", sql))
 ```
 
 ## Run Demo

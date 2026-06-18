@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 5 - Implement SQL Executor |
-| Last completed task | Task 4 - Implement SQL Validator |
+| Current task | Task 6 - Implement Trace Logger |
+| Last completed task | Task 5 - Implement SQL Executor |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, and SQL validator done; SQL executor pending | `[~]` scaffold, seed, metric, schema, and validator tests passing | `[~]` README and status doc updated through Task 4 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, and SQL executor done; trace logger pending | `[~]` scaffold, seed, metric, schema, validator, and executor tests passing | `[~]` README and status doc updated through Task 5 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -42,7 +42,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 2 - Implement Metric Definition | `[x]` `data/metrics.yaml`, `tools/metric_tool.py` | `[x]` metric matching, unknown metric, missing file, and trace-ready output tests | `[x]` metric definitions documented in README | `[x]` Done |
 | Task 3 - Implement Schema Tool | `[x]` `tools/schema_tool.py` | `[x]` normal DB, empty DB, missing DB, schema_text, and trace-ready output tests | `[x]` schema tool usage documented in README | `[x]` Done |
 | Task 4 - Implement SQL Validator | `[x]` `tools/sql_validator.py` | `[x]` safety, multi-statement, schema, limit, metric, and sensitive field tests | `[x]` validator rules documented in README | `[x]` Done |
-| Task 5 - Implement SQL Executor | `[ ]` `tools/sql_executor.py` | `[ ]` success, max rows, non-SELECT, error capture tests | `[ ]` document executor contract | `[ ]` Not started |
+| Task 5 - Implement SQL Executor | `[x]` `tools/sql_executor.py` | `[x]` SELECT success, row cap, non-SELECT rejection, database error, missing DB, and multi-statement tests | `[x]` executor contract documented in README | `[x]` Done |
 | Task 6 - Implement Trace Logger | `[ ]` `tools/trace_logger.py`, `logs/traces/` | `[ ]` append and save trace tests | `[ ]` document trace fields | `[ ]` Not started |
 | Task 7 - Implement P0 Agents | `[ ]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[ ]` structured output and boundary tests | `[ ]` document Agent/Tool responsibilities | `[ ]` Not started |
 | Task 8 - Implement LangGraph Workflow | `[ ]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[ ]` success, blocked SQL, one-retry repair tests | `[ ]` document workflow edges | `[ ]` Not started |
@@ -58,7 +58,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[ ]` SQL Generator produces SELECT SQL.
 - `[ ]` SQL Reviewer calls `validate_sql()`.
 - `[ ]` Dangerous SQL is rejected before `run_sql()`.
-- `[ ]` SQL Executor calls `run_sql()` against SQLite.
+- `[x]` SQL Executor calls `run_sql()` against SQLite.
 - `[ ]` Failed SQL execution enters Error Fix Agent once.
 - `[ ]` Fixed SQL is revalidated and rerun.
 - `[ ]` Final answer is grounded in `execution_result`.
@@ -103,6 +103,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 5 verification:
+
+```bash
+python3 -m pytest tests/test_sql_executor.py
+python3 -m pytest
+python3 -c 'from tools.sql_executor import run_sql; import json; sql="SELECT p.product_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv FROM orders o JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE o.status = '\''paid'\'' GROUP BY p.product_name ORDER BY gmv DESC LIMIT 5"; print(json.dumps(run_sql("data/ecommerce.db", sql), ensure_ascii=False, indent=2))'
+python3 -c 'from tools.sql_executor import run_sql; import json; print(json.dumps(run_sql("data/ecommerce.db", "SELECT oi.price FROM order_items oi LIMIT 5"), ensure_ascii=False, indent=2))'
+```
+
+Result: approved SELECT SQL runs against `data/ecommerce.db` and returns columns/rows/row counts; results are capped by `max_rows`; non-SELECT and multi-statement SQL are rejected; SQLite errors such as `no such column: oi.price` return structured `success: false` payloads with trace-ready events.
 
 Task 4 verification:
 
