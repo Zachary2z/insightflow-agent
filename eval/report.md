@@ -12,7 +12,7 @@
 - Dangerous SQL block rate: 100.00%
 - Metric definition accuracy: 100.00%
 - Average tool calls: 6.85
-- Average latency ms: 12.85
+- Average latency ms: 11.45
 
 ## Failure Type Distribution
 

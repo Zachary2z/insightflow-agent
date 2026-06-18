@@ -15,9 +15,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P0 - Agentic SQL Core |
-| Current task | P0 final README update |
-| Last completed task | Task 10 - Implement P0 Eval |
+| Current phase | P1 - Reliable Analysis & Report Core |
+| Current task | Task 11 - Business Context Retrieval |
+| Last completed task | P0 final README update |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, and eval done; final README polish pending | `[~]` scaffold, seed, metric, schema, validator, executor, trace logger, P0 agent, workflow, Streamlit app, and eval tests passing | `[~]` README and status doc updated through Task 10 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -48,7 +48,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 8 - Implement LangGraph Workflow | `[x]` `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | `[x]` success path, blocked SQL, one-retry repair, failed repair, and trace-save tests | `[x]` workflow edges and usage documented in README | `[x]` Done |
 | Task 9 - Implement Streamlit Demo | `[x]` glass-box app with input, status, steps, SQL, review, execution, repair, answer, trace, and eval entry | `[x]` app helper tests, workflow-backed smoke tests, and Streamlit launch check | `[x]` README demo section updated | `[x]` Done |
 | Task 10 - Implement P0 Eval | `[x]` `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | `[x]` 20-case count, runner summary, report generation, failed expectation, and CLI tests | `[x]` README eval command and result summary updated | `[x]` Done |
-| P0 final README update | `[ ]` startup, architecture, demo examples, eval result | `[ ]` verify commands documented match reality | `[ ]` final P0 docs complete | `[ ]` Not started |
+| P0 final README update | `[x]` startup, architecture, demo examples, eval result, current capability, and P0 limits documented | `[x]` full test suite and eval command verified | `[x]` final P0 docs complete | `[x]` Done |
 
 ### P0 Acceptance Tracker
 
@@ -103,6 +103,15 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P0 final README update verification:
+
+```bash
+python3 eval/run_eval.py
+python3 -m pytest
+```
+
+Result: P0 eval reports 20/20 passed and the full test suite reports 55/55 passed. README now documents setup, architecture, Streamlit demo, eval results, current capabilities, and P0 limitations.
 
 Task 10 verification:
 

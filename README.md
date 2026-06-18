@@ -1,29 +1,34 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow.
+InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-The project is currently in P0, focused on the Agentic SQL Core:
-
-- SQLite ecommerce database
-- Schema and metric tools
-- SQL validation and execution
-- One-step SQL error repair
-- Trace logging
-- Streamlit glass-box demo
-- 20-case eval benchmark
+P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, and run a 20-case eval benchmark.
 
 ## Current Status
 
-Task 10 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 Agent layer, LangGraph workflow, Streamlit glass-box demo, and 20-case P0 eval benchmark.
+P0 - Agentic SQL Core is complete.
+
+Implemented:
+
+- SQLite ecommerce database
+- Schema, metric, SQL validation, SQL execution, and trace tools
+- Supervisor, Schema, Metric, SQL Generator, SQL Reviewer, Error Fix, and Insight agents
+- LangGraph workflow with review, execution, one-retry repair, failure, insight, and trace-save paths
+- Streamlit glass-box demo
+- 20-case eval benchmark
+
+Next phase: P1 - Reliable Analysis & Report Core.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
-## Setup
+## Quickstart
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python data/seed_data.py
+streamlit run app.py
 ```
 
 Copy `.env.example` to `.env` and fill in values as needed.
@@ -32,6 +37,12 @@ Copy `.env.example` to `.env` and fill in values as needed.
 
 ```bash
 python -m pytest
+```
+
+Run the P0 eval benchmark:
+
+```bash
+python eval/run_eval.py
 ```
 
 ## Seed Database
@@ -47,6 +58,39 @@ This creates `data/ecommerce.db` with the P0 ecommerce schema:
 - `order_items`: 1,336 rows
 - `products`: 36 rows
 - `categories`: 6 rows
+
+## What P0 Can Do
+
+- Accept Chinese business questions in Streamlit.
+- Read the real SQLite schema with `get_database_schema()`.
+- Retrieve metric definitions such as GMV with `retrieve_metric_definition()`.
+- Generate SELECT SQL for P0 ecommerce analysis scenarios.
+- Review SQL with `validate_sql()` before execution.
+- Block dangerous SQL such as `DELETE`, `DROP`, `UPDATE`, and sensitive-field exports before `run_sql()`.
+- Execute approved SQL with `run_sql()` and return structured columns, rows, row count, timing, and errors.
+- Repair one supported execution failure and rerun the fixed SQL after validation.
+- Generate final answers only from `execution_result`.
+- Save run traces to `logs/traces/{run_id}.json`.
+- Run 20 eval cases with `eval/run_eval.py`.
+
+## P0 Architecture
+
+```text
+User question
+-> Supervisor Agent
+-> Schema Agent -> get_database_schema()
+-> Metric Agent -> retrieve_metric_definition()
+-> SQL Generator Agent
+-> SQL Reviewer Agent -> validate_sql()
+-> SQL Executor Tool -> run_sql()
+-> Error Fix Agent, when execution fails once
+-> SQL Reviewer Agent -> validate_sql(), for fixed SQL
+-> SQL Executor Tool -> run_sql(), for fixed SQL
+-> Insight Agent
+-> Trace Logger
+```
+
+The main entry point is `graph.workflow.run_workflow()`. Streamlit calls the same workflow used by eval, so demo behavior and benchmark behavior stay aligned.
 
 ## Metric Definitions
 
@@ -229,29 +273,6 @@ Open the Streamlit URL, enter a Chinese business question, and run the workflow.
 - Trace JSON
 - Eval command entry
 
-Useful demo questions:
-
-- 最近 30 天销售额最高的 5 个商品是什么？
-- 最近 3 个月销售额最高的品类是什么？
-- 每个城市的总销售额是多少？
-- 删除所有取消订单的数据。
-- 帮我导出所有用户的手机号和邮箱。
-
-## P0 Architecture Target
-
-```text
-User question
--> Supervisor Agent
--> Schema Agent -> get_database_schema()
--> Metric Agent -> retrieve_metric_definition()
--> SQL Generator Agent
--> SQL Reviewer Agent -> validate_sql()
--> SQL Executor Tool -> run_sql()
--> Error Fix Agent, when execution fails once
--> Insight Agent
--> Trace Logger
-```
-
 ## Demo Questions
 
 - 最近 30 天销售额最高的 5 个商品是什么？
@@ -280,3 +301,10 @@ Current eval summary:
 - Metric definition accuracy: 100.00%
 
 The generated report is written to `eval/report.md`.
+
+## P0 Limits
+
+- The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
+- Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
+- Reports, charts, business context retrieval, evidence validation, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards are intentionally out of P0 scope.
+- P1 will add reliable analysis and report-core capabilities on top of the P0 SQL core.
