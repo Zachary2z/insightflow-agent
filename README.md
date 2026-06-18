@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 3 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, and a schema tool for P0 SQL workflow development; SQL validation, agents, workflow, and eval cases will be added in later P0 tasks.
+Task 4 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, schema tool, and SQL validator for P0 SQL workflow development; SQL execution, agents, workflow, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -72,6 +72,30 @@ The schema tool reads SQLite metadata and returns both structured table metadata
 
 ```bash
 python -c "from tools.schema_tool import get_database_schema; print(get_database_schema('data/ecommerce.db')['schema_text'])"
+```
+
+## SQL Validator
+
+The SQL validator checks generated SQL before execution. It only approves safe SELECT statements, blocks dangerous keywords and sensitive fields, validates table/column names against the schema, appends a default `LIMIT 100` when needed, and checks GMV metric rules when metric context is provided.
+
+```python
+from tools.metric_tool import retrieve_metric_definition
+from tools.schema_tool import get_database_schema
+from tools.sql_validator import validate_sql
+
+schema = get_database_schema("data/ecommerce.db")
+metric = retrieve_metric_definition("最近 30 天销售额最高的 5 个商品是什么？")
+sql = """
+SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS sales
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+JOIN products p ON oi.product_id = p.id
+WHERE o.status = 'paid'
+GROUP BY p.product_name
+ORDER BY sales DESC
+LIMIT 5
+"""
+print(validate_sql(sql, schema, metric))
 ```
 
 ## Run Demo

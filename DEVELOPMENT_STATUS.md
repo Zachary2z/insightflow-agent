@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 4 - Implement SQL Validator |
-| Last completed task | Task 3 - Implement Schema Tool |
+| Current task | Task 5 - Implement SQL Executor |
+| Last completed task | Task 4 - Implement SQL Validator |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, and schema tool done; SQL validator pending | `[~]` scaffold, seed, metric, and schema tests passing | `[~]` README and status doc updated through Task 3 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, schema tool, and SQL validator done; SQL executor pending | `[~]` scaffold, seed, metric, schema, and validator tests passing | `[~]` README and status doc updated through Task 4 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -41,7 +41,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 1 - Build ecommerce SQLite database | `[x]` `data/seed_data.py`, `data/ecommerce.db` | `[x]` table counts, schema, status/date coverage, CLI, and GMV query tests | `[x]` seed command and schema summary added to README | `[x]` Done |
 | Task 2 - Implement Metric Definition | `[x]` `data/metrics.yaml`, `tools/metric_tool.py` | `[x]` metric matching, unknown metric, missing file, and trace-ready output tests | `[x]` metric definitions documented in README | `[x]` Done |
 | Task 3 - Implement Schema Tool | `[x]` `tools/schema_tool.py` | `[x]` normal DB, empty DB, missing DB, schema_text, and trace-ready output tests | `[x]` schema tool usage documented in README | `[x]` Done |
-| Task 4 - Implement SQL Validator | `[ ]` `tools/sql_validator.py` | `[ ]` safety, schema, limit, metric, sensitive field tests | `[ ]` document validator rules | `[ ]` Not started |
+| Task 4 - Implement SQL Validator | `[x]` `tools/sql_validator.py` | `[x]` safety, multi-statement, schema, limit, metric, and sensitive field tests | `[x]` validator rules documented in README | `[x]` Done |
 | Task 5 - Implement SQL Executor | `[ ]` `tools/sql_executor.py` | `[ ]` success, max rows, non-SELECT, error capture tests | `[ ]` document executor contract | `[ ]` Not started |
 | Task 6 - Implement Trace Logger | `[ ]` `tools/trace_logger.py`, `logs/traces/` | `[ ]` append and save trace tests | `[ ]` document trace fields | `[ ]` Not started |
 | Task 7 - Implement P0 Agents | `[ ]` supervisor, schema, metric, generator, reviewer, fixer, insight agents | `[ ]` structured output and boundary tests | `[ ]` document Agent/Tool responsibilities | `[ ]` Not started |
@@ -103,6 +103,18 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 4 verification:
+
+```bash
+python3 -m pytest tests/test_sql_validator.py
+python3 -m pytest
+python3 -c 'from tools.schema_tool import get_database_schema; from tools.metric_tool import retrieve_metric_definition; from tools.sql_validator import validate_sql; import json; schema=get_database_schema("data/ecommerce.db"); metric=retrieve_metric_definition("最近 30 天销售额最高的 5 个商品是什么？"); sql="SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS sales FROM orders o JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE o.status = '\''paid'\'' GROUP BY p.product_name ORDER BY sales DESC LIMIT 5"; print(json.dumps(validate_sql(sql, schema, metric), ensure_ascii=False, indent=2))'
+python3 -c 'from tools.schema_tool import get_database_schema; from tools.sql_validator import validate_sql; import json; schema=get_database_schema("data/ecommerce.db"); print(json.dumps(validate_sql("DELETE FROM orders WHERE status = '\''cancelled'\''", schema), ensure_ascii=False, indent=2))'
+python3 -c 'from tools.schema_tool import get_database_schema; from tools.sql_validator import validate_sql; import json; schema=get_database_schema("data/ecommerce.db"); print(json.dumps(validate_sql("SELECT id, order_date FROM orders", schema), ensure_ascii=False, indent=2))'
+```
+
+Result: safe metric-aware SELECT SQL is approved; DELETE is rejected; multi-statement SQL, unknown tables/columns, sensitive fields, wrong GMV formulas, and missing paid filters are detected; safe SELECT without LIMIT is normalized with `LIMIT 100`; validator output includes trace-ready events.
 
 Task 3 verification:
 
