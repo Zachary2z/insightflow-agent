@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, and run a 20-case eval benchmark.
+P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, and retrieve P1 business context.
 
 ## Current Status
 
-P0 - Agentic SQL Core is complete.
+P0 - Agentic SQL Core is complete. P1 - Reliable Analysis & Report Core is in progress.
 
 Implemented:
 
@@ -16,8 +16,9 @@ Implemented:
 - LangGraph workflow with review, execution, one-retry repair, failure, insight, and trace-save paths
 - Streamlit glass-box demo
 - 20-case eval benchmark
+- P1 business context retrieval for business rules, table docs, and historical SQL examples
 
-Next phase: P1 - Reliable Analysis & Report Core.
+Next P1 task: Task 12 - Evidence Validator.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -109,6 +110,42 @@ Example:
 ```bash
 python -c "from tools.metric_tool import retrieve_metric_definition; print(retrieve_metric_definition('最近 30 天销售额最高的 5 个商品是什么？'))"
 ```
+
+## Business Context Retrieval
+
+Task 11 adds a lightweight Business Context Retrieval layer for P1. It uses Markdown and JSON sources plus keyword matching; it does not require a vector database.
+
+Context sources:
+
+- `data/business_rules.md`: business rules such as paid-order-only GMV and sensitive-field handling
+- `data/table_docs.md`: table and field descriptions for the ecommerce schema
+- `data/sql_examples.json`: historical SQL examples for common BI questions
+
+Tool interface:
+
+```python
+from tools.context_tool import retrieve_business_context
+
+context = retrieve_business_context("最近 30 天销售额最高的 5 个商品是什么？")
+print(context["matched_rules"])
+print(context["matched_table_docs"])
+print(context["matched_sql_examples"])
+print(context["trace_event"])
+```
+
+Agent interface:
+
+```python
+from agents.context_retriever import run_context_retriever_agent
+from agents.supervisor import initialize_run
+
+state = initialize_run("最近 30 天销售额最高的 5 个商品是什么？")
+state = run_context_retriever_agent(state)
+print(state["business_context"]["context_summary"])
+print(state["trace"][-1])
+```
+
+The tool returns structured JSON-compatible dictionaries and never raises file loading errors into the workflow. On failure it returns `success: false`, empty match lists, an `error`, and a trace-ready event. The Agent only reads `state["user_question"]`, writes `state["business_context"]`, and appends trace; it does not access the database, execute SQL, or generate reports.
 
 ## Schema Tool
 
@@ -306,5 +343,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- Reports, charts, business context retrieval, evidence validation, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards are intentionally out of P0 scope.
-- P1 will add reliable analysis and report-core capabilities on top of the P0 SQL core.
+- Reports, charts, evidence validation, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
+- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval is complete; Evidence Validator, Chart Agent, and Report Agent are next.

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "top_products_30d_gmv",
+    "title": "最近 30 天商品 GMV Top 5",
+    "question_keywords": ["最近 30 天", "销售额", "商品", "最高", "top", "GMV"],
+    "tables": ["orders", "order_items", "products"],
+    "metrics": ["gmv", "product_sales"],
+    "sql": "SELECT p.product_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv FROM orders o JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE o.status = 'paid' AND o.order_date >= date((SELECT MAX(order_date) FROM orders), '-30 day') GROUP BY p.product_name ORDER BY gmv DESC LIMIT 5",
+    "notes": "Use paid orders only and transaction-time unit_price for GMV."
+  },
+  {
+    "id": "monthly_order_count_and_aov",
+    "title": "最近 6 个月订单量和客单价",
+    "question_keywords": ["最近 6 个月", "订单量", "客单价", "AOV", "每月"],
+    "tables": ["orders", "order_items"],
+    "metrics": ["order_count", "aov"],
+    "sql": "SELECT strftime('%Y-%m', o.order_date) AS month, COUNT(DISTINCT o.id) AS order_count, ROUND(SUM(oi.quantity * oi.unit_price) / COUNT(DISTINCT o.id), 2) AS aov FROM orders o JOIN order_items oi ON o.id = oi.order_id WHERE o.status = 'paid' AND o.order_date >= date((SELECT MAX(order_date) FROM orders), '-6 month') GROUP BY month ORDER BY month",
+    "notes": "AOV divides paid GMV by distinct paid orders."
+  },
+  {
+    "id": "category_gmv_rank",
+    "title": "品类 GMV 排名",
+    "question_keywords": ["品类", "类目", "销售额", "GMV", "排名"],
+    "tables": ["orders", "order_items", "products", "categories"],
+    "metrics": ["gmv", "category_gmv"],
+    "sql": "SELECT c.category_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv FROM orders o JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id JOIN categories c ON p.category_id = c.id WHERE o.status = 'paid' GROUP BY c.category_name ORDER BY gmv DESC LIMIT 10",
+    "notes": "Join products to categories before grouping."
+  }
+]

@@ -19,6 +19,7 @@ class AgentState(TypedDict, total=False):
     schema_text: str
 
     metric_context: dict[str, Any]
+    business_context: dict[str, Any]
     selected_tables: list[str]
     selected_metrics: list[str]
 

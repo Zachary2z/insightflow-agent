@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P1 - Reliable Analysis & Report Core |
-| Current task | Task 11 - Business Context Retrieval |
-| Last completed task | P0 final README update |
+| Current task | Task 12 - Evidence Validator |
+| Last completed task | Task 11 - Business Context Retrieval |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -27,7 +27,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
-| P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
+| P1 | Reliable Analysis & Report Core | `[~]` Task 11 business context retrieval complete | `[~]` Task 11 tests passing; full suite 60/60 passing; eval 20/20 passing | `[~]` Task 11 README and status docs updated | `[~]` In progress |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 
@@ -70,10 +70,23 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
-| Task 11 - Business Context Retrieval | `[ ]` context files, context tool, context agent | `[ ]` retrieval relevance tests | `[ ]` context source docs | `[ ]` Not started |
+| Task 11 - Business Context Retrieval | `[x]` `data/business_rules.md`, `data/table_docs.md`, `data/sql_examples.json`, `tools/context_tool.py`, `agents/context_retriever.py` | `[x]` context tool and context retriever tests | `[x]` README context source and interface docs | `[x]` Done |
 | Task 12 - Evidence Validator | `[ ]` evidence validator agent/tool | `[ ]` unsupported claim blocking tests | `[ ]` evidence output docs | `[ ]` Not started |
 | Task 13 - Chart Agent | `[ ]` chart agent and chart tool | `[ ]` chart generation tests | `[ ]` chart artifact docs | `[ ]` Not started |
 | Task 14 - Report Agent | `[ ]` report agent and report tool | `[ ]` report save and traceability tests | `[ ]` report structure docs | `[ ]` Not started |
+
+### P1 Acceptance Tracker
+
+- `[x]` Business context tool returns relevant business rules.
+- `[x]` Business context tool returns relevant table and field documentation.
+- `[x]` Business context tool returns relevant historical SQL examples.
+- `[x]` Context Retriever Agent writes `business_context` into state.
+- `[x]` Business context output is structured dict / JSON-compatible data.
+- `[x]` Context load failures return `success: false` with an error instead of crashing.
+- `[x]` Context retrieval emits trace-ready events and Agent appends them to trace.
+- `[x]` Task 11 has dedicated tests.
+- `[x]` Existing P0 tests and eval remain passing.
+- `[x]` README and DEVELOPMENT_STATUS are updated for Task 11.
 
 ## P2 - Business Review & Action Workflow
 
@@ -103,6 +116,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 11 verification:
+
+```bash
+python3 -m pytest tests/test_context_tool.py tests/test_context_retriever.py
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 11 tests report 5/5 passed; the full test suite reports 60/60 passed; P0 eval reports 20/20 passed. Business context retrieval returns matched business rules, table docs, historical SQL examples, structured failure payloads, and trace-ready events. Context Retriever Agent writes `business_context` into state and appends trace without accessing the database or executing SQL.
 
 P0 final README update verification:
 
