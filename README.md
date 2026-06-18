@@ -14,7 +14,7 @@ The project is currently in P0, focused on the Agentic SQL Core:
 
 ## Current Status
 
-Task 2 is complete. The project now has a deterministic SQLite ecommerce database and metric definitions for P0 SQL workflow development; schema tooling, agents, workflow, and eval cases will be added in later P0 tasks.
+Task 3 is complete. The project now has a deterministic SQLite ecommerce database, metric definitions, and a schema tool for P0 SQL workflow development; SQL validation, agents, workflow, and eval cases will be added in later P0 tasks.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -64,6 +64,14 @@ Example:
 
 ```bash
 python -c "from tools.metric_tool import retrieve_metric_definition; print(retrieve_metric_definition('最近 30 天销售额最高的 5 个商品是什么？'))"
+```
+
+## Schema Tool
+
+The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
+
+```bash
+python -c "from tools.schema_tool import get_database_schema; print(get_database_schema('data/ecommerce.db')['schema_text'])"
 ```
 
 ## Run Demo

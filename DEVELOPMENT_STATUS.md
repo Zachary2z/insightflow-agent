@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P0 - Agentic SQL Core |
-| Current task | Task 3 - Implement Schema Tool |
-| Last completed task | Task 2 - Implement Metric Definition |
+| Current task | Task 4 - Implement SQL Validator |
+| Last completed task | Task 3 - Implement Schema Tool |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -26,7 +26,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
-| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, and metric definitions done; schema tool pending | `[~]` scaffold, seed, and metric tests passing | `[~]` README and status doc updated through Task 2 | `[~]` In progress |
+| P0 | Agentic SQL Core | `[~]` scaffold, ecommerce DB, metric definitions, and schema tool done; SQL validator pending | `[~]` scaffold, seed, metric, and schema tests passing | `[~]` README and status doc updated through Task 3 | `[~]` In progress |
 | P1 | Reliable Analysis & Report Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
@@ -40,7 +40,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 0 - Project initialization | `[x]` Created scaffold, requirements, env example, Streamlit shell, base directories | `[x]` `tests/test_project_initialization.py`; `pytest` passes | `[x]` README has setup, run, P0 architecture target | `[x]` Done |
 | Task 1 - Build ecommerce SQLite database | `[x]` `data/seed_data.py`, `data/ecommerce.db` | `[x]` table counts, schema, status/date coverage, CLI, and GMV query tests | `[x]` seed command and schema summary added to README | `[x]` Done |
 | Task 2 - Implement Metric Definition | `[x]` `data/metrics.yaml`, `tools/metric_tool.py` | `[x]` metric matching, unknown metric, missing file, and trace-ready output tests | `[x]` metric definitions documented in README | `[x]` Done |
-| Task 3 - Implement Schema Tool | `[ ]` `tools/schema_tool.py` | `[ ]` normal DB and empty DB tests | `[ ]` document schema output shape | `[ ]` Not started |
+| Task 3 - Implement Schema Tool | `[x]` `tools/schema_tool.py` | `[x]` normal DB, empty DB, missing DB, schema_text, and trace-ready output tests | `[x]` schema tool usage documented in README | `[x]` Done |
 | Task 4 - Implement SQL Validator | `[ ]` `tools/sql_validator.py` | `[ ]` safety, schema, limit, metric, sensitive field tests | `[ ]` document validator rules | `[ ]` Not started |
 | Task 5 - Implement SQL Executor | `[ ]` `tools/sql_executor.py` | `[ ]` success, max rows, non-SELECT, error capture tests | `[ ]` document executor contract | `[ ]` Not started |
 | Task 6 - Implement Trace Logger | `[ ]` `tools/trace_logger.py`, `logs/traces/` | `[ ]` append and save trace tests | `[ ]` document trace fields | `[ ]` Not started |
@@ -53,7 +53,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 ### P0 Acceptance Tracker
 
 - `[ ]` User can enter a Chinese business question in Streamlit.
-- `[ ]` System calls `get_database_schema()` against the real SQLite schema.
+- `[x]` System calls `get_database_schema()` against the real SQLite schema.
 - `[x]` System calls `retrieve_metric_definition()` for GMV and related metrics.
 - `[ ]` SQL Generator produces SELECT SQL.
 - `[ ]` SQL Reviewer calls `validate_sql()`.
@@ -103,6 +103,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 3 verification:
+
+```bash
+python3 -m pytest tests/test_schema_tool.py
+python3 -m pytest
+python3 -c 'from tools.schema_tool import get_database_schema; import json; result=get_database_schema("data/ecommerce.db"); print(json.dumps({"success": result["success"], "table_count": result["table_count"], "tables": [t["table_name"] for t in result["tables"]], "trace_event": result["trace_event"]}, ensure_ascii=False, indent=2)); print(result["schema_text"].split("\n\n")[2])'
+```
+
+Result: schema tool reads 5 SQLite tables, returns columns with types and primary-key/not-null flags, includes foreign keys, emits prompt-friendly `schema_text`, handles empty/missing databases, and includes trace-ready events.
 
 Task 2 verification:
 
