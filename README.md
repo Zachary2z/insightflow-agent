@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, and create approval-gated action plans.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, and expose selected tool capabilities through a P3 MCP-style tool contract layer.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer is complete.
 
 Implemented:
 
@@ -24,8 +24,9 @@ Implemented:
 - P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
 - P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
 - P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
+- P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
 
-P2 - Business Review & Action Workflow is complete. Next phase: P3 - MCP & Engineering Core.
+P3 - MCP & Engineering Core has started with Task 17 complete. Task 18+ engineering work is not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -551,6 +552,46 @@ Approval rules:
 
 Task 16 does not introduce MCP, FastAPI, React, async jobs, RBAC, external SaaS task creation, or real email sending.
 
+## MCP Tool Layer
+
+Task 17 adds a lightweight MCP-style contract layer under `mcp_servers/`. It exposes JSON-compatible tool contracts and wrapper functions for selected external-facing capabilities, while keeping internal safety and audit modules inside the system boundary.
+
+Implemented MCP-style servers:
+
+- `database-mcp-server`: `get_database_schema`, `get_sample_rows`, `run_sql`
+- `report-mcp-server`: `generate_chart`, `save_report`
+- `action-mcp-server`: `create_task`, `create_metric_alert`, `create_email_draft`
+
+Not exposed as MCP tools:
+
+- SQL review internals
+- Permission and approval record tools
+- Trace logging
+- Eval runner
+
+Safety boundaries:
+
+- `mcp_run_sql()` loads schema, retrieves metric context, runs the existing SQL reviewer internally, and only then calls `run_sql()` with reviewed SQL.
+- `mcp_save_report()` requires successful evidence validation and rejects reports with blocked unsupported claims.
+- `mcp_create_task()`, `mcp_create_metric_alert()`, and `mcp_create_email_draft()` require `approval_status="approved"` before writing operational records.
+- MCP wrappers return structured dictionaries with `success`, `mcp_server`, `tool_name`, and either `result` or `error`.
+- The layer does not start a network server and does not add FastAPI, async jobs, dashboards, Docker, CI, or provider/prompt infrastructure.
+
+Example:
+
+```python
+from mcp_servers.database_server import get_tool_contract, mcp_run_sql
+
+print(get_tool_contract())
+
+result = mcp_run_sql(
+    db_path="data/ecommerce.db",
+    sql="SELECT COUNT(*) AS order_count FROM orders",
+)
+print(result["review_result"]["approved"])
+print(result["result"]["rows"])
+```
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -747,5 +788,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- FastAPI, React UI, async jobs, MCP, RBAC, trace dashboards, P2 business review reports, and action workflows remain outside P1 scope.
+- FastAPI, React UI, async jobs, RBAC, trace dashboards, provider abstraction, PromptOps, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
