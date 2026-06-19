@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, and expose selected tool capabilities through a P3 MCP-style tool contract layer.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, and submit workflow runs through a FastAPI async run API.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer is complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer and Task 18 - FastAPI + Async Run API are complete.
 
 Implemented:
 
@@ -25,8 +25,9 @@ Implemented:
 - P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
 - P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
 - P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
+- P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
 
-P3 - MCP & Engineering Core has started with Task 17 complete. Task 18+ engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17 and 18 complete. Task 19+ engineering work is not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -592,6 +593,43 @@ print(result["review_result"]["approved"])
 print(result["result"]["rows"])
 ```
 
+## FastAPI Async Run API
+
+Task 18 adds a minimal FastAPI app under `api/` for submitting LangGraph workflow runs without changing the deterministic baseline.
+
+Run locally:
+
+```bash
+uvicorn api.app:app --reload
+```
+
+Implemented endpoints:
+
+- `POST /api/runs`: enqueue a workflow run and return `run_id`.
+- `GET /api/runs/{run_id}`: read run status and summary.
+- `GET /api/runs/{run_id}/trace`: read current or completed trace data.
+- `GET /api/runs/{run_id}/events`: read run lifecycle events.
+- `POST /api/runs/{run_id}/cancel`: mark an active run as cancelled.
+
+Supported statuses:
+
+- `queued`
+- `running`
+- `waiting_for_approval`
+- `completed`
+- `failed`
+- `cancelled`
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/runs \
+  -H "Content-Type: application/json" \
+  -d '{"user_question":"最近 30 天销售额最高的 5 个商品是什么？"}'
+```
+
+The API uses an in-memory `RunManager` and a thread pool to execute existing `graph.workflow.run_workflow()` calls. It is intentionally local and lightweight: Task 18 does not add persistent queues, SSE, dashboard views, React, RBAC, Docker, CI, or new LLM/provider behavior.
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -788,5 +826,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- FastAPI, React UI, async jobs, RBAC, trace dashboards, provider abstraction, PromptOps, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, trace dashboards, provider abstraction, PromptOps, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.

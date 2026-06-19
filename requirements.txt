@@ -1,6 +1,8 @@
 langgraph
 langchain-core
 langchain-openai
+fastapi
+uvicorn
 streamlit
 python-dotenv
 pydantic

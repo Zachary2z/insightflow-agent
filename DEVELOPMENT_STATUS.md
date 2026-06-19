@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 17 - MCP Tool Layer (complete; Task 18 not started) |
-| Last completed task | Task 17 - MCP Tool Layer |
+| Current task | Task 18 - FastAPI + Async Run API (complete; Task 19 not started) |
+| Last completed task | Task 18 - FastAPI + Async Run API |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -29,7 +29,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style database/report/action tool layer complete; API/dashboard/CI, provider, PromptOps, question understanding, and SQL routing hardening are not started | `[x]` Task 17 tests passing; full suite 99/99 passing; eval 20/20 passing | `[x]` Task 17 README and status docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer and Task 18 FastAPI async run API complete; dashboard/CI, provider, PromptOps, question understanding, and SQL routing hardening are not started | `[x]` Task 18 tests passing; full suite 103/103 passing; eval 20/20 passing | `[x]` Task 18 README and status docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -191,7 +191,7 @@ LLM safety boundaries:
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
 | Task 17 - MCP Tool Layer | `[x]` `mcp_servers/` database, report, and action MCP-style contract wrappers | `[x]` `tests/test_mcp_tool_layer.py`; full suite and P0 eval passing | `[x]` MCP layer docs in README and status tracker | `[x]` Done |
-| Task 18 - FastAPI + Async Run API | `[ ]` run API and status model | `[ ]` API and run-state tests | `[ ]` API docs | `[ ]` Not started |
+| Task 18 - FastAPI + Async Run API | `[x]` `api/` FastAPI app, in-memory run manager, status model, trace/events/cancel endpoints | `[x]` `tests/test_async_run_api.py`; full suite and P0 eval passing | `[x]` API docs in README and status tracker | `[x]` Done |
 | Task 19 - Trace Dashboard | `[ ]` dashboard views and metrics | `[ ]` dashboard data tests | `[ ]` dashboard docs | `[ ]` Not started |
 | Task 20 - LLM Provider and PromptOps Core | `[ ]` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, and LLM eval harness | `[ ]` provider contract tests, prompt rendering tests, cost/latency trace tests, LLM eval smoke tests | `[ ]` provider setup, prompt governance, and eval docs | `[ ]` Not started |
 | Task 20A - Question Understanding & Clarification Router | `[ ]` intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[ ]` intent-slot tests, ambiguous-question tests, missing-slot tests, and rejection-routing tests | `[ ]` intent contract, clarification policy, and routing examples | `[ ]` Not started |
@@ -214,6 +214,23 @@ LLM safety boundaries:
 - `[x]` P0 eval remains 20/20 passing after Task 17.
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 17.
 
+### P3 Task 18 Acceptance Tracker
+
+- `[x]` `POST /api/runs` creates an async workflow run and returns a `run_id`.
+- `[x]` `GET /api/runs/{run_id}` returns run status, summary, timestamps, final answer, trace path, and errors.
+- `[x]` `GET /api/runs/{run_id}/trace` returns trace data without requiring the dashboard.
+- `[x]` `GET /api/runs/{run_id}/events` returns run lifecycle events.
+- `[x]` `POST /api/runs/{run_id}/cancel` marks active runs as `cancelled`.
+- `[x]` Supported statuses include `queued`, `running`, `waiting_for_approval`, `completed`, `failed`, and `cancelled`.
+- `[x]` API execution calls the existing `graph.workflow.run_workflow()` and preserves deterministic SQL review, execution, repair, insight, and trace behavior.
+- `[x]` Workflow failures map to structured API `failed` responses instead of crashing the API.
+- `[x]` Unknown run IDs return structured HTTP 404 responses.
+- `[x]` Task 18 has dedicated tests.
+- `[x]` Existing P0/P1/P2/P3 Task 17 tests remain passing after Task 18.
+- `[x]` P0 eval remains 20/20 passing after Task 18.
+- `[x]` README and DEVELOPMENT_STATUS are updated for Task 18.
+- `[x]` Task 18 does not implement Task 19 Trace Dashboard, SSE, React, RBAC, Docker/CI, persistent queueing, or provider/prompt features.
+
 ### P3 Planned Router Additions
 
 - Question Understanding & Clarification Router extracts `metric`, `dimension`, `time_range`, `filters`, `operation`, `limit`, and `risk_flags` from user questions.
@@ -235,6 +252,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 18 verification:
+
+```bash
+python3 -m pytest tests/test_async_run_api.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 18 async run API tests report 4/4 passed; the full test suite reports 103/103 passed with one FastAPI TestClient deprecation warning from Starlette; P0 eval reports 20/20 passed. The API creates async runs, exposes status, trace, and events, maps workflow failure to `failed`, marks active runs as `cancelled`, and preserves the existing deterministic LangGraph workflow.
 
 Task 17 verification:
 
