@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, and submit workflow runs through a FastAPI async run API.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, and summarize trace/eval/action observability metrics for a dashboard data layer.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer and Task 18 - FastAPI + Async Run API are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, and Task 19 - Trace Dashboard are complete.
 
 Implemented:
 
@@ -26,8 +26,9 @@ Implemented:
 - P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
 - P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
 - P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
+- P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
 
-P3 - MCP & Engineering Core has started with Tasks 17 and 18 complete. Task 19+ engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, and 19 complete. Task 20+ engineering work is not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -630,6 +631,42 @@ curl -X POST http://127.0.0.1:8000/api/runs \
 
 The API uses an in-memory `RunManager` and a thread pool to execute existing `graph.workflow.run_workflow()` calls. It is intentionally local and lightweight: Task 18 does not add persistent queues, SSE, dashboard views, React, RBAC, Docker, CI, or new LLM/provider behavior.
 
+## Trace Dashboard Data Layer
+
+Task 19 adds `dashboard.trace_dashboard.build_trace_dashboard()` for dashboard-ready observability summaries. It reads trace JSON artifacts, optional eval summaries, and optional action workflow SQLite records, then returns a JSON-compatible dictionary.
+
+Metrics included:
+
+- Agent node latency totals and averages
+- Tool call counts
+- SQL execution latency totals and averages
+- SQL repair count
+- Failure type distribution
+- Eval totals and pass rate
+- Action approval records
+- Audit log records
+- Structured load errors for bad trace files or unreadable action DBs
+
+Example:
+
+```python
+from dashboard.trace_dashboard import build_trace_dashboard
+from eval.run_eval import load_cases, run_eval_cases
+
+eval_summary = run_eval_cases(load_cases())
+dashboard = build_trace_dashboard(
+    trace_dir="logs/traces",
+    eval_summary=eval_summary,
+    action_db_path="data/action_ops.db",
+)
+
+print(dashboard["agent_node_latency_ms"])
+print(dashboard["tool_call_counts"])
+print(dashboard["eval_metrics"])
+```
+
+Task 19 is a data layer only. It does not add React, Streamlit UI changes, SSE, dashboard frontend routing, RBAC, Docker/CI, provider abstraction, PromptOps, or new LLM behavior.
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -826,5 +863,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, trace dashboards, provider abstraction, PromptOps, Docker/CI, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, dashboard frontend views, provider abstraction, PromptOps, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
