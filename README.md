@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, and generate simple chart artifacts.
+P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, and save traceable Markdown analysis reports.
 
 ## Current Status
 
-P0 - Agentic SQL Core is complete. P1 - Reliable Analysis & Report Core is in progress.
+P0 - Agentic SQL Core and P1 - Reliable Analysis & Report Core are complete.
 
 Implemented:
 
@@ -19,8 +19,9 @@ Implemented:
 - P1 business context retrieval for business rules, table docs, and historical SQL examples
 - P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
 - P1 chart generation for bar, line, and optional pie charts
+- P1 Markdown report generation with SQL, execution evidence, charts, and trace links
 
-Next P1 task: Task 14 - Report Agent.
+P1 - Reliable Analysis & Report Core is complete. Next phase: P2 - Business Review & Action Workflow.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -238,6 +239,48 @@ print(state["trace"][-1])
 
 The Agent writes `state["chart_result"]`, `state["chart_path"]`, and `state["chart_paths"]`, and appends trace. It does not run SQL or save reports.
 
+## Report Agent
+
+Task 14 adds Markdown report generation for P1. The Report Agent composes already-available state into a traceable analysis report and calls `save_report()` to write `reports/markdown/{run_id}_report.md`.
+
+Report sections:
+
+- 用户问题
+- 使用的业务指标
+- 业务上下文
+- 执行 SQL
+- 查询结果摘要
+- 数据支持结论
+- 需要进一步验证的假设
+- 图表路径
+- 下一步建议
+- Trace 路径
+
+Tool interface:
+
+```python
+from tools.report_tool import save_report
+
+result = save_report(
+    run_id="run_001",
+    report_content="# InsightFlow Analysis Report\n\nTrace path: logs/traces/run_001.json",
+)
+print(result["report_path"])
+print(result["trace_event"])
+```
+
+Agent interface:
+
+```python
+from agents.report_agent import run_report_agent
+
+state = run_report_agent(state)
+print(state["report_path"])
+print(state["trace"][-1])
+```
+
+The Agent writes `state["report_result"]` and `state["report_path"]`, and appends trace. It does not run SQL, generate charts, or include blocked unsupported claims as deterministic report findings.
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -434,5 +477,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- Reports, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
-- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval, Evidence Validator, and Chart Agent are complete; Report Agent is next.
+- FastAPI, React UI, async jobs, MCP, RBAC, trace dashboards, P2 business review reports, and action workflows remain outside P1 scope.
+- P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.

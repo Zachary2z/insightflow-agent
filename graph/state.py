@@ -25,6 +25,8 @@ class AgentState(TypedDict, total=False):
     chart_result: dict[str, Any]
     chart_path: str
     chart_paths: list[str]
+    report_result: dict[str, Any]
+    report_path: str
     selected_tables: list[str]
     selected_metrics: list[str]
 
