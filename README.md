@@ -22,8 +22,9 @@ Implemented:
 - P1 Markdown report generation with SQL, execution evidence, charts, and trace links
 - P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
 - P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
+- P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
 
-P2 Task 15A is complete. Next task: Task 15B - Guarded LLM SQL and Insight Enhancement.
+P2 Task 15B is complete. Next task: Task 16 - Action Workflow.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -392,6 +393,62 @@ print(state["weekly_report_path"])
 ```
 
 No API key is required for the deterministic baseline. Without `llm_provider`, the planner uses the Task 15 deterministic fallback plan.
+
+## Guarded LLM SQL and Insight Enhancement
+
+Task 15B adds optional guarded enhancement agents. These agents accept supplied provider callables for tests or future adapters, but the deterministic baseline still needs no API key and does not call an LLM.
+
+Guarded SQL candidate rules:
+
+- The provider sees `schema_text`, `metric_context`, `business_context`, and current deterministic SQL.
+- Provider output can include SQL candidates, but every candidate is checked with `validate_sql()`.
+- Only the first approved SELECT candidate can replace `generated_sql`.
+- Rejected, unsafe, malformed, or missing candidates leave deterministic SQL unchanged.
+- This agent never calls `run_sql()`.
+
+```python
+from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
+
+state = run_guarded_sql_candidate_agent(
+    state,
+    llm_provider=lambda prompt: {
+        "sql_candidates": [
+            {
+                "sql": "SELECT COUNT(*) AS order_count FROM orders WHERE status = 'paid' LIMIT 100",
+                "rationale": "Safe paid-order count candidate.",
+            }
+        ]
+    },
+)
+print(state["llm_sql_enhancement"])
+print(state["generated_sql"])
+```
+
+Guarded insight enhancement rules:
+
+- Provider output is treated as claims, not trusted final prose.
+- Claims are checked with `validate_evidence()` against execution results and context.
+- `guarded_summary` contains only data-supported findings and hypotheses.
+- Unsupported deterministic claims are recorded in `unsupported_claims_blocked` and excluded from the guarded summary.
+
+```python
+from agents.guarded_llm_enhancer import run_guarded_insight_enhancer_agent
+
+state = run_guarded_insight_enhancer_agent(
+    state,
+    llm_provider=lambda prompt: {
+        "claims": [
+            "Laptop Pro 14 的 GMV 为 511248.56",
+            "库存不足是导致销量下降的主要原因",
+            "可能需要进一步验证广告流量和转化率数据。",
+        ]
+    },
+)
+print(state["llm_insight_enhancement"]["guarded_summary"])
+print(state["llm_insight_enhancement"]["unsupported_claims_blocked"])
+```
+
+Task 15B does not introduce action tools, approvals, MCP, FastAPI, dashboard behavior, provider abstraction, cost tracking, or prompt registry features.
 
 ## Schema Tool
 

@@ -15,6 +15,8 @@ class AgentState(TypedDict, total=False):
     report_sections: list[dict[str, Any]]
     report_sub_tasks: list[dict[str, Any]]
     clarification_questions: list[str]
+    llm_sql_enhancement: dict[str, Any]
+    llm_insight_enhancement: dict[str, Any]
 
     db_path: str | Path
     trace_dir: str | Path

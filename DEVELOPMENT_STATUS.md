@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P2 - Business Review & Action Workflow |
-| Current task | Task 15B - Guarded LLM SQL and Insight Enhancement (not started) |
-| Last completed task | Task 15A - Controlled LLM Report Planner |
+| Current task | Task 16 - Action Workflow (not started) |
+| Last completed task | Task 15B - Guarded LLM SQL and Insight Enhancement |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps, unguarded LLM-driven SQL/report generation |
@@ -28,7 +28,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 |---|---|---|---|---|---|
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
-| P2 | Business Review & Action Workflow | `[~]` Task 15 business review report and Task 15A controlled LLM report planning complete; Task 15B guarded LLM SQL/insight enhancement and Task 16 action workflow are not started | `[x]` Task 15A tests passing; full suite 84/84 passing; eval 20/20 passing | `[x]` Task 15A README and status docs updated | `[~]` In progress |
+| P2 | Business Review & Action Workflow | `[~]` Task 15 business review report, Task 15A controlled LLM report planning, and Task 15B guarded LLM SQL/insight enhancement complete; Task 16 action workflow is not started | `[x]` Task 15B tests passing; full suite 88/88 passing; eval 20/20 passing | `[x]` Task 15B README and status docs updated | `[~]` In progress |
 | P3 | MCP & Engineering Core | `[ ]` MCP/API/dashboard/CI tasks plus LLM provider and PromptOps hardening are not started | `[ ]` | `[ ]` | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
@@ -136,7 +136,7 @@ LLM safety boundaries:
 |---|---|---|---|---|
 | Task 15 - Business Review Report | `[x]` deterministic Report Supervisor, structured report sections, multi-SQL subtasks, per-task review/execution/evidence/chart records, weekly Markdown save, and trace save | `[x]` `tests/test_report_supervisor.py`; full suite and P0 eval passing | `[x]` weekly report docs in README and status tracker | `[x]` Done |
 | Task 15A - Controlled LLM Report Planner | `[x]` optional provider hook, prompt safety contract, allowlisted structured report plan, deterministic fallback, and clarification-question support | `[x]` mocked-provider tests, malformed-response fallback tests, clarification tests, and supervisor integration tests | `[x]` controlled planner interface, no-key fallback, and safety boundaries documented | `[x]` Done |
-| Task 15B - Guarded LLM SQL and Insight Enhancement | `[ ]` optional SQL candidate generator and insight/report polisher behind schema, metric, context, SQL validation, evidence validation, and trace | `[ ]` unsafe SQL rejection tests, unsupported-claim blocking tests, deterministic fallback tests | `[ ]` guarded LLM usage and risk docs | `[ ]` Not started |
+| Task 15B - Guarded LLM SQL and Insight Enhancement | `[x]` optional guarded SQL candidate agent and guarded insight enhancer behind schema, metric, context, SQL validation, Evidence Validator, and trace | `[x]` valid candidate acceptance, unsafe SQL rejection, deterministic fallback, and unsupported-claim blocking tests | `[x]` guarded SQL/insight usage and safety boundaries documented | `[x]` Done |
 | Task 16 - Action Workflow | `[ ]` action planner, risk assessor, approval, verifier, audit tools | `[ ]` approval/action/audit tests | `[ ]` action workflow docs | `[ ]` Not started |
 
 ### P2 Acceptance Tracker
@@ -163,6 +163,16 @@ LLM safety boundaries:
 - `[x]` Existing P0/P1/P2 Task 15 tests remain passing after Task 15A.
 - `[x]` P0 eval remains 20/20 passing after Task 15A.
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 15A.
+- `[x]` Guarded SQL candidate prompt includes schema, metric context, business context, and explicit no-execution contract.
+- `[x]` Guarded SQL candidate agent accepts only SQL approved by `validate_sql()`.
+- `[x]` Unsafe, sensitive-field, malformed, or missing LLM SQL candidates fall back to deterministic SQL.
+- `[x]` Guarded SQL candidate agent does not call `run_sql()`.
+- `[x]` Guarded insight enhancer validates provider claims through Evidence Validator.
+- `[x]` Unsupported LLM claims are recorded and excluded from guarded summaries.
+- `[x]` Task 15B has dedicated tests.
+- `[x]` Existing P0/P1/P2 Task 15/15A tests remain passing after Task 15B.
+- `[x]` P0 eval remains 20/20 passing after Task 15B.
+- `[x]` README and DEVELOPMENT_STATUS are updated for Task 15B.
 
 ## P3 - MCP & Engineering Core
 
@@ -186,6 +196,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 15B verification:
+
+```bash
+python3 -m pytest tests/test_guarded_llm_enhancer.py tests/test_report_planner.py tests/test_report_supervisor.py
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 15B guarded LLM tests plus Task 15A planner and Task 15 supervisor tests report 11/11 passed; the full test suite reports 88/88 passed; P0 eval reports 20/20 passed. Guarded SQL candidates are validated before acceptance, unsafe SQL and sensitive-field candidates fall back to deterministic SQL, no SQL execution happens in the enhancer, and guarded insight output excludes unsupported LLM claims through Evidence Validator.
 
 Task 15A verification:
 
