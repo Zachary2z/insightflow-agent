@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, and save traceable Markdown analysis reports.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, and create approval-gated action plans.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 Task 15 - Business Review Report, and P2 Task 15A - Controlled LLM Report Planner are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete.
 
 Implemented:
 
@@ -38,12 +38,47 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **Current baseline**: deterministic Agent state transitions, SQL validation, SQL execution, evidence validation, chart generation, report saving, and trace logging remain the source of truth.
 - **P2 controlled enhancement**: introduce an optional LLM adapter for report task planning, report section outlining, business-language polishing, and user clarification questions. LLM outputs must be structured and checked before use.
 - **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
+- **P3 question understanding**: add a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
+- **P3 SQL planning router**: route clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
 - **P3 engineering hardening**: add provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and observability around model-assisted steps.
 
 LLM boundaries:
 
 - The LLM must not execute SQL, bypass `validate_sql()`, override `Evidence Validator`, create final evidence-backed claims without data support, or trigger action tools without approval gates.
 - Reports and insights must remain traceable to SQL, execution results, business context, evidence validation, charts, and saved artifacts.
+
+## Planned Question Understanding And SQL Routing
+
+Two P3 tasks are planned to make SQL generation smarter without turning the system into a black-box Text2SQL app.
+
+**Question Understanding & Clarification Router** will decide whether a user question is clear enough for SQL planning. It should extract structured slots such as:
+
+- `metric`: GMV, order count, AOV, repurchase rate, or another known metric
+- `dimension`: product, category, city, user, channel, or another grouping
+- `time_range`: this week, last 30 days, this month, quarter, or a custom period
+- `filters`: paid orders, excluding refunds, new users, high-AOV customers, or other constraints
+- `operation`: top N, trend, comparison, decline, summary, or drilldown
+- `limit`: Top 5, Top 10, or another row limit
+
+If required slots are missing, it should return `strategy: clarify` with focused clarification questions instead of forcing SQL generation. If a request asks for sensitive fields or unsafe operations, it should return `strategy: reject` or route to a safety flow.
+
+**SQL Planning Router** will decide whether SQL should come from a deterministic template or from the guarded LLM SQL candidate path. Template SQL remains the fast, reliable default for common BI questions. Guarded LLM candidates are used only when the question is clear enough but no existing template covers it. Every LLM candidate must still pass `validate_sql()` before execution.
+
+The intended routing contract is:
+
+```python
+{
+    "strategy": "template | llm_candidate | clarify | reject",
+    "matched_template": "top_products_gmv",
+    "confidence": 0.92,
+    "missing_slots": [],
+    "clarification_questions": [],
+    "risk_flags": [],
+    "reason": "Question matches a stable Top-N GMV template."
+}
+```
+
+These tasks belong in P3 because they depend on mature provider, prompt, trace, and eval infrastructure. They should not weaken the current deterministic baseline.
 
 ## Quickstart
 

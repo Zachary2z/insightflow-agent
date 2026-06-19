@@ -20,7 +20,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Last completed task | Task 16 - Action Workflow |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
-| Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps, unguarded LLM-driven SQL/report generation |
+| Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
 
 ## Phase Overview
 
@@ -29,7 +29,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[ ]` MCP/API/dashboard/CI tasks plus LLM provider and PromptOps hardening are not started | `[ ]` | `[ ]` | `[ ]` Not started |
+| P3 | MCP & Engineering Core | `[ ]` MCP/API/dashboard/CI tasks plus LLM provider, PromptOps, question understanding, and SQL routing hardening are not started | `[ ]` | `[ ]` | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
 
@@ -121,6 +121,8 @@ LLM enhancement is planned as a controlled layer, not as a replacement for tool-
 - **P2 placement**: use LLMs where natural-language planning and writing help the most, especially report task decomposition, weekly report section outlines, business-language polishing, and clarification questions.
 - **P2 guarded SQL placement**: allow LLM-generated SQL candidates only after schema, metric, and business context retrieval, and only if every candidate passes `validate_sql()` before `run_sql()`.
 - **P3 placement**: harden model usage through provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM-specific evals, and trace/observability integration.
+- **P3 question understanding placement**: add a structured intent and clarification router that extracts metric, dimension, time range, filters, operation, limit, and risk flags before SQL planning.
+- **P3 SQL planning placement**: add a router that chooses deterministic template SQL, guarded LLM SQL candidate generation, clarification, or rejection based on completeness, confidence, and safety.
 
 LLM safety boundaries:
 
@@ -192,7 +194,18 @@ LLM safety boundaries:
 | Task 18 - FastAPI + Async Run API | `[ ]` run API and status model | `[ ]` API and run-state tests | `[ ]` API docs | `[ ]` Not started |
 | Task 19 - Trace Dashboard | `[ ]` dashboard views and metrics | `[ ]` dashboard data tests | `[ ]` dashboard docs | `[ ]` Not started |
 | Task 20 - LLM Provider and PromptOps Core | `[ ]` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, and LLM eval harness | `[ ]` provider contract tests, prompt rendering tests, cost/latency trace tests, LLM eval smoke tests | `[ ]` provider setup, prompt governance, and eval docs | `[ ]` Not started |
+| Task 20A - Question Understanding & Clarification Router | `[ ]` intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[ ]` intent-slot tests, ambiguous-question tests, missing-slot tests, and rejection-routing tests | `[ ]` intent contract, clarification policy, and routing examples | `[ ]` Not started |
+| Task 20B - SQL Planning Router | `[ ]` template-vs-LLM-candidate strategy router, confidence/reason payload, fallback policy, and template-mining feedback loop | `[ ]` template routing tests, `llm_candidate` routing tests, clarify/reject routing tests, and P0 eval preservation tests | `[ ]` router contract, strategy matrix, and eval plan | `[ ]` Not started |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
+
+### P3 Planned Router Additions
+
+- Question Understanding & Clarification Router extracts `metric`, `dimension`, `time_range`, `filters`, `operation`, `limit`, and `risk_flags` from user questions.
+- Ambiguous or incomplete questions return `strategy: clarify` with focused clarification questions instead of forcing SQL generation.
+- Sensitive, unsafe, or unsupported requests return `strategy: reject` or route to a safety path before SQL generation.
+- SQL Planning Router chooses one of `template`, `llm_candidate`, `clarify`, or `reject` and records confidence, matched template, missing slots, risk flags, and reason.
+- Deterministic templates remain the default for stable BI questions; LLM SQL candidates remain optional and must pass `validate_sql()` before any execution.
+- Repeated successful `llm_candidate` patterns should feed back into deterministic template expansion, preserving eval stability and reducing future model cost.
 
 ## Update Rules
 
