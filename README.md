@@ -25,6 +25,22 @@ P1 - Reliable Analysis & Report Core is complete. Next phase: P2 - Business Revi
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
+## LLM Enhancement Roadmap
+
+The current P0 and P1 implementation is deterministic and does not call an LLM, so an API key is not required for the completed workflow. `.env.example` keeps `OPENAI_API_KEY` as a reserved configuration point for later controlled LLM enhancement.
+
+LLM usage should be additive, optional, and bounded by tools, validators, and trace:
+
+- **Current baseline**: deterministic Agent state transitions, SQL validation, SQL execution, evidence validation, chart generation, report saving, and trace logging remain the source of truth.
+- **P2 controlled enhancement**: introduce an optional LLM adapter for report task planning, report section outlining, business-language polishing, and user clarification questions. LLM outputs must be structured and checked before use.
+- **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
+- **P3 engineering hardening**: add provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and observability around model-assisted steps.
+
+LLM boundaries:
+
+- The LLM must not execute SQL, bypass `validate_sql()`, override `Evidence Validator`, create final evidence-backed claims without data support, or trigger action tools without approval gates.
+- Reports and insights must remain traceable to SQL, execution results, business context, evidence validation, charts, and saved artifacts.
+
 ## Quickstart
 
 ```bash

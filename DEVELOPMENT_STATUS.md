@@ -20,7 +20,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Last completed task | Task 14 - Report Agent |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
-| Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
+| Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps, unguarded LLM-driven SQL/report generation |
 
 ## Phase Overview
 
@@ -28,8 +28,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 |---|---|---|---|---|---|
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite 77/77 passing; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
-| P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
-| P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
+| P2 | Business Review & Action Workflow | `[ ]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow are not started | `[ ]` | `[ ]` | `[ ]` Not started |
+| P3 | MCP & Engineering Core | `[ ]` MCP/API/dashboard/CI tasks plus LLM provider and PromptOps hardening are not started | `[ ]` | `[ ]` | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
 
@@ -112,11 +112,31 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[x]` Existing P0 tests and eval remain passing after Task 14.
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 14.
 
+## LLM Enhancement Plan
+
+The completed P0 and P1 workflow does not require an LLM or API key. Existing deterministic Agents, tools, validators, reports, and traces remain the baseline behavior.
+
+LLM enhancement is planned as a controlled layer, not as a replacement for tool-calling verification:
+
+- **P2 placement**: use LLMs where natural-language planning and writing help the most, especially report task decomposition, weekly report section outlines, business-language polishing, and clarification questions.
+- **P2 guarded SQL placement**: allow LLM-generated SQL candidates only after schema, metric, and business context retrieval, and only if every candidate passes `validate_sql()` before `run_sql()`.
+- **P3 placement**: harden model usage through provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM-specific evals, and trace/observability integration.
+
+LLM safety boundaries:
+
+- The LLM must not execute SQL directly.
+- The LLM must not bypass `validate_sql()`.
+- The LLM must not override `Evidence Validator`.
+- The LLM must not create final evidence-backed claims without SQL results, business context, or validated evidence.
+- The LLM must not trigger action tools without approval gates and audit logging.
+
 ## P2 - Business Review & Action Workflow
 
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
 | Task 15 - Business Review Report | `[ ]` report supervisor and multi-SQL report flow | `[ ]` weekly report completeness tests | `[ ]` weekly report docs | `[ ]` Not started |
+| Task 15A - Controlled LLM Report Planner | `[ ]` optional LLM adapter, prompt contract, structured report plan, and clarification-question support | `[ ]` mocked-provider tests, schema validation tests, fallback tests | `[ ]` LLM setup, prompt contract, and no-key fallback docs | `[ ]` Not started |
+| Task 15B - Guarded LLM SQL and Insight Enhancement | `[ ]` optional SQL candidate generator and insight/report polisher behind schema, metric, context, SQL validation, evidence validation, and trace | `[ ]` unsafe SQL rejection tests, unsupported-claim blocking tests, deterministic fallback tests | `[ ]` guarded LLM usage and risk docs | `[ ]` Not started |
 | Task 16 - Action Workflow | `[ ]` action planner, risk assessor, approval, verifier, audit tools | `[ ]` approval/action/audit tests | `[ ]` action workflow docs | `[ ]` Not started |
 
 ## P3 - MCP & Engineering Core
@@ -126,6 +146,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task 17 - MCP Tool Layer | `[ ]` database, report, and action MCP servers | `[ ]` MCP tool contract tests | `[ ]` MCP server docs | `[ ]` Not started |
 | Task 18 - FastAPI + Async Run API | `[ ]` run API and status model | `[ ]` API and run-state tests | `[ ]` API docs | `[ ]` Not started |
 | Task 19 - Trace Dashboard | `[ ]` dashboard views and metrics | `[ ]` dashboard data tests | `[ ]` dashboard docs | `[ ]` Not started |
+| Task 20 - LLM Provider and PromptOps Core | `[ ]` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, and LLM eval harness | `[ ]` provider contract tests, prompt rendering tests, cost/latency trace tests, LLM eval smoke tests | `[ ]` provider setup, prompt governance, and eval docs | `[ ]` Not started |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ## Update Rules
