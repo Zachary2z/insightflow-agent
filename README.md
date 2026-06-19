@@ -2,7 +2,7 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, and retrieve P1 business context.
+P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, and classify evidence-backed versus unsupported claims.
 
 ## Current Status
 
@@ -17,8 +17,9 @@ Implemented:
 - Streamlit glass-box demo
 - 20-case eval benchmark
 - P1 business context retrieval for business rules, table docs, and historical SQL examples
+- P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
 
-Next P1 task: Task 12 - Evidence Validator.
+Next P1 task: Task 13 - Chart Agent.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -146,6 +147,50 @@ print(state["trace"][-1])
 ```
 
 The tool returns structured JSON-compatible dictionaries and never raises file loading errors into the workflow. On failure it returns `success: false`, empty match lists, an `error`, and a trace-ready event. The Agent only reads `state["user_question"]`, writes `state["business_context"]`, and appends trace; it does not access the database, execute SQL, or generate reports.
+
+## Evidence Validator
+
+Task 12 adds an Evidence Validator layer for P1. It separates claims into:
+
+- `data_supported_findings`: claims backed by `execution_result` rows or explicit business context
+- `hypotheses`: claims framed as possible explanations or requiring more data
+- `unsupported_claims_blocked`: deterministic claims without supporting evidence
+
+Tool interface:
+
+```python
+from tools.evidence_tool import validate_evidence
+
+result = validate_evidence(
+    claims=[
+        "Laptop Pro 14 的 GMV 为 511248.56",
+        "可能与广告流量下降有关，需要 ad_impressions、ctr 和 conversion_rate 数据进一步验证",
+        "库存不足是导致 Camera A 销量下降的主要原因",
+    ],
+    execution_result={
+        "success": True,
+        "columns": ["product_name", "gmv"],
+        "rows": [["Laptop Pro 14", 511248.56]],
+        "row_count": 1,
+    },
+)
+print(result["data_supported_findings"])
+print(result["hypotheses"])
+print(result["unsupported_claims_blocked"])
+```
+
+Agent interface:
+
+```python
+from agents.evidence_validator import run_evidence_validator_agent
+
+state["claims_to_validate"] = ["Laptop Pro 14 的 GMV 为 511248.56"]
+state = run_evidence_validator_agent(state)
+print(state["evidence_result"])
+print(state["trace"][-1])
+```
+
+The Agent writes `state["evidence_result"]` and appends trace. It does not run SQL, generate charts, or save reports.
 
 ## Schema Tool
 
@@ -343,5 +388,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- Reports, charts, evidence validation, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
-- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval is complete; Evidence Validator, Chart Agent, and Report Agent are next.
+- Reports, charts, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
+- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval and Evidence Validator are complete; Chart Agent and Report Agent are next.

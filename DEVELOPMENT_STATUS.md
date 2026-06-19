@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P1 - Reliable Analysis & Report Core |
-| Current task | Task 12 - Evidence Validator |
-| Last completed task | Task 11 - Business Context Retrieval |
+| Current task | Task 13 - Chart Agent |
+| Last completed task | Task 12 - Evidence Validator |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps |
@@ -27,7 +27,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
-| P1 | Reliable Analysis & Report Core | `[~]` Task 11 business context retrieval complete | `[~]` Task 11 tests passing; full suite 60/60 passing; eval 20/20 passing | `[~]` Task 11 README and status docs updated | `[~]` In progress |
+| P1 | Reliable Analysis & Report Core | `[~]` Task 11 business context retrieval and Task 12 evidence validation complete | `[~]` Task 12 tests passing; full suite 66/66 passing; eval 20/20 passing | `[~]` Task 12 README and status docs updated | `[~]` In progress |
 | P2 | Business Review & Action Workflow | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 | P3 | MCP & Engineering Core | `[ ]` | `[ ]` | `[ ]` | `[ ]` Not started |
 
@@ -71,7 +71,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
 | Task 11 - Business Context Retrieval | `[x]` `data/business_rules.md`, `data/table_docs.md`, `data/sql_examples.json`, `tools/context_tool.py`, `agents/context_retriever.py` | `[x]` context tool and context retriever tests | `[x]` README context source and interface docs | `[x]` Done |
-| Task 12 - Evidence Validator | `[ ]` evidence validator agent/tool | `[ ]` unsupported claim blocking tests | `[ ]` evidence output docs | `[ ]` Not started |
+| Task 12 - Evidence Validator | `[x]` `tools/evidence_tool.py`, `agents/evidence_validator.py`, state extension | `[x]` supported finding, hypothesis, unsupported claim blocking, Agent state/trace tests | `[x]` README evidence output and interface docs | `[x]` Done |
 | Task 13 - Chart Agent | `[ ]` chart agent and chart tool | `[ ]` chart generation tests | `[ ]` chart artifact docs | `[ ]` Not started |
 | Task 14 - Report Agent | `[ ]` report agent and report tool | `[ ]` report save and traceability tests | `[ ]` report structure docs | `[ ]` Not started |
 
@@ -87,6 +87,14 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[x]` Task 11 has dedicated tests.
 - `[x]` Existing P0 tests and eval remain passing.
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 11.
+- `[x]` Evidence Validator separates data-supported findings, hypotheses, and unsupported claims.
+- `[x]` Evidence Validator blocks deterministic claims without data support.
+- `[x]` Evidence Validator computes `unsupported_claim_rate`.
+- `[x]` Evidence Validator Agent writes `evidence_result` into state.
+- `[x]` Evidence validation emits trace-ready events and Agent appends them to trace.
+- `[x]` Task 12 has dedicated tests.
+- `[x]` Existing P0 tests and eval remain passing after Task 12.
+- `[x]` README and DEVELOPMENT_STATUS are updated for Task 12.
 
 ## P2 - Business Review & Action Workflow
 
@@ -116,6 +124,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 12 verification:
+
+```bash
+python3 -m pytest tests/test_evidence_tool.py tests/test_evidence_validator.py
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 12 tests report 6/6 passed; the full test suite reports 66/66 passed; P0 eval reports 20/20 passed. Evidence Validator classifies data-supported findings, hypotheses, and unsupported deterministic claims, computes `unsupported_claim_rate`, writes `evidence_result` into state, and appends trace without executing SQL or generating reports.
 
 Task 11 verification:
 
