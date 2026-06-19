@@ -10,6 +10,9 @@ class AgentState(TypedDict, total=False):
     session_id: str
     user_question: str
     task_type: str
+    report_type: str
+    report_sections: list[dict[str, Any]]
+    report_sub_tasks: list[dict[str, Any]]
 
     db_path: str | Path
     trace_dir: str | Path
@@ -27,6 +30,8 @@ class AgentState(TypedDict, total=False):
     chart_paths: list[str]
     report_result: dict[str, Any]
     report_path: str
+    weekly_report_result: dict[str, Any]
+    weekly_report_path: str
     selected_tables: list[str]
     selected_metrics: list[str]
 

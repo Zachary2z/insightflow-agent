@@ -6,7 +6,7 @@ P0 is complete. The current system can take a Chinese business question, route i
 
 ## Current Status
 
-P0 - Agentic SQL Core and P1 - Reliable Analysis & Report Core are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 Task 15 - Business Review Report are complete.
 
 Implemented:
 
@@ -20,8 +20,9 @@ Implemented:
 - P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
 - P1 chart generation for bar, line, and optional pie charts
 - P1 Markdown report generation with SQL, execution evidence, charts, and trace links
+- P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
 
-P1 - Reliable Analysis & Report Core is complete. Next phase: P2 - Business Review & Action Workflow.
+P2 Task 15 is complete. Next task: Task 15A - Controlled LLM Report Planner.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -296,6 +297,47 @@ print(state["trace"][-1])
 ```
 
 The Agent writes `state["report_result"]` and `state["report_path"]`, and appends trace. It does not run SQL, generate charts, or include blocked unsupported claims as deterministic report findings.
+
+## Business Review Report
+
+Task 15 adds a deterministic P2 Report Supervisor for weekly business review reports. It decomposes a weekly report request into structured sections, then runs each SQL subtask through the existing schema, metric, SQL review, SQL execution, Evidence Validator, Chart Agent, Report Tool, and Trace Logger boundaries.
+
+Core sections:
+
+- 本周 GMV
+- 本周订单量
+- 本周客单价
+- Top 商品
+- Top 品类
+- 销售下降品类
+- 下周建议
+
+Agent interface:
+
+```python
+from agents.report_supervisor import run_report_supervisor_agent
+from agents.supervisor import initialize_run
+
+state = initialize_run("帮我生成一份本周电商经营分析周报，包括销售额、订单量、Top 商品、下降品类和运营建议。")
+state["db_path"] = "data/ecommerce.db"
+state["trace_dir"] = "logs/traces"
+state = run_report_supervisor_agent(state)
+
+print(state["weekly_report_path"])
+print(state["trace_path"])
+print(state["report_sub_tasks"][0]["review_result"])
+print(state["report_sub_tasks"][0]["execution_result"])
+```
+
+The supervisor writes:
+
+- `report_type`: `weekly_business_report`
+- `report_sections`: planned weekly report sections
+- `report_sub_tasks`: per-section SQL, `review_result`, `execution_result`, evidence result, chart paths, status, and error
+- `weekly_report_path`: `reports/markdown/{run_id}_weekly_business_report.md`
+- `trace_path`: `logs/traces/{run_id}.json`
+
+Failed subtasks are recorded with `status: failed` and their structured review/execution error, but they do not crash the whole weekly report workflow. Evidence Validator remains responsible for separating data-supported findings, hypotheses, and unsupported claims. Task 15 does not introduce LLM planning, guarded LLM SQL generation, action tools, approval gates, MCP, FastAPI, or dashboard behavior.
 
 ## Schema Tool
 

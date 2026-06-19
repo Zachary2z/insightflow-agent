@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P2 - Business Review & Action Workflow |
-| Current task | Task 15 - Business Review Report |
-| Last completed task | Task 14 - Report Agent |
+| Current task | Task 15A - Controlled LLM Report Planner (not started) |
+| Last completed task | Task 15 - Business Review Report |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current phase | MCP, FastAPI, React, async jobs, RBAC, Trace Dashboard, ActionOps, unguarded LLM-driven SQL/report generation |
@@ -27,8 +27,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Phase | Goal | Development | Tests | Docs | Overall |
 |---|---|---|---|---|---|
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
-| P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite 77/77 passing; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
-| P2 | Business Review & Action Workflow | `[ ]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow are not started | `[ ]` | `[ ]` | `[ ]` Not started |
+| P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
+| P2 | Business Review & Action Workflow | `[~]` Task 15 business review report complete; Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow are not started | `[x]` Task 15 tests passing; full suite 80/80 passing; eval 20/20 passing | `[x]` Task 15 README and status docs updated | `[~]` In progress |
 | P3 | MCP & Engineering Core | `[ ]` MCP/API/dashboard/CI tasks plus LLM provider and PromptOps hardening are not started | `[ ]` | `[ ]` | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
@@ -134,10 +134,26 @@ LLM safety boundaries:
 
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
-| Task 15 - Business Review Report | `[ ]` report supervisor and multi-SQL report flow | `[ ]` weekly report completeness tests | `[ ]` weekly report docs | `[ ]` Not started |
+| Task 15 - Business Review Report | `[x]` deterministic Report Supervisor, structured report sections, multi-SQL subtasks, per-task review/execution/evidence/chart records, weekly Markdown save, and trace save | `[x]` `tests/test_report_supervisor.py`; full suite and P0 eval passing | `[x]` weekly report docs in README and status tracker | `[x]` Done |
 | Task 15A - Controlled LLM Report Planner | `[ ]` optional LLM adapter, prompt contract, structured report plan, and clarification-question support | `[ ]` mocked-provider tests, schema validation tests, fallback tests | `[ ]` LLM setup, prompt contract, and no-key fallback docs | `[ ]` Not started |
 | Task 15B - Guarded LLM SQL and Insight Enhancement | `[ ]` optional SQL candidate generator and insight/report polisher behind schema, metric, context, SQL validation, evidence validation, and trace | `[ ]` unsafe SQL rejection tests, unsupported-claim blocking tests, deterministic fallback tests | `[ ]` guarded LLM usage and risk docs | `[ ]` Not started |
 | Task 16 - Action Workflow | `[ ]` action planner, risk assessor, approval, verifier, audit tools | `[ ]` approval/action/audit tests | `[ ]` action workflow docs | `[ ]` Not started |
+
+### P2 Acceptance Tracker
+
+- `[x]` Report Supervisor decomposes weekly report questions into structured `report_sections`.
+- `[x]` Core modules include weekly GMV, order count, AOV, Top products, Top categories, declining categories, and next-week recommendations.
+- `[x]` A weekly report task executes multiple SQL subtasks.
+- `[x]` Each SQL subtask stores SQL, `review_result`, and `execution_result`.
+- `[x]` Failed subtasks are recorded structurally and do not crash the report workflow.
+- `[x]` Weekly Markdown reports save as `{run_id}_weekly_business_report.md`.
+- `[x]` Reports include SQL, execution evidence, chart paths, and trace path.
+- `[x]` Evidence Validator separates supported findings, hypotheses, and unsupported claims.
+- `[x]` Agent and Tool boundaries remain clear: Report Supervisor orchestrates state; existing tools validate SQL, execute SQL, generate charts, save reports, and save traces.
+- `[x]` Task 15 has dedicated tests.
+- `[x]` Existing P0/P1 tests remain passing after Task 15.
+- `[x]` P0 eval remains 20/20 passing after Task 15.
+- `[x]` README and DEVELOPMENT_STATUS are updated for Task 15.
 
 ## P3 - MCP & Engineering Core
 
@@ -161,6 +177,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 15 verification:
+
+```bash
+python3 -m pytest tests/test_report_supervisor.py
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 15 tests report 3/3 passed; the full test suite reports 80/80 passed; P0 eval reports 20/20 passed. Report Supervisor plans weekly business report sections, executes multiple SQL subtasks through SQL review and SQL execution, records per-task evidence and chart paths, preserves failed subtasks without crashing, saves `{run_id}_weekly_business_report.md`, and writes the trace path used by the report.
 
 Task 14 verification:
 
