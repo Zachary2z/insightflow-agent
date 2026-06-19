@@ -9,4 +9,5 @@ sqlglot
 pandas
 SQLAlchemy
 PyYAML
+matplotlib
 pytest

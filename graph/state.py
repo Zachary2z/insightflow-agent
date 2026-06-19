@@ -22,6 +22,9 @@ class AgentState(TypedDict, total=False):
     business_context: dict[str, Any]
     evidence_result: dict[str, Any]
     claims_to_validate: list[str]
+    chart_result: dict[str, Any]
+    chart_path: str
+    chart_paths: list[str]
     selected_tables: list[str]
     selected_metrics: list[str]
 

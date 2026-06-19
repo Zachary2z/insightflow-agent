@@ -2,7 +2,7 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, and classify evidence-backed versus unsupported claims.
+P0 is complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, and generate simple chart artifacts.
 
 ## Current Status
 
@@ -18,8 +18,9 @@ Implemented:
 - 20-case eval benchmark
 - P1 business context retrieval for business rules, table docs, and historical SQL examples
 - P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
+- P1 chart generation for bar, line, and optional pie charts
 
-Next P1 task: Task 13 - Chart Agent.
+Next P1 task: Task 14 - Report Agent.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -191,6 +192,51 @@ print(state["trace"][-1])
 ```
 
 The Agent writes `state["evidence_result"]` and appends trace. It does not run SQL, generate charts, or save reports.
+
+## Chart Agent
+
+Task 13 adds chart generation for P1. The Chart Agent infers simple chart specs from the user question and `execution_result`, then calls `generate_chart()` to write PNG files under `reports/charts/` by default.
+
+Rules:
+
+- ranking / top questions -> bar chart
+- trend / monthly questions -> line chart
+- share / percentage questions -> pie chart, when requested
+
+Tool interface:
+
+```python
+from tools.chart_tool import generate_chart
+
+result = generate_chart(
+    data={
+        "columns": ["product_name", "gmv"],
+        "rows": [["Laptop Pro 14", 511248.56], ["Camera A", 456050.99]],
+    },
+    chart_spec={
+        "chart_type": "bar",
+        "x": "product_name",
+        "y": "gmv",
+        "title": "Top Products by GMV",
+        "run_id": "run_001",
+    },
+)
+print(result["chart_path"])
+print(result["trace_event"])
+```
+
+Agent interface:
+
+```python
+from agents.chart_agent import run_chart_agent
+
+state = run_chart_agent(state)
+print(state["chart_path"])
+print(state["chart_paths"])
+print(state["trace"][-1])
+```
+
+The Agent writes `state["chart_result"]`, `state["chart_path"]`, and `state["chart_paths"]`, and appends trace. It does not run SQL or save reports.
 
 ## Schema Tool
 
@@ -388,5 +434,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- Reports, charts, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
-- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval and Evidence Validator are complete; Chart Agent and Report Agent are next.
+- Reports, FastAPI, React UI, async jobs, MCP, RBAC, and trace dashboards remain outside the completed P0 scope.
+- P1 is adding reliable analysis and report-core capabilities on top of the P0 SQL core. Business Context Retrieval, Evidence Validator, and Chart Agent are complete; Report Agent is next.
