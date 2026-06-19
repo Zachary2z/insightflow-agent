@@ -6,7 +6,7 @@ P0 is complete. The current system can take a Chinese business question, route i
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 Task 15 - Business Review Report are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 Task 15 - Business Review Report, and P2 Task 15A - Controlled LLM Report Planner are complete.
 
 Implemented:
 
@@ -21,8 +21,9 @@ Implemented:
 - P1 chart generation for bar, line, and optional pie charts
 - P1 Markdown report generation with SQL, execution evidence, charts, and trace links
 - P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
+- P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
 
-P2 Task 15 is complete. Next task: Task 15A - Controlled LLM Report Planner.
+P2 Task 15A is complete. Next task: Task 15B - Guarded LLM SQL and Insight Enhancement.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -338,6 +339,59 @@ The supervisor writes:
 - `trace_path`: `logs/traces/{run_id}.json`
 
 Failed subtasks are recorded with `status: failed` and their structured review/execution error, but they do not crash the whole weekly report workflow. Evidence Validator remains responsible for separating data-supported findings, hypotheses, and unsupported claims. Task 15 does not introduce LLM planning, guarded LLM SQL generation, action tools, approval gates, MCP, FastAPI, or dashboard behavior.
+
+## Controlled LLM Report Planner
+
+Task 15A adds an optional controlled planning layer for weekly business reports. The planner can call a supplied `llm_provider` to select report section IDs and ask clarification questions, but it cannot supply SQL, execute SQL, produce final claims, or bypass deterministic report templates.
+
+Safety contract:
+
+- Provider input includes `allowed_section_ids`, `must_not_generate_sql`, `must_not_execute_sql`, and `must_not_generate_final_claims`.
+- Provider output is accepted only when section IDs match existing deterministic templates.
+- Unknown sections and provider-supplied SQL are ignored.
+- Missing, malformed, or unusable provider responses fall back to deterministic Task 15 sections.
+- Clarification responses set `status: report_plan_needs_clarification` and return questions without running report SQL.
+
+Agent interface:
+
+```python
+from agents.report_planner import run_report_planner_agent
+from agents.supervisor import initialize_run
+
+state = initialize_run("帮我生成一份本周电商经营分析周报，优先看 GMV 和 Top 商品。")
+
+state = run_report_planner_agent(
+    state,
+    llm_provider=lambda prompt: {
+        "report_type": "weekly_business_report",
+        "sections": [{"section_id": "weekly_gmv"}, {"section_id": "top_products"}],
+    },
+)
+
+print(state["report_plan"])
+print([section["section_id"] for section in state["report_sections"]])
+```
+
+Report Supervisor integration:
+
+```python
+from agents.report_supervisor import run_report_supervisor_agent
+from agents.supervisor import initialize_run
+
+state = initialize_run("帮我生成一份本周电商经营分析周报，优先看 GMV 和 Top 商品。")
+state["db_path"] = "data/ecommerce.db"
+
+state = run_report_supervisor_agent(
+    state,
+    llm_provider=lambda prompt: {
+        "report_type": "weekly_business_report",
+        "sections": [{"section_id": "weekly_gmv"}, {"section_id": "top_products"}],
+    },
+)
+print(state["weekly_report_path"])
+```
+
+No API key is required for the deterministic baseline. Without `llm_provider`, the planner uses the Task 15 deterministic fallback plan.
 
 ## Schema Tool
 

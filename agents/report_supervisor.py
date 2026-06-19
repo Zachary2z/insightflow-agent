@@ -7,6 +7,7 @@ from agents.chart_agent import run_chart_agent
 from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.metric_agent import run_metric_agent
+from agents.report_planner import LLMProvider, run_report_planner_agent
 from agents.schema_agent import run_schema_agent
 from agents.sql_reviewer import run_sql_reviewer
 from tools.report_tool import DEFAULT_REPORT_DIR, save_report
@@ -361,12 +362,16 @@ def run_report_supervisor_agent(
     state: dict[str, Any],
     report_dir: str | Path = DEFAULT_REPORT_DIR,
     chart_dir: str | Path | None = None,
+    llm_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     chart_output_dir = chart_dir or Path(__file__).resolve().parents[1] / "reports" / "charts"
-    sections = state.get("report_sections") or plan_business_review_sections(state.get("user_question", ""))
+    planned_state = run_report_planner_agent(state, llm_provider) if llm_provider else state
+    if planned_state.get("status") == "report_plan_needs_clarification":
+        return planned_state
+    sections = planned_state.get("report_sections") or plan_business_review_sections(state.get("user_question", ""))
 
     current = {
-        **state,
+        **planned_state,
         "task_type": "business_review_report",
         "report_type": "weekly_business_report",
         "report_sections": sections,

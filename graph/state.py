@@ -11,8 +11,10 @@ class AgentState(TypedDict, total=False):
     user_question: str
     task_type: str
     report_type: str
+    report_plan: dict[str, Any]
     report_sections: list[dict[str, Any]]
     report_sub_tasks: list[dict[str, Any]]
+    clarification_questions: list[str]
 
     db_path: str | Path
     trace_dir: str | Path
