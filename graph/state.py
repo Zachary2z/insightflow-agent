@@ -17,6 +17,16 @@ class AgentState(TypedDict, total=False):
     clarification_questions: list[str]
     llm_sql_enhancement: dict[str, Any]
     llm_insight_enhancement: dict[str, Any]
+    action_plan: dict[str, Any]
+    risk_assessment: dict[str, Any]
+    approval_status: str
+    approval_record: dict[str, Any]
+    created_actions: list[dict[str, Any]]
+    action_execution_result: dict[str, Any]
+    action_verification_result: dict[str, Any]
+    audit_log_result: dict[str, Any]
+    audit_log_id: str
+    action_db_path: str | Path
 
     db_path: str | Path
     trace_dir: str | Path

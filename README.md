@@ -23,8 +23,9 @@ Implemented:
 - P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
 - P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
 - P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
+- P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
 
-P2 Task 15B is complete. Next task: Task 16 - Action Workflow.
+P2 - Business Review & Action Workflow is complete. Next phase: P3 - MCP & Engineering Core.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -449,6 +450,71 @@ print(state["llm_insight_enhancement"]["unsupported_claims_blocked"])
 ```
 
 Task 15B does not introduce action tools, approvals, MCP, FastAPI, dashboard behavior, provider abstraction, cost tracking, or prompt registry features.
+
+## Action Workflow
+
+Task 16 adds a local, auditable action workflow that can turn evidence-backed analysis into operational follow-up records. It does not call external task systems, send emails, run background jobs, or bypass approval gates.
+
+Workflow:
+
+```text
+Evidence Validator
+-> Action Planner
+-> Risk Assessor
+-> Approval Gate
+-> Action Tool
+-> Action Verifier
+-> Audit Logger
+```
+
+Implemented tools:
+
+- `create_task()` writes tasks to SQLite.
+- `create_metric_alert()` writes metric alerts to SQLite.
+- `create_email_draft()` writes email drafts to SQLite.
+- `record_approval()` writes approval records to SQLite.
+- `verify_action_execution()` confirms created records exist.
+- `log_audit_event()` writes approval, execution, and verification audit events.
+
+Agent interface:
+
+```python
+from agents.action_planner import run_action_planner_agent
+from agents.action_verifier import run_action_verifier_agent
+from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+from tools.approval_tool import record_approval
+
+state = run_action_planner_agent(state)
+state = run_risk_assessor_agent(state)
+
+# Approval gate blocks execution until approval_status is approved.
+approval = record_approval(
+    state["action_db_path"],
+    {
+        "run_id": state["run_id"],
+        "approval_status": "approved",
+        "approved_by": "ops_manager",
+        "reason": "Approved for operational follow-up.",
+    },
+)
+state["approval_status"] = approval["approval_status"]
+state["approval_record"] = approval
+
+state = run_action_executor_agent(state)
+state = run_action_verifier_agent(state)
+print(state["created_actions"])
+print(state["action_verification_result"])
+print(state["audit_log_id"])
+```
+
+Approval rules:
+
+- `create_task`, `create_metric_alert`, and `create_email_draft` require approval.
+- Unapproved actions are blocked and audited.
+- Approved actions create local SQLite records, then verifier confirms they exist.
+- Audit logs preserve approval blocking, action execution, and action verification events.
+
+Task 16 does not introduce MCP, FastAPI, React, async jobs, RBAC, external SaaS task creation, or real email sending.
 
 ## Schema Tool
 
