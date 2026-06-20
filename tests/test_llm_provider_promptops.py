@@ -29,6 +29,30 @@ def test_prompt_registry_renders_versioned_prompt_with_safety_contract():
     assert "must_not_bypass_validate_sql" in result["metadata"]["safety_contract"]
 
 
+def test_prompt_registry_renders_report_writer_prompt_with_evidence_boundary():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    result = DEFAULT_PROMPT_REGISTRY.render(
+        "report_writer",
+        {
+            "user_question": "帮我生成经营复盘。",
+            "verified_findings": ["Laptop Pro 14 的 GMV 为 511248.56"],
+            "verified_hypotheses": ["可能需要进一步验证广告流量变化"],
+            "blocked_unsupported_claims": ["库存不足是导致销量下降的主要原因"],
+            "sql_records": ["SELECT product_name, gmv FROM product_gmv LIMIT 5"],
+            "chart_paths": ["reports/charts/example.png"],
+            "trace_path": "logs/traces/example.json",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["prompt_id"] == "report_writer"
+    assert result["prompt_version"] == "v1"
+    assert "Evidence-backed report writing" in result["prompt"]
+    assert "must_not_add_unsupported_claims" in result["metadata"]["safety_contract"]
+    assert "库存不足" in result["prompt"]
+
+
 def test_prompt_registry_returns_structured_error_for_missing_variables():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 

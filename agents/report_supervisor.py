@@ -8,7 +8,9 @@ from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.metric_agent import run_metric_agent
 from agents.report_planner import LLMProvider, run_report_planner_agent
+from agents.report_writer import run_report_writer_agent
 from llm_ops.runtime_provider import build_business_review_planner_provider
+from llm_ops.runtime_provider import build_report_writer_provider
 from agents.schema_agent import run_schema_agent
 from agents.sql_reviewer import run_sql_reviewer
 from tools.report_tool import DEFAULT_REPORT_DIR, save_report
@@ -342,12 +344,32 @@ def _format_findings(tasks: list[dict[str, Any]], field: str) -> str:
     return "\n".join(lines) if lines else "- None"
 
 
+def _format_list(items: list[Any]) -> str:
+    return "\n".join(f"- {item}" for item in items) if items else "- None"
+
+
 def _build_weekly_report_content(state: dict[str, Any]) -> str:
     tasks = state.get("report_sub_tasks", [])
     failed_tasks = [task for task in tasks if task.get("status") != "completed"]
     chart_paths = [path for task in tasks for path in task.get("chart_paths", [])]
     report_type = state.get("report_type", "weekly_business_report")
     report_title = "# 本月电商经营分析月报" if report_type == "monthly_business_report" else "# 本周电商经营分析周报"
+    report_writer_result = state.get("report_writer_result") or {}
+    writer_section: list[str] = []
+    if report_writer_result.get("success") or report_writer_result.get("source") == "provider":
+        writer_section = [
+            "## LLM 辅助报告表达",
+            "",
+            "### 经营摘要",
+            _format_list(report_writer_result.get("executive_summary", [])),
+            "",
+            "### 业务解读",
+            report_writer_result.get("business_narrative", ""),
+            "",
+            "### 建议下一步",
+            _format_list(report_writer_result.get("next_steps", [])),
+            "",
+        ]
 
     lines = [
         report_title,
@@ -385,6 +407,7 @@ def _build_weekly_report_content(state: dict[str, Any]) -> str:
             "## 8. 需要进一步验证的假设",
             _format_findings(tasks, "hypotheses"),
             "",
+            *writer_section,
             "## 10. Trace 与 SQL 记录",
             f"- Trace Path: {state.get('trace_path', '')}",
             "",
@@ -419,6 +442,7 @@ def run_report_supervisor_agent(
     report_dir: str | Path = DEFAULT_REPORT_DIR,
     chart_dir: str | Path | None = None,
     llm_provider: LLMProvider | None = None,
+    report_writer_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     chart_output_dir = chart_dir or Path(__file__).resolve().parents[1] / "reports" / "charts"
     runtime_provider = llm_provider or build_business_review_planner_provider()
@@ -475,6 +499,8 @@ def run_report_supervisor_agent(
 
     expected_trace_path = Path(current.get("trace_dir", "logs/traces")) / f"{current['run_id']}.json"
     current["trace_path"] = str(expected_trace_path)
+    writer_provider = report_writer_provider or build_report_writer_provider()
+    current = run_report_writer_agent(current, provider=writer_provider)
     report_content = _build_weekly_report_content(current)
     report_slug = "monthly_business" if report_type == "monthly_business_report" else "weekly_business"
     report_result = save_report(f"{current['run_id']}_{report_slug}", report_content, output_dir=report_dir)

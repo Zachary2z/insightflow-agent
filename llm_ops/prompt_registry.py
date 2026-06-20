@@ -89,7 +89,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
         PromptTemplate(
             prompt_id="report_planner",
             version="v1",
-            description="Select allowlisted weekly business review sections without generating SQL.",
+            description="Select allowlisted weekly or monthly business review sections without generating SQL.",
             required_variables=["user_question", "allowed_section_ids"],
             safety_contract=[
                 "must_only_select_allowed_section_ids",
@@ -105,6 +105,11 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Schema: sections must be an array of objects shaped like "
                 "{{\"section_id\": \"one allowed id\", \"rationale\": \"short reason\"}}; "
                 "string lists are invalid.\n"
+                "The section ids are stable template ids and may contain the word weekly even when the "
+                "runtime report is monthly; do not ask whether the user wants weekly or monthly if the "
+                "question already says 本周, 周报, 本月, 月报, 月度, monthly, or 最近 30 天.\n"
+                "For monthly review requests, choose the relevant allowed ids and let the deterministic "
+                "report supervisor adapt labels and SQL date windows.\n"
                 "Safety: select only allowed section ids; do not generate SQL; do not execute SQL; "
                 "do not generate final evidence-backed claims."
             ),
@@ -163,6 +168,44 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Current deterministic answer: {current_final_answer}\n"
                 "Return JSON with claims only.\n"
                 "Safety: Evidence Validator must verify every claim before it can be used."
+            ),
+        ),
+        PromptTemplate(
+            prompt_id="report_writer",
+            version="v1",
+            description="Polish report prose only from verified evidence, SQL records, chart paths, and trace path.",
+            required_variables=[
+                "user_question",
+                "verified_findings",
+                "verified_hypotheses",
+                "blocked_unsupported_claims",
+                "sql_records",
+                "chart_paths",
+                "trace_path",
+            ],
+            safety_contract=[
+                "must_not_add_unsupported_claims",
+                "must_not_bypass_evidence_validator",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+            ],
+            template=(
+                "Task: Evidence-backed report writing and polishing.\n"
+                "User question: {user_question}\n"
+                "Verified findings from Evidence Validator: {verified_findings}\n"
+                "Verified hypotheses from Evidence Validator: {verified_hypotheses}\n"
+                "Blocked unsupported claims that must not appear in prose: {blocked_unsupported_claims}\n"
+                "SQL records for traceability, not for modification: {sql_records}\n"
+                "Chart paths: {chart_paths}\n"
+                "Trace path: {trace_path}\n"
+                "Return JSON only with executive_summary, business_narrative, next_steps, "
+                "used_supported_claims, used_hypotheses, and unsupported_claims.\n"
+                "Schema: executive_summary and next_steps are string arrays; business_narrative is a string; "
+                "used_supported_claims and used_hypotheses are string arrays copied from verified inputs; "
+                "unsupported_claims must be an empty array.\n"
+                "Safety: write clearer business prose only from verified findings and hypotheses; "
+                "do not add unsupported claims; do not generate SQL; do not execute SQL; "
+                "do not replace Evidence Validator."
             ),
         ),
         PromptTemplate(

@@ -50,6 +50,7 @@ class AgentState(TypedDict, total=False):
     chart_path: str
     chart_paths: list[str]
     report_result: dict[str, Any]
+    report_writer_result: dict[str, Any]
     report_path: str
     weekly_report_result: dict[str, Any]
     weekly_report_path: str

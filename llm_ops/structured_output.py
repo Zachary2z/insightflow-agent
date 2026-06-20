@@ -102,6 +102,72 @@ def _validate_guarded_insight_claims(content: Any) -> dict[str, Any]:
     return _ok("guarded_insight_claims", {"claims": [claim.strip() for claim in claims if claim.strip()]})
 
 
+def _validate_report_writer(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "report_writer"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "report_writer output must be an object")
+
+    blocked_fields = {"sql", "generated_sql", "sql_candidates", "candidate_sql", "final_claims", "claims"}
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"report_writer must not return blocked fields: {', '.join(leaked)}")
+
+    summary_ok, executive_summary, message = _string_list(content.get("executive_summary", []), "executive_summary")
+    if not summary_ok:
+        return _error(prompt_id, message)
+    if not isinstance(content.get("business_narrative", ""), str):
+        return _error(prompt_id, "business_narrative must be a string")
+    steps_ok, next_steps, message = _string_list(content.get("next_steps", []), "next_steps")
+    if not steps_ok:
+        return _error(prompt_id, message)
+    supported_ok, used_supported_claims, message = _string_list(
+        content.get("used_supported_claims", []),
+        "used_supported_claims",
+    )
+    if not supported_ok:
+        return _error(prompt_id, message)
+    hypotheses_ok, used_hypotheses, message = _string_list(content.get("used_hypotheses", []), "used_hypotheses")
+    if not hypotheses_ok:
+        return _error(prompt_id, message)
+    unsupported_ok, unsupported_claims, message = _string_list(
+        content.get("unsupported_claims", []),
+        "unsupported_claims",
+    )
+    if not unsupported_ok:
+        return _error(prompt_id, message)
+    if unsupported_claims:
+        return _error(prompt_id, "unsupported_claims must be empty")
+
+    allowed_supported = set(schema_context.get("verified_findings", []))
+    unexpected_supported = [claim for claim in used_supported_claims if allowed_supported and claim not in allowed_supported]
+    if unexpected_supported:
+        return _error(prompt_id, f"used_supported_claims contains unverified claims: {unexpected_supported[0]}")
+
+    allowed_hypotheses = set(schema_context.get("verified_hypotheses", []))
+    unexpected_hypotheses = [claim for claim in used_hypotheses if allowed_hypotheses and claim not in allowed_hypotheses]
+    if unexpected_hypotheses:
+        return _error(prompt_id, f"used_hypotheses contains unverified claims: {unexpected_hypotheses[0]}")
+
+    business_narrative = content.get("business_narrative", "").strip()
+    combined_text = "\n".join([*executive_summary, business_narrative, *next_steps])
+    for blocked_claim in schema_context.get("blocked_unsupported_claims", []):
+        blocked_text = str(blocked_claim).strip()
+        if blocked_text and blocked_text in combined_text:
+            return _error(prompt_id, f"report_writer included blocked unsupported claim: {blocked_text}")
+
+    return _ok(
+        prompt_id,
+        {
+            "executive_summary": executive_summary,
+            "business_narrative": business_narrative,
+            "next_steps": next_steps,
+            "used_supported_claims": used_supported_claims,
+            "used_hypotheses": used_hypotheses,
+            "unsupported_claims": [],
+        },
+    )
+
+
 def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
     if value is None:
         return True, "", ""
@@ -303,6 +369,8 @@ def validate_prompt_output(
         return _validate_guarded_sql_candidate(content)
     if prompt_id == "guarded_insight_claims":
         return _validate_guarded_insight_claims(content)
+    if prompt_id == "report_writer":
+        return _validate_report_writer(content, context)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":

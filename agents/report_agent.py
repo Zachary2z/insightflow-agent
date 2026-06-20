@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agents.report_writer import run_report_writer_agent
+from llm_ops.provider import LLMProvider
+from llm_ops.runtime_provider import build_report_writer_provider
 from tools.report_tool import DEFAULT_REPORT_DIR, save_report
 from tools.trace_logger import append_trace
 
@@ -73,6 +76,22 @@ def build_report_content(state: dict[str, Any]) -> str:
     chart_paths = state.get("chart_paths") or ([state["chart_path"]] if state.get("chart_path") else [])
     selected_metrics = state.get("selected_metrics") or state.get("metric_context", {}).get("matched_metrics", [])
     business_context_summary = state.get("business_context", {}).get("context_summary", "")
+    report_writer_result = state.get("report_writer_result") or {}
+    writer_section: list[str] = []
+    if report_writer_result.get("success") or report_writer_result.get("source") == "provider":
+        writer_section = [
+            "## LLM 辅助报告表达",
+            "",
+            "### 经营摘要",
+            _bullet_list(report_writer_result.get("executive_summary", [])),
+            "",
+            "### 业务解读",
+            report_writer_result.get("business_narrative", ""),
+            "",
+            "### 建议下一步",
+            _bullet_list(report_writer_result.get("next_steps", [])),
+            "",
+        ]
 
     return "\n".join(
         [
@@ -101,6 +120,7 @@ def build_report_content(state: dict[str, Any]) -> str:
             "## 需要进一步验证的假设",
             _format_hypotheses(evidence_result),
             "",
+            *writer_section,
             "## 图表路径",
             _bullet_list(chart_paths),
             "",
@@ -135,16 +155,20 @@ def _report_failure(error: str) -> dict[str, Any]:
 def run_report_agent(
     state: dict[str, Any],
     output_dir: str | Path = DEFAULT_REPORT_DIR,
+    report_writer_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     execution_result = state.get("execution_result")
     if not execution_result or not execution_result.get("success"):
         result = _report_failure("execution_result is required for report generation")
+        working_state = state
     else:
-        report_content = build_report_content(state)
-        result = save_report(state.get("run_id", "run_unknown"), report_content, output_dir=output_dir)
+        provider = report_writer_provider or build_report_writer_provider()
+        working_state = run_report_writer_agent(state, provider=provider)
+        report_content = build_report_content(working_state)
+        result = save_report(working_state.get("run_id", "run_unknown"), report_content, output_dir=output_dir)
 
     updated = {
-        **state,
+        **working_state,
         "report_result": result,
         "report_path": result.get("report_path", "") if result.get("success") else "",
     }
