@@ -17,6 +17,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
 | Current task | Task 20B - SQL Planning Router (complete; next task not started) |
+| Next planned task | Task 21 - Provider-backed Question Understanding |
 | Last completed task | Task 20B - SQL Planning Router |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
@@ -29,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, and Task 20B SQL planning router complete; CI and later engineering hardening are not started | `[x]` Task 20B tests passing; full suite 138/138 passing with one skipped live test; eval 20/20 passing | `[x]` Task 20B README and status docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, and Task 20B SQL planning router complete; Task 21-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 20B tests passing; full suite 138/138 passing with one skipped live test; eval 20/20 passing | `[x]` Task 20B README and status docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -145,6 +146,32 @@ Final LLM participation map added to the tracked [DEVELOPMENT_PLAN.md](DEVELOPME
 | Template mining and LLM eval | Summarize repeated candidate patterns and validate provider/prompt health | No automatic production template changes; live tests remain opt-in |
 
 Non-negotiable deterministic ownership remains with `validate_sql()`, `run_sql()`, `Evidence Validator`, `Approval Gate`, `Audit Logger`, `Trace Logger`, MCP safety wrappers, and the P0 eval baseline.
+
+### LLM Enhancement Task Backlog
+
+These tasks are the concrete development plan for future model-enhanced behavior. They must be implemented one task at a time using TDD, and each task must preserve the no-key deterministic baseline, full test suite, and P0 eval.
+
+| Task | Development | Tests | Docs | Status |
+|---|---|---|---|---|
+| Task 21 - Provider-backed Question Understanding | `[ ]` Add optional DeepSeek-backed intent extraction behind the existing deterministic `question_understanding` router; normalize output into the existing intent schema; keep deterministic fallback on provider/schema failure | `[ ]` mocked provider success, malformed output fallback, schema mismatch fallback, no-key baseline, no-SQL/no-execution boundary tests | `[ ]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS usage and boundary docs | `[ ]` Not started |
+| Task 22 - Provider-backed Clarification Router | `[ ]` Add structured clarification prompt/schema for missing metric, dimension, time range, filters, operation, or limit; merge with existing deterministic clarification behavior | `[ ]` focused-question generation, ambiguous-question fallback, unsafe-request rejection preservation, malformed output fallback tests | `[ ]` Clarification examples and safety boundaries documented | `[ ]` Not started |
+| Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[ ]` Add optional provider-assisted routing for complex complete intents and connect `llm_candidate` strategy to guarded SQL candidate generation without executing SQL | `[ ]` provider routing success, deterministic fallback, candidate validation requirement, rejected unsafe SQL, no direct provider SQL execution tests | `[ ]` SQL planning/candidate flow and validation policy documented | `[ ]` Not started |
+| Task 24 - LLM Business Review Decomposition | `[ ]` Expand controlled report planner for richer allowlisted section/subtask selection for weekly/monthly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis | `[ ]` allowlisted section selection, provider-supplied SQL rejection, clarification, fallback, report supervisor integration tests | `[ ]` Review planning examples and allowlist rules documented | `[ ]` Not started |
+| Task 25 - Evidence-backed Report Writing and Polishing | `[ ]` Add provider-backed report prose generation from verified findings, hypotheses, SQL, chart paths, and trace path only | `[ ]` supported-claim inclusion, unsupported-claim exclusion, Evidence Validator gate, malformed output fallback, report save integration tests | `[ ]` Report polishing contract and evidence boundaries documented | `[ ]` Not started |
+| Task 26 - Guarded Insight Claim Typing | `[ ]` Expand guarded insight prompts to classify claims as data-supported candidate, hypothesis, recommendation, or unsupported candidate before Evidence Validator filtering | `[ ]` claim-type normalization, evidence validation, unsupported blocking, fallback, trace metadata tests | `[ ]` Claim type schema and Evidence Validator interaction documented | `[ ]` Not started |
+| Task 27 - LLM Action and Email Drafting | `[ ]` Add optional provider-backed task/alert/email draft wording from evidence-backed findings before risk assessment and approval | `[ ]` draft schema validation, approval gate preservation, no direct action creation, audit requirement, malformed output fallback tests | `[ ]` Action drafting flow, approval boundary, and email draft rules documented | `[ ]` Not started |
+| Task 28 - LLM Template Mining and Eval Suite | `[ ]` Expand template-mining feedback and LLM eval smoke cases for provider output shape, fallback behavior, malformed JSON, schema mismatch, and repeated successful `llm_candidate` patterns | `[ ]` eval case success/failure, template recommendation, no auto-template-write, no-key baseline, optional live test gating tests | `[ ]` LLM eval command, template-mining policy, and opt-in live test docs | `[ ]` Not started |
+
+### LLM Enhancement Backlog Acceptance Rules
+
+- `[ ]` Each task must have dedicated tests before implementation.
+- `[ ]` Each task must return structured dict / JSON-compatible outputs.
+- `[ ]` Provider failures must return `success: false` or deterministic fallback instead of crashing workflows.
+- `[ ]` No task may bypass `validate_sql()`, `run_sql()`, Evidence Validator, Approval Gate, Audit Logger, Trace Logger, or MCP safety wrappers.
+- `[ ]` The default workflow must keep running without an API key.
+- `[ ]` `python3 -m pytest` must pass after every task.
+- `[ ]` `python3 eval/run_eval.py` must remain 20/20 passed after every task.
+- `[ ]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS must be updated after every task.
 
 ## P2 - Business Review & Action Workflow
 

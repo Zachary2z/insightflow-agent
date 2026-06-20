@@ -35,7 +35,7 @@ Implemented:
 
 P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Track current phase, task status, test status, acceptance progress, and the concrete Task 21-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 

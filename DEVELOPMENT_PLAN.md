@@ -67,17 +67,14 @@ These are the concrete places where future tasks should enhance the project with
 
 | Target | Why the LLM is useful | Future development task | Safety boundary |
 |---|---|---|---|
-| Provider-backed question understanding | Improve intent extraction for more varied Chinese business phrasing, synonyms, and multi-intent questions | Add optional DeepSeek-backed understanding path behind the existing deterministic router | Must not generate SQL or execute SQL |
-| Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Add structured clarification prompt and schema | Must not guess missing requirements |
-| Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Add optional model-assisted routing with confidence and fallback | Must not return executable SQL directly |
-| Guarded non-template SQL candidate generation | Cover valid BI questions not supported by existing deterministic SQL templates | Connect `guarded_sql_candidate` prompt to the planning router when strategy is `llm_candidate` | Every candidate must pass `validate_sql()` before `run_sql()` |
-| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Expand controlled report planner for richer but still allowlisted section/subtask selection | Must not provide provider-supplied SQL |
-| Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Add provider-backed report prose from verified findings, hypotheses, SQL, chart paths, and trace path | Must not add unsupported claims |
-| Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Expand guarded insight prompts with stricter claim typing | Evidence Validator decides what can be used |
-| Action plan drafting | Turn evidence-backed findings into clearer task, alert, and email draft wording | Add optional LLM drafting before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
-| Email draft content | Create stakeholder-facing email draft bodies from approved action plans | Add structured email draft prompt and schema | Draft only; no sending |
-| Template mining feedback | Identify repeated successful `llm_candidate` patterns that should become deterministic templates | Use eval/trace summaries to recommend new template candidates | Must not auto-modify production templates |
-| LLM-specific eval suite | Measure provider output shape, fallback behavior, malformed JSON handling, and task quality | Expand `llm_ops.eval_smoke` into a broader opt-in eval set | Must not affect no-key baseline |
+| Provider-backed question understanding | Improve intent extraction for more varied Chinese business phrasing, synonyms, and multi-intent questions | Task 21 - add optional DeepSeek-backed understanding path behind the existing deterministic router | Must not generate SQL or execute SQL |
+| Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Task 22 - add structured clarification prompt and schema | Must not guess missing requirements |
+| Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Task 23 - add optional model-assisted routing with confidence/fallback and connect `llm_candidate` to guarded SQL generation | Must not return executable SQL directly |
+| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Task 24 - expand controlled report planner for richer but still allowlisted section/subtask selection | Must not provide provider-supplied SQL |
+| Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Task 25 - add provider-backed report prose from verified findings, hypotheses, SQL, chart paths, and trace path | Must not add unsupported claims |
+| Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Task 26 - expand guarded insight prompts with stricter claim typing | Evidence Validator decides what can be used |
+| Action plan and email draft wording | Turn evidence-backed findings into clearer task, alert, and email draft wording | Task 27 - add optional LLM drafting before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
+| Template mining and LLM eval suite | Identify repeated successful `llm_candidate` patterns and measure provider output quality | Task 28 - expand template mining feedback and LLM eval smoke cases | Must not auto-modify production templates or affect no-key baseline |
 
 ### 4.3 Areas That Must Stay Deterministic
 
@@ -225,13 +222,18 @@ The next task should be selected from the remaining P3 engineering backlog. Do n
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
+| Next | Task 21 - Provider-backed Question Understanding | Add optional DeepSeek-backed intent extraction behind deterministic fallback |
+| Later | Task 22 - Provider-backed Clarification Router | Add structured clarification prompt/schema while preserving reject and fallback behavior |
+| Later | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | Connect `llm_candidate` planning to guarded SQL generation and validation |
+| Later | Task 24 - LLM Business Review Decomposition | Expand controlled allowlisted report/subtask planning |
+| Later | Task 25 - Evidence-backed Report Writing and Polishing | Generate prose only from verified evidence and traceable artifacts |
+| Later | Task 26 - Guarded Insight Claim Typing | Add stricter claim classification before Evidence Validator filtering |
+| Later | Task 27 - LLM Action and Email Drafting | Draft task/alert/email wording before approval-gated execution |
+| Later | Task 28 - LLM Template Mining and Eval Suite | Expand template recommendations and opt-in LLM eval coverage |
+| Later | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
 | Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
 | Later | React dashboard | Only after dashboard data contracts are stable |
 | Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
-| Later | Provider-backed question understanding | Optional DeepSeek-backed intent extraction while preserving deterministic fallback |
-| Later | Provider-backed SQL candidate routing | Connect `llm_candidate` planning to guarded SQL generation and validation |
-| Later | LLM report/action drafting | Add provider-backed prose for verified reports and approved action drafts |
 | Later | Full ActionOps | External task/email integrations require stricter approval, audit, and secrets handling |
 
 ## 11. Final LLM Participation Boundary
