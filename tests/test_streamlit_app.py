@@ -31,13 +31,164 @@ def test_build_capability_overview_makes_p1_p2_p3_visible():
 
     labels = [item["label"] for item in overview]
     assert "SQL Analysis" in labels
-    assert "Report Generation" in labels
+    assert "Evidence-backed Report" in labels
     assert "Weekly Business Review" in labels
-    assert "Action Workflow" in labels
+    assert "Approval-gated Action Workflow" in labels
     assert "MCP Tool Layer" in labels
-    assert "Async Run API" in labels
+    assert "FastAPI Async Run API" in labels
     assert "Trace Dashboard" in labels
-    assert all(item["status"] in {"available", "local-api"} for item in overview)
+    assert "LLM Provider & PromptOps" in labels
+    assert "Template Mining & Eval" in labels
+    assert {"P0", "P1", "P2", "P3"} <= {item["phase"] for item in overview}
+    assert all(item["status"] in {"available", "local-api", "provider-optional"} for item in overview)
+    assert all(item["entrypoint"] for item in overview)
+    assert all(item["safety_boundary"] for item in overview)
+
+
+def test_source_view_model_extracts_provider_and_prompt_metadata():
+    from ui.view_models import build_source_cards
+
+    state = {
+        "question_understanding": {
+            "source": "provider",
+            "provider_called": True,
+            "fallback_used": False,
+            "prompt_id": "question_understanding",
+            "validation_error": "",
+            "provider_error": "",
+        },
+        "sql_planning": {
+            "source": "deterministic",
+            "provider_called": True,
+            "fallback_used": True,
+            "prompt_id": "sql_planning_router",
+            "validation_error": "strategy must be one of allowed values",
+            "provider_error": "",
+        },
+        "llm_sql_enhancement": {
+            "source": "deterministic",
+            "provider_called": True,
+            "fallback_used": True,
+            "prompt_id": "guarded_sql_candidate",
+            "validation_error": "",
+            "provider_error": "provider timeout",
+        },
+    }
+
+    cards = build_source_cards(state)
+
+    by_module = {card["module"]: card for card in cards}
+    assert by_module["Question Understanding"]["provider_called"] is True
+    assert by_module["Question Understanding"]["fallback_used"] is False
+    assert by_module["Question Understanding"]["prompt_id"] == "question_understanding"
+    assert by_module["SQL Planning Router"]["validation_error"] == "strategy must be one of allowed values"
+    assert by_module["Guarded SQL Candidate"]["provider_error"] == "provider timeout"
+
+
+def test_trace_timeline_view_model_preserves_glass_box_fields():
+    from ui.view_models import build_trace_timeline
+
+    state = {
+        "trace": [
+            {
+                "node": "question_understanding_agent",
+                "tool_name": "provider_backed_question_understanding",
+                "status": "success",
+                "latency_ms": 17,
+                "retry_count": 1,
+                "provider_called": True,
+                "fallback_used": False,
+                "error_type": "",
+            },
+            {
+                "node": "sql_executor_node",
+                "tool_name": "run_sql",
+                "status": "error",
+                "latency_ms": 9,
+                "retry_count": 0,
+                "provider_called": False,
+                "fallback_used": False,
+                "error_type": "sqlite_error",
+            },
+        ]
+    }
+
+    timeline = build_trace_timeline(state)
+
+    assert timeline == [
+        {
+            "node": "question_understanding_agent",
+            "tool_name": "provider_backed_question_understanding",
+            "status": "success",
+            "latency_ms": 17,
+            "retry_count": 1,
+            "provider_called": True,
+            "fallback_used": False,
+            "error_type": "",
+            "error": "",
+        },
+        {
+            "node": "sql_executor_node",
+            "tool_name": "run_sql",
+            "status": "error",
+            "latency_ms": 9,
+            "retry_count": 0,
+            "provider_called": False,
+            "fallback_used": False,
+            "error_type": "sqlite_error",
+            "error": "",
+        },
+    ]
+
+
+def test_no_key_llm_ops_status_shows_deterministic_not_configured():
+    from ui.view_models import build_llm_ops_summary
+
+    summary = build_llm_ops_summary(env={})
+
+    assert summary["provider"]["name"] == "DeepSeek"
+    assert summary["provider"]["configured"] is False
+    assert summary["provider"]["status"] == "deterministic / not configured"
+    assert summary["deterministic_baseline"]["available"] is True
+
+
+def test_llm_ops_summary_does_not_leak_api_key():
+    from ui.view_models import build_llm_ops_summary
+
+    summary = build_llm_ops_summary(env={"DEEPSEEK_API_KEY": "super-secret-token"})
+    payload = json.dumps(summary, ensure_ascii=False)
+
+    assert "super-secret-token" not in payload
+    assert summary["provider"]["configured"] is True
+
+
+def test_command_center_analysis_helper_reuses_workflow_helper(monkeypatch):
+    import app
+
+    calls = []
+
+    def fake_run_demo_question(question, **kwargs):
+        calls.append({"question": question, **kwargs})
+        return {"status": "completed", "final_answer": "ok", "trace": []}
+
+    monkeypatch.setattr(app, "run_demo_question", fake_run_demo_question)
+
+    result = app.run_command_center_analysis(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        db_path="demo.db",
+        trace_dir="demo-traces",
+        initial_sql=None,
+    )
+
+    assert result["status"] == "completed"
+    assert calls == [
+        {
+            "question": "最近 30 天销售额最高的 5 个商品是什么？",
+            "db_path": "demo.db",
+            "trace_dir": "demo-traces",
+            "initial_sql": None,
+        }
+    ]
 
 
 def test_run_report_generation_demo_creates_report_and_chart(tmp_path):

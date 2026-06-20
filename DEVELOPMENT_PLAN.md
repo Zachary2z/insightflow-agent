@@ -41,7 +41,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI and later hardening not started |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -206,6 +206,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 | Task 18 | FastAPI + Async Run API | `api/app.py`, `api/run_manager.py`, `api/models.py` | Complete | Submit run, poll status, fetch trace/events, cancel active runs |
 | Task 19 | Trace Dashboard data layer | `dashboard/trace_dashboard.py` | Complete | Summarizes trace, SQL repair, tool, eval, approval, and audit metrics |
 | Task 19A | Streamlit Unified Demo | `app.py` | Complete | Shows P0/P1/P2/P3 capabilities clearly in one product demo |
+| Hardening | Streamlit Command Center UI | `app.py`, `ui/view_models.py`, `ui/components.py` | Complete | First-level Command Center navigation, one-run detail, LLM Ops, Observability/Audit, Integrations, and Capability Catalog without changing backend safety boundaries |
 | Task 20 | LLM Provider and PromptOps Core | `llm_ops/provider.py`, `prompt_registry.py`, `eval_smoke.py` | Complete | Provider contract, prompt versions, cost/latency metadata, smoke eval |
 | Task 20C | Production DeepSeek Provider & Structured Output Validation | `llm_ops/deepseek_provider.py`, `structured_output.py` | Complete | `.env` config, opt-in live tests, malformed JSON and schema mismatch failures |
 | Task 20A | Question Understanding & Clarification Router | `question_understanding/router.py`, `agents/question_understanding.py` | Complete | Extracts intent slots, returns clarify/reject/template/llm_candidate, does not generate SQL |
@@ -227,6 +228,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 - API failures return structured failed responses instead of crashing.
 - Dashboard data layer does not introduce frontend or provider behavior.
 - Streamlit demo makes P1/P2/P3 visible, not just P0.
+- Streamlit Command Center shows one-run intent, SQL, evidence, report/action, provider/fallback, safety, and trace details without bypassing workflow helpers.
 - LLM provider usage is opt-in, structured, traceable, and provider-independent by default.
 - P0 eval remains 20/20 passed.
 

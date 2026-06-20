@@ -6,7 +6,7 @@ P0, P1, and P2 are complete. The current system can take a Chinese business ques
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, Task 26 - Guarded Insight Claim Typing, Task 27 - LLM Action and Email Drafting, and Task 28 - LLM Template Mining and Eval Suite are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Streamlit Command Center UI hardening, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, Task 26 - Guarded Insight Claim Typing, Task 27 - LLM Action and Email Drafting, and Task 28 - LLM Template Mining and Eval Suite are complete.
 
 Implemented:
 
@@ -28,6 +28,7 @@ Implemented:
 - P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
 - P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
 - P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
+- P3 Streamlit Command Center UI with Ask & Analyze, Reports, Actions, Observability, LLM Ops, Integrations, Capability Catalog, source/safety cards, and glass-box trace timeline
 - P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
 - P3 production DeepSeek provider adapter with `.env` config loading, opt-in live smoke tests, malformed JSON handling, and strict prompt-specific output validation
 - P3 Question Understanding & Clarification Router with deterministic intent slots, missing-slot clarification, sensitive/unsafe rejection, and strategy recommendations before SQL planning
@@ -41,7 +42,7 @@ Implemented:
 - P3 LLM Action and Email Drafting with optional DeepSeek-backed task, alert, and email draft wording after Action Planner and before Risk Assessor, Approval Gate, Action Executor, and Audit Logger
 - P3 LLM Template Mining and Eval Suite with workflow-trace mining for repeated successful `llm_candidate` patterns, schema-aware LLM smoke evals, expected malformed/schema failure cases, and opt-in live DeepSeek eval coverage
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete. Later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete. Later engineering work is not implemented yet.
 
 Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
@@ -1283,15 +1284,15 @@ streamlit run app.py
 
 Open the Streamlit URL. The unified demo now displays:
 
-- SQL Analysis with Agent steps, generated SQL, SQL review, execution result, repair process, final answer, trace JSON, and eval command entry
-- Report Generation for P1 evidence-backed charts and Markdown reports
-- Weekly Business Review for P2 report sections and SQL subtasks
-- Action Workflow for approval-gated task, alert, email draft, verification, and audit output
-- MCP Tool Layer contract summaries
-- Async Run API endpoints and local run demo
-- Trace Dashboard summary metrics
+- Ask & Analyze Command Center for one-run question, intent, SQL review/execution, evidence, report/action output, source metadata, safety boundaries, and trace timeline
+- Reports for P1 evidence-backed charts/Markdown reports and P2 weekly/monthly business reviews
+- Actions for approval-gated task, alert, email draft, verification, and audit output
+- Observability for trace count, event count, SQL repair count, eval pass rate, approvals, audit logs, node latency, tool counts, failures, and raw details
+- LLM Ops for provider configured/not configured status, runtime switches, prompt registry, deterministic baseline, provider_called/fallback_used/error visibility through run source cards
+- Integrations for MCP Tool Layer contracts and FastAPI Async Run API endpoints/local run demo
+- Capability Catalog for P0/P1/P2/P3 coverage including LLM Provider & PromptOps and Template Mining & Eval
 
-The SQL Analysis tab preserves the original P0 glass-box workflow, while the other tabs make P1/P2/P3 capabilities visible from the same app.
+The Command Center preserves the original P0 glass-box workflow while making P1/P2/P3 capabilities, provider participation, fallback behavior, and safety gates visible from the same Streamlit app.
 
 ## Demo Questions
 

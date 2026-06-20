@@ -22,10 +22,24 @@ from mcp_servers.database_server import get_tool_contract as get_database_mcp_co
 from mcp_servers.report_server import get_tool_contract as get_report_mcp_contract
 from tools.approval_tool import record_approval
 from tools.action_tool import DEFAULT_ACTION_DB_PATH
+from ui.components import (
+    render_capability_catalog,
+    render_json_expander,
+    render_metric_strip,
+    render_source_cards,
+    render_trace_timeline,
+)
+from ui.view_models import (
+    build_capability_overview as build_command_center_capability_overview,
+    build_llm_ops_summary,
+    build_observability_view_model,
+    build_run_detail_view_model,
+    build_trace_timeline,
+)
 
 
 APP_TITLE = "InsightFlow Agent"
-APP_SUBTITLE = "Unified Multi-Agent BI Workflow Demo"
+APP_SUBTITLE = "Command Center for multi-agent BI analysis"
 DEFAULT_DB_PATH = Path("data/ecommerce.db")
 DEFAULT_TRACE_DIR = Path("logs/traces")
 DEFAULT_ACTION_DB_PATH_FOR_DEMO = DEFAULT_ACTION_DB_PATH
@@ -46,17 +60,19 @@ DEMO_VIEWS = [
     {"id": "async_run_api", "label": "Async Run API", "phase": "P3"},
     {"id": "trace_dashboard", "label": "Trace Dashboard", "phase": "P3"},
 ]
+COMMAND_CENTER_NAV = [
+    "Ask & Analyze",
+    "Reports",
+    "Actions",
+    "Observability",
+    "LLM Ops",
+    "Integrations",
+    "Capability Catalog",
+]
 
 
-def build_capability_overview() -> list[dict[str, str]]:
-    return [
-        {
-            "label": view["label"],
-            "phase": view["phase"],
-            "status": "local-api" if view["id"] == "async_run_api" else "available",
-        }
-        for view in DEMO_VIEWS
-    ]
+def build_capability_overview() -> list[dict[str, Any]]:
+    return build_command_center_capability_overview()
 
 
 def run_demo_question(
@@ -73,6 +89,20 @@ def run_demo_question(
         trace_dir=trace_dir,
         run_id=run_id,
         session_id=session_id,
+        initial_sql=initial_sql,
+    )
+
+
+def run_command_center_analysis(
+    question: str,
+    db_path: str | Path = DEFAULT_DB_PATH,
+    trace_dir: str | Path = DEFAULT_TRACE_DIR,
+    initial_sql: str | None = None,
+) -> dict[str, Any]:
+    return run_demo_question(
+        question,
+        db_path=db_path,
+        trace_dir=trace_dir,
         initial_sql=initial_sql,
     )
 
@@ -222,19 +252,7 @@ def build_trace_dashboard_summary(
 
 
 def format_agent_steps(result: dict[str, Any]) -> list[dict[str, Any]]:
-    steps = []
-    for event in result.get("trace", []):
-        steps.append(
-            {
-                "node": event.get("node", ""),
-                "tool_name": event.get("tool_name", ""),
-                "status": event.get("status", ""),
-                "latency_ms": event.get("latency_ms", 0),
-                "retry_count": event.get("retry_count", 0),
-                "summary": event.get("tool_output_summary", ""),
-            }
-        )
-    return steps
+    return build_trace_timeline(result)
 
 
 def load_trace_file(trace_path: str | Path) -> dict[str, Any]:
@@ -546,6 +564,214 @@ def _render_trace_dashboard_view(st: Any, config: dict[str, Any]) -> None:
         st.json(summary, expanded=False)
 
 
+def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
+    view = build_run_detail_view_model(result)
+    execution_result = view["execution_result"]
+    evidence = view["evidence"]
+    render_metric_strip(
+        st,
+        {
+            "Status": view["status"],
+            "Rows": execution_result.get("row_count", 0),
+            "Unsupported Rate": evidence.get("unsupported_claim_rate", 0),
+            "Trace Events": len(view["trace_timeline"]),
+        },
+    )
+    if view["answer"]:
+        if view["status"] == "completed":
+            st.success(view["answer"])
+        else:
+            st.error(view["answer"])
+
+    st.subheader("Source & Safety")
+    render_source_cards(st, view["sources"])
+    st.dataframe(view["safety_boundaries"], use_container_width=True, hide_index=True)
+
+    st.subheader("Run Detail")
+    detail_tabs = st.tabs(["Intent", "SQL & Data", "Evidence", "Report", "Action", "Trace"])
+    with detail_tabs[0]:
+        st.json(
+            {
+                "intent": view["intent"],
+                "clarification_questions": view["clarification_questions"],
+            },
+            expanded=True,
+        )
+    with detail_tabs[1]:
+        st.code(view["sql"], language="sql")
+        st.json(view["review_result"], expanded=False)
+        if view["execution_rows"]:
+            st.dataframe(view["execution_rows"], use_container_width=True, hide_index=True)
+        render_json_expander(st, "Execution Result", view["execution_result"])
+        render_json_expander(st, "Repair Attempt", view["sql_fix"])
+    with detail_tabs[2]:
+        st.json(view["evidence"], expanded=False)
+        if view["chart_paths"]:
+            st.dataframe([{"chart_path": path} for path in view["chart_paths"]], use_container_width=True, hide_index=True)
+    with detail_tabs[3]:
+        if view["report_path"]:
+            st.code(view["report_path"])
+        if view["report_sections"]:
+            st.dataframe(view["report_sections"], use_container_width=True, hide_index=True)
+        if view["report_sub_tasks"]:
+            st.dataframe(view["report_sub_tasks"], use_container_width=True, hide_index=True)
+    with detail_tabs[4]:
+        st.json(view["action"], expanded=False)
+    with detail_tabs[5]:
+        if view["trace_path"]:
+            st.code(view["trace_path"])
+        render_trace_timeline(st, view["trace_timeline"])
+        render_json_expander(st, "Trace JSON", load_trace_file(view["trace_path"]) if view["trace_path"] else {})
+
+
+def _render_command_center(st: Any, config: dict[str, Any]) -> None:
+    sync_selected_question(st.session_state, config["selected_question"])
+    question = st.text_area(
+        "Business question",
+        key="question_input",
+        height=96,
+        placeholder="最近 30 天销售额最高的 5 个商品是什么？",
+    )
+    run_type = st.radio(
+        "Run type",
+        ["SQL analysis", "Evidence report", "Business review", "Action workflow"],
+        horizontal=True,
+    )
+    controls = st.columns(3)
+    run_clicked = controls[0].button("Run analysis", type="primary")
+    report_clicked = controls[1].button("Generate report")
+    action_clicked = controls[2].button("Draft actions")
+
+    if run_clicked:
+        with st.spinner("Running command center analysis..."):
+            if run_type == "Evidence report":
+                st.session_state["command_center_result"] = run_report_generation_demo(
+                    question,
+                    db_path=config["db_path"],
+                    trace_dir=config["trace_dir"],
+                )
+            elif run_type == "Business review":
+                st.session_state["command_center_result"] = run_weekly_review_demo(
+                    question,
+                    db_path=config["db_path"],
+                    trace_dir=config["trace_dir"],
+                )
+            elif run_type == "Action workflow":
+                st.session_state["command_center_result"] = run_action_workflow_demo(approved=False)
+            else:
+                st.session_state["command_center_result"] = run_command_center_analysis(
+                    question,
+                    db_path=config["db_path"],
+                    trace_dir=config["trace_dir"],
+                    initial_sql=config["initial_sql"],
+                )
+    if report_clicked:
+        with st.spinner("Generating evidence-backed report..."):
+            st.session_state["command_center_result"] = run_report_generation_demo(
+                question,
+                db_path=config["db_path"],
+                trace_dir=config["trace_dir"],
+            )
+    if action_clicked:
+        with st.spinner("Drafting approval-gated actions..."):
+            st.session_state["command_center_result"] = run_action_workflow_demo(approved=False)
+
+    provider = build_llm_ops_summary()["provider"]
+    st.caption(f"Provider: {provider['status']} | deterministic baseline: available")
+    result = st.session_state.get("command_center_result")
+    if result:
+        _render_run_summary(st, result)
+    else:
+        st.info("Run a workflow to inspect answer, SQL, evidence, report, action, and trace in one place.")
+
+
+def _render_reports_page(st: Any, config: dict[str, Any]) -> None:
+    report_tabs = st.tabs(["Evidence Report", "Business Review"])
+    with report_tabs[0]:
+        _render_report_generation_view(st, config)
+    with report_tabs[1]:
+        _render_weekly_review_view(st, config)
+
+
+def _render_actions_page(st: Any) -> None:
+    _render_action_workflow_view(st)
+
+
+def _render_observability_page(st: Any, config: dict[str, Any]) -> None:
+    st.subheader("Observability & Audit")
+    action_db_path = st.text_input("Action database", value=str(DEFAULT_ACTION_DB_PATH_FOR_DEMO), key="observability_action_db")
+    if st.button("Refresh observability"):
+        st.session_state["observability_summary"] = build_trace_dashboard_summary(
+            trace_dir=config["trace_dir"],
+            action_db_path=action_db_path,
+        )
+    summary = st.session_state.get("observability_summary") or build_trace_dashboard_summary(
+        trace_dir=config["trace_dir"],
+        action_db_path=action_db_path,
+    )
+    view = build_observability_view_model(summary)
+    render_metric_strip(
+        st,
+        {
+            "Trace Count": view["metrics"]["trace_count"],
+            "Event Count": view["metrics"]["event_count"],
+            "SQL Fix Count": view["metrics"]["sql_fix_count"],
+            "Eval Pass Rate": view["metrics"]["eval_pass_rate"],
+            "Approvals": view["metrics"]["approval_count"],
+            "Audit Logs": view["metrics"]["audit_log_count"],
+        },
+    )
+    obs_tabs = st.tabs(["Latency", "Tools", "Failures", "Approvals", "Audit Logs", "Details"])
+    with obs_tabs[0]:
+        st.dataframe(view["node_latency"], use_container_width=True, hide_index=True)
+    with obs_tabs[1]:
+        st.dataframe(view["tool_call_counts"], use_container_width=True, hide_index=True)
+    with obs_tabs[2]:
+        st.dataframe(view["failure_distribution"], use_container_width=True, hide_index=True)
+    with obs_tabs[3]:
+        st.dataframe(view["approval_records"], use_container_width=True, hide_index=True)
+    with obs_tabs[4]:
+        st.dataframe(view["audit_logs"], use_container_width=True, hide_index=True)
+    with obs_tabs[5]:
+        st.json({"load_errors": view["load_errors"]}, expanded=False)
+        render_json_expander(st, "Dashboard JSON", view["raw"])
+
+
+def _render_llm_ops_page(st: Any) -> None:
+    st.subheader("LLM Ops")
+    summary = build_llm_ops_summary()
+    provider = summary["provider"]
+    render_metric_strip(
+        st,
+        {
+            "Provider": provider["name"],
+            "Configured": provider["api_key"],
+            "Mode": provider["status"],
+            "Model": provider["model"],
+        },
+    )
+    st.dataframe(
+        [{"switch": key, "enabled": value} for key, value in summary["runtime_switches"].items()],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.dataframe(summary["prompt_registry"], use_container_width=True, hide_index=True)
+    st.json(summary["deterministic_baseline"], expanded=False)
+
+
+def _render_integrations_page(st: Any, config: dict[str, Any]) -> None:
+    integration_tabs = st.tabs(["MCP Tool Layer", "FastAPI Async Run API"])
+    with integration_tabs[0]:
+        _render_mcp_view(st)
+    with integration_tabs[1]:
+        _render_async_api_view(st, config)
+
+
+def _render_capability_catalog(st: Any) -> None:
+    st.subheader("Capability Catalog")
+    render_capability_catalog(st, build_capability_overview())
+
+
 def main() -> None:
     import streamlit as st
 
@@ -554,22 +780,21 @@ def main() -> None:
     st.caption(APP_SUBTITLE)
 
     config = _render_sidebar(st)
-    _render_capability_overview(st)
-    tabs = st.tabs([view["label"] for view in DEMO_VIEWS])
-    with tabs[0]:
-        _render_sql_analysis_view(st, config)
-    with tabs[1]:
-        _render_report_generation_view(st, config)
-    with tabs[2]:
-        _render_weekly_review_view(st, config)
-    with tabs[3]:
-        _render_action_workflow_view(st)
-    with tabs[4]:
-        _render_mcp_view(st)
-    with tabs[5]:
-        _render_async_api_view(st, config)
-    with tabs[6]:
-        _render_trace_dashboard_view(st, config)
+    page = st.radio("Navigation", COMMAND_CENTER_NAV, horizontal=True)
+    if page == "Ask & Analyze":
+        _render_command_center(st, config)
+    elif page == "Reports":
+        _render_reports_page(st, config)
+    elif page == "Actions":
+        _render_actions_page(st)
+    elif page == "Observability":
+        _render_observability_page(st, config)
+    elif page == "LLM Ops":
+        _render_llm_ops_page(st)
+    elif page == "Integrations":
+        _render_integrations_page(st, config)
+    else:
+        _render_capability_catalog(st)
 
 
 if __name__ == "__main__":

@@ -16,9 +16,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 28 - LLM Template Mining and Eval Suite (complete; next task not started) |
+| Current task | P3 Streamlit Command Center UI hardening complete |
 | Next planned task | Docker / CI or later P3 engineering hardening |
-| Last completed task | Task 28 - LLM Template Mining and Eval Suite |
+| Last completed task | P3 Streamlit Command Center UI hardening |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -30,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, Task 26 guarded insight claim typing, Task 27 action/email drafting, and Task 28 template mining/eval suite complete; CI and later engineering hardening are not started | `[x]` Task 28 trace-mining/eval tests passing; full suite 185 passed / 9 live tests skipped by default; live DeepSeek suite 9/9 passed when explicitly enabled; P0 eval 20/20 passing | `[x]` Task 28 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Streamlit Command Center UI hardening, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, Task 26 guarded insight claim typing, Task 27 action/email drafting, and Task 28 template mining/eval suite complete; CI and later engineering hardening are not started | `[x]` Command Center Streamlit tests 18/18 passing; full suite 190 passed / 9 live tests skipped by default; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated for Command Center hardening | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -239,6 +239,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 18 - FastAPI + Async Run API | `[x]` `api/` FastAPI app, in-memory run manager, status model, trace/events/cancel endpoints | `[x]` `tests/test_async_run_api.py`; full suite and P0 eval passing | `[x]` API docs in README and status tracker | `[x]` Done |
 | Task 19 - Trace Dashboard | `[x]` `dashboard/` trace dashboard data layer for trace, eval, approval, and audit metrics | `[x]` `tests/test_trace_dashboard.py`; full suite and P0 eval passing | `[x]` dashboard data docs in README and status tracker | `[x]` Done |
 | Task 19A - Streamlit Unified Demo | `[x]` multi-tab Streamlit product demo for SQL analysis, report generation, weekly review, action workflow, MCP contracts, async runs, and trace dashboard summaries | `[x]` Streamlit helper/UI tests and workflow smoke tests | `[x]` demo usage docs and UI scope notes | `[x]` Done |
+| Streamlit Command Center UI hardening | `[x]` Command Center navigation, Ask & Analyze run summary, source/safety cards, run detail timeline, LLM Ops, Observability/Audit, Integrations, and Capability Catalog | `[x]` Streamlit view-model/helper tests for capability coverage, provider metadata, no-key baseline, trace timeline, workflow helper reuse, approval gate semantics, and secret redaction | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS command-center notes | `[x]` Done |
 | Task 20 - LLM Provider and PromptOps Core | `[x]` `llm_ops/` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, trace-ready provider metadata, and LLM eval harness | `[x]` `tests/test_llm_provider_promptops.py`; full suite and P0 eval passing | `[x]` provider setup, prompt governance, safety boundaries, and eval docs | `[x]` Done |
 | Task 20C - Production DeepSeek Provider & Structured Output Validation | `[x]` `DeepSeekProvider`, `.env`-driven model/base URL config, strict JSON schema/structure validation, provider response normalization, and production smoke-test controls | `[x]` provider adapter contract tests, schema validation failure tests, malformed JSON fallback tests, optional live DeepSeek smoke test, and no-key baseline tests | `[x]` DeepSeek setup, structured output rules, live-test opt-in, and safety boundary docs | `[x]` Done |
 | Task 20A - Question Understanding & Clarification Router | `[x]` deterministic intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[x]` intent-slot tests, ambiguous-question tests, missing-slot tests, rejection-routing tests, and no-SQL/no-20B-boundary tests | `[x]` intent contract, clarification policy, and routing examples | `[x]` Done |
@@ -320,6 +321,21 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Task 19A has dedicated tests for Streamlit helper functions and smoke paths.
 - `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 19A.
 - `[x]` Task 19A does not implement React, RBAC, Docker/CI, persistent queues, provider abstraction, PromptOps, or new LLM behavior.
+
+### P3 Streamlit Command Center UI Hardening Acceptance Tracker
+
+- `[x]` Main Streamlit entry uses Command Center navigation instead of the original horizontal tab demo as the first-level structure.
+- `[x]` Ask & Analyze shows question, status, answer, SQL/review/execution, evidence, report/action artifacts, source/safety cards, and trace timeline for one run.
+- `[x]` Source cards expose `provider_called`, `fallback_used`, `prompt_id`, `validation_error`, and `provider_error` from existing workflow state.
+- `[x]` LLM Ops shows provider configured/not configured status, runtime switches, prompt registry, and deterministic baseline without exposing API keys.
+- `[x]` Observability/Audit shows trace count, event count, SQL fix count, eval pass rate, approval records, audit logs, latency, tool counts, failures, and raw details.
+- `[x]` Capability Catalog covers P0/P1/P2/P3 including LLM Provider & PromptOps and Template Mining & Eval.
+- `[x]` Integrations keep MCP Tool Layer and FastAPI Async Run API visible.
+- `[x]` UI helper tests prove Command Center analysis still calls the existing workflow helper and does not bypass `run_workflow()`.
+- `[x]` Action workflow approval gate semantics remain covered by Streamlit tests.
+- `[x]` `python3 -m pytest` reports 190 passed and 9 opt-in live DeepSeek tests skipped by default.
+- `[x]` `python3 eval/run_eval.py` reports 20/20 passed.
+- `[x]` This hardening does not implement React, Docker/CI, RBAC, full ActionOps, or new backend LLM behavior.
 
 ### P3 Task 20 Acceptance Tracker
 
