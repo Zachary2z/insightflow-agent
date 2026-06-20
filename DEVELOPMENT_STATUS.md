@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 This file is the living development tracker for InsightFlow Agent. Update it after every completed task, test milestone, or scope change.
 
@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 19 - Trace Dashboard (complete; Task 20 not started) |
-| Last completed task | Task 19 - Trace Dashboard |
+| Current task | Task 19A - Streamlit Unified Demo (complete; Task 20 not started) |
+| Last completed task | Task 19A - Streamlit Unified Demo |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -29,7 +29,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, and Task 19 Trace Dashboard data layer complete; CI, provider, PromptOps, question understanding, and SQL routing hardening are not started | `[x]` Task 19 tests passing; full suite 106/106 passing; eval 20/20 passing | `[x]` Task 19 README and status docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, and Task 19A Streamlit unified demo complete; CI, provider, PromptOps, question understanding, and SQL routing hardening are not started | `[x]` Task 19A tests passing; full suite 111/111 passing; eval 20/20 passing | `[x]` Task 19A README and status docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -193,6 +193,7 @@ LLM safety boundaries:
 | Task 17 - MCP Tool Layer | `[x]` `mcp_servers/` database, report, and action MCP-style contract wrappers | `[x]` `tests/test_mcp_tool_layer.py`; full suite and P0 eval passing | `[x]` MCP layer docs in README and status tracker | `[x]` Done |
 | Task 18 - FastAPI + Async Run API | `[x]` `api/` FastAPI app, in-memory run manager, status model, trace/events/cancel endpoints | `[x]` `tests/test_async_run_api.py`; full suite and P0 eval passing | `[x]` API docs in README and status tracker | `[x]` Done |
 | Task 19 - Trace Dashboard | `[x]` `dashboard/` trace dashboard data layer for trace, eval, approval, and audit metrics | `[x]` `tests/test_trace_dashboard.py`; full suite and P0 eval passing | `[x]` dashboard data docs in README and status tracker | `[x]` Done |
+| Task 19A - Streamlit Unified Demo | `[x]` multi-tab Streamlit product demo for SQL analysis, report generation, weekly review, action workflow, MCP contracts, async runs, and trace dashboard summaries | `[x]` Streamlit helper/UI tests and workflow smoke tests | `[x]` demo usage docs and UI scope notes | `[x]` Done |
 | Task 20 - LLM Provider and PromptOps Core | `[ ]` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, and LLM eval harness | `[ ]` provider contract tests, prompt rendering tests, cost/latency trace tests, LLM eval smoke tests | `[ ]` provider setup, prompt governance, and eval docs | `[ ]` Not started |
 | Task 20A - Question Understanding & Clarification Router | `[ ]` intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[ ]` intent-slot tests, ambiguous-question tests, missing-slot tests, and rejection-routing tests | `[ ]` intent contract, clarification policy, and routing examples | `[ ]` Not started |
 | Task 20B - SQL Planning Router | `[ ]` template-vs-LLM-candidate strategy router, confidence/reason payload, fallback policy, and template-mining feedback loop | `[ ]` template routing tests, `llm_candidate` routing tests, clarify/reject routing tests, and P0 eval preservation tests | `[ ]` router contract, strategy matrix, and eval plan | `[ ]` Not started |
@@ -249,6 +250,22 @@ LLM safety boundaries:
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 19.
 - `[x]` Task 19 does not implement React, Streamlit UI changes, SSE, RBAC, Docker/CI, provider abstraction, PromptOps, or new LLM behavior.
 
+### P3 Task 19A Acceptance Tracker
+
+- `[x]` Streamlit entry point clearly communicates that P0/P1/P2/P3 backend capabilities exist beyond the original P0 SQL demo.
+- `[x]` SQL Analysis view preserves the current glass-box P0 workflow presentation.
+- `[x]` Report Generation view exposes P1 evidence validation, chart generation, and Markdown report saving in a clear flow.
+- `[x]` Weekly Business Review view exposes P2 report supervisor output, report sections, SQL subtasks, evidence, charts, and saved report path.
+- `[x]` Action Workflow view shows action planning, risk assessment, approval gate state, created task/alert/email draft records, verification, and audit log output.
+- `[x]` MCP Tool Layer view shows database/report/action tool contracts and safe wrapper outputs without exposing internal validators or audit modules as external tools.
+- `[x]` Async Run API view explains local API usage and can show run status, trace, and events in a demo-friendly way.
+- `[x]` Trace Dashboard view calls `build_trace_dashboard()` and presents node latency, tool counts, SQL execution latency, repair count, eval pass rate, approvals, and audit logs.
+- `[x]` Page copy and layout are clear for demos: no misleading P0-only subtitle, no hidden P1/P2/P3 capabilities, and no raw JSON wall where a table or summary is clearer.
+- `[x]` UI does not bypass SQL Validator, Evidence Validator, approval gate, MCP boundaries, or existing deterministic workflow contracts.
+- `[x]` Task 19A has dedicated tests for Streamlit helper functions and smoke paths.
+- `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 19A.
+- `[x]` Task 19A does not implement React, RBAC, Docker/CI, persistent queues, provider abstraction, PromptOps, or new LLM behavior.
+
 ### P3 Planned Router Additions
 
 - Question Understanding & Clarification Router extracts `metric`, `dimension`, `time_range`, `filters`, `operation`, `limit`, and `risk_flags` from user questions.
@@ -270,6 +287,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 19A verification:
+
+```bash
+python3 -m pytest tests/test_streamlit_app.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 19A Streamlit unified demo tests report 13/13 passed; the full test suite reports 111/111 passed with one FastAPI TestClient deprecation warning from Starlette; P0 eval reports 20/20 passed. The Streamlit app now exposes SQL Analysis, Report Generation, Weekly Business Review, Action Workflow, MCP Tool Layer, Async Run API, and Trace Dashboard views without changing core backend safety boundaries.
 
 Task 19 verification:
 

@@ -6,7 +6,7 @@ P0, P1, and P2 are complete. The current system can take a Chinese business ques
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, and Task 19 - Trace Dashboard are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, and Task 19A - Streamlit Unified Demo are complete.
 
 Implemented:
 
@@ -27,8 +27,9 @@ Implemented:
 - P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
 - P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
 - P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
+- P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, and 19 complete. Task 20+ engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, and 19A complete. Task 20+ engineering work is not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -667,6 +668,22 @@ print(dashboard["eval_metrics"])
 
 Task 19 is a data layer only. It does not add React, Streamlit UI changes, SSE, dashboard frontend routing, RBAC, Docker/CI, provider abstraction, PromptOps, or new LLM behavior.
 
+## Streamlit Unified Demo
+
+Task 19A upgrades the Streamlit app from a P0-only glass-box SQL demo into a clear product demo for the backend capabilities that already exist.
+
+Views:
+
+- SQL Analysis: preserve the current P0 workflow view with Agent steps, SQL, SQL review, execution, repair, final answer, and trace.
+- Report Generation: expose P1 evidence validation, chart generation, and Markdown report saving.
+- Weekly Business Review: expose P2 report supervisor sections, SQL subtasks, evidence, charts, and saved weekly report path.
+- Action Workflow: show action planning, risk assessment, approval gate state, created task/alert/email draft records, verification, and audit logs.
+- MCP Tool Layer: show database/report/action MCP-style contracts and safe wrapper outputs.
+- Async Run API: explain local FastAPI usage and show run status, trace, and event payloads in a demo-friendly way.
+- Trace Dashboard: presents `build_trace_dashboard()` summaries such as node latency, tool counts, SQL execution latency, repair count, eval pass rate, approvals, and audit logs.
+
+Task 19A improves clarity without changing core safety boundaries. The UI does not bypass SQL Validator, Evidence Validator, approval gate, MCP contracts, or deterministic workflow behavior. It does not introduce React, RBAC, Docker/CI, persistent queues, provider abstraction, PromptOps, or new LLM behavior.
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -819,16 +836,17 @@ print(result["trace_path"])
 streamlit run app.py
 ```
 
-Open the Streamlit URL, enter a Chinese business question, and run the workflow. The demo displays:
+Open the Streamlit URL. The unified demo now displays:
 
-- Agent steps
-- Generated SQL
-- SQL review result
-- SQL execution result
-- Error repair process
-- Final answer
-- Trace JSON
-- Eval command entry
+- SQL Analysis with Agent steps, generated SQL, SQL review, execution result, repair process, final answer, trace JSON, and eval command entry
+- Report Generation for P1 evidence-backed charts and Markdown reports
+- Weekly Business Review for P2 report sections and SQL subtasks
+- Action Workflow for approval-gated task, alert, email draft, verification, and audit output
+- MCP Tool Layer contract summaries
+- Async Run API endpoints and local run demo
+- Trace Dashboard summary metrics
+
+The SQL Analysis tab preserves the original P0 glass-box workflow, while the other tabs make P1/P2/P3 capabilities visible from the same app.
 
 ## Demo Questions
 
