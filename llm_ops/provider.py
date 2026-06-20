@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from json import JSONDecodeError
 from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any, Protocol
@@ -62,6 +63,7 @@ def _trace_event(
     latency_ms: int,
     usage: dict[str, Any],
     error: str = "",
+    error_type: str = "llm_provider_error",
 ) -> dict[str, Any]:
     event = {
         "node": request.metadata.get("node", "llm_ops"),
@@ -78,7 +80,7 @@ def _trace_event(
         "estimated_cost_usd": usage["estimated_cost_usd"],
     }
     if error:
-        event["error_type"] = "llm_provider_error"
+        event["error_type"] = error_type
         event["error"] = error
     return event
 
@@ -108,9 +110,10 @@ def run_llm_request(provider: LLMProvider, request: LLMRequest) -> dict[str, Any
             "error": "",
             "trace_event": _trace_event(request, "success", latency_ms, usage),
         }
-    except Exception as exc:
+    except JSONDecodeError as exc:
         latency_ms = int((perf_counter() - started_at) * 1000)
         error = str(exc)
+        error_type = "llm_malformed_json_error"
         return {
             "success": False,
             "content": None,
@@ -120,5 +123,22 @@ def run_llm_request(provider: LLMProvider, request: LLMRequest) -> dict[str, Any
             "usage": usage,
             "latency_ms": latency_ms,
             "error": error,
-            "trace_event": _trace_event(request, "error", latency_ms, usage, error),
+            "error_type": error_type,
+            "trace_event": _trace_event(request, "error", latency_ms, usage, error, error_type),
+        }
+    except Exception as exc:
+        latency_ms = int((perf_counter() - started_at) * 1000)
+        error = str(exc)
+        error_type = "llm_provider_error"
+        return {
+            "success": False,
+            "content": None,
+            "model": request.model,
+            "prompt_id": request.prompt_id,
+            "prompt_version": request.prompt_version,
+            "usage": usage,
+            "latency_ms": latency_ms,
+            "error": error,
+            "error_type": error_type,
+            "trace_event": _trace_event(request, "error", latency_ms, usage, error, error_type),
         }

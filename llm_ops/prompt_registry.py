@@ -102,6 +102,9 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "User question: {user_question}\n"
                 "Allowed section ids: {allowed_section_ids}\n"
                 "Return JSON with sections, requires_clarification, and clarification_questions.\n"
+                "Schema: sections must be an array of objects shaped like "
+                "{{\"section_id\": \"one allowed id\", \"rationale\": \"short reason\"}}; "
+                "string lists are invalid.\n"
                 "Safety: select only allowed section ids; do not generate SQL; do not execute SQL; "
                 "do not generate final evidence-backed claims."
             ),

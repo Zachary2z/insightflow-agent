@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, and provide a controlled no-key LLM Provider and PromptOps core for future model-assisted steps.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, and expose an opt-in production DeepSeek provider adapter with strict structured-output validation.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, and Task 20 - LLM Provider and PromptOps Core are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, and Task 20C - Production DeepSeek Provider & Structured Output Validation are complete.
 
 Implemented:
 
@@ -29,14 +29,15 @@ Implemented:
 - P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
 - P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
 - P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
+- P3 production DeepSeek provider adapter with `.env` config loading, opt-in live smoke tests, malformed JSON handling, and strict prompt-specific output validation
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, and 20 complete. Task 20C production provider hardening, Task 20A+ router work, and later engineering work are not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, and 20C complete. Task 20A+ router work and later engineering work are not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## LLM Enhancement Roadmap
 
-The default P0/P1/P2 workflow is deterministic and does not call a real LLM, so an API key is not required for the completed workflow. P3 Task 20 adds no-key provider and PromptOps infrastructure with a mock provider contract; `.env.example` keeps `OPENAI_API_KEY` as a reserved configuration point for later controlled provider integration.
+The default P0/P1/P2 workflow is deterministic and does not call a real LLM, so an API key is not required for the completed workflow. P3 Task 20 adds no-key provider and PromptOps infrastructure with a mock provider contract. P3 Task 20C adds a production `DeepSeekProvider`, but live DeepSeek calls remain explicitly opt-in through `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`.
 
 LLM usage should be additive, optional, and bounded by tools, validators, and trace:
 
@@ -46,7 +47,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 question understanding**: add a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
 - **P3 SQL planning router**: route clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
-- **P3 production provider hardening**: planned Task 20C will add a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
+- **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
 
 LLM boundaries:
 
@@ -86,7 +87,7 @@ The intended routing contract is:
 
 These tasks belong in P3 because they depend on mature provider, prompt, trace, and eval infrastructure. They should not weaken the current deterministic baseline.
 
-Before enabling real-provider model output in production paths, planned Task 20C will harden the provider layer with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. This keeps Task 20A and Task 20B from depending on loosely parsed model responses.
+Before enabling real-provider model output in production paths, Task 20C hardens the provider layer with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. This keeps Task 20A and Task 20B from depending on loosely parsed model responses.
 
 ## Quickstart
 
@@ -698,6 +699,8 @@ Implemented pieces:
 - `llm_ops.provider.LLMRequest` and `run_llm_request()` define the provider contract and return JSON-compatible results with `success`, `content`, `usage`, `latency_ms`, `error`, and `trace_event`.
 - `llm_ops.provider.MockLLMProvider` supports deterministic tests and smoke evals without network calls.
 - `llm_ops.eval_smoke.run_llm_smoke_eval()` runs lightweight prompt/provider checks with expected output keys.
+- `llm_ops.deepseek_provider.DeepSeekProvider` calls DeepSeek through the existing provider contract when explicitly configured.
+- `llm_ops.structured_output.run_validated_llm_request()` validates model output against prompt-specific schemas before agents can consume it.
 
 Example:
 
@@ -730,8 +733,25 @@ Safety boundaries:
 - `guarded_insight_claims` prompts require Evidence Validator verification before claims can be used.
 - The provider layer does not expose approval-gated action tools and does not trigger tasks, alerts, or email drafts.
 - Provider failures are returned as `success: false` with structured errors instead of crashing workflows.
+- Malformed JSON returns `llm_malformed_json_error`.
+- Schema mismatches return `llm_schema_validation_error`; for example, `report_planner.sections` must be an array of objects, not a loose string list.
 
-Planned Task 20C will turn the live DeepSeek smoke-test path into a production-grade adapter. It should add `DeepSeekProvider`, strict per-prompt JSON schema validation, response normalization, optional live-test markers or flags, and documentation for `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`. The default workflow must still run without any API key.
+DeepSeek config:
+
+```env
+DEEPSEEK_API_KEY=
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=0
+```
+
+Live DeepSeek tests are opt-in:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_live_smoke.py -q
+```
+
+The default workflow and full test suite still run without any API key.
 
 ## Schema Tool
 
@@ -930,5 +950,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, dashboard frontend views, real LLM provider integration, question understanding router, SQL planning router, Docker/CI, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, dashboard frontend views, production LLM routing, question understanding router, SQL planning router, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
