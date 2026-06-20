@@ -93,6 +93,102 @@ def _validate_guarded_insight_claims(content: Any) -> dict[str, Any]:
     return _ok("guarded_insight_claims", {"claims": [claim.strip() for claim in claims if claim.strip()]})
 
 
+def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
+    if value is None:
+        return True, "", ""
+    if isinstance(value, str):
+        return True, value.strip(), ""
+    return False, "", f"{field_name} must be a string or null"
+
+
+def _string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
+    if not isinstance(value, list):
+        return False, [], f"{field_name} must be a list"
+    normalized = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str):
+            return False, [], f"{field_name}[{index}] must be a string"
+        item = item.strip()
+        if item:
+            normalized.append(item)
+    return True, normalized, ""
+
+
+def _validate_question_understanding(content: Any) -> dict[str, Any]:
+    prompt_id = "question_understanding"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "question_understanding output must be an object")
+
+    strategy = str(content.get("strategy", "")).strip()
+    if strategy not in {"template", "llm_candidate", "clarify", "reject"}:
+        return _error(prompt_id, "strategy must be one of template, llm_candidate, clarify, reject")
+
+    intent = content.get("intent")
+    if not isinstance(intent, dict):
+        return _error(prompt_id, "intent must be an object")
+
+    ok, metric, message = _nullable_string(intent.get("metric"), "intent.metric")
+    if not ok:
+        return _error(prompt_id, message)
+    ok, dimension, message = _nullable_string(intent.get("dimension"), "intent.dimension")
+    if not ok:
+        return _error(prompt_id, message)
+    ok, operation, message = _nullable_string(intent.get("operation"), "intent.operation")
+    if not ok:
+        return _error(prompt_id, message)
+
+    time_range = intent.get("time_range")
+    if time_range is not None and not isinstance(time_range, dict):
+        return _error(prompt_id, "intent.time_range must be an object or null")
+
+    filters_ok, filters, message = _string_list(intent.get("filters"), "intent.filters")
+    if not filters_ok:
+        return _error(prompt_id, message)
+
+    limit = intent.get("limit")
+    if limit is not None and not isinstance(limit, int):
+        return _error(prompt_id, "intent.limit must be an int or null")
+
+    intent_risk_ok, intent_risk_flags, message = _string_list(intent.get("risk_flags"), "intent.risk_flags")
+    if not intent_risk_ok:
+        return _error(prompt_id, message)
+
+    missing_ok, missing_slots, message = _string_list(content.get("missing_slots"), "missing_slots")
+    if not missing_ok:
+        return _error(prompt_id, message)
+    questions_ok, clarification_questions, message = _string_list(
+        content.get("clarification_questions"),
+        "clarification_questions",
+    )
+    if not questions_ok:
+        return _error(prompt_id, message)
+    risk_ok, risk_flags, message = _string_list(content.get("risk_flags"), "risk_flags")
+    if not risk_ok:
+        return _error(prompt_id, message)
+
+    normalized_risk_flags = list(dict.fromkeys([*intent_risk_flags, *risk_flags]))
+    normalized_intent = {
+        "metric": metric,
+        "dimension": dimension,
+        "time_range": time_range,
+        "filters": filters,
+        "operation": operation,
+        "limit": limit,
+        "risk_flags": normalized_risk_flags,
+    }
+    return _ok(
+        prompt_id,
+        {
+            "strategy": strategy,
+            "intent": normalized_intent,
+            "missing_slots": missing_slots,
+            "clarification_questions": clarification_questions,
+            "risk_flags": normalized_risk_flags,
+            "reason": str(content.get("reason", "")).strip(),
+        },
+    )
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -105,6 +201,8 @@ def validate_prompt_output(
         return _validate_guarded_sql_candidate(content)
     if prompt_id == "guarded_insight_claims":
         return _validate_guarded_insight_claims(content)
+    if prompt_id == "question_understanding":
+        return _validate_question_understanding(content)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 

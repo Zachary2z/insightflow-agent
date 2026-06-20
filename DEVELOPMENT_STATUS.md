@@ -16,9 +16,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 20B - SQL Planning Router (complete; next task not started) |
-| Next planned task | Task 21 - Provider-backed Question Understanding |
-| Last completed task | Task 20B - SQL Planning Router |
+| Current task | Task 21 - Provider-backed Question Understanding (complete; next task not started) |
+| Next planned task | Task 22 - Provider-backed Clarification Router |
+| Last completed task | Task 21 - Provider-backed Question Understanding |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -30,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, and Task 20B SQL planning router complete; Task 21-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 20B tests passing; full suite 138/138 passing with one skipped live test; eval 20/20 passing | `[x]` Task 20B README and status docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, and Task 21 provider-backed question understanding complete; Task 22-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 21 tests passing; full suite 145 passed / 1 skipped by default; live DeepSeek smoke 1/1 passed with opt-in network run; eval 20/20 passing | `[x]` Task 21 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -153,7 +153,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
-| Task 21 - Provider-backed Question Understanding | `[ ]` Add optional DeepSeek-backed intent extraction behind the existing deterministic `question_understanding` router; normalize output into the existing intent schema; keep deterministic fallback on provider/schema failure | `[ ]` mocked provider success, malformed output fallback, schema mismatch fallback, no-key baseline, no-SQL/no-execution boundary tests | `[ ]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS usage and boundary docs | `[ ]` Not started |
+| Task 21 - Provider-backed Question Understanding | `[x]` Added optional DeepSeek-compatible intent extraction behind the existing deterministic `question_understanding` router; normalized output into the existing intent schema; kept deterministic fallback on provider/schema failure | `[x]` mocked provider success, malformed output fallback, schema mismatch fallback, no-key baseline, risk flag preservation, Agent trace, and no-SQL/no-execution boundary tests | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS usage and boundary docs | `[x]` Done |
 | Task 22 - Provider-backed Clarification Router | `[ ]` Add structured clarification prompt/schema for missing metric, dimension, time range, filters, operation, or limit; merge with existing deterministic clarification behavior | `[ ]` focused-question generation, ambiguous-question fallback, unsafe-request rejection preservation, malformed output fallback tests | `[ ]` Clarification examples and safety boundaries documented | `[ ]` Not started |
 | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[ ]` Add optional provider-assisted routing for complex complete intents and connect `llm_candidate` strategy to guarded SQL candidate generation without executing SQL | `[ ]` provider routing success, deterministic fallback, candidate validation requirement, rejected unsafe SQL, no direct provider SQL execution tests | `[ ]` SQL planning/candidate flow and validation policy documented | `[ ]` Not started |
 | Task 24 - LLM Business Review Decomposition | `[ ]` Expand controlled report planner for richer allowlisted section/subtask selection for weekly/monthly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis | `[ ]` allowlisted section selection, provider-supplied SQL rejection, clarification, fallback, report supervisor integration tests | `[ ]` Review planning examples and allowlist rules documented | `[ ]` Not started |
@@ -239,6 +239,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 20C - Production DeepSeek Provider & Structured Output Validation | `[x]` `DeepSeekProvider`, `.env`-driven model/base URL config, strict JSON schema/structure validation, provider response normalization, and production smoke-test controls | `[x]` provider adapter contract tests, schema validation failure tests, malformed JSON fallback tests, optional live DeepSeek smoke test, and no-key baseline tests | `[x]` DeepSeek setup, structured output rules, live-test opt-in, and safety boundary docs | `[x]` Done |
 | Task 20A - Question Understanding & Clarification Router | `[x]` deterministic intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[x]` intent-slot tests, ambiguous-question tests, missing-slot tests, rejection-routing tests, and no-SQL/no-20B-boundary tests | `[x]` intent contract, clarification policy, and routing examples | `[x]` Done |
 | Task 20B - SQL Planning Router | `[x]` template-vs-LLM-candidate strategy router, confidence/reason payload, fallback policy, and template-mining feedback loop | `[x]` template routing tests, `llm_candidate` routing tests, clarify/reject routing tests, no-provider/no-SQL boundary tests, and P0 eval preservation tests | `[x]` router contract, strategy matrix, and eval plan | `[x]` Done |
+| Task 21 - Provider-backed Question Understanding | `[x]` optional provider-backed intent extraction, `question_understanding` prompt, structured-output validation, deterministic fallback, provider/fallback trace metadata | `[x]` `tests/test_provider_backed_question_understanding.py`; full suite and P0 eval passing | `[x]` provider-backed contract and safety boundaries documented | `[x]` Done |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ### P3 Task 17 Acceptance Tracker
@@ -358,6 +359,20 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` `agents.sql_planning_router.run_sql_planning_router_agent()` writes planning state and appends trace without generating SQL.
 - `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 20B.
 
+### P3 Task 21 Acceptance Tracker
+
+- `[x]` `question_understanding.provider_backed.understand_question_with_provider()` adds an optional provider-backed path behind deterministic question understanding.
+- `[x]` Provider output is rendered through prompt id `question_understanding`.
+- `[x]` Provider output must pass prompt-specific structured validation before use.
+- `[x]` Accepted provider output is normalized into existing intent slots: `metric`, `dimension`, `time_range`, `filters`, `operation`, `limit`, and `risk_flags`.
+- `[x]` `provider=None` preserves the no-key deterministic baseline.
+- `[x]` Provider errors, malformed JSON, and schema mismatch fall back to deterministic `understand_question()`.
+- `[x]` Fallback results record `provider_called`, `fallback_used`, and `provider_error` or `validation_error`.
+- `[x]` Sensitive or unsafe provider risk flags are preserved and force `strategy: reject`.
+- `[x]` Task 21 does not generate SQL, execute SQL, emit `matched_template`, or perform SQL planning.
+- `[x]` `agents.question_understanding.run_question_understanding_agent()` accepts an optional provider, writes state, and appends trace with `provider_called` and `fallback_used`.
+- `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 21.
+
 ## Update Rules
 
 After every task:
@@ -370,6 +385,18 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 21 verification:
+
+```bash
+python3 -m pytest tests/test_provider_backed_question_understanding.py
+python3 -m pytest tests/test_question_understanding_router.py tests/test_deepseek_provider_structured_output.py tests/test_llm_provider_promptops.py tests/test_provider_backed_question_understanding.py
+python3 -m pytest
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_live_smoke.py -q
+python3 eval/run_eval.py
+```
+
+Result: Task 21 provider-backed question-understanding tests report 7/7 passed; related Task 20A/20C/PromptOps tests report 27/27 passed; the default full test suite reports 145 passed, 1 skipped opt-in live DeepSeek smoke test, and one FastAPI TestClient deprecation warning from Starlette; the real live DeepSeek smoke test reports 1/1 passed when explicitly enabled with network access; P0 eval reports 20/20 passed. The provider-backed path validates `question_understanding` output, normalizes intent slots, falls back deterministically on provider failure, malformed JSON, or schema mismatch, records provider/fallback metadata, preserves sensitive risk flags, and does not generate SQL, execute SQL, or perform SQL planning.
 
 Task 20B verification:
 

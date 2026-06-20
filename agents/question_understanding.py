@@ -2,29 +2,38 @@ from __future__ import annotations
 
 from typing import Any
 
+from llm_ops.provider import LLMProvider
+from question_understanding.provider_backed import understand_question_with_provider
 from question_understanding.router import understand_question
 from tools.trace_logger import append_trace
 
 
-def run_question_understanding_agent(state: dict[str, Any]) -> dict[str, Any]:
+def run_question_understanding_agent(state: dict[str, Any], provider: LLMProvider | None = None) -> dict[str, Any]:
     question = state.get("user_question", "")
-    result = understand_question(question)
+    result = understand_question_with_provider(question, provider=provider) if provider is not None else understand_question(question)
     updated = {
         **state,
         "question_understanding": result,
         "intent_slots": result.get("intent", {}),
         "routing_strategy": result.get("strategy", ""),
     }
+    provider_called = bool(result.get("provider_called", False))
+    fallback_used = bool(result.get("fallback_used", False))
     return append_trace(
         updated,
         {
             "node": "question_understanding_agent",
-            "tool_name": "question_understanding_router",
+            "tool_name": "provider_backed_question_understanding" if provider_called else "question_understanding_router",
             "tool_input_summary": question,
-            "tool_output_summary": f"strategy={result.get('strategy')} missing={','.join(result.get('missing_slots', []))}",
+            "tool_output_summary": (
+                f"strategy={result.get('strategy')} missing={','.join(result.get('missing_slots', []))} "
+                f"provider_called={provider_called} fallback_used={fallback_used}"
+            ),
             "status": "success" if result.get("success") else "error",
             "latency_ms": 0,
             "error_type": None if result.get("success") else "question_understanding_error",
             "error": result.get("error") or None,
+            "provider_called": provider_called,
+            "fallback_used": fallback_used,
         },
     )

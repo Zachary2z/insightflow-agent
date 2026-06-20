@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, and plan SQL source strategy before any SQL generation or execution.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use a validated provider-backed question-understanding path, and plan SQL source strategy before any SQL generation or execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, and Task 20B - SQL Planning Router are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, and Task 21 - Provider-backed Question Understanding are complete.
 
 Implemented:
 
@@ -32,10 +32,11 @@ Implemented:
 - P3 production DeepSeek provider adapter with `.env` config loading, opt-in live smoke tests, malformed JSON handling, and strict prompt-specific output validation
 - P3 Question Understanding & Clarification Router with deterministic intent slots, missing-slot clarification, sensitive/unsafe rejection, and strategy recommendations before SQL planning
 - P3 SQL Planning Router with deterministic template matching, guarded `llm_candidate` policy, clarify/reject preservation, and template-mining feedback summaries
+- P3 Provider-backed Question Understanding with optional DeepSeek-compatible intent extraction, prompt-specific schema validation, deterministic fallback, and trace metadata
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete. Later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, and 21 complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, acceptance progress, and the concrete Task 21-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Track current phase, task status, test status, acceptance progress, and the concrete Task 22-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 
@@ -50,6 +51,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 SQL planning router**: Task 20B routes clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 - **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
+- **P3 provider-backed question understanding**: Task 21 adds an optional provider-backed path behind the deterministic question-understanding router. Provider output must pass the `question_understanding` structured-output validator, is normalized to the existing intent schema, and falls back deterministically on provider errors, malformed JSON, schema mismatch, or missing provider configuration.
 
 LLM boundaries:
 
@@ -108,7 +110,40 @@ The intended routing contract is:
 
 These tasks belong in P3 because they depend on mature provider, prompt, trace, and eval infrastructure. They should not weaken the current deterministic baseline.
 
-Before enabling real-provider model output in production paths, Task 20C hardens the provider layer with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. This keeps Task 20A and Task 20B from depending on loosely parsed model responses.
+Before enabling real-provider model output in production paths, Task 20C hardens the provider layer with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. Task 21 reuses that layer for optional provider-backed question understanding without weakening Task 20A deterministic fallback or Task 20B SQL planning boundaries.
+
+Task 21 provider-backed question understanding can be called explicitly:
+
+```python
+from llm_ops.provider import MockLLMProvider
+from question_understanding.provider_backed import understand_question_with_provider
+
+provider = MockLLMProvider(
+    {
+        "strategy": "template",
+        "intent": {
+            "metric": "gmv",
+            "dimension": "category",
+            "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
+            "filters": ["paid_orders"],
+            "operation": "top_n",
+            "limit": 5,
+            "risk_flags": [],
+        },
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": [],
+        "reason": "Provider extracted a complete BI intent.",
+    }
+)
+
+result = understand_question_with_provider("最近 30 天销售额最高的 5 个品类是什么？", provider=provider)
+print(result["source"])
+print(result["provider_called"])
+print(result["fallback_used"])
+```
+
+Accepted provider output includes `source: "provider"`, `provider_called: true`, and `fallback_used: false`. Provider exceptions, malformed JSON, and schema mismatch return deterministic fallback output with `source: "deterministic"`, `provider_called: true`, `fallback_used: true`, and either `provider_error` or `validation_error`.
 
 ## Quickstart
 
@@ -812,6 +847,24 @@ Boundaries:
 - It does not execute SQL.
 - It does not choose a concrete SQL template or emit `matched_template`.
 - Sensitive-field or unsafe-write requests return `strategy: reject` before SQL planning.
+
+Task 21 adds an optional provider-backed wrapper:
+
+```python
+from question_understanding.provider_backed import understand_question_with_provider
+
+result = understand_question_with_provider(question, provider=provider)
+```
+
+Provider output is accepted only after the `question_understanding` structured-output schema validates `strategy`, `intent`, `missing_slots`, `clarification_questions`, and `risk_flags`. Accepted output is normalized into the same intent schema as the deterministic router. `provider=None`, provider exceptions, malformed JSON, and schema mismatch all keep the deterministic no-key baseline by falling back to `understand_question(question)`.
+
+Additional boundaries:
+
+- It does not generate SQL.
+- It does not execute SQL.
+- It does not emit `matched_template`, `confidence`, or selected table fields.
+- Sensitive or unsafe provider risk flags force `strategy: reject` and preserve the risk flags.
+- Agent trace events include `provider_called` and `fallback_used`.
 
 ## SQL Planning Router
 

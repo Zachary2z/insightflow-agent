@@ -41,7 +41,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, and 21 complete; Docker/CI and later hardening not started |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -60,14 +60,14 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Production DeepSeek adapter | `.env` config, opt-in live test, provider errors, malformed JSON handling, strict prompt schemas | `llm_ops/deepseek_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Question understanding router | Deterministic extraction of metric, dimension, time range, filters, operation, limit, risk flags | `question_understanding/`, `agents/question_understanding.py` | Complete |
 | SQL planning router | Deterministic routing to template, guarded `llm_candidate`, clarify, or reject | `sql_planning/`, `agents/sql_planning_router.py` | Complete |
+| Provider-backed question understanding | Optional provider-backed intent extraction with prompt-specific validation and deterministic fallback | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete |
 
-### 4.2 Future LLM Enhancement Targets
+### 4.2 Remaining LLM Enhancement Targets
 
-These are the concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback and existing validators.
+These are the remaining concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback and existing validators.
 
 | Target | Why the LLM is useful | Future development task | Safety boundary |
 |---|---|---|---|
-| Provider-backed question understanding | Improve intent extraction for more varied Chinese business phrasing, synonyms, and multi-intent questions | Task 21 - add optional DeepSeek-backed understanding path behind the existing deterministic router | Must not generate SQL or execute SQL |
 | Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Task 22 - add structured clarification prompt and schema | Must not guess missing requirements |
 | Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Task 23 - add optional model-assisted routing with confidence/fallback and connect `llm_candidate` to guarded SQL generation | Must not return executable SQL directly |
 | Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Task 24 - expand controlled report planner for richer but still allowlisted section/subtask selection | Must not provide provider-supplied SQL |
@@ -205,6 +205,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 | Task 20C | Production DeepSeek Provider & Structured Output Validation | `llm_ops/deepseek_provider.py`, `structured_output.py` | Complete | `.env` config, opt-in live tests, malformed JSON and schema mismatch failures |
 | Task 20A | Question Understanding & Clarification Router | `question_understanding/router.py`, `agents/question_understanding.py` | Complete | Extracts intent slots, returns clarify/reject/template/llm_candidate, does not generate SQL |
 | Task 20B | SQL Planning Router | `sql_planning/router.py`, `feedback.py`, `agents/sql_planning_router.py` | Complete | Routes to deterministic template or guarded LLM candidate, preserves clarify/reject, does not call provider |
+| Task 21 | Provider-backed Question Understanding | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete | Optional provider-backed intent extraction, structured validation, deterministic fallback, no SQL generation or execution |
 | Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
 
 ### P3 Acceptance Standard
@@ -222,8 +223,7 @@ The next task should be selected from the remaining P3 engineering backlog. Do n
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | Task 21 - Provider-backed Question Understanding | Add optional DeepSeek-backed intent extraction behind deterministic fallback |
-| Later | Task 22 - Provider-backed Clarification Router | Add structured clarification prompt/schema while preserving reject and fallback behavior |
+| Next | Task 22 - Provider-backed Clarification Router | Add structured clarification prompt/schema while preserving reject and fallback behavior |
 | Later | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | Connect `llm_candidate` planning to guarded SQL generation and validation |
 | Later | Task 24 - LLM Business Review Decomposition | Expand controlled allowlisted report/subtask planning |
 | Later | Task 25 - Evidence-backed Report Writing and Polishing | Generate prose only from verified evidence and traceable artifacts |

@@ -165,5 +165,27 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Safety: Evidence Validator must verify every claim before it can be used."
             ),
         ),
+        PromptTemplate(
+            prompt_id="question_understanding",
+            version="v1",
+            description="Extract structured BI intent slots without generating SQL.",
+            required_variables=["user_question"],
+            safety_contract=[
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_select_matched_template",
+                "must_preserve_sensitive_or_unsafe_risk_flags",
+            ],
+            template=(
+                "Task: provider-backed question understanding.\n"
+                "User question: {user_question}\n"
+                "Return JSON only with strategy, intent, missing_slots, clarification_questions, risk_flags, and reason.\n"
+                "Allowed strategy values: template, llm_candidate, clarify, reject.\n"
+                "Intent schema: metric, dimension, and operation are strings or null; time_range is an object or null; "
+                "filters is a string array; limit is an integer or null; risk_flags is a string array.\n"
+                "Safety: do not generate SQL, do not execute SQL, do not select matched_template, "
+                "and preserve sensitive_field, unsafe_operation, or bulk_export risk flags."
+            ),
+        ),
     ]
 )

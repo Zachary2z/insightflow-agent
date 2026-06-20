@@ -1,0 +1,175 @@
+from __future__ import annotations
+
+
+def _valid_provider_payload() -> dict:
+    return {
+        "strategy": "template",
+        "intent": {
+            "metric": "gmv",
+            "dimension": "category",
+            "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
+            "filters": ["paid_orders"],
+            "operation": "top_n",
+            "limit": 5,
+            "risk_flags": [],
+        },
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": [],
+        "reason": "Provider extracted a complete BI intent.",
+    }
+
+
+def test_provider_backed_question_understanding_uses_valid_provider_output():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    result = understand_question_with_provider(
+        "最近 30 天销售额最高的 5 个品类是什么？",
+        provider=MockLLMProvider(_valid_provider_payload()),
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "provider"
+    assert result["provider_called"] is True
+    assert result["fallback_used"] is False
+    assert result["strategy"] == "template"
+    assert result["intent"] == _valid_provider_payload()["intent"]
+    assert result["missing_slots"] == []
+    assert result["clarification_questions"] == []
+    assert result["risk_flags"] == []
+    assert "sql" not in result
+    assert "generated_sql" not in result
+    assert "matched_template" not in result
+
+
+def test_provider_backed_question_understanding_falls_back_on_malformed_json():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    result = understand_question_with_provider(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        provider=MockLLMProvider('{"strategy": "template", "intent": '),
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "deterministic"
+    assert result["provider_called"] is True
+    assert result["fallback_used"] is True
+    assert result["provider_error"]
+    assert result["strategy"] == "template"
+    assert result["intent"]["metric"] == "gmv"
+    assert result["intent"]["dimension"] == "product"
+    assert "sql" not in result
+    assert "matched_template" not in result
+
+
+def test_provider_backed_question_understanding_falls_back_on_schema_mismatch():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    invalid_payload = _valid_provider_payload()
+    invalid_payload["intent"] = {**invalid_payload["intent"], "filters": "paid_orders"}
+
+    result = understand_question_with_provider(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        provider=MockLLMProvider(invalid_payload),
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "deterministic"
+    assert result["provider_called"] is True
+    assert result["fallback_used"] is True
+    assert result["validation_error"]
+    assert result["strategy"] == "template"
+    assert result["intent"]["dimension"] == "product"
+
+
+def test_provider_none_keeps_deterministic_no_key_baseline():
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    result = understand_question_with_provider("最近 30 天销售额最高的 5 个商品是什么？", provider=None)
+
+    assert result["success"] is True
+    assert result["source"] == "deterministic"
+    assert result["provider_called"] is False
+    assert result["fallback_used"] is False
+    assert result["strategy"] == "template"
+    assert result["intent"]["metric"] == "gmv"
+    assert result["intent"]["dimension"] == "product"
+
+
+def test_provider_backed_question_understanding_preserves_unsafe_risk_flags_as_reject():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "template"
+    payload["intent"] = {
+        **payload["intent"],
+        "risk_flags": ["sensitive_field", "bulk_export"],
+    }
+    payload["risk_flags"] = ["sensitive_field", "bulk_export"]
+
+    result = understand_question_with_provider(
+        "帮我导出所有用户的手机号和邮箱",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "provider"
+    assert result["provider_called"] is True
+    assert result["fallback_used"] is False
+    assert result["strategy"] == "reject"
+    assert result["risk_flags"] == ["sensitive_field", "bulk_export"]
+    assert result["intent"]["risk_flags"] == ["sensitive_field", "bulk_export"]
+    assert result["rejection_reason"] == "Request asks for sensitive fields or unsafe data access."
+
+
+def test_provider_backed_question_understanding_never_returns_sql_or_planning_fields():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = {
+        **_valid_provider_payload(),
+        "sql": "SELECT * FROM users",
+        "generated_sql": "SELECT * FROM users",
+        "matched_template": "top_categories_gmv",
+    }
+
+    result = understand_question_with_provider(
+        "最近 30 天销售额最高的 5 个品类是什么？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert "sql" not in result
+    assert "generated_sql" not in result
+    assert "matched_template" not in result
+    assert "confidence" not in result
+    assert "selected_tables" not in result
+
+
+def test_question_understanding_agent_accepts_provider_and_traces_fallback_flags():
+    from agents.question_understanding import run_question_understanding_agent
+    from agents.supervisor import initialize_run
+    from llm_ops.provider import MockLLMProvider
+
+    state = initialize_run(
+        "最近 30 天销售额最高的 5 个品类是什么？",
+        run_id="run_provider_question_understanding_test",
+        session_id="session_provider_question_understanding_test",
+    )
+
+    result = run_question_understanding_agent(state, provider=MockLLMProvider(_valid_provider_payload()))
+
+    assert result["question_understanding"]["source"] == "provider"
+    assert result["question_understanding"]["provider_called"] is True
+    assert result["question_understanding"]["fallback_used"] is False
+    assert result["intent_slots"]["dimension"] == "category"
+    assert result["routing_strategy"] == "template"
+    assert "generated_sql" not in result
+    assert result["trace"][-1]["node"] == "question_understanding_agent"
+    assert result["trace"][-1]["tool_name"] == "provider_backed_question_understanding"
+    assert result["trace"][-1]["provider_called"] is True
+    assert result["trace"][-1]["fallback_used"] is False
