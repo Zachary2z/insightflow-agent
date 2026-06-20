@@ -43,7 +43,65 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
 | P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete; Docker/CI and later hardening not started |
 
-## 4. Target Repository Structure
+## 4. LLM Enhancement Development Roadmap
+
+This section is the product-facing list of where the project should use a large model. It separates already implemented controlled LLM pieces from future enhancements that still need development.
+
+LLM participation rule: the model helps with understanding, planning, candidates, wording, and suggestions. Deterministic tools keep ownership of validation, execution, approval, trace, and audit.
+
+### 4.1 Implemented LLM-Related Capabilities
+
+| Capability | Current implementation | Files | Status |
+|---|---|---|---|
+| Controlled report planning | Optional provider hook selects allowlisted weekly report sections and can ask clarification questions | `agents/report_planner.py` | Complete |
+| Guarded SQL candidate enhancement | Optional provider proposes SQL candidates; accepted SQL must pass `validate_sql()` | `agents/guarded_llm_enhancer.py` | Complete |
+| Guarded insight enhancement | Optional provider proposes claims; claims must pass Evidence Validator before use | `agents/guarded_llm_enhancer.py` | Complete |
+| Provider and PromptOps layer | Provider contract, prompt registry, prompt versions, usage/cost/latency trace metadata, smoke eval | `llm_ops/` | Complete |
+| Production DeepSeek adapter | `.env` config, opt-in live test, provider errors, malformed JSON handling, strict prompt schemas | `llm_ops/deepseek_provider.py`, `llm_ops/structured_output.py` | Complete |
+| Question understanding router | Deterministic extraction of metric, dimension, time range, filters, operation, limit, risk flags | `question_understanding/`, `agents/question_understanding.py` | Complete |
+| SQL planning router | Deterministic routing to template, guarded `llm_candidate`, clarify, or reject | `sql_planning/`, `agents/sql_planning_router.py` | Complete |
+
+### 4.2 Future LLM Enhancement Targets
+
+These are the concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback and existing validators.
+
+| Target | Why the LLM is useful | Future development task | Safety boundary |
+|---|---|---|---|
+| Provider-backed question understanding | Improve intent extraction for more varied Chinese business phrasing, synonyms, and multi-intent questions | Add optional DeepSeek-backed understanding path behind the existing deterministic router | Must not generate SQL or execute SQL |
+| Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Add structured clarification prompt and schema | Must not guess missing requirements |
+| Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Add optional model-assisted routing with confidence and fallback | Must not return executable SQL directly |
+| Guarded non-template SQL candidate generation | Cover valid BI questions not supported by existing deterministic SQL templates | Connect `guarded_sql_candidate` prompt to the planning router when strategy is `llm_candidate` | Every candidate must pass `validate_sql()` before `run_sql()` |
+| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Expand controlled report planner for richer but still allowlisted section/subtask selection | Must not provide provider-supplied SQL |
+| Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Add provider-backed report prose from verified findings, hypotheses, SQL, chart paths, and trace path | Must not add unsupported claims |
+| Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Expand guarded insight prompts with stricter claim typing | Evidence Validator decides what can be used |
+| Action plan drafting | Turn evidence-backed findings into clearer task, alert, and email draft wording | Add optional LLM drafting before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
+| Email draft content | Create stakeholder-facing email draft bodies from approved action plans | Add structured email draft prompt and schema | Draft only; no sending |
+| Template mining feedback | Identify repeated successful `llm_candidate` patterns that should become deterministic templates | Use eval/trace summaries to recommend new template candidates | Must not auto-modify production templates |
+| LLM-specific eval suite | Measure provider output shape, fallback behavior, malformed JSON handling, and task quality | Expand `llm_ops.eval_smoke` into a broader opt-in eval set | Must not affect no-key baseline |
+
+### 4.3 Areas That Must Stay Deterministic
+
+| Area | Reason |
+|---|---|
+| `validate_sql()` | SQL safety boundary; the model cannot self-approve SQL |
+| `run_sql()` | Execution boundary; only deterministic tools execute SQL |
+| Evidence Validator | Fact boundary; model claims must be independently checked |
+| Approval Gate | Action boundary; model output cannot bypass approval |
+| Audit Logger / Trace Logger | Audit boundary; model output cannot decide whether to record events |
+| MCP tool wrappers | External contracts must not bypass internal validator, evidence, approval, or trace requirements |
+| P0 eval baseline | Core demo must remain provider-independent and 20/20 passing |
+
+### 4.4 LLM Enhancement Acceptance Checklist
+
+- Every real-provider output is validated by a prompt-specific schema before an agent consumes it.
+- Every LLM-assisted SQL candidate goes through `validate_sql()`.
+- Every LLM-assisted insight/report claim goes through Evidence Validator.
+- Every LLM-assisted action draft goes through Risk Assessor, Approval Gate, Action Executor, and Audit Logger.
+- Provider failures return structured `success: false` errors and do not crash the workflow.
+- Deterministic fallback remains available without an API key.
+- `python3 eval/run_eval.py` remains 20/20 passed.
+
+## 5. Target Repository Structure
 
 The project should continue to preserve clear Agent/Tool/Graph boundaries.
 
@@ -69,7 +127,7 @@ insightflow-agent/
 └── requirements.txt
 ```
 
-## 5. P0 - Agentic SQL Core
+## 6. P0 - Agentic SQL Core
 
 Goal: prove that InsightFlow is a multi-agent tool-calling SQL execution workflow, not a black-box Text2SQL wrapper.
 
@@ -99,7 +157,7 @@ Goal: prove that InsightFlow is a multi-agent tool-calling SQL execution workflo
 - Every run has a trace artifact.
 - `python3 eval/run_eval.py` remains 20/20 passed.
 
-## 6. P1 - Reliable Analysis & Report Core
+## 7. P1 - Reliable Analysis & Report Core
 
 Goal: produce traceable business analysis artifacts, not just SQL answers.
 
@@ -117,7 +175,7 @@ Goal: produce traceable business analysis artifacts, not just SQL answers.
 - Chart/report generation never bypasses evidence validation.
 - P0 eval remains passing.
 
-## 7. P2 - Business Review & Action Workflow
+## 8. P2 - Business Review & Action Workflow
 
 Goal: support weekly business reviews, retrospectives, and lightweight operational actions.
 
@@ -136,7 +194,7 @@ Goal: support weekly business reviews, retrospectives, and lightweight operation
 - Audit logs preserve approval blocking, execution, and verification.
 - LLM-assisted P2 features are optional and never replace deterministic fallback.
 
-## 8. P3 - MCP & Engineering Core
+## 9. P3 - MCP & Engineering Core
 
 Goal: standardize tool access, expose engineering interfaces, improve observability, and harden controlled LLM usage.
 
@@ -161,7 +219,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 - LLM provider usage is opt-in, structured, traceable, and provider-independent by default.
 - P0 eval remains 20/20 passed.
 
-## 9. Current Next-Task Queue
+## 10. Current Next-Task Queue
 
 The next task should be selected from the remaining P3 engineering backlog. Do not start multiple future tasks at once.
 
@@ -171,9 +229,12 @@ The next task should be selected from the remaining P3 engineering backlog. Do n
 | Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
 | Later | React dashboard | Only after dashboard data contracts are stable |
 | Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
+| Later | Provider-backed question understanding | Optional DeepSeek-backed intent extraction while preserving deterministic fallback |
+| Later | Provider-backed SQL candidate routing | Connect `llm_candidate` planning to guarded SQL generation and validation |
+| Later | LLM report/action drafting | Add provider-backed prose for verified reports and approved action drafts |
 | Later | Full ActionOps | External task/email integrations require stricter approval, audit, and secrets handling |
 
-## 10. Final LLM Participation Boundary
+## 11. Final LLM Participation Boundary
 
 InsightFlow treats LLMs as a controlled enhancement layer. The model can help with understanding, planning, candidate generation, wording, and suggestions, but deterministic tools remain responsible for approval, execution, validation, and audit.
 
@@ -237,7 +298,7 @@ User Question
 - Default no-key baseline must continue to run.
 - P0 eval must remain 20/20 passing.
 
-## 11. Long-Term Development Principles
+## 12. Long-Term Development Principles
 
 - Do not pile on features before the current phase is stable.
 - Preserve Agent/Tool/Graph boundaries.
