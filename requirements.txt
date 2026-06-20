@@ -2,6 +2,7 @@ langgraph
 langchain-core
 langchain-openai
 fastapi
+httpx2
 uvicorn
 streamlit
 python-dotenv
