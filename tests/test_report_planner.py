@@ -126,3 +126,112 @@ def test_report_supervisor_can_use_controlled_llm_planner(tmp_path):
     assert len(result["report_sub_tasks"]) == 2
     assert result["status"] == "business_review_report_completed"
     assert Path(result["weekly_report_path"]).exists()
+
+
+def test_report_planner_uses_promptops_provider_and_rejects_provider_sql():
+    from agents.report_planner import run_report_planner_agent
+    from agents.supervisor import initialize_run
+    from llm_ops.provider import MockLLMProvider
+
+    state = initialize_run(
+        "帮我生成本月经营复盘，重点看 Top 商品。",
+        run_id="run_promptops_report_planner",
+        session_id="session_promptops_report_planner",
+    )
+
+    valid = run_report_planner_agent(
+        state,
+        llm_provider=MockLLMProvider(
+            {
+                "report_type": "monthly_business_report",
+                "sections": [{"section_id": "top_products", "rationale": "Need product ranking."}],
+                "requires_clarification": False,
+                "clarification_questions": [],
+            }
+        ),
+    )
+
+    assert valid["report_plan"]["success"] is True
+    assert valid["report_plan"]["source"] == "provider"
+    assert valid["report_plan"]["provider_called"] is True
+    assert valid["report_plan"]["fallback_used"] is False
+    assert valid["report_plan"]["prompt_id"] == "report_planner"
+    assert [section["section_id"] for section in valid["report_sections"]] == ["top_products"]
+    assert valid["report_sections"][0]["sql"].lower().startswith("select")
+
+    leaked_sql = run_report_planner_agent(
+        state,
+        llm_provider=MockLLMProvider(
+            {
+                "sections": [
+                    {
+                        "section_id": "top_products",
+                        "rationale": "Need product ranking.",
+                        "sql": "DELETE FROM orders",
+                    }
+                ],
+                "requires_clarification": False,
+                "clarification_questions": [],
+            }
+        ),
+    )
+
+    assert leaked_sql["report_plan"]["source"] == "deterministic"
+    assert leaked_sql["report_plan"]["provider_called"] is True
+    assert leaked_sql["report_plan"]["fallback_used"] is True
+    assert leaked_sql["report_plan"]["validation_error"]
+    assert all(task["sql"].lower().startswith("select") for task in leaked_sql["report_sections"])
+
+
+def test_report_supervisor_runtime_provider_factory_and_no_key_baseline(tmp_path, monkeypatch):
+    from agents.report_supervisor import run_report_supervisor_agent
+    from agents.supervisor import initialize_run
+    from llm_ops.provider import MockLLMProvider
+
+    state = initialize_run(
+        "帮我生成本月经营复盘，重点看 GMV 和 Top 商品。",
+        run_id="run_runtime_report_planner",
+        session_id="session_runtime_report_planner",
+    )
+    state["db_path"] = DB_PATH
+    state["trace_dir"] = tmp_path / "traces"
+
+    result = run_report_supervisor_agent(
+        state,
+        llm_provider=MockLLMProvider(
+            {
+                "report_type": "monthly_business_report",
+                "sections": [{"section_id": "weekly_gmv"}, {"section_id": "top_products"}],
+                "requires_clarification": False,
+                "clarification_questions": [],
+            }
+        ),
+        report_dir=tmp_path / "markdown",
+        chart_dir=tmp_path / "charts",
+    )
+
+    assert result["report_plan"]["provider_called"] is True
+    assert result["report_plan"]["source"] == "provider"
+    assert result["report_type"] == "monthly_business_report"
+    assert [section["section_id"] for section in result["report_sections"]] == ["weekly_gmv", "top_products"]
+    assert result["status"] == "business_review_report_completed"
+
+    monkeypatch.setenv("INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER", "1")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+    fallback_state = initialize_run(
+        "帮我生成本月经营复盘。",
+        run_id="run_no_key_review_planner",
+        session_id="session_no_key_review_planner",
+    )
+    fallback_state["db_path"] = DB_PATH
+    fallback_state["trace_dir"] = tmp_path / "fallback_traces"
+
+    fallback = run_report_supervisor_agent(
+        fallback_state,
+        report_dir=tmp_path / "fallback_markdown",
+        chart_dir=tmp_path / "fallback_charts",
+    )
+
+    assert fallback["report_plan"]["source"] == "deterministic"
+    assert fallback["report_plan"]["provider_called"] is False
+    assert fallback["status"] == "business_review_report_completed"

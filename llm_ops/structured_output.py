@@ -29,6 +29,11 @@ def _validate_report_planner(content: Any, schema_context: dict[str, Any]) -> di
     if not isinstance(content, dict):
         return _error("report_planner", "report_planner output must be an object")
 
+    blocked_top_level = {"sql", "generated_sql", "sql_candidates", "final_claims", "claims"}
+    leaked = sorted(blocked_top_level & set(content))
+    if leaked:
+        return _error("report_planner", f"report_planner must not return blocked fields: {', '.join(leaked)}")
+
     sections = content.get("sections", [])
     if not isinstance(sections, list):
         return _error("report_planner", "sections must be a list")
@@ -38,6 +43,9 @@ def _validate_report_planner(content: Any, schema_context: dict[str, Any]) -> di
     for index, section in enumerate(sections):
         if not isinstance(section, dict):
             return _error("report_planner", f"sections[{index}] must be an object")
+        leaked = sorted(blocked_top_level & set(section))
+        if leaked:
+            return _error("report_planner", f"sections[{index}] must not return blocked fields: {', '.join(leaked)}")
         section_id = str(section.get("section_id", "")).strip()
         if not section_id:
             return _error("report_planner", f"sections[{index}].section_id is required")
@@ -55,6 +63,7 @@ def _validate_report_planner(content: Any, schema_context: dict[str, Any]) -> di
         return _error("report_planner", "clarification_questions must be a list")
 
     normalized = {
+        "report_type": str(content.get("report_type") or schema_context.get("report_type") or "").strip(),
         "sections": normalized_sections,
         "requires_clarification": bool(content.get("requires_clarification", False)),
         "clarification_questions": [str(question).strip() for question in clarification_questions if str(question).strip()],

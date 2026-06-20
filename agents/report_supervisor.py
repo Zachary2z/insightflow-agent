@@ -8,6 +8,7 @@ from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.metric_agent import run_metric_agent
 from agents.report_planner import LLMProvider, run_report_planner_agent
+from llm_ops.runtime_provider import build_business_review_planner_provider
 from agents.schema_agent import run_schema_agent
 from agents.sql_reviewer import run_sql_reviewer
 from tools.report_tool import DEFAULT_REPORT_DIR, save_report
@@ -25,48 +26,97 @@ o.order_date >= date((SELECT MAX(order_date) FROM orders), '-13 day')
 AND o.order_date < date((SELECT MAX(order_date) FROM orders), '-6 day')
 """.strip()
 
+MONTH_FILTER = """
+o.order_date >= date((SELECT MAX(order_date) FROM orders), '-29 day')
+AND o.order_date <= (SELECT MAX(order_date) FROM orders)
+""".strip()
+
+PREVIOUS_MONTH_FILTER = """
+o.order_date >= date((SELECT MAX(order_date) FROM orders), '-59 day')
+AND o.order_date < date((SELECT MAX(order_date) FROM orders), '-29 day')
+""".strip()
+
+
+def _is_monthly_review(user_question: str) -> bool:
+    normalized = user_question.lower()
+    return any(term in normalized for term in ("本月", "月报", "月度", "monthly", "最近30天", "最近 30 天"))
+
+
+def _review_config(user_question: str) -> dict[str, Any]:
+    if _is_monthly_review(user_question):
+        return {
+            "report_type": "monthly_business_report",
+            "title": "本月电商经营分析月报",
+            "current_label": "本月",
+            "previous_label": "上月",
+            "recommendation_label": "下月建议",
+            "current_filter": MONTH_FILTER,
+            "previous_filter": PREVIOUS_MONTH_FILTER,
+            "lookback_filter": "o.order_date >= date((SELECT MAX(order_date) FROM orders), '-59 day')",
+        }
+    return {
+        "report_type": "weekly_business_report",
+        "title": "本周电商经营分析周报",
+        "current_label": "本周",
+        "previous_label": "上周",
+        "recommendation_label": "下周建议",
+        "current_filter": WEEK_FILTER,
+        "previous_filter": PREVIOUS_WEEK_FILTER,
+        "lookback_filter": "o.order_date >= date((SELECT MAX(order_date) FROM orders), '-13 day')",
+    }
+
 
 def plan_business_review_sections(user_question: str) -> list[dict[str, Any]]:
-    del user_question
+    config = _review_config(user_question)
+    report_type = config["report_type"]
+    current_label = config["current_label"]
+    previous_label = config["previous_label"]
+    recommendation_label = config["recommendation_label"]
+    current_filter = config["current_filter"]
+    previous_filter = config["previous_filter"]
+    lookback_filter = config["lookback_filter"]
     return [
         {
             "section_id": "weekly_gmv",
-            "title": "本周 GMV",
-            "question": "本周 GMV 是多少？",
+            "report_type": report_type,
+            "title": f"{current_label} GMV",
+            "question": f"{current_label} GMV 是多少？",
             "sql": f"""
 SELECT 'GMV' AS metric, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS value
 FROM orders o
 JOIN order_items oi ON o.id = oi.order_id
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 LIMIT 100
 """.strip(),
             "expected_chart_type": "none",
         },
         {
             "section_id": "weekly_order_count",
-            "title": "本周订单量",
-            "question": "本周订单量是多少？",
+            "report_type": report_type,
+            "title": f"{current_label}订单量",
+            "question": f"{current_label}订单量是多少？",
             "sql": f"""
 SELECT '订单量' AS metric, COUNT(*) AS value
 FROM orders o
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 LIMIT 100
 """.strip(),
             "expected_chart_type": "none",
         },
         {
             "section_id": "weekly_aov",
-            "title": "本周客单价",
-            "question": "本周客单价是多少？",
+            "report_type": report_type,
+            "title": f"{current_label}客单价",
+            "question": f"{current_label}客单价是多少？",
             "sql": f"""
 SELECT '客单价' AS metric,
        ROUND(SUM(oi.quantity * oi.unit_price) / COUNT(DISTINCT o.id), 2) AS value
 FROM orders o
 JOIN order_items oi ON o.id = oi.order_id
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 LIMIT 100
 """.strip(),
             "expected_chart_type": "none",
@@ -74,14 +124,15 @@ LIMIT 100
         {
             "section_id": "top_products",
             "title": "Top 商品",
-            "question": "本周 GMV 最高的 Top 5 商品是什么？",
+            "report_type": report_type,
+            "question": f"{current_label} GMV 最高的 Top 5 商品是什么？",
             "sql": f"""
 SELECT p.product_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv
 FROM orders o
 JOIN order_items oi ON o.id = oi.order_id
 JOIN products p ON oi.product_id = p.id
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 GROUP BY p.product_name
 ORDER BY gmv DESC
 LIMIT 5
@@ -91,7 +142,8 @@ LIMIT 5
         {
             "section_id": "top_categories",
             "title": "Top 品类",
-            "question": "本周 GMV 最高的 Top 5 品类是什么？",
+            "report_type": report_type,
+            "question": f"{current_label} GMV 最高的 Top 5 品类是什么？",
             "sql": f"""
 SELECT c.category_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv
 FROM orders o
@@ -99,7 +151,7 @@ JOIN order_items oi ON o.id = oi.order_id
 JOIN products p ON oi.product_id = p.id
 JOIN categories c ON p.category_id = c.id
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 GROUP BY c.category_name
 ORDER BY gmv DESC
 LIMIT 5
@@ -109,14 +161,15 @@ LIMIT 5
         {
             "section_id": "declining_categories",
             "title": "销售下降品类",
-            "question": "本周较上周 GMV 下降最多的品类是什么？",
+            "report_type": report_type,
+            "question": f"{current_label}较{previous_label} GMV 下降最多的品类是什么？",
             "sql": f"""
 SELECT c.category_name,
-       ROUND(SUM(CASE WHEN {WEEK_FILTER} THEN oi.quantity * oi.unit_price ELSE 0 END), 2) AS this_week_gmv,
-       ROUND(SUM(CASE WHEN {PREVIOUS_WEEK_FILTER} THEN oi.quantity * oi.unit_price ELSE 0 END), 2) AS previous_week_gmv,
+       ROUND(SUM(CASE WHEN {current_filter} THEN oi.quantity * oi.unit_price ELSE 0 END), 2) AS this_week_gmv,
+       ROUND(SUM(CASE WHEN {previous_filter} THEN oi.quantity * oi.unit_price ELSE 0 END), 2) AS previous_week_gmv,
        ROUND(
-           SUM(CASE WHEN {WEEK_FILTER} THEN oi.quantity * oi.unit_price ELSE 0 END)
-           - SUM(CASE WHEN {PREVIOUS_WEEK_FILTER} THEN oi.quantity * oi.unit_price ELSE 0 END),
+           SUM(CASE WHEN {current_filter} THEN oi.quantity * oi.unit_price ELSE 0 END)
+           - SUM(CASE WHEN {previous_filter} THEN oi.quantity * oi.unit_price ELSE 0 END),
            2
        ) AS gmv_change
 FROM orders o
@@ -124,7 +177,7 @@ JOIN order_items oi ON o.id = oi.order_id
 JOIN products p ON oi.product_id = p.id
 JOIN categories c ON p.category_id = c.id
 WHERE o.status = 'paid'
-  AND o.order_date >= date((SELECT MAX(order_date) FROM orders), '-13 day')
+  AND {lookback_filter}
   AND o.order_date <= (SELECT MAX(order_date) FROM orders)
 GROUP BY c.category_name
 ORDER BY gmv_change ASC
@@ -134,13 +187,14 @@ LIMIT 5
         },
         {
             "section_id": "next_week_recommendations",
-            "title": "下周建议",
-            "question": "基于本周经营数据生成下周建议。",
+            "report_type": report_type,
+            "title": recommendation_label,
+            "question": f"基于{current_label}经营数据生成{recommendation_label}。",
             "sql": f"""
-SELECT '下周建议依据' AS metric, COUNT(*) AS paid_orders
+SELECT '{recommendation_label}依据' AS metric, COUNT(*) AS paid_orders
 FROM orders o
 WHERE o.status = 'paid'
-  AND {WEEK_FILTER}
+  AND {current_filter}
 LIMIT 100
 """.strip(),
             "expected_chart_type": "none",
@@ -292,9 +346,11 @@ def _build_weekly_report_content(state: dict[str, Any]) -> str:
     tasks = state.get("report_sub_tasks", [])
     failed_tasks = [task for task in tasks if task.get("status") != "completed"]
     chart_paths = [path for task in tasks for path in task.get("chart_paths", [])]
+    report_type = state.get("report_type", "weekly_business_report")
+    report_title = "# 本月电商经营分析月报" if report_type == "monthly_business_report" else "# 本周电商经营分析周报"
 
     lines = [
-        "# 本周电商经营分析周报",
+        report_title,
         "",
         "## 1. 核心结论",
         f"- 已完成 {len(tasks) - len(failed_tasks)} 个数据子任务，失败 {len(failed_tasks)} 个。",
@@ -365,15 +421,23 @@ def run_report_supervisor_agent(
     llm_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     chart_output_dir = chart_dir or Path(__file__).resolve().parents[1] / "reports" / "charts"
-    planned_state = run_report_planner_agent(state, llm_provider) if llm_provider else state
+    runtime_provider = llm_provider or build_business_review_planner_provider()
+    planned_state = (
+        state
+        if state.get("report_sections")
+        else run_report_planner_agent(state, runtime_provider)
+    )
     if planned_state.get("status") == "report_plan_needs_clarification":
         return planned_state
     sections = planned_state.get("report_sections") or plan_business_review_sections(state.get("user_question", ""))
+    report_type = planned_state.get("report_plan", {}).get("report_type") or (
+        sections[0].get("report_type") if sections else "weekly_business_report"
+    )
 
     current = {
         **planned_state,
         "task_type": "business_review_report",
-        "report_type": "weekly_business_report",
+        "report_type": report_type,
         "report_sections": sections,
         "report_sub_tasks": [],
     }
@@ -412,7 +476,8 @@ def run_report_supervisor_agent(
     expected_trace_path = Path(current.get("trace_dir", "logs/traces")) / f"{current['run_id']}.json"
     current["trace_path"] = str(expected_trace_path)
     report_content = _build_weekly_report_content(current)
-    report_result = save_report(f"{current['run_id']}_weekly_business", report_content, output_dir=report_dir)
+    report_slug = "monthly_business" if report_type == "monthly_business_report" else "weekly_business"
+    report_result = save_report(f"{current['run_id']}_{report_slug}", report_content, output_dir=report_dir)
     current = {
         **current,
         "weekly_report_result": report_result,

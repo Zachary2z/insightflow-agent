@@ -16,9 +16,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration (complete; next task not started) |
-| Next planned task | Task 24 - LLM Business Review Decomposition |
-| Last completed task | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration |
+| Current task | Task 24 - LLM Business Review Decomposition (complete; next task not started) |
+| Next planned task | Task 25 - Evidence-backed Report Writing and Polishing |
+| Last completed task | Task 24 - LLM Business Review Decomposition |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -30,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, and Task 23 provider-assisted SQL planning/guarded candidate integration complete; Task 24-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 23 provider/runtime tests passing; full suite 165 passed / 4 live tests skipped by default; live DeepSeek SQL planning workflow smoke 1/1 passed; P0 eval 20/20 passing | `[x]` Task 23 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, and Task 24 LLM business review decomposition complete; Task 25-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 24 provider/runtime tests passing; full suite 168 passed / 5 live tests skipped by default; live DeepSeek business review decomposition smoke 1/1 passed; P0 eval 20/20 passing | `[x]` Task 24 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -157,7 +157,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 21A - Runtime Provider-backed Question Understanding Wiring | `[x]` Wired question understanding into `graph.workflow.run_workflow()` before schema retrieval; added runtime DeepSeek provider factory behind `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING`; Streamlit and FastAPI inherit the core workflow path | `[x]` mock-provider workflow tests, runtime provider factory tests, no-key env fallback, provider alias normalization, full suite, P0 eval, and real DeepSeek-backed workflow smoke | `[x]` Runtime switch and live workflow smoke command documented | `[x]` Done |
 | Task 22 - Provider-backed Clarification Router | `[x]` Added structured clarification prompt/schema for missing metric, dimension, time range, filters, operation, or limit; wired clarification output into workflow state before SQL generation | `[x]` focused-question generation, ambiguous-question fallback, unsafe-request rejection preservation, malformed output fallback, runtime workflow trace, no-key baseline, and live DeepSeek clarification smoke tests | `[x]` Clarification examples, runtime switch behavior, and safety boundaries documented | `[x]` Done |
 | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[x]` Added optional provider-assisted SQL planning, structured `sql_planning_router` validation, runtime provider factories, workflow SQL planning node, and guarded SQL candidate workflow integration | `[x]` provider routing success, malformed/schema mismatch fallback, no-key baseline, candidate validation, rejected unsafe SQL, no direct provider SQL execution, runtime workflow trace, and live DeepSeek SQL planning smoke tests | `[x]` SQL planning/candidate flow, runtime switches, live smoke command, and validation policy documented | `[x]` Done |
-| Task 24 - LLM Business Review Decomposition | `[ ]` Expand controlled report planner for richer allowlisted section/subtask selection and wire it into weekly/monthly review runtime paths | `[ ]` allowlisted section selection, provider-supplied SQL rejection, clarification, fallback, report supervisor runtime integration, and live DeepSeek review-planning smoke tests | `[ ]` Review planning examples, runtime entry points, and allowlist rules documented | `[ ]` Not started |
+| Task 24 - LLM Business Review Decomposition | `[x]` Expanded controlled report planner with PromptOps provider support, weekly/monthly allowlisted section selection, provider SQL/claim rejection, and report supervisor runtime wiring | `[x]` provider section selection, SQL leak rejection, schema mismatch fallback, no-key baseline, monthly review runtime, trace metadata, full suite, P0 eval, and live DeepSeek review-planning smoke tests | `[x]` Review planning runtime switch, live smoke command, monthly report support, and allowlist rules documented | `[x]` Done |
 | Task 25 - Evidence-backed Report Writing and Polishing | `[ ]` Add provider-backed report prose generation from verified findings, hypotheses, SQL, chart paths, and trace path; wire into report generation after Evidence Validator | `[ ]` supported-claim inclusion, unsupported-claim exclusion, Evidence Validator gate, malformed output fallback, report save integration, and live DeepSeek report-writing smoke tests | `[ ]` Report polishing contract, runtime integration, and evidence boundaries documented | `[ ]` Not started |
 | Task 26 - Guarded Insight Claim Typing | `[ ]` Expand guarded insight prompts to classify claims before Evidence Validator filtering and wire into insight/report workflows | `[ ]` claim-type normalization, evidence validation, unsupported blocking, fallback, runtime trace metadata, and live DeepSeek claim-typing smoke tests | `[ ]` Claim type schema, runtime integration, and Evidence Validator interaction documented | `[ ]` Not started |
 | Task 27 - LLM Action and Email Drafting | `[ ]` Add optional provider-backed task/alert/email draft wording from evidence-backed findings before risk assessment and approval; wire into action workflow only before approval gates | `[ ]` draft schema validation, approval gate preservation, no direct action creation, audit requirement, malformed output fallback, runtime action workflow trace, and live DeepSeek drafting smoke tests | `[ ]` Action drafting flow, runtime integration, approval boundary, and email draft rules documented | `[ ]` Not started |
@@ -247,6 +247,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 21A - Runtime Provider-backed Question Understanding Wiring | `[x]` `run_workflow()` question-understanding node, env-gated DeepSeek provider factory, state schema fields, provider alias normalization, live workflow smoke test | `[x]` focused runtime tests, runtime provider factory tests, full suite, P0 eval, and live DeepSeek-backed workflow smoke pass | `[x]` runtime wiring and env switch documented | `[x]` Done |
 | Task 22 - Provider-backed Clarification Router | `[x]` `clarification_router` prompt, structured-output validation, optional provider-backed clarification helper, agent wrapper, workflow node, env-gated runtime provider factory | `[x]` provider success/fallback tests, malformed/schema-mismatch tests, no-key baseline tests, workflow trace/no-SQL tests, full suite, P0 eval, and live DeepSeek-backed clarification workflow smoke pass | `[x]` runtime switch, clarification contract, live smoke command, and safety boundaries documented | `[x]` Done |
 | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[x]` `sql_planning_router` prompt/schema, provider-backed planning helper, provider-aware planning agent, runtime provider factories, workflow planning node, guarded candidate node before SQL Reviewer | `[x]` provider/fallback tests, SQL leak validation test, no-key baseline test, candidate accepted/rejected workflow tests, full suite, P0 eval, and live DeepSeek-backed SQL planning workflow smoke pass | `[x]` runtime switches, guarded candidate flow, live smoke command, and SQL validation boundary documented | `[x]` Done |
+| Task 24 - LLM Business Review Decomposition | `[x]` PromptOps-backed `report_planner` path, weekly/monthly report section templates, env-gated DeepSeek provider factory, and report supervisor runtime integration | `[x]` provider success/fallback tests, provider SQL/claim rejection tests, no-key baseline tests, monthly supervisor tests, full suite, P0 eval, and live DeepSeek-backed business review workflow smoke pass | `[x]` runtime switch, monthly review behavior, live smoke command, and allowlist/SQL boundaries documented | `[x]` Done |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ### P3 Task 17 Acceptance Tracker
@@ -423,6 +424,20 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` The no-key deterministic baseline continues through the existing SQL workflow.
 - `[x]` Live DeepSeek SQL planning workflow smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1`, and `INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1`.
 
+### P3 Task 24 Acceptance Tracker
+
+- `[x]` Report planning output is rendered through prompt id `report_planner` for PromptOps-compatible providers.
+- `[x]` Provider report plans must pass prompt-specific structured validation before use.
+- `[x]` Provider success records `provider_called: true`, `fallback_used: false`, `source: provider`, prompt id/version, model, usage, and latency metadata.
+- `[x]` Provider output can select only allowlisted weekly/monthly report section IDs.
+- `[x]` Provider-supplied SQL, generated SQL, SQL candidates, factual claims, or final claims trigger deterministic fallback.
+- `[x]` `provider=None`, missing API key, provider errors, malformed JSON, schema mismatch, and SQL/claim leakage fall back to deterministic report planning.
+- `[x]` `run_report_supervisor_agent()` can call the runtime DeepSeek provider factory when `INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1`.
+- `[x]` The no-key deterministic baseline continues through the report supervisor without requiring a provider.
+- `[x]` Monthly review questions produce `monthly_business_report` sections and save monthly report artifacts while preserving existing SQL review/execution/evidence/chart/report boundaries.
+- `[x]` Provider-backed business review decomposition does not generate SQL, execute SQL, bypass `validate_sql()`, bypass Evidence Validator, or create final unsupported claims.
+- `[x]` Live DeepSeek business review decomposition smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1` and `INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1`.
+
 ## Update Rules
 
 After every task:
@@ -435,6 +450,19 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 24 verification:
+
+```bash
+python3 -m pytest tests/test_runtime_provider.py -q
+python3 -m pytest tests/test_report_planner.py tests/test_report_supervisor.py tests/test_deepseek_business_review_planner_live.py -q
+python3 -m pytest tests/test_streamlit_app.py tests/test_llm_provider_promptops.py tests/test_deepseek_provider_structured_output.py -q
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1 python3 -m pytest tests/test_deepseek_business_review_planner_live.py -q
+python3 -m pytest -q -rs
+python3 eval/run_eval.py
+```
+
+Result: runtime provider tests report 3/3 passed; Task 24 report planner/supervisor tests report 10 passed and 1 live DeepSeek test skipped by default; Streamlit/PromptOps/DeepSeek structured-output tests report 26/26 passed; the real DeepSeek-backed business review decomposition workflow smoke reports 1/1 passed when explicitly enabled; the default full suite reports 168 passed and 5 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. No full-suite warning was reported. Task 24 proves DeepSeek can participate in the real report supervisor workflow by selecting validated weekly/monthly review sections while provider-supplied SQL or claims are rejected and deterministic fallback remains available without an API key.
 
 Task 23 verification:
 

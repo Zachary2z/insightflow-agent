@@ -131,3 +131,36 @@ LIMIT 100
     assert Path(result["weekly_report_path"]).exists()
     assert result["status"] == "business_review_report_completed_with_subtask_errors"
     assert "runtime_failure" in Path(result["weekly_report_path"]).read_text(encoding="utf-8")
+
+
+def test_report_supervisor_decomposes_monthly_review_question_and_saves_monthly_report(tmp_path):
+    from agents.report_supervisor import plan_business_review_sections, run_report_supervisor_agent
+    from agents.supervisor import initialize_run
+
+    sections = plan_business_review_sections("帮我生成本月电商经营复盘，包含 GMV、订单量、Top 商品和下月建议。")
+
+    assert sections
+    assert all(section["report_type"] == "monthly_business_report" for section in sections)
+    assert any("本月" in section["title"] or "月" in section["question"] for section in sections)
+    assert all("'-29 day'" in section["sql"] or "本月" not in section["question"] for section in sections)
+
+    state = initialize_run(
+        "帮我生成本月电商经营复盘，包含 GMV、订单量、Top 商品和下月建议。",
+        run_id="run_monthly_report_test",
+        session_id="session_monthly_report_test",
+    )
+    state["db_path"] = DB_PATH
+    state["trace_dir"] = tmp_path / "traces"
+
+    result = run_report_supervisor_agent(
+        state,
+        report_dir=tmp_path / "markdown",
+        chart_dir=tmp_path / "charts",
+    )
+
+    assert result["status"] == "business_review_report_completed"
+    assert result["report_type"] == "monthly_business_report"
+    assert result["weekly_report_path"].endswith("run_monthly_report_test_monthly_business_report.md")
+    report_text = Path(result["weekly_report_path"]).read_text(encoding="utf-8")
+    assert "# 本月电商经营分析月报" in report_text
+    assert "下月建议" in report_text

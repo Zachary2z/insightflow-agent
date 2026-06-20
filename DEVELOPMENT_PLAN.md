@@ -41,7 +41,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, and 23 complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, and 24 complete; Docker/CI and later hardening not started |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -64,6 +64,7 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Runtime provider-backed question understanding wiring | Core workflow runs question understanding before schema retrieval; env-gated DeepSeek provider can participate in workflow state and trace | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete |
 | Provider-backed clarification router | Optional provider-backed clarification questions with prompt-specific validation, deterministic fallback, runtime workflow state, and trace metadata | `question_understanding/clarification.py`, `agents/clarification_router.py`, `graph/workflow.py`, `llm_ops/structured_output.py` | Complete |
 | Provider-assisted SQL planning and guarded candidates | Optional provider-backed SQL source routing plus guarded candidate SQL generation in the core workflow; accepted candidates still require `validate_sql()` and SQL Reviewer approval | `sql_planning/provider_backed.py`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py`, `graph/workflow.py` | Complete |
+| Provider-backed business review decomposition | Optional provider-backed weekly/monthly report section planning in the report supervisor runtime; accepted plans can only select allowlisted sections and cannot provide SQL or claims | `agents/report_planner.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 
 ### 4.2 Remaining LLM Enhancement Targets
 
@@ -71,7 +72,6 @@ These are the remaining concrete places where future tasks should enhance the pr
 
 | Target | Why the LLM is useful | Future development task | Safety boundary |
 |---|---|---|---|
-| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Task 24 - expand controlled report planner and wire provider planning into report supervisor runtime paths | Must not provide provider-supplied SQL |
 | Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Task 25 - add provider-backed report prose from verified evidence and wire it into report generation after Evidence Validator | Must not add unsupported claims |
 | Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Task 26 - expand guarded insight prompts and wire claim typing into insight/report workflows before Evidence Validator filtering | Evidence Validator decides what can be used |
 | Action plan and email draft wording | Turn evidence-backed findings into clearer task, alert, and email draft wording | Task 27 - add optional LLM drafting in action workflow before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
@@ -213,6 +213,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 | Task 21A | Runtime Provider-backed Question Understanding Wiring | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete | Env-gated DeepSeek provider can participate in core workflow question understanding without changing SQL validation or execution boundaries |
 | Task 22 | Provider-backed Clarification Router | `question_understanding/clarification.py`, `agents/clarification_router.py`, `graph/workflow.py`, `llm_ops/runtime_provider.py` | Complete | Env-gated DeepSeek provider can participate in runtime clarification; ambiguous provider-backed clarification stops before schema retrieval and SQL generation |
 | Task 23 | Provider-assisted SQL Planning and Guarded Candidate Integration | `sql_planning/provider_backed.py`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py`, `graph/workflow.py` | Complete | Env-gated DeepSeek provider can participate in runtime SQL planning and guarded SQL candidates; planning cannot return SQL and candidate SQL still requires validation/review |
+| Task 24 | LLM Business Review Decomposition | `agents/report_planner.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can participate in weekly/monthly business review decomposition; provider can only select allowlisted sections and cannot return SQL or final claims |
 | Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
 
 ### P3 Acceptance Standard
@@ -230,8 +231,7 @@ The next task should be selected from the remaining P3 engineering backlog. Do n
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | Task 24 - LLM Business Review Decomposition | Expand controlled allowlisted report/subtask planning |
-| Later | Task 25 - Evidence-backed Report Writing and Polishing | Generate prose only from verified evidence and traceable artifacts |
+| Next | Task 25 - Evidence-backed Report Writing and Polishing | Generate prose only from verified evidence and traceable artifacts |
 | Later | Task 26 - Guarded Insight Claim Typing | Add stricter claim classification before Evidence Validator filtering |
 | Later | Task 27 - LLM Action and Email Drafting | Draft task/alert/email wording before approval-gated execution |
 | Later | Task 28 - LLM Template Mining and Eval Suite | Expand template recommendations and opt-in LLM eval coverage |
@@ -256,8 +256,8 @@ The no-key deterministic baseline must continue to run without a provider, and P
 | Clarification routing | P3 Task 20A / 22 | Ask focused follow-up questions for ambiguous requests | Must not guess missing SQL requirements |
 | SQL planning | P3 Task 20B / 23 | Choose deterministic template, guarded `llm_candidate`, clarify, or reject strategy | Must not return executable SQL directly |
 | Guarded SQL candidate | P2 Task 15B, hardened and wired by P3 Task 20 / 20C / 23 | Propose SQL candidates for clear non-template questions | Every candidate must pass `validate_sql()` and SQL Reviewer before `run_sql()` |
-| Controlled report planning | P2 Task 15A | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
-| Business review decomposition | P2 / P3 enhancement | Break weekly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis into subtasks | Each subtask still goes through SQL review, SQL execution, Evidence Validator, chart, and report tools |
+| Controlled report planning | P2 Task 15A / P3 Task 24 | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
+| Business review decomposition | P3 Task 24 | Break weekly/monthly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis into allowlisted subtasks | Each subtask still goes through SQL review, SQL execution, Evidence Validator, chart, and report tools |
 | Guarded insight claims | P2 Task 15B | Suggest or polish claims from execution results, metric context, and business context | Evidence Validator decides which claims can be used |
 | Report writing / polishing | P2 / P3 enhancement | Turn verified findings, hypotheses, SQL, chart paths, and trace paths into clearer business prose | Must not invent unsupported data or conclusions |
 | Action drafting | P2 Task 16 enhancement | Draft task, alert, and email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
