@@ -30,7 +30,7 @@ Implemented:
 - P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
 - P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, and 20 complete. Task 20A+ router and later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, and 20 complete. Task 20C production provider hardening, Task 20A+ router work, and later engineering work are not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -46,6 +46,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 question understanding**: add a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
 - **P3 SQL planning router**: route clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
+- **P3 production provider hardening**: planned Task 20C will add a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
 
 LLM boundaries:
 
@@ -84,6 +85,8 @@ The intended routing contract is:
 ```
 
 These tasks belong in P3 because they depend on mature provider, prompt, trace, and eval infrastructure. They should not weaken the current deterministic baseline.
+
+Before enabling real-provider model output in production paths, planned Task 20C will harden the provider layer with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. This keeps Task 20A and Task 20B from depending on loosely parsed model responses.
 
 ## Quickstart
 
@@ -727,6 +730,8 @@ Safety boundaries:
 - `guarded_insight_claims` prompts require Evidence Validator verification before claims can be used.
 - The provider layer does not expose approval-gated action tools and does not trigger tasks, alerts, or email drafts.
 - Provider failures are returned as `success: false` with structured errors instead of crashing workflows.
+
+Planned Task 20C will turn the live DeepSeek smoke-test path into a production-grade adapter. It should add `DeepSeekProvider`, strict per-prompt JSON schema validation, response normalization, optional live-test markers or flags, and documentation for `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`. The default workflow must still run without any API key.
 
 ## Schema Tool
 
