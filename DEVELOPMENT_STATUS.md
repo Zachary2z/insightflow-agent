@@ -16,8 +16,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 20A - Question Understanding & Clarification Router (complete; Task 20B not started) |
-| Last completed task | Task 20A - Question Understanding & Clarification Router |
+| Current task | Task 20B - SQL Planning Router (complete; next task not started) |
+| Last completed task | Task 20B - SQL Planning Router |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -29,7 +29,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, and Task 20A question understanding complete; CI and SQL routing hardening are not started | `[x]` Task 20A tests passing; full suite 131/131 passing with one skipped live test; eval 20/20 passing | `[x]` Task 20A README and status docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, and Task 20B SQL planning router complete; CI and later engineering hardening are not started | `[x]` Task 20B tests passing; full suite 138/138 passing with one skipped live test; eval 20/20 passing | `[x]` Task 20B README and status docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -197,7 +197,7 @@ LLM safety boundaries:
 | Task 20 - LLM Provider and PromptOps Core | `[x]` `llm_ops/` provider abstraction, prompt registry, prompt/version metadata, model cost/latency tracking, trace-ready provider metadata, and LLM eval harness | `[x]` `tests/test_llm_provider_promptops.py`; full suite and P0 eval passing | `[x]` provider setup, prompt governance, safety boundaries, and eval docs | `[x]` Done |
 | Task 20C - Production DeepSeek Provider & Structured Output Validation | `[x]` `DeepSeekProvider`, `.env`-driven model/base URL config, strict JSON schema/structure validation, provider response normalization, and production smoke-test controls | `[x]` provider adapter contract tests, schema validation failure tests, malformed JSON fallback tests, optional live DeepSeek smoke test, and no-key baseline tests | `[x]` DeepSeek setup, structured output rules, live-test opt-in, and safety boundary docs | `[x]` Done |
 | Task 20A - Question Understanding & Clarification Router | `[x]` deterministic intent slot extraction, completeness checks, clarification-question generation, and risk/sensitive-request routing | `[x]` intent-slot tests, ambiguous-question tests, missing-slot tests, rejection-routing tests, and no-SQL/no-20B-boundary tests | `[x]` intent contract, clarification policy, and routing examples | `[x]` Done |
-| Task 20B - SQL Planning Router | `[ ]` template-vs-LLM-candidate strategy router, confidence/reason payload, fallback policy, and template-mining feedback loop | `[ ]` template routing tests, `llm_candidate` routing tests, clarify/reject routing tests, and P0 eval preservation tests | `[ ]` router contract, strategy matrix, and eval plan | `[ ]` Not started |
+| Task 20B - SQL Planning Router | `[x]` template-vs-LLM-candidate strategy router, confidence/reason payload, fallback policy, and template-mining feedback loop | `[x]` template routing tests, `llm_candidate` routing tests, clarify/reject routing tests, no-provider/no-SQL boundary tests, and P0 eval preservation tests | `[x]` router contract, strategy matrix, and eval plan | `[x]` Done |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ### P3 Task 17 Acceptance Tracker
@@ -305,11 +305,17 @@ LLM safety boundaries:
 - `[x]` Task 20A does not emit SQL, execute SQL, choose a concrete `matched_template`, or add Task 20B confidence fields.
 - `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 20A.
 
-### P3 Planned Router Additions
+### P3 Task 20B Acceptance Tracker
 
-- SQL Planning Router chooses one of `template`, `llm_candidate`, `clarify`, or `reject` and records confidence, matched template, missing slots, risk flags, and reason.
-- Deterministic templates remain the default for stable BI questions; LLM SQL candidates remain optional and must pass `validate_sql()` before any execution.
-- Repeated successful `llm_candidate` patterns should feed back into deterministic template expansion, preserving eval stability and reducing future model cost.
+- `[x]` `sql_planning.router.plan_sql_strategy()` chooses one of `template`, `llm_candidate`, `clarify`, or `reject`.
+- `[x]` Stable Top product/category/city BI intents route to deterministic template IDs with confidence and template variables.
+- `[x]` Clarify and reject routes preserve missing slots, clarification questions, risk flags, and rejection reasons from Task 20A.
+- `[x]` Complete non-template intents route to `llm_candidate` with a guarded candidate policy.
+- `[x]` `llm_candidate` routing does not call a provider and does not return SQL.
+- `[x]` All planned SQL paths carry `must_validate_sql_before_execution`.
+- `[x]` `sql_planning.feedback.summarize_template_mining_feedback()` flags repeated successful `llm_candidate` intent patterns for future deterministic template mining.
+- `[x]` `agents.sql_planning_router.run_sql_planning_router_agent()` writes planning state and appends trace without generating SQL.
+- `[x]` Existing P0/P1/P2/P3 tests and P0 eval remain passing after Task 20B.
 
 ## Update Rules
 
@@ -323,6 +329,16 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 20B verification:
+
+```bash
+python3 -m pytest tests/test_sql_planning_router.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: Task 20B SQL planning router tests report 7/7 passed; the full test suite reports 138/138 passed with 1 skipped opt-in live DeepSeek smoke test and one FastAPI TestClient deprecation warning from Starlette; P0 eval reports 20/20 passed. The router maps stable intents to deterministic template IDs, preserves clarify/reject routes, sends complete non-template intents to guarded `llm_candidate` policy, records validation requirements, summarizes repeated candidate patterns for template mining, and does not call a provider, generate SQL, or execute SQL.
 
 Task 20A verification:
 
