@@ -132,6 +132,20 @@ LLM safety boundaries:
 - The LLM must not create final evidence-backed claims without SQL results, business context, or validated evidence.
 - The LLM must not trigger action tools without approval gates and audit logging.
 
+Final LLM participation map added to the tracked [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md):
+
+| Area | Intended LLM role | Boundary |
+|---|---|---|
+| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Preserve no-key deterministic baseline |
+| Question understanding and clarification | Extract intent slots and ask missing-context questions | No SQL generation or execution |
+| SQL planning and guarded SQL candidates | Route to deterministic templates or propose validated candidates for clear non-template questions | `validate_sql()` remains mandatory before `run_sql()` |
+| Report planning and business review decomposition | Select allowlisted report sections and organize subtasks | No provider-supplied SQL or final factual claims |
+| Insight/report polishing | Suggest or polish claims from execution results and context | Evidence Validator decides what can be used |
+| Action drafting | Draft task, alert, and email wording from evidence-backed findings | Approval Gate, Action Executor, and Audit Logger remain mandatory |
+| Template mining and LLM eval | Summarize repeated candidate patterns and validate provider/prompt health | No automatic production template changes; live tests remain opt-in |
+
+Non-negotiable deterministic ownership remains with `validate_sql()`, `run_sql()`, `Evidence Validator`, `Approval Gate`, `Audit Logger`, `Trace Logger`, MCP safety wrappers, and the P0 eval baseline.
+
 ## P2 - Business Review & Action Workflow
 
 | Task | Development | Tests | Docs | Status |

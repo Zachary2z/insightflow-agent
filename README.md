@@ -35,7 +35,7 @@ Implemented:
 
 P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
+Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track long-lived engineering boundaries, including final LLM participation rules, in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 
@@ -55,6 +55,23 @@ LLM boundaries:
 
 - The LLM must not execute SQL, bypass `validate_sql()`, override `Evidence Validator`, create final evidence-backed claims without data support, or trigger action tools without approval gates.
 - Reports and insights must remain traceable to SQL, execution results, business context, evidence validation, charts, and saved artifacts.
+
+Final LLM participation map:
+
+| Area | LLM role | Hard boundary |
+|---|---|---|
+| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Must not change the no-key deterministic baseline |
+| Question understanding | Extract metric, dimension, time range, filters, operation, limit, and risk flags | Must not generate or execute SQL |
+| Clarification routing | Ask focused follow-up questions for ambiguous requests | Must not guess missing SQL requirements |
+| SQL planning | Choose template, guarded `llm_candidate`, clarify, or reject strategy | Must not return executable SQL directly |
+| Guarded SQL candidate | Propose SQL candidates for clear non-template questions | Every candidate must pass `validate_sql()` before `run_sql()` |
+| Report planning | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
+| Insight/report wording | Suggest claims or polish business-language summaries | Every claim must pass Evidence Validator before use |
+| Action drafting | Draft task, alert, or email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
+| Template mining feedback | Summarize repeated successful `llm_candidate` patterns | Must not automatically modify production templates |
+| LLM eval / smoke tests | Validate provider availability, JSON shape, prompt schemas, and failure handling | Live provider tests must remain explicit opt-in |
+
+The development plan tracks this as the final LLM participation boundary: LLMs may help with understanding, planning, candidates, wording, and suggestions; deterministic tools remain responsible for approval, execution, validation, and audit.
 
 ## Question Understanding And SQL Routing
 
