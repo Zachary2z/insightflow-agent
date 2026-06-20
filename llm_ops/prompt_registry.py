@@ -211,5 +211,33 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "and do not override sensitive or unsafe rejection."
             ),
         ),
+        PromptTemplate(
+            prompt_id="sql_planning_router",
+            version="v1",
+            description="Choose SQL source strategy without returning executable SQL.",
+            required_variables=["user_question", "question_understanding", "deterministic_plan"],
+            safety_contract=[
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_bypass_validate_sql",
+                "must_not_invent_template_ids",
+            ],
+            template=(
+                "Task: provider-assisted SQL planning.\n"
+                "User question: {user_question}\n"
+                "Question understanding: {question_understanding}\n"
+                "Deterministic SQL plan: {deterministic_plan}\n"
+                "Return JSON only with strategy, matched_template, confidence, missing_slots, "
+                "clarification_questions, risk_flags, and reason.\n"
+                "Allowed strategy values: template, llm_candidate, clarify, reject.\n"
+                "Allowed matched_template values: empty string, top_products_gmv, top_categories_gmv, "
+                "city_gmv_summary, city_order_count_summary.\n"
+                "Use the deterministic SQL plan as the default. Keep llm_candidate for complete non-template "
+                "intents; use template only for an allowed matched_template; use clarify or reject only when "
+                "required by missing slots or safety risks.\n"
+                "Safety: do not generate SQL, do not return sql_candidates, do not execute SQL, "
+                "and do not bypass validate_sql."
+            ),
+        ),
     ]
 )

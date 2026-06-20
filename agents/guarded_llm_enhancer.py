@@ -4,12 +4,15 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+from llm_ops.provider import LLMProvider, LLMRequest
+from llm_ops.structured_output import run_validated_llm_request
 from tools.evidence_tool import validate_evidence
 from tools.sql_validator import validate_sql
 from tools.trace_logger import append_trace
 
 
-LLMProvider = Callable[[dict[str, Any]], dict[str, Any] | str]
+LegacyCallableProvider = Callable[[dict[str, Any]], dict[str, Any] | str]
 
 
 def _parse_provider_response(response: dict[str, Any] | str) -> dict[str, Any]:
@@ -43,6 +46,45 @@ def _sql_prompt(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sql_prompt_variables(state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "user_question": state.get("user_question", ""),
+        "schema_text": state.get("schema_text", ""),
+        "metric_context": state.get("metric_context", {}),
+        "business_context": state.get("business_context", {}),
+        "current_deterministic_sql": state.get("generated_sql", ""),
+    }
+
+
+def _provider_payload_from_llm_provider(state: dict[str, Any], provider: LLMProvider) -> dict[str, Any]:
+    rendered = DEFAULT_PROMPT_REGISTRY.render("guarded_sql_candidate", _sql_prompt_variables(state))
+    if not rendered.get("success"):
+        return {
+            "success": False,
+            "content": None,
+            "error": rendered.get("error", ""),
+            "error_type": "prompt_render_error",
+        }
+
+    request = LLMRequest(
+        prompt=rendered["prompt"],
+        prompt_id=rendered["prompt_id"],
+        prompt_version=rendered["prompt_version"],
+        model=getattr(provider, "model", "unknown"),
+        metadata={"node": "guarded_sql_candidate_agent"},
+    )
+    return run_validated_llm_request(provider, request)
+
+
+def _provider_payload(state: dict[str, Any], provider: LLMProvider | LegacyCallableProvider) -> dict[str, Any]:
+    if hasattr(provider, "generate"):
+        result = _provider_payload_from_llm_provider(state, provider)
+        if not result.get("success"):
+            raise ValueError(result.get("error", "provider request failed"))
+        return result.get("content", {})
+    return _parse_provider_response(provider(_sql_prompt(state)))
+
+
 def _fallback_sql_enhancement(reason: str, provider_called: bool) -> dict[str, Any]:
     return {
         "success": True if not provider_called else False,
@@ -64,7 +106,7 @@ def _candidate_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def run_guarded_sql_candidate_agent(
     state: dict[str, Any],
-    llm_provider: LLMProvider | None = None,
+    llm_provider: LLMProvider | LegacyCallableProvider | None = None,
 ) -> dict[str, Any]:
     deterministic_sql = state.get("generated_sql", "")
     if not llm_provider:
@@ -86,7 +128,7 @@ def run_guarded_sql_candidate_agent(
     accepted_sql = ""
     error = ""
     try:
-        payload = _parse_provider_response(llm_provider(_sql_prompt(state)))
+        payload = _provider_payload(state, llm_provider)
         for item in _candidate_items(payload):
             candidate_sql = str(item.get("sql", "")).strip()
             review_result = validate_sql(candidate_sql, state.get("database_schema", {}), state.get("metric_context"))
@@ -134,6 +176,8 @@ def run_guarded_sql_candidate_agent(
             "latency_ms": 0,
             "error_type": None if accepted else "llm_sql_candidate_rejected",
             "error": error or None,
+            "provider_called": True,
+            "fallback_used": not accepted,
         },
     )
 

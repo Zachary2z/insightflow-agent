@@ -12,26 +12,36 @@ from graph.nodes import (
     early_response_node,
     error_fix_node,
     fail_response_node,
+    guarded_sql_candidate_node,
     insight_node,
     metric_node,
     route_after_execute,
     route_after_fix,
     route_after_clarification,
+    route_after_sql_planning,
     route_after_review,
     save_trace_node,
     schema_node,
+    sql_planning_node,
     sql_executor_node,
     sql_generator_node,
     sql_reviewer_node,
 )
 from graph.state import AgentState
 from llm_ops.provider import LLMProvider
-from llm_ops.runtime_provider import build_clarification_provider, build_question_understanding_provider
+from llm_ops.runtime_provider import (
+    build_clarification_provider,
+    build_question_understanding_provider,
+    build_sql_candidate_provider,
+    build_sql_planning_provider,
+)
 
 
 def build_workflow(
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
+    sql_planning_provider: LLMProvider | None = None,
+    sql_candidate_provider: LLMProvider | None = None,
 ):
     workflow = StateGraph(AgentState)
     workflow.add_node(
@@ -42,9 +52,17 @@ def build_workflow(
         "clarification",
         lambda state: clarification_node(dict(state), provider=clarification_provider),
     )
+    workflow.add_node(
+        "sql_planning",
+        lambda state: sql_planning_node(dict(state), provider=sql_planning_provider),
+    )
     workflow.add_node("schema", schema_node)
     workflow.add_node("metric", metric_node)
     workflow.add_node("generate", sql_generator_node)
+    workflow.add_node(
+        "guarded_candidate",
+        lambda state: guarded_sql_candidate_node(dict(state), provider=sql_candidate_provider),
+    )
     workflow.add_node("review", sql_reviewer_node)
     workflow.add_node("execute", sql_executor_node)
     workflow.add_node("fix", error_fix_node)
@@ -58,11 +76,17 @@ def build_workflow(
     workflow.add_conditional_edges(
         "clarification",
         route_after_clarification,
+        {"early_response": "early_response", "schema": "sql_planning"},
+    )
+    workflow.add_conditional_edges(
+        "sql_planning",
+        route_after_sql_planning,
         {"early_response": "early_response", "schema": "schema"},
     )
     workflow.add_edge("schema", "metric")
     workflow.add_edge("metric", "generate")
-    workflow.add_edge("generate", "review")
+    workflow.add_edge("generate", "guarded_candidate")
+    workflow.add_edge("guarded_candidate", "review")
     workflow.add_conditional_edges("review", route_after_review, {"execute": "execute", "fail": "fail"})
     workflow.add_conditional_edges("execute", route_after_execute, {"insight": "insight", "fix": "fix", "fail": "fail"})
     workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
@@ -82,6 +106,8 @@ def run_workflow(
     initial_sql: str | None = None,
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
+    sql_planning_provider: LLMProvider | None = None,
+    sql_candidate_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
     state["db_path"] = db_path
@@ -93,8 +119,12 @@ def run_workflow(
 
     question_provider = question_understanding_provider or build_question_understanding_provider()
     clarify_provider = clarification_provider or build_clarification_provider()
+    planning_provider = sql_planning_provider or build_sql_planning_provider()
+    candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
     app = build_workflow(
         question_understanding_provider=question_provider,
         clarification_provider=clarify_provider,
+        sql_planning_provider=planning_provider,
+        sql_candidate_provider=candidate_provider,
     )
     return dict(app.invoke(state))

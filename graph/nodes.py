@@ -6,8 +6,10 @@ from typing import Any
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
 from agents.insight_agent import run_insight_agent
+from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
+from agents.sql_planning_router import run_sql_planning_router_agent
 from agents.sql_generator import run_sql_generator
 from agents.sql_reviewer import run_sql_reviewer
 from tools.sql_executor import run_sql
@@ -26,6 +28,10 @@ def metric_node(state: AgentState) -> AgentState:
 
 def clarification_node(state: AgentState, provider=None) -> AgentState:
     return run_clarification_router_agent(dict(state), provider=provider)
+
+
+def sql_planning_node(state: AgentState, provider=None) -> AgentState:
+    return run_sql_planning_router_agent(dict(state), provider=provider)
 
 
 def early_response_node(state: AgentState) -> AgentState:
@@ -94,6 +100,12 @@ def sql_generator_node(state: AgentState) -> AgentState:
             },
         )
     return run_sql_generator(dict(state))
+
+
+def guarded_sql_candidate_node(state: AgentState, provider=None) -> AgentState:
+    if state.get("sql_routing_strategy") != "llm_candidate":
+        return dict(state)
+    return run_guarded_sql_candidate_agent(dict(state), llm_provider=provider)
 
 
 def sql_reviewer_node(state: AgentState) -> AgentState:
@@ -211,5 +223,14 @@ def route_after_clarification(state: AgentState) -> str:
     if state.get("routing_strategy") == "reject":
         return "early_response"
     if state.get("routing_strategy") == "clarify" and state.get("clarification_result", {}).get("provider_called"):
+        return "early_response"
+    return "schema"
+
+
+def route_after_sql_planning(state: AgentState) -> str:
+    if state.get("initial_sql"):
+        return "schema"
+    planning = state.get("sql_planning", {})
+    if planning.get("source") == "provider" and planning.get("strategy") in {"clarify", "reject"}:
         return "early_response"
     return "schema"

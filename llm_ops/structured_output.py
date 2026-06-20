@@ -221,6 +221,67 @@ def _validate_clarification_router(content: Any) -> dict[str, Any]:
     )
 
 
+def _validate_sql_planning_router(content: Any) -> dict[str, Any]:
+    prompt_id = "sql_planning_router"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "sql_planning_router output must be an object")
+
+    blocked_fields = {"sql", "generated_sql", "sql_candidates", "candidate_sql", "selected_tables"}
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"sql_planning_router must not return SQL fields: {', '.join(leaked)}")
+
+    strategy = str(content.get("strategy", "")).strip()
+    if strategy not in {"template", "llm_candidate", "clarify", "reject"}:
+        return _error(prompt_id, "strategy must be one of template, llm_candidate, clarify, reject")
+
+    matched_template = str(content.get("matched_template") or "").strip()
+    allowed_templates = {
+        "",
+        "top_products_gmv",
+        "top_categories_gmv",
+        "city_gmv_summary",
+        "city_order_count_summary",
+    }
+    if matched_template not in allowed_templates:
+        return _error(prompt_id, f"matched_template is not allowed: {matched_template}")
+    if strategy != "template":
+        matched_template = ""
+
+    confidence = content.get("confidence", 0.0)
+    if not isinstance(confidence, int | float):
+        return _error(prompt_id, "confidence must be a number")
+    confidence = float(confidence)
+    if confidence < 0 or confidence > 1:
+        return _error(prompt_id, "confidence must be between 0 and 1")
+
+    missing_ok, missing_slots, message = _string_list(content.get("missing_slots", []), "missing_slots")
+    if not missing_ok:
+        return _error(prompt_id, message)
+    questions_ok, clarification_questions, message = _string_list(
+        content.get("clarification_questions", []),
+        "clarification_questions",
+    )
+    if not questions_ok:
+        return _error(prompt_id, message)
+    risk_ok, risk_flags, message = _string_list(content.get("risk_flags", []), "risk_flags")
+    if not risk_ok:
+        return _error(prompt_id, message)
+
+    return _ok(
+        prompt_id,
+        {
+            "strategy": strategy,
+            "matched_template": matched_template,
+            "confidence": confidence,
+            "missing_slots": missing_slots,
+            "clarification_questions": clarification_questions,
+            "risk_flags": risk_flags,
+            "reason": str(content.get("reason", "")).strip(),
+        },
+    )
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -237,6 +298,8 @@ def validate_prompt_output(
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":
         return _validate_clarification_router(content)
+    if prompt_id == "sql_planning_router":
+        return _validate_sql_planning_router(content)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 
