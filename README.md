@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, and summarize trace/eval/action observability metrics for a dashboard data layer.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, and provide a controlled no-key LLM Provider and PromptOps core for future model-assisted steps.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, and Task 19A - Streamlit Unified Demo are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, and Task 20 - LLM Provider and PromptOps Core are complete.
 
 Implemented:
 
@@ -28,14 +28,15 @@ Implemented:
 - P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
 - P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
 - P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
+- P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, and 19A complete. Task 20+ engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, and 20 complete. Task 20A+ router and later engineering work is not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
 ## LLM Enhancement Roadmap
 
-The current P0 and P1 implementation is deterministic and does not call an LLM, so an API key is not required for the completed workflow. `.env.example` keeps `OPENAI_API_KEY` as a reserved configuration point for later controlled LLM enhancement.
+The default P0/P1/P2 workflow is deterministic and does not call a real LLM, so an API key is not required for the completed workflow. P3 Task 20 adds no-key provider and PromptOps infrastructure with a mock provider contract; `.env.example` keeps `OPENAI_API_KEY` as a reserved configuration point for later controlled provider integration.
 
 LLM usage should be additive, optional, and bounded by tools, validators, and trace:
 
@@ -44,7 +45,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
 - **P3 question understanding**: add a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
 - **P3 SQL planning router**: route clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
-- **P3 engineering hardening**: add provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and observability around model-assisted steps.
+- **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 
 LLM boundaries:
 
@@ -684,6 +685,49 @@ Views:
 
 Task 19A improves clarity without changing core safety boundaries. The UI does not bypass SQL Validator, Evidence Validator, approval gate, MCP contracts, or deterministic workflow behavior. It does not introduce React, RBAC, Docker/CI, persistent queues, provider abstraction, PromptOps, or new LLM behavior.
 
+## LLM Provider And PromptOps Core
+
+Task 20 introduces a controlled `llm_ops` layer for future model-assisted steps. It is infrastructure only: it does not call a real model by default, does not require an API key, and does not change the deterministic workflow baseline.
+
+Implemented pieces:
+
+- `llm_ops.prompt_registry.DEFAULT_PROMPT_REGISTRY` stores versioned prompt templates for `report_planner`, `guarded_sql_candidate`, and `guarded_insight_claims`.
+- `llm_ops.provider.LLMRequest` and `run_llm_request()` define the provider contract and return JSON-compatible results with `success`, `content`, `usage`, `latency_ms`, `error`, and `trace_event`.
+- `llm_ops.provider.MockLLMProvider` supports deterministic tests and smoke evals without network calls.
+- `llm_ops.eval_smoke.run_llm_smoke_eval()` runs lightweight prompt/provider checks with expected output keys.
+
+Example:
+
+```python
+from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+from llm_ops.provider import LLMRequest, MockLLMProvider, run_llm_request
+
+rendered = DEFAULT_PROMPT_REGISTRY.render(
+    "report_planner",
+    {
+        "user_question": "帮我生成本周经营周报。",
+        "allowed_section_ids": ["weekly_gmv", "top_products"],
+    },
+)
+
+result = run_llm_request(
+    MockLLMProvider({"sections": [{"section_id": "weekly_gmv"}]}),
+    LLMRequest(
+        prompt=rendered["prompt"],
+        prompt_id=rendered["prompt_id"],
+        prompt_version=rendered["prompt_version"],
+    ),
+)
+print(result["trace_event"])
+```
+
+Safety boundaries:
+
+- `guarded_sql_candidate` prompts explicitly require `validate_sql()` and never execute SQL.
+- `guarded_insight_claims` prompts require Evidence Validator verification before claims can be used.
+- The provider layer does not expose approval-gated action tools and does not trigger tasks, alerts, or email drafts.
+- Provider failures are returned as `success: false` with structured errors instead of crashing workflows.
+
 ## Schema Tool
 
 The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
@@ -881,5 +925,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, dashboard frontend views, provider abstraction, PromptOps, Docker/CI, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, dashboard frontend views, real LLM provider integration, question understanding router, SQL planning router, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
