@@ -41,7 +41,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, and 27 complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI and later hardening not started |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -68,14 +68,15 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Provider-backed report writing | Optional provider-backed prose polishing after Evidence Validator for analysis reports and business review reports; accepted prose can only use verified findings/hypotheses and traceable artifacts | `agents/report_writer.py`, `agents/report_agent.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Provider-backed insight claim typing | Optional provider-backed claim classification before Evidence Validator in the core workflow and report supervisor; Evidence Validator keeps final authority | `agents/insight_claim_typer.py`, `graph/workflow.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Provider-backed action and email drafting | Optional provider-backed task, alert, and email draft payload drafting inside the action workflow before Risk Assessor and Approval Gate; accepted drafts cannot create records or set approval state | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
+| Template mining and LLM eval suite | Saved workflow trace mining for successful `llm_candidate` patterns plus schema-aware smoke evals for valid output, malformed JSON, and schema mismatch | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete |
 
 ### 4.2 Remaining LLM Enhancement Targets
 
-These are the remaining concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback, existing validators, runtime trace evidence, and a live DeepSeek smoke test for the actual project entry point it affects.
+The concrete LLM enhancement backlog through Task 28 is complete. Future work should focus on engineering hardening unless a new model-assisted product capability is explicitly scoped.
 
 | Target | Why the LLM is useful | Future development task | Safety boundary |
 |---|---|---|---|
-| Template mining and LLM eval suite | Identify repeated successful `llm_candidate` patterns and measure provider output quality | Task 28 - expand template mining and LLM eval from real workflow traces | Must not auto-modify production templates or affect no-key baseline |
+| New LLM capability proposals | Extend model participation only where validators, traces, and deterministic fallback are already defined | Future scoped task | Must not affect no-key baseline or bypass deterministic safety gates |
 
 ### 4.3 Areas That Must Stay Deterministic
 
@@ -217,6 +218,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 | Task 25 | Evidence-backed Report Writing and Polishing | `agents/report_writer.py`, `agents/report_agent.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can participate in report prose after Evidence Validator; provider cannot add unsupported claims, generate SQL, or bypass traceability |
 | Task 26 | Guarded Insight Claim Typing | `agents/insight_claim_typer.py`, `graph/workflow.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can classify candidate claims before Evidence Validator; classification is advisory and cannot bypass evidence filtering |
 | Task 27 | LLM Action and Email Drafting | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can draft pending task, alert, and email payloads before Risk Assessor and Approval Gate; provider cannot create records, set approval state, or send email |
+| Task 28 | LLM Template Mining and Eval Suite | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete | Mines saved workflow traces for repeated successful `llm_candidate` intent signatures and validates prompt outputs in smoke evals; recommendations are never auto-applied |
 | Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
 
 ### P3 Acceptance Standard
@@ -234,8 +236,7 @@ The next task should be selected from the remaining P3 engineering backlog. Do n
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | Task 28 - LLM Template Mining and Eval Suite | Expand template recommendations and opt-in LLM eval coverage from validated runtime traces |
-| Later | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
+| Next | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
 | Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
 | Later | React dashboard | Only after dashboard data contracts are stable |
 | Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
@@ -262,8 +263,8 @@ The no-key deterministic baseline must continue to run without a provider, and P
 | Report writing / polishing | P3 Task 25 | Turn verified findings, hypotheses, SQL, chart paths, and trace paths into clearer business prose | Must not invent unsupported data or conclusions |
 | Action drafting | P3 Task 27 | Draft task, alert, and email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
 | Email draft content | P3 Task 27 | Draft stakeholder-facing email text | Must create drafts only; no sending and no approval bypass |
-| Template mining feedback | P3 Task 20B enhancement | Summarize repeated successful `llm_candidate` intent patterns for future deterministic templates | Must not automatically modify production templates |
-| LLM eval / smoke tests | P3 Task 20 / 20C | Validate provider availability, JSON shape, prompt schemas, malformed JSON handling, and provider errors | Live provider tests must remain explicit opt-in |
+| Template mining feedback | P3 Task 28 | Summarize repeated successful `llm_candidate` intent patterns from saved workflow traces for future deterministic templates | Must not automatically modify production templates |
+| LLM eval / smoke tests | P3 Task 20 / 20C / 28 | Validate provider availability, JSON shape, prompt schemas, malformed JSON handling, schema mismatch, and provider errors | Live provider tests must remain explicit opt-in |
 
 ### Where The LLM Must Not Take Ownership
 

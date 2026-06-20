@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, and action/email-drafting paths, and preserve SQL validation before any SQL execution.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, and action/email-drafting paths, mine validated `llm_candidate` trace patterns for future template recommendations, and preserve SQL validation before any SQL execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, Task 26 - Guarded Insight Claim Typing, and Task 27 - LLM Action and Email Drafting are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, Task 26 - Guarded Insight Claim Typing, Task 27 - LLM Action and Email Drafting, and Task 28 - LLM Template Mining and Eval Suite are complete.
 
 Implemented:
 
@@ -39,10 +39,11 @@ Implemented:
 - P3 Evidence-backed Report Writing and Polishing with optional DeepSeek-backed report prose generated only from Evidence Validator outputs, SQL records, chart paths, and trace paths; unsupported claims are rejected and deterministic fallback is preserved
 - P3 Guarded Insight Claim Typing with optional DeepSeek-backed claim classification before Evidence Validator, runtime workflow/report-supervisor trace, deterministic fallback, and Evidence Validator final ownership
 - P3 LLM Action and Email Drafting with optional DeepSeek-backed task, alert, and email draft wording after Action Planner and before Risk Assessor, Approval Gate, Action Executor, and Audit Logger
+- P3 LLM Template Mining and Eval Suite with workflow-trace mining for repeated successful `llm_candidate` patterns, schema-aware LLM smoke evals, expected malformed/schema failure cases, and opt-in live DeepSeek eval coverage
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, and 27 complete. Later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, acceptance progress, and the concrete Task 28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 
@@ -64,6 +65,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 evidence-backed report writing**: Task 25 wires optional DeepSeek-backed report prose into `run_report_agent()` and `run_report_supervisor_agent()` after Evidence Validator. Provider prose must pass the `report_writer` schema, reference only verified findings or hypotheses, and is rejected if it includes blocked unsupported claims.
 - **P3 guarded insight claim typing**: Task 26 wires optional DeepSeek-backed `insight_claim_typer` into the core workflow after deterministic insight generation and into report supervisor sections before Evidence Validator filtering. Provider classification is advisory; Evidence Validator still decides supported findings, hypotheses, and blocked unsupported claims.
 - **P3 action and email drafting**: Task 27 wires optional DeepSeek-backed `action_drafter` output into `run_action_planner_agent()`. The provider can draft task, metric-alert, and email-draft payloads from Evidence Validator outputs, but those drafts still flow through Risk Assessor, Approval Gate, Action Executor, and Audit Logger before any SQLite action record is created.
+- **P3 template mining and eval**: Task 28 writes safe template-mining metadata into accepted guarded SQL candidate trace events, mines saved workflow trace files for repeated successful `llm_candidate` intent signatures, and expands `run_llm_smoke_eval()` with prompt-specific structured validation plus expected malformed/schema-failure cases.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
 
 LLM boundaries:
@@ -83,7 +85,7 @@ Final LLM participation map:
 | Report planning | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
 | Insight/report wording | Suggest claims or polish business-language summaries | Every claim must pass Evidence Validator before use |
 | Action drafting | Draft task, alert, or email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
-| Template mining feedback | Summarize repeated successful `llm_candidate` patterns | Must not automatically modify production templates |
+| Template mining feedback | Summarize repeated successful `llm_candidate` patterns from saved workflow traces | Must not automatically modify production templates |
 | LLM eval / smoke tests | Validate provider availability, JSON shape, prompt schemas, and failure handling | Live provider tests must remain explicit opt-in |
 
 The development plan tracks this as the final LLM participation boundary: LLMs may help with understanding, planning, candidates, wording, and suggestions; deterministic tools remain responsible for approval, execution, validation, and audit.
@@ -1049,6 +1051,52 @@ Example output:
 
 For complete questions that do not match a deterministic template, the router returns `strategy: llm_candidate` with `candidate_policy.provider_prompt_id = "guarded_sql_candidate"`. The deterministic Task 20B router does not call a provider and does not return SQL. Repeated successful `llm_candidate` patterns can be summarized with `sql_planning.feedback.summarize_template_mining_feedback()` to identify future deterministic template candidates.
 
+## LLM Template Mining and Eval Suite
+
+Task 28 adds workflow-trace mining for accepted guarded SQL candidates. When a guarded candidate is accepted after `validate_sql()`, the trace event stores safe metadata for template mining: strategy, accepted flag, provider flag, candidate count, user question, and structured intent. It does not store provider SQL for template mining, and it never writes or modifies production templates.
+
+Mine recommendations from saved workflow traces:
+
+```python
+from sql_planning.feedback import mine_template_candidates_from_trace_files
+
+result = mine_template_candidates_from_trace_files(
+    ["logs/traces/run_example.json"],
+    min_success_count=3,
+)
+print(result["candidates"])
+```
+
+Candidate recommendations include `intent_signature`, `success_count`, `recommended_template_id`, `sample_questions`, and `auto_apply: false`. A human still has to review the pattern, design the deterministic SQL template, add tests, and run `validate_sql()`/P0 eval before any template becomes production behavior.
+
+Task 28 also expands `llm_ops.eval_smoke.run_llm_smoke_eval()` so smoke cases can opt into prompt-specific structured validation:
+
+```python
+from llm_ops.eval_smoke import run_llm_smoke_eval
+
+result = run_llm_smoke_eval(
+    [
+        {
+            "case_id": "question_understanding_schema",
+            "prompt_id": "question_understanding",
+            "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
+            "expected_keys": ["strategy", "intent", "missing_slots", "clarification_questions", "risk_flags"],
+            "validate_output": True,
+            "expected_success": True,
+        }
+    ],
+    provider=provider,
+)
+```
+
+Eval cases can also set `expected_success: false` and `expected_error_type` to verify malformed JSON and schema mismatch handling without treating safe rejection as a test failure.
+
+Live DeepSeek eval suite:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_llm_eval_suite_live.py -q
+```
+
 Task 23 runtime behavior:
 
 - `run_workflow()` now writes `sql_planning`, `sql_routing_strategy`, and guarded candidate metadata into workflow state.
@@ -1278,5 +1326,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, dashboard frontend views, Task 28+ LLM template-mining enhancements, Docker/CI, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, dashboard frontend views, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.

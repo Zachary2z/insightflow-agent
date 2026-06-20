@@ -4,6 +4,7 @@ from typing import Any
 
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY, PromptRegistry
 from llm_ops.provider import LLMProvider, LLMRequest, run_llm_request
+from llm_ops.structured_output import run_validated_llm_request
 
 
 def _missing_expected_keys(content: Any, expected_keys: list[str]) -> list[str]:
@@ -35,24 +36,46 @@ def run_llm_smoke_eval(
             )
             continue
 
-        provider_result = run_llm_request(
-            provider,
-            LLMRequest(
-                prompt=rendered["prompt"],
-                prompt_id=rendered["prompt_id"],
-                prompt_version=rendered["prompt_version"],
-                model=model,
-                metadata={"node": "llm_smoke_eval"},
-            ),
+        request = LLMRequest(
+            prompt=rendered["prompt"],
+            prompt_id=rendered["prompt_id"],
+            prompt_version=rendered["prompt_version"],
+            model=model,
+            metadata={"node": "llm_smoke_eval"},
         )
-        missing = _missing_expected_keys(provider_result.get("content"), list(case.get("expected_keys", [])))
-        success = bool(provider_result.get("success")) and not missing
+        validation_enabled = bool(case.get("validate_output", False))
+        if validation_enabled:
+            provider_result = run_validated_llm_request(
+                provider,
+                request,
+                schema_context=case.get("schema_context", {}),
+            )
+        else:
+            provider_result = run_llm_request(provider, request)
+
+        expected_success = bool(case.get("expected_success", True))
+        missing = (
+            _missing_expected_keys(provider_result.get("content"), list(case.get("expected_keys", [])))
+            if provider_result.get("success")
+            else list(case.get("expected_keys", []))
+        )
+        expected_error_type = str(case.get("expected_error_type", "")).strip()
+        actual_error_type = str(provider_result.get("error_type", "")).strip()
+        if expected_success:
+            success = bool(provider_result.get("success")) and not missing
+            error = "" if success else f"missing expected keys: {', '.join(missing)}"
+        else:
+            error_type_matches = not expected_error_type or actual_error_type == expected_error_type
+            success = not provider_result.get("success") and error_type_matches
+            error = "" if success else f"expected failure {expected_error_type or '<any>'}, got {actual_error_type or '<none>'}"
         results.append(
             {
                 "case_id": case_id,
                 "prompt_id": prompt_id,
                 "success": success,
-                "error": "" if success else f"missing expected keys: {', '.join(missing)}",
+                "error": error,
+                "validation_enabled": validation_enabled,
+                "expected_success": expected_success,
                 "provider_result": provider_result,
             }
         )

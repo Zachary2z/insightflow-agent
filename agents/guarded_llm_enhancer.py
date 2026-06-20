@@ -178,6 +178,15 @@ def run_guarded_sql_candidate_agent(
             "error": error or None,
             "provider_called": True,
             "fallback_used": not accepted,
+            "template_mining_event": {
+                "strategy": state.get("sql_routing_strategy", ""),
+                "success": accepted,
+                "accepted": accepted,
+                "provider_called": True,
+                "candidate_count": len(candidates),
+                "intent": dict(state.get("sql_planning", {}).get("intent", {})),
+                "user_question": state.get("user_question", ""),
+            },
         },
     )
 
