@@ -48,7 +48,7 @@ def test_deepseek_config_loads_from_env_file_without_leaking_secret(tmp_path, mo
             [
                 "DEEPSEEK_API_KEY=sk-test-secret",
                 "DEEPSEEK_BASE_URL=https://api.deepseek.com",
-                "DEEPSEEK_MODEL=deepseek-v4-flash",
+                "DEEPSEEK_MODEL=DeepSeekv4pro",
                 "INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1",
             ]
         ),
@@ -63,14 +63,14 @@ def test_deepseek_config_loads_from_env_file_without_leaking_secret(tmp_path, mo
     assert config.success is True
     assert config.api_key == "sk-test-secret"
     assert config.base_url == "https://api.deepseek.com"
-    assert config.model == "deepseek-v4-flash"
+    assert config.model == "deepseek-v4-pro"
     assert config.live_tests_enabled is True
     assert "sk-test-secret" not in repr(config)
     assert config.safe_dict() == {
         "success": True,
         "api_key_present": True,
         "base_url": "https://api.deepseek.com",
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-v4-pro",
         "live_tests_enabled": True,
         "error": "",
     }
@@ -85,7 +85,7 @@ def test_deepseek_config_keeps_no_key_baseline_non_blocking(tmp_path, monkeypatc
     assert config.success is True
     assert config.api_key == ""
     assert config.base_url == "https://api.deepseek.com"
-    assert config.model == "deepseek-v4-flash"
+    assert config.model == "deepseek-v4-pro"
     assert config.live_tests_enabled is False
 
     required = load_deepseek_config(env_path=tmp_path / "missing.env", require_api_key=True)
@@ -103,7 +103,7 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
         DeepSeekConfig(
             api_key="sk-test-secret",
             base_url="https://api.deepseek.com",
-            model="deepseek-v4-flash",
+            model="deepseek-v4-pro",
         ),
         client=client,
     )
@@ -119,7 +119,7 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
 
     call = client.chat.completions.calls[0]
     assert json.loads(content) == {"claims": ["GMV 为 100"]}
-    assert call["model"] == "deepseek-v4-flash"
+    assert call["model"] == "deepseek-v4-pro"
     assert call["temperature"] == 0
     assert call["response_format"] == {"type": "json_object"}
     assert "max_tokens" not in call

@@ -821,9 +821,11 @@ DeepSeek config:
 ```env
 DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL=deepseek-v4-pro
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=0
 ```
+
+`DEEPSEEK_MODEL` is intentionally configurable. Use `deepseek-v4-pro` for stronger reasoning and SQL-planning quality, or switch to `deepseek-v4-flash` for cheaper/faster smoke tests. The config loader also normalizes common aliases such as `DeepSeekv4pro`, `v4pro`, and `v4flash`.
 
 Live DeepSeek tests are opt-in:
 

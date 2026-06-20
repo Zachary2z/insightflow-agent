@@ -12,7 +12,17 @@ from llm_ops.provider import LLMRequest
 
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
+DEEPSEEK_MODEL_ALIASES = {
+    "deepseekv4pro": "deepseek-v4-pro",
+    "deepseek-v4-pro": "deepseek-v4-pro",
+    "deepseek_v4_pro": "deepseek-v4-pro",
+    "v4pro": "deepseek-v4-pro",
+    "deepseekv4flash": "deepseek-v4-flash",
+    "deepseek-v4-flash": "deepseek-v4-flash",
+    "deepseek_v4_flash": "deepseek-v4-flash",
+    "v4flash": "deepseek-v4-flash",
+}
 
 
 def live_deepseek_tests_enabled(env: dict[str, str] | None = None) -> bool:
@@ -58,12 +68,20 @@ def _load_env_file(env_path: str | Path) -> dict[str, str]:
     return {key: str(value or "") for key, value in dotenv_values(path).items()}
 
 
+def normalize_deepseek_model(model: str) -> str:
+    normalized = model.strip()
+    if not normalized:
+        return DEFAULT_DEEPSEEK_MODEL
+    alias_key = normalized.lower().replace(" ", "").replace(".", "-")
+    return DEEPSEEK_MODEL_ALIASES.get(alias_key, normalized)
+
+
 def load_deepseek_config(env_path: str | Path = ".env", require_api_key: bool = False) -> DeepSeekConfig:
     file_values = _load_env_file(env_path)
     values = {**file_values, **os.environ}
     api_key = str(values.get("DEEPSEEK_API_KEY", "")).strip()
     base_url = str(values.get("DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL)).strip() or DEFAULT_DEEPSEEK_BASE_URL
-    model = str(values.get("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)).strip() or DEFAULT_DEEPSEEK_MODEL
+    model = normalize_deepseek_model(str(values.get("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)))
     live_enabled = live_deepseek_tests_enabled(values)
 
     if require_api_key and not api_key:
