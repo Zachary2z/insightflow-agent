@@ -1,14 +1,185 @@
 # InsightFlow Agent Development Plan
 
-This tracked plan records the project-level engineering boundaries that should guide future tasks. The full extracted planning references under `tmp/pdfs/` are local source material and are ignored by git.
+This document is the tracked development plan for InsightFlow Agent. It consolidates the phased roadmap, task boundaries, acceptance criteria, and final LLM participation rules that were previously spread across local extracted planning notes under `tmp/pdfs/`.
 
-## Final LLM Participation Boundary
+## 1. Project Positioning
+
+InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow.
+
+The project is not intended to be a generic Text2SQL demo or a generic data-analysis chatbot. Its core product identity is:
+
+- Multi-agent collaboration
+- Tool calling
+- Real SQL execution
+- Execution feedback and repair
+- Traceability
+- Eval-driven development
+- Evidence-backed reporting
+- Approval-gated action workflow
+
+Development principle:
+
+- P0 builds a small, stable Agentic SQL Core.
+- P1 adds reliable analysis and traceable reporting.
+- P2 adds business review and action workflow.
+- P3 adds MCP, API, dashboard, LLM provider hardening, and engineering core.
+
+## 2. Reference Strategy
+
+Use reference projects selectively. InsightFlow should borrow engineering ideas, not copy project structure wholesale.
+
+| Reference | Use for | Avoid copying |
+|---|---|---|
+| `adamfaik/sql-agent` | LangGraph SQL workflow, SQLite execution, execution failure repair, glass-box demo, eval benchmark, ecommerce questions | Single-file style, Text2SQL-only framing, weak Agent/Tool separation |
+| `mallahyari/langgraph-sql-agent` | Multi-agent modularization, router/table selector/validator/executor/visualization planner, graph conditional edges, later FastAPI/SSE ideas | Starting with heavy React/FastAPI architecture, weaker SQL validation |
+| `azain47/Multi-Agent-Text2SQL-System` | Parser-based SQL validation, feedback formatting, iterative repair loop, max retry/history ideas | Full complex system shape; use only local validation/feedback patterns |
+
+## 3. Current Phase Status
+
+| Phase | Status | Summary |
+|---|---|---|
+| P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
+| P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
+| P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, and 20B complete; Docker/CI and later hardening not started |
+
+## 4. Target Repository Structure
+
+The project should continue to preserve clear Agent/Tool/Graph boundaries.
+
+```text
+insightflow-agent/
+├── agents/
+├── api/
+├── dashboard/
+├── data/
+├── eval/
+├── graph/
+├── llm_ops/
+├── mcp_servers/
+├── question_understanding/
+├── reports/
+├── sql_planning/
+├── tests/
+├── tools/
+├── app.py
+├── DEVELOPMENT_PLAN.md
+├── DEVELOPMENT_STATUS.md
+├── README.md
+└── requirements.txt
+```
+
+## 5. P0 - Agentic SQL Core
+
+Goal: prove that InsightFlow is a multi-agent tool-calling SQL execution workflow, not a black-box Text2SQL wrapper.
+
+### P0 Tasks
+
+| Task | Name | Core files | Acceptance |
+|---|---|---|---|
+| Task 0 | Project initialization | `requirements.txt`, `README.md`, `app.py`, base folders | Dependencies install, pytest runs, Streamlit starts, folders exist |
+| Task 1 | Ecommerce SQLite database | `data/seed_data.py`, `data/ecommerce.db` | Database has users/orders/order_items/products/categories with realistic sample data |
+| Task 2 | Metric definition | `data/metrics.yaml`, `tools/metric_tool.py` | GMV/order/AOV definitions return formula and required filters |
+| Task 3 | Schema tool | `tools/schema_tool.py` | Reads tables/columns/types and produces prompt-friendly schema text |
+| Task 4 | SQL validator | `tools/sql_validator.py` | Blocks unsafe SQL, unknown tables/columns, sensitive fields, and bad metric definitions |
+| Task 5 | SQL executor | `tools/sql_executor.py` | Executes real SELECT SQL with timeout/row cap and structured errors |
+| Task 6 | Trace logger | `tools/trace_logger.py` | Saves node/tool/status/error/retry/latency trace events |
+| Task 7 | P0 agents | `agents/supervisor.py`, `schema_agent.py`, `metric_agent.py`, `sql_generator.py`, `sql_reviewer.py`, `error_fixer.py`, `insight_agent.py` | Agents call tools instead of directly accessing external resources |
+| Task 8 | LangGraph workflow | `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | Review -> execute -> repair/fail -> insight -> trace path works end to end |
+| Task 9 | Streamlit glass-box demo | `app.py` | User can see agent steps, SQL, review, execution, repair, final answer, trace |
+| Task 10 | P0 eval | `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | 20-case benchmark runs and reports success/repair/safety metrics |
+
+### P0 Acceptance Standard
+
+- Chinese business questions can run through the full workflow.
+- SQL is generated as SELECT-only and reviewed before execution.
+- Dangerous SQL does not enter `run_sql()`.
+- Execution failures can be repaired once.
+- Final answers are based on `execution_result`.
+- Every run has a trace artifact.
+- `python3 eval/run_eval.py` remains 20/20 passed.
+
+## 6. P1 - Reliable Analysis & Report Core
+
+Goal: produce traceable business analysis artifacts, not just SQL answers.
+
+| Task | Name | Core files | Acceptance |
+|---|---|---|---|
+| Task 11 | Business context retrieval | `data/business_rules.md`, `data/table_docs.md`, `data/sql_examples.json`, `tools/context_tool.py`, `agents/context_retriever.py` | Returns relevant rules, examples, and field docs into state |
+| Task 12 | Evidence Validator | `tools/evidence_tool.py`, `agents/evidence_validator.py` | Separates data-supported findings, hypotheses, and unsupported claims |
+| Task 13 | Chart Agent | `tools/chart_tool.py`, `agents/chart_agent.py` | Ranking -> bar, trend -> line, optional share -> pie, paths written to state |
+| Task 14 | Report Agent | `tools/report_tool.py`, `agents/report_agent.py` | Saves Markdown report with SQL, execution result, evidence, chart paths, trace path |
+
+### P1 Acceptance Standard
+
+- Reports are traceable to SQL and execution results.
+- Unsupported claims are blocked or separated.
+- Chart/report generation never bypasses evidence validation.
+- P0 eval remains passing.
+
+## 7. P2 - Business Review & Action Workflow
+
+Goal: support weekly business reviews, retrospectives, and lightweight operational actions.
+
+| Task | Name | Core files | Acceptance |
+|---|---|---|---|
+| Task 15 | Business Review Report | `agents/report_supervisor.py` | Weekly review decomposes into multiple SQL subtasks with review, execution, evidence, chart, and Markdown output |
+| Task 15A | Controlled LLM Report Planner | `agents/report_planner.py` | Optional LLM selects only allowlisted report sections and can ask clarification questions |
+| Task 15B | Guarded LLM SQL and Insight Enhancement | `agents/guarded_llm_enhancer.py` | SQL candidates require `validate_sql()`; insight claims require Evidence Validator |
+| Task 16 | Action Workflow | `agents/action_planner.py`, `agents/risk_assessor.py`, `agents/action_verifier.py`, `tools/action_tool.py`, `tools/approval_tool.py`, `tools/audit_logger.py` | Action plans, risk assessment, approval gate, task/alert/email draft records, verification, audit logs |
+
+### P2 Acceptance Standard
+
+- Weekly reports can run multiple SQL subtasks.
+- Failed subtasks are recorded structurally and do not crash the full report.
+- Action creation requires approval.
+- Audit logs preserve approval blocking, execution, and verification.
+- LLM-assisted P2 features are optional and never replace deterministic fallback.
+
+## 8. P3 - MCP & Engineering Core
+
+Goal: standardize tool access, expose engineering interfaces, improve observability, and harden controlled LLM usage.
+
+| Task | Name | Core files | Status | Acceptance |
+|---|---|---|---|---|
+| Task 17 | MCP Tool Layer | `mcp_servers/database_server.py`, `report_server.py`, `action_server.py`, `contracts.py` | Complete | Exposes database/report/action MCP-style wrappers without exposing internal validators/audit/eval |
+| Task 18 | FastAPI + Async Run API | `api/app.py`, `api/run_manager.py`, `api/models.py` | Complete | Submit run, poll status, fetch trace/events, cancel active runs |
+| Task 19 | Trace Dashboard data layer | `dashboard/trace_dashboard.py` | Complete | Summarizes trace, SQL repair, tool, eval, approval, and audit metrics |
+| Task 19A | Streamlit Unified Demo | `app.py` | Complete | Shows P0/P1/P2/P3 capabilities clearly in one product demo |
+| Task 20 | LLM Provider and PromptOps Core | `llm_ops/provider.py`, `prompt_registry.py`, `eval_smoke.py` | Complete | Provider contract, prompt versions, cost/latency metadata, smoke eval |
+| Task 20C | Production DeepSeek Provider & Structured Output Validation | `llm_ops/deepseek_provider.py`, `structured_output.py` | Complete | `.env` config, opt-in live tests, malformed JSON and schema mismatch failures |
+| Task 20A | Question Understanding & Clarification Router | `question_understanding/router.py`, `agents/question_understanding.py` | Complete | Extracts intent slots, returns clarify/reject/template/llm_candidate, does not generate SQL |
+| Task 20B | SQL Planning Router | `sql_planning/router.py`, `feedback.py`, `agents/sql_planning_router.py` | Complete | Routes to deterministic template or guarded LLM candidate, preserves clarify/reject, does not call provider |
+| Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
+
+### P3 Acceptance Standard
+
+- MCP contracts return JSON-compatible dictionaries and structured errors.
+- API failures return structured failed responses instead of crashing.
+- Dashboard data layer does not introduce frontend or provider behavior.
+- Streamlit demo makes P1/P2/P3 visible, not just P0.
+- LLM provider usage is opt-in, structured, traceable, and provider-independent by default.
+- P0 eval remains 20/20 passed.
+
+## 9. Current Next-Task Queue
+
+The next task should be selected from the remaining P3 engineering backlog. Do not start multiple future tasks at once.
+
+| Priority | Candidate task | Notes |
+|---|---|---|
+| Next | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
+| Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
+| Later | React dashboard | Only after dashboard data contracts are stable |
+| Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
+| Later | Full ActionOps | External task/email integrations require stricter approval, audit, and secrets handling |
+
+## 10. Final LLM Participation Boundary
 
 InsightFlow treats LLMs as a controlled enhancement layer. The model can help with understanding, planning, candidate generation, wording, and suggestions, but deterministic tools remain responsible for approval, execution, validation, and audit.
 
 The no-key deterministic baseline must continue to run without a provider, and P0 eval must remain 20/20 passing.
 
-## Where The LLM Should Participate
+### Where The LLM Should Participate
 
 | Area | Phase / task | Intended role | Boundary |
 |---|---|---|---|
@@ -26,7 +197,7 @@ The no-key deterministic baseline must continue to run without a provider, and P
 | Template mining feedback | P3 Task 20B enhancement | Summarize repeated successful `llm_candidate` intent patterns for future deterministic templates | Must not automatically modify production templates |
 | LLM eval / smoke tests | P3 Task 20 / 20C | Validate provider availability, JSON shape, prompt schemas, malformed JSON handling, and provider errors | Live provider tests must remain explicit opt-in |
 
-## Where The LLM Must Not Take Ownership
+### Where The LLM Must Not Take Ownership
 
 | Deterministic owner | Reason |
 |---|---|
@@ -38,7 +209,7 @@ The no-key deterministic baseline must continue to run without a provider, and P
 | MCP database / report / action wrappers | External contracts must not bypass validators, approval, evidence, or trace requirements |
 | P0 eval baseline | Core workflow must remain deterministic and provider-independent |
 
-## Target Flow
+### Target LLM-Assisted Flow
 
 ```text
 User Question
@@ -56,7 +227,7 @@ User Question
 -> Audit / Trace
 ```
 
-## Acceptance Rules
+### LLM Acceptance Rules
 
 - README, DEVELOPMENT_STATUS, requirements, and development plan language must stay aligned on LLM boundaries.
 - All real-provider outputs must pass prompt-specific structured-output validation.
@@ -65,3 +236,12 @@ User Question
 - LLM-assisted action drafts must not bypass Approval Gate or Audit Logger.
 - Default no-key baseline must continue to run.
 - P0 eval must remain 20/20 passing.
+
+## 11. Long-Term Development Principles
+
+- Do not pile on features before the current phase is stable.
+- Preserve Agent/Tool/Graph boundaries.
+- Prefer deterministic baselines and optional model-assisted enhancements.
+- Every new behavior needs focused tests.
+- High-risk boundaries must remain tool-owned: SQL validation, SQL execution, evidence validation, approval, trace, and audit.
+- User-facing demos should make implemented capabilities visible and understandable.
