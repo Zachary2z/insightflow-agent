@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, and evidence-backed report-writing paths, and preserve SQL validation before any SQL execution.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, and guarded insight claim-typing paths, and preserve SQL validation before any SQL execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, and Task 25 - Evidence-backed Report Writing and Polishing are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, and Task 26 - Guarded Insight Claim Typing are complete.
 
 Implemented:
 
@@ -37,10 +37,11 @@ Implemented:
 - P3 Provider-assisted SQL Planning and Guarded Candidate Integration with optional DeepSeek-backed SQL source routing, guarded candidate generation, `validate_sql()` approval, deterministic fallback, and runtime workflow trace
 - P3 LLM Business Review Decomposition with optional DeepSeek-backed report-section planning for weekly/monthly reviews, allowlisted sections only, provider SQL/claim rejection, deterministic fallback, and report supervisor trace metadata
 - P3 Evidence-backed Report Writing and Polishing with optional DeepSeek-backed report prose generated only from Evidence Validator outputs, SQL records, chart paths, and trace paths; unsupported claims are rejected and deterministic fallback is preserved
+- P3 Guarded Insight Claim Typing with optional DeepSeek-backed claim classification before Evidence Validator, runtime workflow/report-supervisor trace, deterministic fallback, and Evidence Validator final ownership
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, and 25 complete. Later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, and 26 complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, acceptance progress, and the concrete Task 26-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Track current phase, task status, test status, acceptance progress, and the concrete Task 27-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 
@@ -60,6 +61,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 provider-assisted SQL planning and candidates**: Task 23 wires optional DeepSeek-backed SQL planning and guarded SQL candidate generation into `run_workflow()`. Planning output cannot contain SQL, candidate SQL must pass `validate_sql()`, and the original SQL Reviewer still approves SQL before execution.
 - **P3 provider-backed business review decomposition**: Task 24 wires optional DeepSeek-backed report planning into `run_report_supervisor_agent()`. Provider output can select only allowlisted weekly/monthly report sections, is rejected if it supplies SQL or factual claims, and falls back to deterministic review planning on provider or validation failure.
 - **P3 evidence-backed report writing**: Task 25 wires optional DeepSeek-backed report prose into `run_report_agent()` and `run_report_supervisor_agent()` after Evidence Validator. Provider prose must pass the `report_writer` schema, reference only verified findings or hypotheses, and is rejected if it includes blocked unsupported claims.
+- **P3 guarded insight claim typing**: Task 26 wires optional DeepSeek-backed `insight_claim_typer` into the core workflow after deterministic insight generation and into report supervisor sections before Evidence Validator filtering. Provider classification is advisory; Evidence Validator still decides supported findings, hypotheses, and blocked unsupported claims.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
 
 LLM boundaries:
@@ -449,6 +451,26 @@ Live DeepSeek workflow smoke:
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1 python3 -m pytest tests/test_deepseek_report_writer_live.py -q
 ```
 
+## Guarded Insight Claim Typing
+
+Task 26 adds optional provider-backed claim typing before Evidence Validator. The provider can classify candidate claims as `data_supported_finding`, `hypothesis`, or `unsupported`, but that classification is advisory: `validate_evidence()` still produces the final supported/hypothesis/blocked split.
+
+Enable real DeepSeek-backed claim typing in the core workflow:
+
+```bash
+export INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1
+export DEEPSEEK_API_KEY=...
+python -c "from graph.workflow import run_workflow; r=run_workflow('最近 30 天销售额最高的 5 个商品是什么？'); print(r['claim_typing_result'])"
+```
+
+The same provider can be passed to `run_report_supervisor_agent(..., claim_typing_provider=provider)` or enabled through the runtime switch for report sections. Provider output must pass the `insight_claim_typer` schema and cannot generate SQL, execute SQL, bypass Evidence Validator, or create final claims without data.
+
+Live DeepSeek workflow smoke:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 python3 -m pytest tests/test_deepseek_claim_typing_workflow_live.py -q
+```
+
 ## Business Review Report
 
 Task 15 adds a deterministic P2 Report Supervisor for weekly business review reports. It decomposes a weekly report request into structured sections, then runs each SQL subtask through the existing schema, metric, SQL review, SQL execution, Evidence Validator, Chart Agent, Report Tool, and Trace Logger boundaries.
@@ -817,7 +839,7 @@ Task 20 introduces a controlled `llm_ops` layer for future model-assisted steps.
 
 Implemented pieces:
 
-- `llm_ops.prompt_registry.DEFAULT_PROMPT_REGISTRY` stores versioned prompt templates for `report_planner`, `guarded_sql_candidate`, `guarded_insight_claims`, `report_writer`, `question_understanding`, `clarification_router`, and `sql_planning_router`.
+- `llm_ops.prompt_registry.DEFAULT_PROMPT_REGISTRY` stores versioned prompt templates for `report_planner`, `guarded_sql_candidate`, `guarded_insight_claims`, `report_writer`, `insight_claim_typer`, `question_understanding`, `clarification_router`, and `sql_planning_router`.
 - `llm_ops.provider.LLMRequest` and `run_llm_request()` define the provider contract and return JSON-compatible results with `success`, `content`, `usage`, `latency_ms`, `error`, and `trace_event`.
 - `llm_ops.provider.MockLLMProvider` supports deterministic tests and smoke evals without network calls.
 - `llm_ops.eval_smoke.run_llm_smoke_eval()` runs lightweight prompt/provider checks with expected output keys.
@@ -1234,5 +1256,5 @@ The generated report is written to `eval/report.md`.
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, dashboard frontend views, Task 26+ LLM insight/action enhancements, Docker/CI, and full ActionOps product features remain outside the current baseline.
+- React UI, persistent async jobs, RBAC, dashboard frontend views, Task 27+ LLM action/template-mining enhancements, Docker/CI, and full ActionOps product features remain outside the current baseline.
 - P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.

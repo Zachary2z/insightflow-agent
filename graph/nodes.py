@@ -5,6 +5,7 @@ from typing import Any
 
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
+from agents.insight_claim_typer import run_insight_claim_typer_agent
 from agents.insight_agent import run_insight_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
@@ -143,6 +144,12 @@ def insight_node(state: AgentState) -> AgentState:
     updated["status"] = "completed" if updated.get("insight", {}).get("success") else "failed"
     updated["data_used"] = updated.get("insight", {}).get("data_used", False)
     return updated
+
+
+def claim_typing_node(state: AgentState, provider=None) -> AgentState:
+    if state.get("status") != "completed":
+        return dict(state)
+    return run_insight_claim_typer_agent(dict(state), provider=provider)
 
 
 def fail_response_node(state: AgentState) -> AgentState:

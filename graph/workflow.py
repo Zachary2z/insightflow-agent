@@ -9,6 +9,7 @@ from agents.question_understanding import run_question_understanding_agent
 from agents.supervisor import initialize_run
 from graph.nodes import (
     clarification_node,
+    claim_typing_node,
     early_response_node,
     error_fix_node,
     fail_response_node,
@@ -31,6 +32,7 @@ from graph.state import AgentState
 from llm_ops.provider import LLMProvider
 from llm_ops.runtime_provider import (
     build_clarification_provider,
+    build_claim_typing_provider,
     build_question_understanding_provider,
     build_sql_candidate_provider,
     build_sql_planning_provider,
@@ -42,6 +44,7 @@ def build_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
+    claim_typing_provider: LLMProvider | None = None,
 ):
     workflow = StateGraph(AgentState)
     workflow.add_node(
@@ -67,6 +70,10 @@ def build_workflow(
     workflow.add_node("execute", sql_executor_node)
     workflow.add_node("fix", error_fix_node)
     workflow.add_node("insight", insight_node)
+    workflow.add_node(
+        "claim_typing",
+        lambda state: claim_typing_node(dict(state), provider=claim_typing_provider),
+    )
     workflow.add_node("fail", fail_response_node)
     workflow.add_node("early_response", early_response_node)
     workflow.add_node("save_trace", save_trace_node)
@@ -90,7 +97,8 @@ def build_workflow(
     workflow.add_conditional_edges("review", route_after_review, {"execute": "execute", "fail": "fail"})
     workflow.add_conditional_edges("execute", route_after_execute, {"insight": "insight", "fix": "fix", "fail": "fail"})
     workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
-    workflow.add_edge("insight", "save_trace")
+    workflow.add_edge("insight", "claim_typing")
+    workflow.add_edge("claim_typing", "save_trace")
     workflow.add_edge("fail", "save_trace")
     workflow.add_edge("early_response", "save_trace")
     workflow.add_edge("save_trace", END)
@@ -108,6 +116,7 @@ def run_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
+    claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
     state["db_path"] = db_path
@@ -121,10 +130,12 @@ def run_workflow(
     clarify_provider = clarification_provider or build_clarification_provider()
     planning_provider = sql_planning_provider or build_sql_planning_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
+    typing_provider = claim_typing_provider or build_claim_typing_provider()
     app = build_workflow(
         question_understanding_provider=question_provider,
         clarification_provider=clarify_provider,
         sql_planning_provider=planning_provider,
         sql_candidate_provider=candidate_provider,
+        claim_typing_provider=typing_provider,
     )
     return dict(app.invoke(state))

@@ -168,6 +168,46 @@ def _validate_report_writer(content: Any, schema_context: dict[str, Any]) -> dic
     )
 
 
+def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
+    prompt_id = "insight_claim_typer"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "insight_claim_typer output must be an object")
+
+    blocked_fields = {"sql", "generated_sql", "sql_candidates", "candidate_sql", "final_answer"}
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"insight_claim_typer must not return blocked fields: {', '.join(leaked)}")
+
+    typed_claims = content.get("typed_claims", [])
+    if not isinstance(typed_claims, list):
+        return _error(prompt_id, "typed_claims must be a list")
+
+    normalized_claims = []
+    allowed_types = {"data_supported_finding", "hypothesis", "unsupported"}
+    for index, item in enumerate(typed_claims):
+        if not isinstance(item, dict):
+            return _error(prompt_id, f"typed_claims[{index}] must be an object")
+        claim = str(item.get("claim", "")).strip()
+        if not claim:
+            return _error(prompt_id, f"typed_claims[{index}].claim is required")
+        claim_type = str(item.get("claim_type", "")).strip()
+        if claim_type not in allowed_types:
+            return _error(prompt_id, f"typed_claims[{index}].claim_type must be one of {', '.join(sorted(allowed_types))}")
+        normalized_claims.append(
+            {
+                "claim": claim,
+                "claim_type": claim_type,
+                "rationale": str(item.get("rationale", "")).strip(),
+            }
+        )
+
+    risk_ok, risk_flags, message = _string_list(content.get("risk_flags", []), "risk_flags")
+    if not risk_ok:
+        return _error(prompt_id, message)
+
+    return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
+
+
 def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
     if value is None:
         return True, "", ""
@@ -371,6 +411,8 @@ def validate_prompt_output(
         return _validate_guarded_insight_claims(content)
     if prompt_id == "report_writer":
         return _validate_report_writer(content, context)
+    if prompt_id == "insight_claim_typer":
+        return _validate_insight_claim_typer(content)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":

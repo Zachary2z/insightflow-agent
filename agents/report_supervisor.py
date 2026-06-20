@@ -6,10 +6,12 @@ from typing import Any
 from agents.chart_agent import run_chart_agent
 from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
+from agents.insight_claim_typer import run_insight_claim_typer_agent
 from agents.metric_agent import run_metric_agent
 from agents.report_planner import LLMProvider, run_report_planner_agent
 from agents.report_writer import run_report_writer_agent
 from llm_ops.runtime_provider import build_business_review_planner_provider
+from llm_ops.runtime_provider import build_claim_typing_provider
 from llm_ops.runtime_provider import build_report_writer_provider
 from agents.schema_agent import run_schema_agent
 from agents.sql_reviewer import run_sql_reviewer
@@ -268,6 +270,7 @@ def _run_section(
     state: dict[str, Any],
     section: dict[str, Any],
     chart_dir: str | Path,
+    claim_typing_provider: LLMProvider | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     task_state = {
         **state,
@@ -296,7 +299,10 @@ def _run_section(
         task_state = {**task_state, "execution_result": execution_result}
 
     task_state["claims_to_validate"] = _claims_for_section(section, execution_result)
-    task_state = run_evidence_validator_agent(task_state)
+    if claim_typing_provider:
+        task_state = run_insight_claim_typer_agent(task_state, provider=claim_typing_provider)
+    else:
+        task_state = run_evidence_validator_agent(task_state)
 
     chart_paths: list[str] = []
     chart_spec = _chart_spec(section, task_state)
@@ -314,6 +320,7 @@ def _run_section(
         "review_result": review_result,
         "execution_result": execution_result,
         "claims_to_validate": task_state.get("claims_to_validate", []),
+        "claim_typing_result": task_state.get("claim_typing_result", {}),
         "evidence_result": task_state.get("evidence_result", {}),
         "chart_paths": chart_paths,
         "status": status,
@@ -443,6 +450,7 @@ def run_report_supervisor_agent(
     chart_dir: str | Path | None = None,
     llm_provider: LLMProvider | None = None,
     report_writer_provider: LLMProvider | None = None,
+    claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     chart_output_dir = chart_dir or Path(__file__).resolve().parents[1] / "reports" / "charts"
     runtime_provider = llm_provider or build_business_review_planner_provider()
@@ -481,8 +489,14 @@ def run_report_supervisor_agent(
     current = run_context_retriever_agent(current)
 
     tasks = []
+    runtime_claim_typing_provider = claim_typing_provider or build_claim_typing_provider()
     for section in sections:
-        task_state, task = _run_section(current, section, chart_output_dir)
+        task_state, task = _run_section(
+            current,
+            section,
+            chart_output_dir,
+            claim_typing_provider=runtime_claim_typing_provider,
+        )
         current["trace"] = task_state.get("trace", current.get("trace", []))
         tasks.append(task)
 

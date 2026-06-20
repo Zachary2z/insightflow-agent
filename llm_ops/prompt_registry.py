@@ -209,6 +209,38 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
+            prompt_id="insight_claim_typer",
+            version="v1",
+            description="Classify candidate insight claims before Evidence Validator makes the final evidence decision.",
+            required_variables=[
+                "user_question",
+                "candidate_claims",
+                "execution_result",
+                "business_context",
+                "metric_context",
+            ],
+            safety_contract=[
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_bypass_evidence_validator",
+                "must_not_create_final_claims_without_data",
+            ],
+            template=(
+                "Task: guarded insight claim typing.\n"
+                "User question: {user_question}\n"
+                "Candidate claims: {candidate_claims}\n"
+                "Execution result: {execution_result}\n"
+                "Business context: {business_context}\n"
+                "Metric context: {metric_context}\n"
+                "Return JSON only with typed_claims and risk_flags.\n"
+                "Schema: typed_claims is an array of objects with claim, claim_type, and rationale. "
+                "Allowed claim_type values: data_supported_finding, hypothesis, unsupported. "
+                "risk_flags is a string array.\n"
+                "Safety: classify claims only; do not generate SQL; do not execute SQL; "
+                "do not bypass Evidence Validator. Evidence Validator still decides which claims can be used."
+            ),
+        ),
+        PromptTemplate(
             prompt_id="question_understanding",
             version="v1",
             description="Extract structured BI intent slots without generating SQL.",

@@ -53,6 +53,26 @@ def test_prompt_registry_renders_report_writer_prompt_with_evidence_boundary():
     assert "库存不足" in result["prompt"]
 
 
+def test_prompt_registry_renders_insight_claim_typer_prompt_with_evidence_boundary():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    result = DEFAULT_PROMPT_REGISTRY.render(
+        "insight_claim_typer",
+        {
+            "user_question": "最近 30 天销售额最高的商品是什么？",
+            "candidate_claims": ["Laptop Pro 14 的 GMV 为 511248.56"],
+            "execution_result": {"columns": ["product_name", "gmv"], "rows": [["Laptop Pro 14", 511248.56]]},
+            "business_context": {},
+            "metric_context": {"metric_name": "gmv"},
+        },
+    )
+
+    assert result["success"] is True
+    assert result["prompt_id"] == "insight_claim_typer"
+    assert "typed_claims" in result["prompt"]
+    assert "must_not_bypass_evidence_validator" in result["metadata"]["safety_contract"]
+
+
 def test_prompt_registry_returns_structured_error_for_missing_variables():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 

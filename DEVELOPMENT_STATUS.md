@@ -16,9 +16,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 25 - Evidence-backed Report Writing and Polishing (complete; next task not started) |
-| Next planned task | Task 26 - Guarded Insight Claim Typing |
-| Last completed task | Task 25 - Evidence-backed Report Writing and Polishing |
+| Current task | Task 26 - Guarded Insight Claim Typing (complete; next task not started) |
+| Next planned task | Task 27 - LLM Action and Email Drafting |
+| Last completed task | Task 26 - Guarded Insight Claim Typing |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -30,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, and Task 25 evidence-backed report writing complete; Task 26-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 25 provider/runtime tests passing; full suite 172 passed / 6 live tests skipped by default; live DeepSeek suite 6/6 passed when explicitly enabled; P0 eval 20/20 passing | `[x]` Task 25 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, and Task 26 guarded insight claim typing complete; Task 27-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 26 provider/runtime tests passing; full suite 177 passed / 7 live tests skipped by default; live DeepSeek suite 7/7 passed when explicitly enabled; P0 eval 20/20 passing | `[x]` Task 26 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -159,7 +159,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[x]` Added optional provider-assisted SQL planning, structured `sql_planning_router` validation, runtime provider factories, workflow SQL planning node, and guarded SQL candidate workflow integration | `[x]` provider routing success, malformed/schema mismatch fallback, no-key baseline, candidate validation, rejected unsafe SQL, no direct provider SQL execution, runtime workflow trace, and live DeepSeek SQL planning smoke tests | `[x]` SQL planning/candidate flow, runtime switches, live smoke command, and validation policy documented | `[x]` Done |
 | Task 24 - LLM Business Review Decomposition | `[x]` Expanded controlled report planner with PromptOps provider support, weekly/monthly allowlisted section selection, provider SQL/claim rejection, and report supervisor runtime wiring | `[x]` provider section selection, SQL leak rejection, schema mismatch fallback, no-key baseline, monthly review runtime, trace metadata, full suite, P0 eval, and live DeepSeek review-planning smoke tests | `[x]` Review planning runtime switch, live smoke command, monthly report support, and allowlist rules documented | `[x]` Done |
 | Task 25 - Evidence-backed Report Writing and Polishing | `[x]` Added provider-backed `report_writer` prompt/schema, report writer agent, env-gated runtime provider factory, and report-agent/report-supervisor wiring after Evidence Validator | `[x]` supported-claim inclusion, unsupported-claim rejection, Evidence Validator gate, no-key fallback, report save integration, full suite, P0 eval, and live DeepSeek report-writing smoke tests | `[x]` Report polishing contract, runtime switches, live smoke command, and evidence boundaries documented | `[x]` Done |
-| Task 26 - Guarded Insight Claim Typing | `[ ]` Expand guarded insight prompts to classify claims before Evidence Validator filtering and wire into insight/report workflows | `[ ]` claim-type normalization, evidence validation, unsupported blocking, fallback, runtime trace metadata, and live DeepSeek claim-typing smoke tests | `[ ]` Claim type schema, runtime integration, and Evidence Validator interaction documented | `[ ]` Not started |
+| Task 26 - Guarded Insight Claim Typing | `[x]` Added provider-backed `insight_claim_typer` prompt/schema, claim typing agent, env-gated runtime provider factory, and core workflow/report supervisor wiring before Evidence Validator filtering | `[x]` claim-type normalization, Evidence Validator final classification, unsupported blocking, fallback, runtime trace metadata, full suite, P0 eval, and live DeepSeek claim-typing smoke tests | `[x]` Claim type schema, runtime integration, live smoke command, and Evidence Validator interaction documented | `[x]` Done |
 | Task 27 - LLM Action and Email Drafting | `[ ]` Add optional provider-backed task/alert/email draft wording from evidence-backed findings before risk assessment and approval; wire into action workflow only before approval gates | `[ ]` draft schema validation, approval gate preservation, no direct action creation, audit requirement, malformed output fallback, runtime action workflow trace, and live DeepSeek drafting smoke tests | `[ ]` Action drafting flow, runtime integration, approval boundary, and email draft rules documented | `[ ]` Not started |
 | Task 28 - LLM Template Mining and Eval Suite | `[ ]` Expand template-mining feedback and LLM eval smoke cases for provider output shape, fallback behavior, malformed JSON, schema mismatch, and repeated successful `llm_candidate` patterns from real workflow traces | `[ ]` eval case success/failure, template recommendation, no auto-template-write, no-key baseline, runtime trace mining, and live DeepSeek eval tests | `[ ]` LLM eval command, runtime trace-mining policy, and opt-in live test docs | `[ ]` Not started |
 
@@ -249,6 +249,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration | `[x]` `sql_planning_router` prompt/schema, provider-backed planning helper, provider-aware planning agent, runtime provider factories, workflow planning node, guarded candidate node before SQL Reviewer | `[x]` provider/fallback tests, SQL leak validation test, no-key baseline test, candidate accepted/rejected workflow tests, full suite, P0 eval, and live DeepSeek-backed SQL planning workflow smoke pass | `[x]` runtime switches, guarded candidate flow, live smoke command, and SQL validation boundary documented | `[x]` Done |
 | Task 24 - LLM Business Review Decomposition | `[x]` PromptOps-backed `report_planner` path, weekly/monthly report section templates, env-gated DeepSeek provider factory, and report supervisor runtime integration | `[x]` provider success/fallback tests, provider SQL/claim rejection tests, no-key baseline tests, monthly supervisor tests, full suite, P0 eval, and live DeepSeek-backed business review workflow smoke pass | `[x]` runtime switch, monthly review behavior, live smoke command, and allowlist/SQL boundaries documented | `[x]` Done |
 | Task 25 - Evidence-backed Report Writing and Polishing | `[x]` PromptOps-backed `report_writer` path, structured evidence-bound prose schema, env-gated DeepSeek provider factory, and report agent/supervisor runtime integration | `[x]` provider success/fallback tests, blocked unsupported-claim rejection tests, no-key baseline tests, report save integration tests, full suite, P0 eval, and live DeepSeek-backed report writer workflow smoke pass | `[x]` runtime switch, report writer contract, live smoke command, and Evidence Validator boundary documented | `[x]` Done |
+| Task 26 - Guarded Insight Claim Typing | `[x]` PromptOps-backed `insight_claim_typer` path, structured claim type schema, env-gated DeepSeek provider factory, core workflow claim typing node, and report supervisor section integration | `[x]` provider success/fallback tests, schema mismatch fallback, Evidence Validator final-decision tests, report supervisor tests, full suite, P0 eval, and live DeepSeek-backed claim typing workflow smoke pass | `[x]` runtime switch, claim typing contract, live smoke command, and Evidence Validator ownership documented | `[x]` Done |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ### P3 Task 17 Acceptance Tracker
@@ -454,6 +455,21 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Provider-backed report writing does not generate SQL, execute SQL, bypass `validate_sql()`, bypass Evidence Validator, or create approval-gated actions.
 - `[x]` Live DeepSeek report writer workflow smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1` and `INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1`.
 
+### P3 Task 26 Acceptance Tracker
+
+- `[x]` Claim typing output is rendered through prompt id `insight_claim_typer` for PromptOps-compatible providers.
+- `[x]` Provider claim typing output must pass prompt-specific structured validation before use.
+- `[x]` Provider success records `provider_called: true`, `fallback_used: false`, `source: provider`, prompt id/version, model, usage, and latency metadata.
+- `[x]` Provider output can classify candidate claims as `data_supported_finding`, `hypothesis`, or `unsupported`.
+- `[x]` Provider classification is advisory; Evidence Validator still produces the final supported/hypothesis/blocked split.
+- `[x]` Provider output is rejected if it returns SQL fields, malformed `typed_claims`, unknown claim types, or invalid risk flags.
+- `[x]` `provider=None`, missing API key, provider errors, malformed JSON, and schema mismatch fall back to deterministic claim validation.
+- `[x]` `run_workflow()` runs claim typing after deterministic Insight Agent output and before trace save.
+- `[x]` `run_report_supervisor_agent()` can run claim typing on report-section claims before Evidence Validator filtering.
+- `[x]` The no-key deterministic baseline continues through insight and report workflows without requiring a provider.
+- `[x]` Provider-backed claim typing does not generate SQL, execute SQL, bypass `validate_sql()`, bypass Evidence Validator, or create approval-gated actions.
+- `[x]` Live DeepSeek claim typing workflow smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1` and `INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1`.
+
 ## Update Rules
 
 After every task:
@@ -466,6 +482,22 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 26 verification:
+
+```bash
+python3 -m pytest tests/test_guarded_insight_claim_typing.py tests/test_deepseek_claim_typing_workflow_live.py tests/test_llm_provider_promptops.py tests/test_runtime_provider.py -q
+python3 -m pytest tests/test_workflow.py tests/test_guarded_insight_claim_typing.py tests/test_deepseek_claim_typing_workflow_live.py -q
+python3 -m pytest tests/test_report_supervisor.py tests/test_provider_backed_report_writer.py tests/test_report_planner.py -q
+python3 -m pytest tests/test_guarded_llm_enhancer.py tests/test_llm_provider_promptops.py tests/test_deepseek_provider_structured_output.py tests/test_runtime_provider.py -q
+python3 -m pytest tests/test_streamlit_app.py tests/test_async_run_api.py -q
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 python3 -m pytest tests/test_deepseek_claim_typing_workflow_live.py -q
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1 INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 python3 -m pytest tests/test_deepseek_live_smoke.py tests/test_deepseek_question_understanding_workflow_live.py tests/test_deepseek_clarification_workflow_live.py tests/test_deepseek_sql_planning_workflow_live.py tests/test_deepseek_business_review_planner_live.py tests/test_deepseek_report_writer_live.py tests/test_deepseek_claim_typing_workflow_live.py -q
+python3 -m pytest -q -rs
+python3 eval/run_eval.py
+```
+
+Result: Task 26 claim typing tests report 14 passed and 1 live test skipped by default; workflow claim-typing tests report 8 passed and 1 live test skipped by default; report-supervisor/report-writer/report-planner tests report 13/13 passed; guarded enhancer/PromptOps/DeepSeek/runtime provider tests report 22/22 passed; Streamlit/API tests report 17/17 passed; the real DeepSeek-backed claim typing workflow smoke reports 1/1 passed when explicitly enabled; the full live DeepSeek workflow suite reports 7/7 passed when all provider switches are explicitly enabled; the default full suite reports 177 passed and 7 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. Task 26 proves DeepSeek can participate in core insight claim typing and report-section claim typing while Evidence Validator remains the final authority.
 
 Task 25 verification:
 
