@@ -16,9 +16,9 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | Field | Status |
 |---|---|
 | Current phase | P3 - MCP & Engineering Core |
-| Current task | Task 26 - Guarded Insight Claim Typing (complete; next task not started) |
-| Next planned task | Task 27 - LLM Action and Email Drafting |
-| Last completed task | Task 26 - Guarded Insight Claim Typing |
+| Current task | Task 27 - LLM Action and Email Drafting (complete; next task not started) |
+| Next planned task | Task 28 - LLM Template Mining and Eval Suite |
+| Last completed task | Task 27 - LLM Action and Email Drafting |
 | Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
 | Active frontend | Streamlit |
 | Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
@@ -30,7 +30,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, and Task 26 guarded insight claim typing complete; Task 27-28 LLM enhancement backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 26 provider/runtime tests passing; full suite 177 passed / 7 live tests skipped by default; live DeepSeek suite 7/7 passed when explicitly enabled; P0 eval 20/20 passing | `[x]` Task 26 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, Task 26 guarded insight claim typing, and Task 27 action/email drafting complete; Task 28 LLM template mining/eval backlog is planned but not started; CI and later engineering hardening are not started | `[x]` Task 27 provider/runtime tests passing; full suite 183 passed / 8 live tests skipped by default; live DeepSeek suite 8/8 passed when explicitly enabled; P0 eval 20/20 passing | `[x]` Task 27 README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS docs updated | `[~]` In progress |
 
 ## P0 - Agentic SQL Core
 
@@ -160,7 +160,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 24 - LLM Business Review Decomposition | `[x]` Expanded controlled report planner with PromptOps provider support, weekly/monthly allowlisted section selection, provider SQL/claim rejection, and report supervisor runtime wiring | `[x]` provider section selection, SQL leak rejection, schema mismatch fallback, no-key baseline, monthly review runtime, trace metadata, full suite, P0 eval, and live DeepSeek review-planning smoke tests | `[x]` Review planning runtime switch, live smoke command, monthly report support, and allowlist rules documented | `[x]` Done |
 | Task 25 - Evidence-backed Report Writing and Polishing | `[x]` Added provider-backed `report_writer` prompt/schema, report writer agent, env-gated runtime provider factory, and report-agent/report-supervisor wiring after Evidence Validator | `[x]` supported-claim inclusion, unsupported-claim rejection, Evidence Validator gate, no-key fallback, report save integration, full suite, P0 eval, and live DeepSeek report-writing smoke tests | `[x]` Report polishing contract, runtime switches, live smoke command, and evidence boundaries documented | `[x]` Done |
 | Task 26 - Guarded Insight Claim Typing | `[x]` Added provider-backed `insight_claim_typer` prompt/schema, claim typing agent, env-gated runtime provider factory, and core workflow/report supervisor wiring before Evidence Validator filtering | `[x]` claim-type normalization, Evidence Validator final classification, unsupported blocking, fallback, runtime trace metadata, full suite, P0 eval, and live DeepSeek claim-typing smoke tests | `[x]` Claim type schema, runtime integration, live smoke command, and Evidence Validator interaction documented | `[x]` Done |
-| Task 27 - LLM Action and Email Drafting | `[ ]` Add optional provider-backed task/alert/email draft wording from evidence-backed findings before risk assessment and approval; wire into action workflow only before approval gates | `[ ]` draft schema validation, approval gate preservation, no direct action creation, audit requirement, malformed output fallback, runtime action workflow trace, and live DeepSeek drafting smoke tests | `[ ]` Action drafting flow, runtime integration, approval boundary, and email draft rules documented | `[ ]` Not started |
+| Task 27 - LLM Action and Email Drafting | `[x]` Added optional provider-backed task/alert/email draft wording from evidence-backed findings after Action Planner and before Risk Assessor, Approval Gate, Action Executor, and Audit Logger | `[x]` draft schema validation, approval gate preservation, no direct action creation, audit requirement, malformed output fallback/retry, runtime action workflow trace, full suite, P0 eval, and live DeepSeek drafting smoke tests | `[x]` Action drafting flow, runtime integration, approval boundary, and email draft rules documented | `[x]` Done |
 | Task 28 - LLM Template Mining and Eval Suite | `[ ]` Expand template-mining feedback and LLM eval smoke cases for provider output shape, fallback behavior, malformed JSON, schema mismatch, and repeated successful `llm_candidate` patterns from real workflow traces | `[ ]` eval case success/failure, template recommendation, no auto-template-write, no-key baseline, runtime trace mining, and live DeepSeek eval tests | `[ ]` LLM eval command, runtime trace-mining policy, and opt-in live test docs | `[ ]` Not started |
 
 ### LLM Enhancement Backlog Acceptance Rules
@@ -250,6 +250,7 @@ These tasks are the concrete development plan for future model-enhanced behavior
 | Task 24 - LLM Business Review Decomposition | `[x]` PromptOps-backed `report_planner` path, weekly/monthly report section templates, env-gated DeepSeek provider factory, and report supervisor runtime integration | `[x]` provider success/fallback tests, provider SQL/claim rejection tests, no-key baseline tests, monthly supervisor tests, full suite, P0 eval, and live DeepSeek-backed business review workflow smoke pass | `[x]` runtime switch, monthly review behavior, live smoke command, and allowlist/SQL boundaries documented | `[x]` Done |
 | Task 25 - Evidence-backed Report Writing and Polishing | `[x]` PromptOps-backed `report_writer` path, structured evidence-bound prose schema, env-gated DeepSeek provider factory, and report agent/supervisor runtime integration | `[x]` provider success/fallback tests, blocked unsupported-claim rejection tests, no-key baseline tests, report save integration tests, full suite, P0 eval, and live DeepSeek-backed report writer workflow smoke pass | `[x]` runtime switch, report writer contract, live smoke command, and Evidence Validator boundary documented | `[x]` Done |
 | Task 26 - Guarded Insight Claim Typing | `[x]` PromptOps-backed `insight_claim_typer` path, structured claim type schema, env-gated DeepSeek provider factory, core workflow claim typing node, and report supervisor section integration | `[x]` provider success/fallback tests, schema mismatch fallback, Evidence Validator final-decision tests, report supervisor tests, full suite, P0 eval, and live DeepSeek-backed claim typing workflow smoke pass | `[x]` runtime switch, claim typing contract, live smoke command, and Evidence Validator ownership documented | `[x]` Done |
+| Task 27 - LLM Action and Email Drafting | `[x]` PromptOps-backed `action_drafter` path, structured action/email draft schema, env-gated DeepSeek provider factory, action planner runtime integration, and provider retry/fallback metadata | `[x]` provider success/fallback tests, approval bypass rejection, unsupported claim blocking, no-key baseline, runtime action workflow tests, full suite, P0 eval, and live DeepSeek-backed action drafting workflow smoke pass | `[x]` runtime switch, action drafter contract, live smoke command, and approval/audit boundaries documented | `[x]` Done |
 | Docker / CI | `[ ]` Dockerfile, compose, CI workflow | `[ ]` CI test command | `[ ]` deployment docs | `[ ]` Not started |
 
 ### P3 Task 17 Acceptance Tracker
@@ -470,6 +471,22 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Provider-backed claim typing does not generate SQL, execute SQL, bypass `validate_sql()`, bypass Evidence Validator, or create approval-gated actions.
 - `[x]` Live DeepSeek claim typing workflow smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1` and `INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1`.
 
+### P3 Task 27 Acceptance Tracker
+
+- `[x]` Action drafting output is rendered through prompt id `action_drafter` for PromptOps-compatible providers.
+- `[x]` Provider action drafting output must pass prompt-specific structured validation before use.
+- `[x]` Provider success records `provider_called: true`, `fallback_used: false`, `source: provider`, prompt id/version, model, usage, and latency metadata.
+- `[x]` Provider output can draft only `create_task`, `create_metric_alert`, and `create_email_draft` pending action payloads.
+- `[x]` Provider input is limited to user question, existing deterministic actions, verified findings, verified hypotheses, and blocked unsupported claims.
+- `[x]` Provider output is rejected if it returns approval-bypass fields, action record IDs, audit IDs, send-email flags, unsupported claim references, malformed action fields, or blocked unsupported claim text.
+- `[x]` Top-level provider metadata such as `status` is ignored instead of being copied into action payloads.
+- `[x]` Provider malformed JSON or transient validation/provider failures retry once, then fall back deterministically if the second attempt still fails.
+- `[x]` `provider=None`, missing API key, provider errors, malformed JSON, and schema mismatch fall back to deterministic action plans.
+- `[x]` `run_action_planner_agent()` calls the action drafter before Risk Assessor and Approval Gate when `INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1` or an explicit provider is supplied.
+- `[x]` The no-key deterministic baseline continues through action planning without requiring a provider.
+- `[x]` Provider-backed action drafting does not generate SQL, execute SQL, bypass `validate_sql()`, bypass Evidence Validator, set approval status, create actions, send email, or bypass Risk Assessor, Approval Gate, Action Executor, or Audit Logger.
+- `[x]` Live DeepSeek action drafting workflow smoke test passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1` and `INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1`.
+
 ## Update Rules
 
 After every task:
@@ -482,6 +499,18 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+Task 27 verification:
+
+```bash
+python3 -m pytest tests/test_provider_backed_action_drafter.py tests/test_deepseek_action_drafter_live.py tests/test_llm_provider_promptops.py tests/test_runtime_provider.py -q
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1 python3 -m pytest tests/test_deepseek_action_drafter_live.py -q
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1 INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1 python3 -m pytest tests/test_deepseek_live_smoke.py tests/test_deepseek_question_understanding_workflow_live.py tests/test_deepseek_clarification_workflow_live.py tests/test_deepseek_sql_planning_workflow_live.py tests/test_deepseek_business_review_planner_live.py tests/test_deepseek_report_writer_live.py tests/test_deepseek_claim_typing_workflow_live.py tests/test_deepseek_action_drafter_live.py -q
+python3 -m pytest -q -rs
+python3 eval/run_eval.py
+```
+
+Result: Task 27 action drafter/PromptOps/runtime provider tests report 16 passed and 1 live test skipped by default; the real DeepSeek-backed action drafting workflow smoke reports 1/1 passed when explicitly enabled; the full live DeepSeek workflow suite reports 8/8 passed when all provider switches are explicitly enabled; the default full suite reports 183 passed and 8 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. Task 27 proves DeepSeek can participate in the real action workflow by drafting pending task, metric-alert, and email-draft payloads before Risk Assessor and Approval Gate, while deterministic fallback, approval blocking, action execution, and audit boundaries remain intact.
 
 Task 26 verification:
 

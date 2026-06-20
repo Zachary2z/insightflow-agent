@@ -208,6 +208,91 @@ def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
 
 
+def _validate_action_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "action_drafter"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "action_drafter output must be an object")
+
+    top_level_blocked_fields = {
+        "approval_status",
+        "requires_approval",
+        "created_actions",
+        "record_id",
+        "task_id",
+        "alert_id",
+        "draft_id",
+        "audit_log_id",
+        "send_email",
+    }
+    action_blocked_fields = {*top_level_blocked_fields, "status"}
+    leaked = sorted(top_level_blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"action_drafter must not return blocked fields: {', '.join(leaked)}")
+
+    actions = content.get("actions", [])
+    if not isinstance(actions, list):
+        return _error(prompt_id, "actions must be a list")
+
+    allowed_action_types = {"create_task", "create_metric_alert", "create_email_draft"}
+    allowed_claims = set(schema_context.get("allowed_claims", []))
+    blocked_claims = [str(claim).strip() for claim in schema_context.get("blocked_unsupported_claims", []) if str(claim).strip()]
+    normalized_actions = []
+    for index, action in enumerate(actions):
+        if not isinstance(action, dict):
+            return _error(prompt_id, f"actions[{index}] must be an object")
+        leaked = sorted(action_blocked_fields & set(action))
+        if leaked:
+            return _error(prompt_id, f"actions[{index}] must not return blocked fields: {', '.join(leaked)}")
+
+        action_type = str(action.get("action_type", "")).strip()
+        if action_type not in allowed_action_types:
+            return _error(prompt_id, f"actions[{index}].action_type is not allowed: {action_type}")
+
+        source_ok, source_claims, message = _string_list(action.get("source_claims", []), f"actions[{index}].source_claims")
+        if not source_ok:
+            return _error(prompt_id, message)
+        for claim in source_claims:
+            if allowed_claims and claim not in allowed_claims:
+                return _error(prompt_id, f"actions[{index}].source_claims contains unverified claim: {claim}")
+
+        action_text = " ".join(str(value) for value in action.values())
+        for blocked_claim in blocked_claims:
+            if blocked_claim in action_text:
+                return _error(prompt_id, f"actions[{index}] includes blocked unsupported claim: {blocked_claim}")
+
+        normalized = {
+            "action_id": str(action.get("action_id") or f"action_{index + 1}").strip(),
+            "action_type": action_type,
+            "source": "provider_action_drafter",
+            "source_claims": source_claims,
+        }
+        if action_type == "create_task":
+            for field in ("title", "description", "owner", "priority"):
+                value = str(action.get(field, "")).strip()
+                if not value:
+                    return _error(prompt_id, f"actions[{index}].{field} is required")
+                normalized[field] = value
+        elif action_type == "create_metric_alert":
+            for field in ("metric_name", "condition", "threshold", "description"):
+                value = str(action.get(field, "")).strip()
+                if not value:
+                    return _error(prompt_id, f"actions[{index}].{field} is required")
+                normalized[field] = value
+        else:
+            for field in ("recipient", "subject", "body"):
+                value = str(action.get(field, "")).strip()
+                if not value:
+                    return _error(prompt_id, f"actions[{index}].{field} is required")
+                normalized[field] = value
+        normalized_actions.append(normalized)
+
+    risk_ok, risk_flags, message = _string_list(content.get("risk_flags", []), "risk_flags")
+    if not risk_ok:
+        return _error(prompt_id, message)
+
+    return _ok(prompt_id, {"actions": normalized_actions, "risk_flags": risk_flags})
+
+
 def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
     if value is None:
         return True, "", ""
@@ -413,6 +498,8 @@ def validate_prompt_output(
         return _validate_report_writer(content, context)
     if prompt_id == "insight_claim_typer":
         return _validate_insight_claim_typer(content)
+    if prompt_id == "action_drafter":
+        return _validate_action_drafter(content, context)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":

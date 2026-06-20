@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agents.action_drafter import run_action_drafter_agent
+from llm_ops.provider import LLMProvider
+from llm_ops.runtime_provider import build_action_drafter_provider
 from tools.action_tool import DEFAULT_ACTION_DB_PATH
 from tools.trace_logger import append_trace
 
@@ -69,6 +72,7 @@ def build_action_plan(state: dict[str, Any]) -> dict[str, Any]:
 def run_action_planner_agent(
     state: dict[str, Any],
     action_db_path: str | Path | None = None,
+    action_draft_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     action_plan = build_action_plan(state)
     updated = {
@@ -77,7 +81,7 @@ def run_action_planner_agent(
         "action_db_path": action_db_path or state.get("action_db_path") or DEFAULT_ACTION_DB_PATH,
         "status": "action_plan_created",
     }
-    return append_trace(
+    planned = append_trace(
         updated,
         {
             "node": "action_planner_agent",
@@ -88,3 +92,5 @@ def run_action_planner_agent(
             "latency_ms": 0,
         },
     )
+    provider = action_draft_provider or build_action_drafter_provider()
+    return run_action_drafter_agent(planned, provider=provider)

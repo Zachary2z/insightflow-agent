@@ -73,6 +73,27 @@ def test_prompt_registry_renders_insight_claim_typer_prompt_with_evidence_bounda
     assert "must_not_bypass_evidence_validator" in result["metadata"]["safety_contract"]
 
 
+def test_prompt_registry_renders_action_drafter_prompt_with_approval_boundary():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    result = DEFAULT_PROMPT_REGISTRY.render(
+        "action_drafter",
+        {
+            "user_question": "请为运营团队创建跟进任务和邮件草稿。",
+            "evidence_findings": ["Cameras 的 GMV 变化为 -12000.0"],
+            "evidence_hypotheses": ["可能需要进一步验证广告流量和转化率数据。"],
+            "blocked_unsupported_claims": ["库存不足是确定原因"],
+            "existing_actions": [{"action_id": "action_follow_up_task", "action_type": "create_task"}],
+        },
+    )
+
+    assert result["success"] is True
+    assert result["prompt_id"] == "action_drafter"
+    assert "create_email_draft" in result["prompt"]
+    assert "must_not_bypass_approval_gate" in result["metadata"]["safety_contract"]
+    assert "库存不足" in result["prompt"]
+
+
 def test_prompt_registry_returns_structured_error_for_missing_variables():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 

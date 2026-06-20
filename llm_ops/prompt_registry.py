@@ -241,6 +241,40 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
+            prompt_id="action_drafter",
+            version="v1",
+            description="Draft approval-gated task, metric alert, and email draft payloads from evidence-backed findings.",
+            required_variables=[
+                "user_question",
+                "evidence_findings",
+                "evidence_hypotheses",
+                "blocked_unsupported_claims",
+                "existing_actions",
+            ],
+            safety_contract=[
+                "must_not_execute_actions",
+                "must_not_bypass_approval_gate",
+                "must_not_send_email",
+                "must_not_use_unsupported_claims",
+            ],
+            template=(
+                "Task: provider-backed action and email drafting.\n"
+                "User question: {user_question}\n"
+                "Evidence-backed findings: {evidence_findings}\n"
+                "Evidence-backed hypotheses: {evidence_hypotheses}\n"
+                "Blocked unsupported claims that must not appear: {blocked_unsupported_claims}\n"
+                "Existing deterministic actions: {existing_actions}\n"
+                "Return JSON only with actions and risk_flags.\n"
+                "Allowed action_type values: create_task, create_metric_alert, create_email_draft.\n"
+                "For create_task include action_id, action_type, title, description, owner, priority, and source_claims.\n"
+                "For create_metric_alert include action_id, action_type, metric_name, condition, threshold, description, and source_claims.\n"
+                "For create_email_draft include action_id, action_type, recipient, subject, body, and source_claims.\n"
+                "Safety: draft only from evidence-backed findings or hypotheses; do not execute actions; "
+                "do not bypass approval gate; do not set approval_status, requires_approval, status, record ids, "
+                "or audit fields; do not send email; do not use blocked unsupported claims."
+            ),
+        ),
+        PromptTemplate(
             prompt_id="question_understanding",
             version="v1",
             description="Extract structured BI intent slots without generating SQL.",
