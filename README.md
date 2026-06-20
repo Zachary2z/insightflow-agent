@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, and expose an opt-in production DeepSeek provider adapter with strict structured-output validation.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, and classify user questions into structured intent, clarification, rejection, or downstream planning strategies.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, and Task 20C - Production DeepSeek Provider & Structured Output Validation are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, and Task 20A - Question Understanding & Clarification Router are complete.
 
 Implemented:
 
@@ -30,8 +30,9 @@ Implemented:
 - P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
 - P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
 - P3 production DeepSeek provider adapter with `.env` config loading, opt-in live smoke tests, malformed JSON handling, and strict prompt-specific output validation
+- P3 Question Understanding & Clarification Router with deterministic intent slots, missing-slot clarification, sensitive/unsafe rejection, and strategy recommendations before SQL planning
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, and 20C complete. Task 20A+ router work and later engineering work are not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, and 20A complete. Task 20B SQL Planning Router and later engineering work are not implemented yet.
 
 Track current phase, task status, test status, and acceptance progress in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
 
@@ -44,7 +45,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **Current baseline**: deterministic Agent state transitions, SQL validation, SQL execution, evidence validation, chart generation, report saving, and trace logging remain the source of truth.
 - **P2 controlled enhancement**: introduce an optional LLM adapter for report task planning, report section outlining, business-language polishing, and user clarification questions. LLM outputs must be structured and checked before use.
 - **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
-- **P3 question understanding**: add a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
+- **P3 question understanding**: Task 20A adds a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
 - **P3 SQL planning router**: route clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 - **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
@@ -54,11 +55,11 @@ LLM boundaries:
 - The LLM must not execute SQL, bypass `validate_sql()`, override `Evidence Validator`, create final evidence-backed claims without data support, or trigger action tools without approval gates.
 - Reports and insights must remain traceable to SQL, execution results, business context, evidence validation, charts, and saved artifacts.
 
-## Planned Question Understanding And SQL Routing
+## Question Understanding And Planned SQL Routing
 
-Two P3 tasks are planned to make SQL generation smarter without turning the system into a black-box Text2SQL app.
+P3 separates natural-language understanding from SQL planning so the system can become smarter without turning into a black-box Text2SQL app.
 
-**Question Understanding & Clarification Router** will decide whether a user question is clear enough for SQL planning. It should extract structured slots such as:
+**Question Understanding & Clarification Router** decides whether a user question is clear enough for SQL planning. It extracts structured slots such as:
 
 - `metric`: GMV, order count, AOV, repurchase rate, or another known metric
 - `dimension`: product, category, city, user, channel, or another grouping
@@ -67,9 +68,11 @@ Two P3 tasks are planned to make SQL generation smarter without turning the syst
 - `operation`: top N, trend, comparison, decline, summary, or drilldown
 - `limit`: Top 5, Top 10, or another row limit
 
-If required slots are missing, it should return `strategy: clarify` with focused clarification questions instead of forcing SQL generation. If a request asks for sensitive fields or unsafe operations, it should return `strategy: reject` or route to a safety flow.
+If required slots are missing, it returns `strategy: clarify` with focused clarification questions instead of forcing SQL generation. If a request asks for sensitive fields or unsafe operations, it returns `strategy: reject` before SQL generation. Complete stable BI intent returns `strategy: template`; complete but non-template intent returns `strategy: llm_candidate` for a later planning step.
 
-**SQL Planning Router** will decide whether SQL should come from a deterministic template or from the guarded LLM SQL candidate path. Template SQL remains the fast, reliable default for common BI questions. Guarded LLM candidates are used only when the question is clear enough but no existing template covers it. Every LLM candidate must still pass `validate_sql()` before execution.
+Task 20A does not produce SQL, select a concrete SQL template, expose `matched_template`, or set routing confidence. Those belong to Task 20B.
+
+**SQL Planning Router** is still planned. It will decide whether SQL should come from a deterministic template or from the guarded LLM SQL candidate path. Template SQL remains the fast, reliable default for common BI questions. Guarded LLM candidates are used only when the question is clear enough but no existing template covers it. Every LLM candidate must still pass `validate_sql()` before execution.
 
 The intended routing contract is:
 
@@ -752,6 +755,45 @@ INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_live_smo
 ```
 
 The default workflow and full test suite still run without any API key.
+
+## Question Understanding Router
+
+Task 20A adds a deterministic question-understanding layer. It can be used before SQL planning to classify whether a question is complete, ambiguous, or unsafe.
+
+```python
+from question_understanding.router import understand_question
+
+result = understand_question("最近 30 天销售额最高的 5 个商品是什么？")
+print(result["strategy"])
+print(result["intent"])
+```
+
+The output is JSON-compatible:
+
+```python
+{
+    "strategy": "template | llm_candidate | clarify | reject",
+    "intent": {
+        "metric": "gmv",
+        "dimension": "product",
+        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
+        "filters": ["paid_orders"],
+        "operation": "top_n",
+        "limit": 5,
+        "risk_flags": [],
+    },
+    "missing_slots": [],
+    "clarification_questions": [],
+    "risk_flags": [],
+}
+```
+
+Boundaries:
+
+- It does not generate SQL.
+- It does not execute SQL.
+- It does not choose a concrete SQL template or emit `matched_template`.
+- Sensitive-field or unsafe-write requests return `strategy: reject` before SQL planning.
 
 ## Schema Tool
 
