@@ -17,6 +17,9 @@ class AgentState(TypedDict, total=False):
     clarification_questions: list[str]
     llm_sql_enhancement: dict[str, Any]
     llm_insight_enhancement: dict[str, Any]
+    question_understanding: dict[str, Any]
+    intent_slots: dict[str, Any]
+    routing_strategy: str
     action_plan: dict[str, Any]
     risk_assessment: dict[str, Any]
     approval_status: str

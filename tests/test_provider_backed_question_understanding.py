@@ -20,6 +20,15 @@ def _valid_provider_payload() -> dict:
     }
 
 
+def _runtime_provider_payload() -> dict:
+    payload = _valid_provider_payload()
+    payload["intent"] = {
+        **payload["intent"],
+        "dimension": "product",
+    }
+    return payload
+
+
 def test_provider_backed_question_understanding_uses_valid_provider_output():
     from llm_ops.provider import MockLLMProvider
     from question_understanding.provider_backed import understand_question_with_provider
@@ -150,6 +159,29 @@ def test_provider_backed_question_understanding_never_returns_sql_or_planning_fi
     assert "selected_tables" not in result
 
 
+def test_provider_backed_question_understanding_normalizes_provider_slot_aliases():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": "sales",
+        "dimension": "商品",
+        "operation": "最高",
+    }
+
+    result = understand_question_with_provider(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["intent"]["metric"] == "gmv"
+    assert result["intent"]["dimension"] == "product"
+    assert result["intent"]["operation"] == "top_n"
+
+
 def test_question_understanding_agent_accepts_provider_and_traces_fallback_flags():
     from agents.question_understanding import run_question_understanding_agent
     from agents.supervisor import initialize_run
@@ -173,3 +205,60 @@ def test_question_understanding_agent_accepts_provider_and_traces_fallback_flags
     assert result["trace"][-1]["tool_name"] == "provider_backed_question_understanding"
     assert result["trace"][-1]["provider_called"] is True
     assert result["trace"][-1]["fallback_used"] is False
+
+
+def test_core_workflow_uses_provider_backed_question_understanding_when_provider_is_supplied(tmp_path):
+    from graph.workflow import run_workflow
+    from llm_ops.provider import MockLLMProvider
+
+    result = run_workflow(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        db_path="data/ecommerce.db",
+        trace_dir=tmp_path,
+        run_id="run_provider_runtime_question_understanding",
+        session_id="session_provider_runtime_question_understanding",
+        question_understanding_provider=MockLLMProvider(_runtime_provider_payload()),
+    )
+
+    assert result["status"] == "completed"
+    assert result["question_understanding"]["source"] == "provider"
+    assert result["question_understanding"]["provider_called"] is True
+    assert result["question_understanding"]["fallback_used"] is False
+    assert result["intent_slots"]["metric"] == "gmv"
+    assert result["routing_strategy"] == "template"
+
+    provider_events = [
+        event
+        for event in result["trace"]
+        if event.get("node") == "question_understanding_agent"
+        and event.get("tool_name") == "provider_backed_question_understanding"
+    ]
+    assert provider_events
+    assert provider_events[0]["provider_called"] is True
+    assert provider_events[0]["fallback_used"] is False
+    assert "generated_sql" in result
+
+
+def test_core_workflow_env_opt_in_without_api_key_keeps_deterministic_baseline(tmp_path, monkeypatch):
+    from graph.workflow import run_workflow
+
+    monkeypatch.setenv("INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING", "1")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+
+    result = run_workflow(
+        "最近 30 天销售额最高的 5 个商品是什么？",
+        db_path="data/ecommerce.db",
+        trace_dir=tmp_path,
+        run_id="run_no_key_runtime_question_understanding",
+        session_id="session_no_key_runtime_question_understanding",
+    )
+
+    assert result["status"] == "completed"
+    assert result["question_understanding"]["strategy"] == "template"
+    assert result["intent_slots"]["metric"] == "gmv"
+    assert result["routing_strategy"] == "template"
+    assert result["question_understanding"].get("source", "deterministic") == "deterministic"
+    assert not any(
+        event.get("tool_name") == "provider_backed_question_understanding"
+        for event in result["trace"]
+    )

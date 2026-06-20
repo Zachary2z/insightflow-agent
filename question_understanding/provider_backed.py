@@ -9,10 +9,89 @@ from question_understanding.router import understand_question
 
 
 _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "selected_tables"}
+_METRIC_ALIASES = {
+    "销售额": "gmv",
+    "成交额": "gmv",
+    "收入": "gmv",
+    "gmv": "gmv",
+    "sales": "gmv",
+    "revenue": "gmv",
+    "sales_amount": "gmv",
+    "gross_merchandise_value": "gmv",
+    "订单量": "order_count",
+    "订单数": "order_count",
+    "订单数量": "order_count",
+    "order_count": "order_count",
+    "客单价": "aov",
+    "平均订单金额": "aov",
+    "aov": "aov",
+    "复购率": "repurchase_rate",
+    "复购": "repurchase_rate",
+    "repurchase_rate": "repurchase_rate",
+    "销量": "product_sales",
+    "销售量": "product_sales",
+    "product_sales": "product_sales",
+}
+_DIMENSION_ALIASES = {
+    "商品": "product",
+    "产品": "product",
+    "product": "product",
+    "品类": "category",
+    "类别": "category",
+    "category": "category",
+    "城市": "city",
+    "city": "city",
+    "用户": "user",
+    "客户": "user",
+    "user": "user",
+    "渠道": "channel",
+    "channel": "channel",
+}
+_OPERATION_ALIASES = {
+    "最高": "top_n",
+    "最多": "top_n",
+    "排名": "top_n",
+    "top": "top_n",
+    "top n": "top_n",
+    "ranking": "top_n",
+    "rank": "top_n",
+    "top_n": "top_n",
+    "趋势": "trend",
+    "走势": "trend",
+    "trend": "trend",
+    "下降": "decline",
+    "下滑": "decline",
+    "decline": "decline",
+    "对比": "comparison",
+    "比较": "comparison",
+    "comparison": "comparison",
+    "明细": "drilldown",
+    "详情": "drilldown",
+    "drilldown": "drilldown",
+    "总结": "summary",
+    "概览": "summary",
+    "summary": "summary",
+    "unsafe_write": "unsafe_write",
+}
 
 
 def _strip_forbidden_fields(result: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in result.items() if key not in _BLOCKED_FIELDS}
+
+
+def _normalize_slot(value: Any, aliases: dict[str, str]) -> str:
+    text = str(value or "").strip()
+    return aliases.get(text.lower(), aliases.get(text, text))
+
+
+def _normalize_provider_content(content: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(content)
+    intent = dict(normalized.get("intent", {}))
+    intent["metric"] = _normalize_slot(intent.get("metric"), _METRIC_ALIASES)
+    intent["dimension"] = _normalize_slot(intent.get("dimension"), _DIMENSION_ALIASES)
+    intent["operation"] = _normalize_slot(intent.get("operation"), _OPERATION_ALIASES)
+    normalized["intent"] = intent
+    return normalized
 
 
 def _fallback_result(
@@ -34,7 +113,7 @@ def _fallback_result(
 
 
 def _provider_result(content: dict[str, Any], provider_response: dict[str, Any]) -> dict[str, Any]:
-    normalized = _strip_forbidden_fields(content)
+    normalized = _strip_forbidden_fields(_normalize_provider_content(content))
     risk_flags = normalized.get("risk_flags", [])
     if risk_flags:
         normalized["strategy"] = "reject"

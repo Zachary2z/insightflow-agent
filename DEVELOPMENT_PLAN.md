@@ -41,7 +41,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, and 21 complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, and 21A complete; Docker/CI and later hardening not started |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -61,20 +61,21 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Question understanding router | Deterministic extraction of metric, dimension, time range, filters, operation, limit, risk flags | `question_understanding/`, `agents/question_understanding.py` | Complete |
 | SQL planning router | Deterministic routing to template, guarded `llm_candidate`, clarify, or reject | `sql_planning/`, `agents/sql_planning_router.py` | Complete |
 | Provider-backed question understanding | Optional provider-backed intent extraction with prompt-specific validation and deterministic fallback | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete |
+| Runtime provider-backed question understanding wiring | Core workflow runs question understanding before schema retrieval; env-gated DeepSeek provider can participate in workflow state and trace | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete |
 
 ### 4.2 Remaining LLM Enhancement Targets
 
-These are the remaining concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback and existing validators.
+These are the remaining concrete places where future tasks should enhance the project with real provider-backed behavior. Each one must keep deterministic fallback, existing validators, runtime trace evidence, and a live DeepSeek smoke test for the actual project entry point it affects.
 
 | Target | Why the LLM is useful | Future development task | Safety boundary |
 |---|---|---|---|
-| Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Task 22 - add structured clarification prompt and schema | Must not guess missing requirements |
-| Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Task 23 - add optional model-assisted routing with confidence/fallback and connect `llm_candidate` to guarded SQL generation | Must not return executable SQL directly |
-| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Task 24 - expand controlled report planner for richer but still allowlisted section/subtask selection | Must not provide provider-supplied SQL |
-| Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Task 25 - add provider-backed report prose from verified findings, hypotheses, SQL, chart paths, and trace path | Must not add unsupported claims |
-| Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Task 26 - expand guarded insight prompts with stricter claim typing | Evidence Validator decides what can be used |
-| Action plan and email draft wording | Turn evidence-backed findings into clearer task, alert, and email draft wording | Task 27 - add optional LLM drafting before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
-| Template mining and LLM eval suite | Identify repeated successful `llm_candidate` patterns and measure provider output quality | Task 28 - expand template mining feedback and LLM eval smoke cases | Must not auto-modify production templates or affect no-key baseline |
+| Provider-backed clarification questions | Produce clearer follow-up questions when metric, dimension, time range, or filters are missing | Task 22 - add structured clarification prompt/schema and wire it into workflow/API/Streamlit clarification state | Must not guess missing requirements |
+| Provider-assisted SQL planning | Help classify complex complete questions into template vs guarded candidate vs reject | Task 23 - add optional model-assisted routing with confidence/fallback and connect `llm_candidate` to guarded SQL generation in workflow | Must not return executable SQL directly |
+| Business review decomposition | Improve weekly/monthly review section planning for complex review requests | Task 24 - expand controlled report planner and wire provider planning into report supervisor runtime paths | Must not provide provider-supplied SQL |
+| Report writing and business-language polishing | Make reports clearer for business users while preserving traceability | Task 25 - add provider-backed report prose from verified evidence and wire it into report generation after Evidence Validator | Must not add unsupported claims |
+| Insight claim suggestion | Suggest hypotheses and possible business explanations from execution results and context | Task 26 - expand guarded insight prompts and wire claim typing into insight/report workflows before Evidence Validator filtering | Evidence Validator decides what can be used |
+| Action plan and email draft wording | Turn evidence-backed findings into clearer task, alert, and email draft wording | Task 27 - add optional LLM drafting in action workflow before risk assessment and approval | Must not create actions without Approval Gate and Audit Logger |
+| Template mining and LLM eval suite | Identify repeated successful `llm_candidate` patterns and measure provider output quality | Task 28 - expand template mining and LLM eval from real workflow traces | Must not auto-modify production templates or affect no-key baseline |
 
 ### 4.3 Areas That Must Stay Deterministic
 
@@ -91,6 +92,9 @@ These are the remaining concrete places where future tasks should enhance the pr
 ### 4.4 LLM Enhancement Acceptance Checklist
 
 - Every real-provider output is validated by a prompt-specific schema before an agent consumes it.
+- Every LLM enhancement must be wired into a real runtime path, not stop at standalone helper support.
+- Every LLM enhancement must leave trace/state evidence of `provider_called`, `fallback_used`, prompt id/version, and validation/fallback status.
+- Every LLM enhancement must include a live DeepSeek smoke test for the affected runtime path.
 - Every LLM-assisted SQL candidate goes through `validate_sql()`.
 - Every LLM-assisted insight/report claim goes through Evidence Validator.
 - Every LLM-assisted action draft goes through Risk Assessor, Approval Gate, Action Executor, and Audit Logger.
@@ -206,6 +210,7 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 | Task 20A | Question Understanding & Clarification Router | `question_understanding/router.py`, `agents/question_understanding.py` | Complete | Extracts intent slots, returns clarify/reject/template/llm_candidate, does not generate SQL |
 | Task 20B | SQL Planning Router | `sql_planning/router.py`, `feedback.py`, `agents/sql_planning_router.py` | Complete | Routes to deterministic template or guarded LLM candidate, preserves clarify/reject, does not call provider |
 | Task 21 | Provider-backed Question Understanding | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete | Optional provider-backed intent extraction, structured validation, deterministic fallback, no SQL generation or execution |
+| Task 21A | Runtime Provider-backed Question Understanding Wiring | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete | Env-gated DeepSeek provider can participate in core workflow question understanding without changing SQL validation or execution boundaries |
 | Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
 
 ### P3 Acceptance Standard
@@ -294,6 +299,7 @@ User Question
 
 - README, DEVELOPMENT_STATUS, requirements, and development plan language must stay aligned on LLM boundaries.
 - All real-provider outputs must pass prompt-specific structured-output validation.
+- LLM work must be connected to a real runtime path with tests, trace evidence, and opt-in live DeepSeek verification.
 - LLM-assisted SQL candidates must not bypass `validate_sql()`.
 - LLM-assisted insights and reports must not bypass Evidence Validator.
 - LLM-assisted action drafts must not bypass Approval Gate or Audit Logger.

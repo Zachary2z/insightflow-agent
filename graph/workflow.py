@@ -5,6 +5,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.question_understanding import run_question_understanding_agent
 from agents.supervisor import initialize_run
 from graph.nodes import (
     error_fix_node,
@@ -21,10 +22,16 @@ from graph.nodes import (
     sql_reviewer_node,
 )
 from graph.state import AgentState
+from llm_ops.provider import LLMProvider
+from llm_ops.runtime_provider import build_question_understanding_provider
 
 
-def build_workflow():
+def build_workflow(question_understanding_provider: LLMProvider | None = None):
     workflow = StateGraph(AgentState)
+    workflow.add_node(
+        "question_understanding",
+        lambda state: run_question_understanding_agent(dict(state), provider=question_understanding_provider),
+    )
     workflow.add_node("schema", schema_node)
     workflow.add_node("metric", metric_node)
     workflow.add_node("generate", sql_generator_node)
@@ -35,7 +42,8 @@ def build_workflow():
     workflow.add_node("fail", fail_response_node)
     workflow.add_node("save_trace", save_trace_node)
 
-    workflow.add_edge(START, "schema")
+    workflow.add_edge(START, "question_understanding")
+    workflow.add_edge("question_understanding", "schema")
     workflow.add_edge("schema", "metric")
     workflow.add_edge("metric", "generate")
     workflow.add_edge("generate", "review")
@@ -55,6 +63,7 @@ def run_workflow(
     run_id: str | None = None,
     session_id: str | None = None,
     initial_sql: str | None = None,
+    question_understanding_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
     state["db_path"] = db_path
@@ -64,5 +73,6 @@ def run_workflow(
     if initial_sql:
         state["initial_sql"] = initial_sql
 
-    app = build_workflow()
+    provider = question_understanding_provider or build_question_understanding_provider()
+    app = build_workflow(question_understanding_provider=provider)
     return dict(app.invoke(state))

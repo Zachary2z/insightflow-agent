@@ -52,6 +52,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 - **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
 - **P3 provider-backed question understanding**: Task 21 adds an optional provider-backed path behind the deterministic question-understanding router. Provider output must pass the `question_understanding` structured-output validator, is normalized to the existing intent schema, and falls back deterministically on provider errors, malformed JSON, schema mismatch, or missing provider configuration.
+- **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
 
 LLM boundaries:
 
@@ -74,6 +75,13 @@ Final LLM participation map:
 | LLM eval / smoke tests | Validate provider availability, JSON shape, prompt schemas, and failure handling | Live provider tests must remain explicit opt-in |
 
 The development plan tracks this as the final LLM participation boundary: LLMs may help with understanding, planning, candidates, wording, and suggestions; deterministic tools remain responsible for approval, execution, validation, and audit.
+
+Runtime LLM development standard:
+
+- Do not stop at standalone provider helpers; each LLM task must be wired into `graph.workflow`, FastAPI, Streamlit helpers, report supervisor, or action workflow.
+- Keep the no-key deterministic baseline available.
+- Record `provider_called`, `fallback_used`, prompt id/version, validation status, and fallback errors in state or trace.
+- Add both mocked runtime tests and a live DeepSeek smoke test for the affected workflow path.
 
 ## Question Understanding And SQL Routing
 
@@ -144,6 +152,18 @@ print(result["fallback_used"])
 ```
 
 Accepted provider output includes `source: "provider"`, `provider_called: true`, and `fallback_used: false`. Provider exceptions, malformed JSON, and schema mismatch return deterministic fallback output with `source: "deterministic"`, `provider_called: true`, `fallback_used: true`, and either `provider_error` or `validation_error`.
+
+Task 21A wires provider-backed question understanding into the real runtime workflow. `graph.workflow.run_workflow()` now runs the Question Understanding Agent before schema retrieval, so Streamlit `run_demo_question()` and the FastAPI async run manager inherit the same behavior.
+
+Enable real DeepSeek-backed question understanding in the runtime workflow:
+
+```bash
+export INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1
+export DEEPSEEK_API_KEY=...
+python -c "from graph.workflow import run_workflow; print(run_workflow('最近 30 天销售额最高的 5 个商品是什么？')['question_understanding'])"
+```
+
+The runtime switch only affects question understanding. The LLM still does not generate SQL, execute SQL, select `matched_template`, bypass `validate_sql()`, bypass Evidence Validator, or trigger approval-gated actions.
 
 ## Quickstart
 
@@ -865,6 +885,19 @@ Additional boundaries:
 - It does not emit `matched_template`, `confidence`, or selected table fields.
 - Sensitive or unsafe provider risk flags force `strategy: reject` and preserve the risk flags.
 - Agent trace events include `provider_called` and `fallback_used`.
+
+Task 21A runtime behavior:
+
+- `run_workflow()` always writes `question_understanding`, `intent_slots`, and `routing_strategy` into workflow state.
+- With `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1` and a valid `DEEPSEEK_API_KEY`, the workflow creates a `DeepSeekProvider` and calls the provider-backed path.
+- Without the flag or without a key, the same workflow uses deterministic question understanding.
+- Streamlit demo helpers and FastAPI async runs inherit this through the core workflow.
+- A live workflow smoke test is available with:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+  python3 -m pytest tests/test_deepseek_question_understanding_workflow_live.py -q
+```
 
 ## SQL Planning Router
 
