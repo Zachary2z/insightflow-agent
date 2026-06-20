@@ -187,5 +187,29 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "and preserve sensitive_field, unsafe_operation, or bulk_export risk flags."
             ),
         ),
+        PromptTemplate(
+            prompt_id="clarification_router",
+            version="v1",
+            description="Generate focused clarification questions for missing BI intent slots without guessing requirements.",
+            required_variables=["user_question", "missing_slots", "current_intent", "deterministic_questions"],
+            safety_contract=[
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_guess_missing_requirements",
+                "must_not_bypass_reject_strategy",
+            ],
+            template=(
+                "Task: provider-backed clarification routing.\n"
+                "User question: {user_question}\n"
+                "Missing slots: {missing_slots}\n"
+                "Current intent: {current_intent}\n"
+                "Deterministic clarification questions: {deterministic_questions}\n"
+                "Return JSON only with requires_clarification, missing_slots, clarification_questions, risk_flags, and reason.\n"
+                "Schema: requires_clarification is true; missing_slots is a string array; "
+                "clarification_questions is a string array; risk_flags is a string array; reason is a short string.\n"
+                "Safety: do not generate SQL, do not execute SQL, do not guess missing requirements, "
+                "and do not override sensitive or unsafe rejection."
+            ),
+        ),
     ]
 )

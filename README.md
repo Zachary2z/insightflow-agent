@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use a validated provider-backed question-understanding path, and plan SQL source strategy before any SQL generation or execution.
+P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding and clarification paths, and plan SQL source strategy before any SQL generation or execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, and Task 21 - Provider-backed Question Understanding are complete.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, and Task 22 - Provider-backed Clarification Router are complete.
 
 Implemented:
 
@@ -33,10 +33,11 @@ Implemented:
 - P3 Question Understanding & Clarification Router with deterministic intent slots, missing-slot clarification, sensitive/unsafe rejection, and strategy recommendations before SQL planning
 - P3 SQL Planning Router with deterministic template matching, guarded `llm_candidate` policy, clarify/reject preservation, and template-mining feedback summaries
 - P3 Provider-backed Question Understanding with optional DeepSeek-compatible intent extraction, prompt-specific schema validation, deterministic fallback, and trace metadata
+- P3 Provider-backed Clarification Router with optional DeepSeek clarification questions, deterministic fallback, runtime workflow trace, and SQL-before-clarification blocking only when provider clarification is active
 
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, and 21 complete. Later engineering work is not implemented yet.
+P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, 20, 20C, 20A, 20B, 21, 21A, and 22 complete. Later engineering work is not implemented yet.
 
-Track current phase, task status, test status, acceptance progress, and the concrete Task 22-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Track current phase, task status, test status, acceptance progress, and the concrete Task 23-28 LLM enhancement backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
 ## LLM Enhancement Roadmap
 
@@ -52,6 +53,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 - **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
 - **P3 provider-backed question understanding**: Task 21 adds an optional provider-backed path behind the deterministic question-understanding router. Provider output must pass the `question_understanding` structured-output validator, is normalized to the existing intent schema, and falls back deterministically on provider errors, malformed JSON, schema mismatch, or missing provider configuration.
+- **P3 provider-backed clarification**: Task 22 adds an optional provider-backed clarification router. When provider clarification is active, ambiguous questions stop before schema/SQL generation and return provider-generated follow-up questions; no-key deterministic baseline continues through the existing P0 SQL workflow.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
 
 LLM boundaries:
@@ -897,6 +899,29 @@ Task 21A runtime behavior:
 ```bash
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
   python3 -m pytest tests/test_deepseek_question_understanding_workflow_live.py -q
+```
+
+Task 22 runtime behavior:
+
+- `run_workflow()` now runs a clarification router after question understanding and before schema retrieval.
+- With `INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1` and a valid `DEEPSEEK_API_KEY`, ambiguous questions call the DeepSeek-backed clarification prompt and return focused follow-up questions.
+- Provider clarification stops before schema retrieval, SQL generation, SQL execution, and SQL planning.
+- Without the flag or without a key, the no-key deterministic baseline continues through the existing P0 SQL workflow.
+- Provider output must pass the `clarification_router` structured-output validator before it is used.
+
+Example:
+
+```bash
+export INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1
+export DEEPSEEK_API_KEY=...
+python3 -c "from graph.workflow import run_workflow; print(run_workflow('帮我看看销售情况')['clarification_result'])"
+```
+
+A live workflow smoke test is available with:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1 \
+  python3 -m pytest tests/test_deepseek_clarification_workflow_live.py -q
 ```
 
 ## SQL Planning Router

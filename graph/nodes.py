@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.error_fixer import run_error_fix_agent
+from agents.clarification_router import run_clarification_router_agent
 from agents.insight_agent import run_insight_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
@@ -21,6 +22,47 @@ def schema_node(state: AgentState) -> AgentState:
 
 def metric_node(state: AgentState) -> AgentState:
     return run_metric_agent(dict(state))
+
+
+def clarification_node(state: AgentState, provider=None) -> AgentState:
+    return run_clarification_router_agent(dict(state), provider=provider)
+
+
+def early_response_node(state: AgentState) -> AgentState:
+    strategy = state.get("routing_strategy", "")
+    if strategy == "clarify":
+        questions = state.get("clarification_questions", [])
+        answer = "需要补充信息后才能继续分析：" + " ".join(questions)
+        status = "waiting_for_clarification"
+        error_type = None
+    elif strategy == "reject":
+        reason = state.get("question_understanding", {}).get("rejection_reason") or "Request rejected before SQL generation."
+        answer = f"请求包含敏感字段或不安全操作，已在 SQL 生成前拒绝。原因：{reason}"
+        status = "failed"
+        error_type = "question_understanding_rejected"
+    else:
+        answer = "Workflow stopped before SQL generation."
+        status = "failed"
+        error_type = "workflow_stopped_before_sql"
+
+    updated = {
+        **state,
+        "status": status,
+        "final_answer": answer,
+        "data_used": False,
+    }
+    return append_trace(
+        updated,
+        {
+            "node": "early_response_node",
+            "tool_name": "",
+            "tool_input_summary": state.get("user_question", ""),
+            "tool_output_summary": answer[:200],
+            "status": "success" if status == "waiting_for_clarification" else "error",
+            "latency_ms": 0,
+            "error_type": error_type,
+        },
+    )
 
 
 def sql_generator_node(state: AgentState) -> AgentState:
@@ -161,3 +203,13 @@ def route_after_fix(state: AgentState) -> str:
     if state.get("sql_fix", {}).get("success"):
         return "review"
     return "fail"
+
+
+def route_after_clarification(state: AgentState) -> str:
+    if state.get("initial_sql"):
+        return "schema"
+    if state.get("routing_strategy") == "reject":
+        return "early_response"
+    if state.get("routing_strategy") == "clarify" and state.get("clarification_result", {}).get("provider_called"):
+        return "early_response"
+    return "schema"

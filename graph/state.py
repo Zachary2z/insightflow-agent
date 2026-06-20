@@ -20,6 +20,7 @@ class AgentState(TypedDict, total=False):
     question_understanding: dict[str, Any]
     intent_slots: dict[str, Any]
     routing_strategy: str
+    clarification_result: dict[str, Any]
     action_plan: dict[str, Any]
     risk_assessment: dict[str, Any]
     approval_status: str

@@ -189,6 +189,38 @@ def _validate_question_understanding(content: Any) -> dict[str, Any]:
     )
 
 
+def _validate_clarification_router(content: Any) -> dict[str, Any]:
+    prompt_id = "clarification_router"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "clarification_router output must be an object")
+
+    missing_ok, missing_slots, message = _string_list(content.get("missing_slots"), "missing_slots")
+    if not missing_ok:
+        return _error(prompt_id, message)
+    questions_ok, clarification_questions, message = _string_list(
+        content.get("clarification_questions"),
+        "clarification_questions",
+    )
+    if not questions_ok:
+        return _error(prompt_id, message)
+    if not clarification_questions:
+        return _error(prompt_id, "clarification_questions must contain at least one question")
+    risk_ok, risk_flags, message = _string_list(content.get("risk_flags"), "risk_flags")
+    if not risk_ok:
+        return _error(prompt_id, message)
+
+    return _ok(
+        prompt_id,
+        {
+            "requires_clarification": bool(content.get("requires_clarification", True)),
+            "missing_slots": missing_slots,
+            "clarification_questions": clarification_questions,
+            "risk_flags": risk_flags,
+            "reason": str(content.get("reason", "")).strip(),
+        },
+    )
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -203,6 +235,8 @@ def validate_prompt_output(
         return _validate_guarded_insight_claims(content)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
+    if prompt_id == "clarification_router":
+        return _validate_clarification_router(content)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 
