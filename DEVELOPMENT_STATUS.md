@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P3 - MCP & Engineering Core |
-| Current task | P3 Streamlit Command Center UI hardening complete |
-| Next planned task | Docker / CI or later P3 engineering hardening |
-| Last completed task | P3 Streamlit Command Center UI hardening |
-| Main demo target | Multi-Agent + Tool Calling + SQL Execution Feedback |
+| Current phase | P7 - Visualization Intelligence |
+| Current task | Not started |
+| Next planned task | Build validated visualization planning after P6 |
+| Last completed task | P6 Scenario Analysis Planner |
+| Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P3 baseline | React frontend, RBAC, full ActionOps product suite, and unguarded LLM-driven SQL/report generation |
+| Out of scope for current baseline | React frontend, Docker/CI, RBAC, full ActionOps product suite, external SaaS integrations, vector database, and unguarded LLM-driven SQL/report generation |
 
 ## Phase Overview
 
@@ -30,7 +30,15 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P0 | Agentic SQL Core | `[x]` scaffold, ecommerce DB, metric definitions, schema tool, SQL validator, SQL executor, trace logger, P0 agents, LangGraph workflow, Streamlit demo, eval, and final docs complete | `[x]` 55 tests passing; eval 20/20 passing | `[x]` README includes setup, architecture, demo, limits, and eval result | `[x]` Done |
 | P1 | Reliable Analysis & Report Core | `[x]` Task 11 business context retrieval, Task 12 evidence validation, Task 13 chart generation, and Task 14 report generation complete | `[x]` Task 14 tests passing; full suite remains passing after Task 15; eval 20/20 passing | `[x]` Task 14 README and status docs updated | `[x]` Done |
 | P2 | Business Review & Action Workflow | `[x]` Task 15 business review report, Task 15A controlled LLM report planning, Task 15B guarded LLM SQL/insight enhancement, and Task 16 action workflow complete | `[x]` Task 16 tests passing; full suite 92/92 passing; eval 20/20 passing | `[x]` Task 16 README and status docs updated | `[x]` Done |
-| P3 | MCP & Engineering Core | `[~]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Streamlit Command Center UI hardening, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, Task 26 guarded insight claim typing, Task 27 action/email drafting, and Task 28 template mining/eval suite complete; CI and later engineering hardening are not started | `[x]` Command Center Streamlit tests 18/18 passing; full suite 190 passed / 9 live tests skipped by default; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated for Command Center hardening | `[~]` In progress |
+| P3 | MCP & Engineering Core | `[x]` Task 17 MCP-style tool layer, Task 18 FastAPI async run API, Task 19 Trace Dashboard data layer, Task 19A Streamlit unified demo, Streamlit Command Center UI hardening, Task 20 LLM Provider/PromptOps core, Task 20C production DeepSeek provider hardening, Task 20A question understanding, Task 20B SQL planning router, Task 21 provider-backed question understanding, Task 21A runtime workflow wiring, Task 22 provider-backed clarification router, Task 23 provider-assisted SQL planning/guarded candidate integration, Task 24 LLM business review decomposition, Task 25 evidence-backed report writing, Task 26 guarded insight claim typing, Task 27 action/email drafting, and Task 28 template mining/eval suite complete; Docker/CI deferred unless explicitly selected | `[x]` Task 28 full suite 185+ passed / live tests skipped by default; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated through Task 28 | `[x]` Done for scoped baseline |
+| P4 | Realistic Scenario Dataset | `[x]` realistic scenario tables, deterministic anomaly profiles, business rules, table docs, metrics, and seed integration complete | `[x]` `tests/test_realistic_seed_data.py` passing; P0 eval preserved | `[x]` realistic scenario docs added to data docs and planning notes | `[x]` Done |
+| P5 | Lightweight Semantic Layer | `[x]` `semantic_layer/` metrics, dimensions, entities, join paths, loader, retriever, metric tool compatibility, and context semantic attachment complete | `[x]` semantic layer tests 6/6 passing; related regression 23/23 passing; full suite 203 passed / 9 skipped; P0 eval 20/20 passing | `[x]` DEVELOPMENT_PLAN and DEVELOPMENT_STATUS now expose phase status at the top | `[x]` Done |
+| P6 | Scenario Analysis Planner | `[x]` deterministic planner, provider-backed planner validation, runtime provider switch, workflow state, and trace metadata complete | `[x]` planner tests 9/9 passing; related regression 22/22 passing; full suite 212 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P7 | Visualization Intelligence | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
+| P8 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P8.5 | Structural Slimming And UI Consolidation | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
 
@@ -519,6 +527,20 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Live DeepSeek eval suite passes with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`.
 - `[x]` Task 28 does not bypass `validate_sql()`, `run_sql()`, Evidence Validator, Approval Gate, Audit Logger, Trace Logger, or MCP safety wrappers.
 
+### P6 Scenario Analysis Planner Acceptance Tracker
+
+- `[x]` `agents/analysis_planner.py` implements deterministic scenario-aware planning.
+- `[x]` Planner supports `quick_metric_lookup`, `gmv_decline_diagnosis`, `marketing_roi_review`, `inventory_risk_analysis`, `refund_anomaly_analysis`, `promotion_review`, `customer_segment_analysis`, and `general_non_template_analysis`.
+- `[x]` Planner output includes `success`, `scenario_type`, `analysis_steps`, `provider_called`, `fallback_used`, `prompt_id`, `validation_error`, and `provider_error`.
+- `[x]` Each analysis step includes `step_id`, `question`, `required_metrics`, `required_dimensions`, and `candidate_tables`.
+- `[x]` Planner reuses P5 semantic metrics, dimensions, entities, and join paths to populate required metrics, dimensions, and candidate tables.
+- `[x]` No-key deterministic baseline works without an API key or provider.
+- `[x]` Optional provider-backed planner uses `llm_ops/runtime_provider.py`, `prompt_registry.py`, and `structured_output.py`.
+- `[x]` Provider output is rejected if it contains SQL, final claims, action payloads, approval fields, or malformed step shapes.
+- `[x]` Malformed provider JSON and provider/schema errors fall back to deterministic planning without crashing.
+- `[x]` Workflow adds planner state and trace evidence without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+- `[x]` P0 workflow and P0 eval remain compatible and provider-independent by default.
+
 ## Update Rules
 
 After every task:
@@ -531,6 +553,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P6 verification:
+
+```bash
+python3 -m pytest tests/test_analysis_planner.py tests/test_provider_backed_analysis_planner.py -q
+python3 -m pytest tests/test_semantic_layer.py tests/test_metric_tool.py tests/test_workflow.py tests/test_sql_validator.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: P6 planner tests report 9/9 passed; semantic layer, metric tool, workflow, and SQL validator regressions report 22/22 passed; the default full suite reports 212 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. P6 adds deterministic and provider-backed scenario analysis planning, semantic metrics/dimensions/table retrieval, workflow trace metadata, provider fallback on malformed or unsafe output, and preserves SQL validation, SQL execution, Evidence Validator, action approval, audit, and no-key baseline boundaries.
 
 Task 28 verification:
 

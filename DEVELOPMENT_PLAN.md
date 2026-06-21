@@ -2,6 +2,27 @@
 
 This document is the tracked development plan for InsightFlow Agent. It consolidates the phased roadmap, task boundaries, acceptance criteria, and final LLM participation rules that were previously spread across local extracted planning notes under `tmp/pdfs/`.
 
+## Phase Development Status
+
+Update this table after every completed phase or task so the current project position is visible at the top of the development plan.
+
+| Phase | Name | Status | Latest result | Next action |
+|---|---|---|---|---|
+| P0 | Agentic SQL Core | `[x]` Complete | Core SQL workflow, validation, execution, trace, Streamlit demo, and 20-case eval are complete. | Regression only |
+| P1 | Reliable Analysis & Report Core | `[x]` Complete | Business context, evidence validation, charts, and Markdown reports are complete. | Regression only |
+| P2 | Business Review & Action Workflow | `[x]` Complete | Weekly/monthly reports, guarded LLM enhancement, and approval-gated local actions are complete. | Regression only |
+| P3 | MCP & Engineering Core | `[x]` Complete for scoped baseline | MCP contracts, FastAPI async API, trace dashboard data, Command Center UI, provider hardening, question understanding, SQL planning, and template mining are complete. | Defer Docker/CI unless explicitly selected |
+| P4 | Realistic Scenario Dataset | `[x]` Complete | Realistic ecommerce scenario tables, deterministic anomalies, table docs, business rules, and seed tests are complete. | Regression only |
+| P5 | Lightweight Semantic Layer | `[x]` Complete | `semantic_layer/` now loads metrics, dimensions, entities, and join paths; metric/context retrieval reads semantic metadata while preserving legacy metric compatibility. | Regression only |
+| P6 | Scenario Analysis Planner | `[x]` Complete | `agents/analysis_planner.py` now decomposes scenario questions into semantic analysis steps, supports provider fallback, and writes workflow trace state. | Regression only |
+| P7 | Visualization Intelligence | `[ ]` Next | Not started. | Build validated visualization planning after P6 |
+| P8 | Agent Pipeline UX | `[ ]` Not started | Not started. | Start after planner/visualization foundations |
+| P8.5 | Structural Slimming And UI Consolidation | `[ ]` Not started | Not started. | Start before P9 demo polish |
+| P9 | Realistic Eval And Demo Polish | `[ ]` Not started | Not started. | Start after P8.5 |
+| P10 | Lightweight Engineering Hardening | `[ ]` Not started | Not started. | Start after product shape stabilizes |
+
+Current development position: **P6 Scenario Analysis Planner is complete; P7 Visualization Intelligence is next.**
+
 ## 1. Project Positioning
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow.
@@ -41,7 +62,10 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
 | P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
 | P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI and later hardening not started |
+| P3 - MCP & Engineering Core | Complete for scoped baseline | Task 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI deferred unless explicitly selected |
+| P4 - Realistic Scenario Dataset | Complete | Realistic scenario seed tables, deterministic anomaly profiles, business rules, table docs, and focused seed tests complete |
+| P5 - Lightweight Semantic Layer | Complete | Semantic metrics, dimensions, entities, join paths, loader/retriever, metric tool compatibility, and context semantic attachment complete |
+| P6 - Scenario Analysis Planner | Complete | Scenario-aware deterministic planner, provider-backed planner validation, workflow state/trace wiring, and P0-safe fallback are complete |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -69,6 +93,7 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Provider-backed insight claim typing | Optional provider-backed claim classification before Evidence Validator in the core workflow and report supervisor; Evidence Validator keeps final authority | `agents/insight_claim_typer.py`, `graph/workflow.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Provider-backed action and email drafting | Optional provider-backed task, alert, and email draft payload drafting inside the action workflow before Risk Assessor and Approval Gate; accepted drafts cannot create records or set approval state | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Template mining and LLM eval suite | Saved workflow trace mining for successful `llm_candidate` patterns plus schema-aware smoke evals for valid output, malformed JSON, and schema mismatch | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete |
+| Scenario analysis planner | Optional provider-backed scenario decomposition with deterministic fallback, semantic-layer metrics/dimensions/tables, and workflow trace metadata | `agents/analysis_planner.py`, `graph/workflow.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 
 ### 4.2 Remaining LLM Enhancement Targets
 
