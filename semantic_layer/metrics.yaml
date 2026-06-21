@@ -1,0 +1,345 @@
+gmv:
+  name: "GMV"
+  aliases:
+    - "销售额"
+    - "gmv"
+    - "GMV"
+    - "成交额"
+    - "收入"
+    - "sales"
+    - "revenue"
+  formula: "SUM(order_items.quantity * order_items.unit_price)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+  entities:
+    - "order"
+    - "product"
+  default_dimensions:
+    - "product"
+    - "category"
+    - "city"
+    - "time"
+  description: "Paid order gross merchandise value calculated from order item quantity and unit price."
+
+order_count:
+  name: "订单量"
+  aliases:
+    - "订单量"
+    - "订单数"
+    - "订单数量"
+    - "order count"
+    - "order_count"
+  formula: "COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+  entities:
+    - "order"
+  default_dimensions:
+    - "time"
+    - "city"
+    - "channel"
+    - "promotion"
+  description: "Number of distinct paid orders."
+
+aov:
+  name: "客单价"
+  aliases:
+    - "客单价"
+    - "平均订单金额"
+    - "aov"
+    - "AOV"
+  formula: "SUM(order_items.quantity * order_items.unit_price) / COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+  entities:
+    - "order"
+    - "product"
+  default_dimensions:
+    - "category"
+    - "promotion"
+    - "time"
+  description: "Average order value for paid orders."
+
+net_gmv:
+  name: "Net GMV"
+  aliases:
+    - "净 GMV"
+    - "净gmv"
+    - "net gmv"
+    - "net_gmv"
+    - "收入质量"
+  formula: "SUM(campaign_daily_metrics.net_gmv)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+  entities:
+    - "campaign"
+    - "promotion"
+  default_dimensions:
+    - "campaign"
+    - "channel"
+    - "promotion"
+    - "time"
+  description: "Scenario net GMV after refund, discount, or quality adjustments."
+
+refund_rate:
+  name: "退款率"
+  aliases:
+    - "退款率"
+    - "refund rate"
+    - "refund_rate"
+    - "退款风险"
+    - "售后风险"
+  formula: "COUNT(refund_requests.id) * 1.0 / COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "refund_requests"
+    - "orders"
+  entities:
+    - "refund"
+    - "order"
+    - "product"
+  default_dimensions:
+    - "product"
+    - "category"
+    - "time"
+  description: "Refund requests divided by paid orders for the matching analysis grain."
+
+conversion_rate:
+  name: "转化率"
+  aliases:
+    - "转化率"
+    - "conversion rate"
+    - "conversion_rate"
+    - "CVR"
+  formula: "SUM(traffic_sessions.paid_orders) * 1.0 / SUM(traffic_sessions.sessions)"
+  required_filters: []
+  required_tables:
+    - "traffic_sessions"
+  entities:
+    - "traffic_session"
+  default_dimensions:
+    - "city"
+    - "channel"
+    - "category"
+    - "time"
+  description: "Paid orders divided by sessions for traffic funnel analysis."
+
+checkout_conversion_rate:
+  name: "Checkout 转化率"
+  aliases:
+    - "checkout conversion"
+    - "checkout conversion rate"
+    - "checkout_conversion_rate"
+    - "结账转化率"
+    - "支付链路转化"
+  formula: "SUM(traffic_sessions.checkout_starts) * 1.0 / SUM(traffic_sessions.add_to_carts)"
+  required_filters: []
+  required_tables:
+    - "traffic_sessions"
+  entities:
+    - "traffic_session"
+  default_dimensions:
+    - "city"
+    - "channel"
+    - "category"
+    - "time"
+  description: "Checkout starts divided by add-to-cart sessions."
+
+cac:
+  name: "CAC"
+  aliases:
+    - "CAC"
+    - "cac"
+    - "获客成本"
+    - "单客成本"
+  formula: "SUM(campaign_daily_metrics.spend) / SUM(campaign_daily_metrics.attributed_orders)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+    - "marketing_campaigns"
+  entities:
+    - "campaign"
+  default_dimensions:
+    - "campaign"
+    - "channel"
+    - "time"
+  description: "Marketing spend divided by attributed orders."
+
+roi:
+  name: "ROI"
+  aliases:
+    - "ROI"
+    - "roi"
+    - "投放回报"
+    - "营销效率"
+  formula: "SUM(campaign_daily_metrics.attributed_gmv) / SUM(campaign_daily_metrics.spend)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+    - "marketing_campaigns"
+  entities:
+    - "campaign"
+  default_dimensions:
+    - "campaign"
+    - "channel"
+    - "time"
+  description: "Attributed GMV divided by marketing spend."
+
+roas:
+  name: "ROAS"
+  aliases:
+    - "ROAS"
+    - "roas"
+    - "广告回报"
+  formula: "SUM(campaign_daily_metrics.attributed_gmv) / SUM(campaign_daily_metrics.spend)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+    - "marketing_campaigns"
+  entities:
+    - "campaign"
+  default_dimensions:
+    - "campaign"
+    - "channel"
+    - "time"
+  description: "Advertising return on ad spend."
+
+repeat_purchase_rate:
+  name: "复购率"
+  aliases:
+    - "复购率"
+    - "repeat purchase rate"
+    - "repeat_purchase_rate"
+  formula: "COUNT(DISTINCT repeat_users.user_id) * 1.0 / COUNT(DISTINCT users.id)"
+  required_filters: []
+  required_tables:
+    - "users"
+    - "orders"
+  entities:
+    - "customer"
+    - "order"
+  default_dimensions:
+    - "city"
+    - "time"
+  description: "Share of buyers with repeated paid purchases."
+
+stockout_rate:
+  name: "缺货率"
+  aliases:
+    - "缺货率"
+    - "stockout rate"
+    - "stockout_rate"
+    - "库存风险"
+  formula: "COUNT(stockout_events.id) * 1.0 / COUNT(DISTINCT inventory_snapshots.product_id)"
+  required_filters: []
+  required_tables:
+    - "stockout_events"
+    - "inventory_snapshots"
+  entities:
+    - "inventory"
+    - "product"
+  default_dimensions:
+    - "product"
+    - "category"
+    - "time"
+  description: "Stockout events divided by observed product inventory snapshots."
+
+negative_review_rate:
+  name: "负面评价率"
+  aliases:
+    - "负面评价率"
+    - "negative review rate"
+    - "negative_review_rate"
+    - "差评率"
+  formula: "AVG(CASE WHEN product_reviews.sentiment = 'negative' THEN 1.0 ELSE 0.0 END)"
+  required_filters: []
+  required_tables:
+    - "product_reviews"
+  entities:
+    - "review"
+    - "product"
+  default_dimensions:
+    - "product"
+    - "category"
+    - "time"
+  description: "Share of product reviews with negative sentiment."
+
+on_time_delivery_rate:
+  name: "准时履约率"
+  aliases:
+    - "准时履约率"
+    - "on time delivery rate"
+    - "on_time_delivery_rate"
+    - "履约准时率"
+  formula: "AVG(CASE WHEN fulfillment_events.delivery_status = 'delivered' AND fulfillment_events.delay_days = 0 THEN 1.0 ELSE 0.0 END)"
+  required_filters: []
+  required_tables:
+    - "fulfillment_events"
+  entities:
+    - "fulfillment"
+    - "order"
+    - "product"
+  default_dimensions:
+    - "city"
+    - "product"
+    - "time"
+  description: "Share of fulfillment events delivered without delay."
+
+category_gmv:
+  name: "品类销售额"
+  aliases:
+    - "品类销售额"
+    - "品类gmv"
+    - "品类 GMV"
+    - "品类"
+  formula: "SUM(order_items.quantity * order_items.unit_price)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+    - "products"
+    - "categories"
+  group_by:
+    - "categories.category_name"
+  entities:
+    - "order"
+    - "product"
+    - "category"
+  default_dimensions:
+    - "category"
+  description: "GMV grouped by category."
+
+product_sales:
+  name: "商品销量"
+  aliases:
+    - "商品销量"
+    - "销量"
+    - "销售量"
+    - "商品"
+    - "产品"
+  formula: "SUM(order_items.quantity)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "order_items"
+    - "products"
+  group_by:
+    - "products.product_name"
+  entities:
+    - "order"
+    - "product"
+  default_dimensions:
+    - "product"
+  description: "Paid item quantity grouped by product."

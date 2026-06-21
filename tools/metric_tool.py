@@ -6,6 +6,9 @@ from typing import Any
 
 import yaml
 
+from semantic_layer.loader import DEFAULT_SEMANTIC_PATHS
+from semantic_layer.retriever import retrieve_semantic_context
+
 
 DEFAULT_METRICS_PATH = Path(__file__).resolve().parents[1] / "data" / "metrics.yaml"
 
@@ -100,6 +103,34 @@ def retrieve_metric_definition(
     metrics_path: str | Path = DEFAULT_METRICS_PATH,
 ) -> dict[str, Any]:
     started_at = perf_counter()
+    path = Path(metrics_path)
+    use_semantic_layer = path.resolve() == DEFAULT_METRICS_PATH.resolve()
+    if use_semantic_layer:
+        semantic_context = retrieve_semantic_context(question)
+        latency_ms = int((perf_counter() - started_at) * 1000)
+        if semantic_context.get("success"):
+            matched_metrics = semantic_context.get("matched_metrics", [])
+            if not matched_metrics:
+                error = f"No metric definition matched question: {question}"
+                return {
+                    "success": False,
+                    "question": question,
+                    "matched_metrics": [],
+                    "metrics": {},
+                    "semantic_context": semantic_context,
+                    "error": error,
+                    "trace_event": _trace_event(question, [], "error", latency_ms, error),
+                }
+            return {
+                "success": True,
+                "question": question,
+                "matched_metrics": matched_metrics,
+                "metrics": semantic_context.get("metrics", {}),
+                "metrics_path": str(DEFAULT_SEMANTIC_PATHS["metrics"]),
+                "semantic_context": semantic_context,
+                "trace_event": _trace_event(question, matched_metrics, "success", latency_ms),
+            }
+
     loaded = load_metric_definitions(metrics_path)
     if not loaded["success"]:
         latency_ms = int((perf_counter() - started_at) * 1000)
