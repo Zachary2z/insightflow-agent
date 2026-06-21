@@ -28,6 +28,7 @@ from graph.nodes import (
     sql_executor_node,
     sql_generator_node,
     sql_reviewer_node,
+    visualization_planner_node,
 )
 from graph.state import AgentState
 from llm_ops.provider import LLMProvider
@@ -36,6 +37,7 @@ from llm_ops.runtime_provider import (
     build_clarification_provider,
     build_claim_typing_provider,
     build_question_understanding_provider,
+    build_visualization_planner_provider,
     build_sql_candidate_provider,
     build_sql_planning_provider,
 )
@@ -46,6 +48,7 @@ def build_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     analysis_planner_provider: LLMProvider | None = None,
+    visualization_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ):
@@ -81,6 +84,10 @@ def build_workflow(
         "claim_typing",
         lambda state: claim_typing_node(dict(state), provider=claim_typing_provider),
     )
+    workflow.add_node(
+        "visualization_planner",
+        lambda state: visualization_planner_node(dict(state), provider=visualization_planner_provider),
+    )
     workflow.add_node("fail", fail_response_node)
     workflow.add_node("early_response", early_response_node)
     workflow.add_node("save_trace", save_trace_node)
@@ -106,7 +113,8 @@ def build_workflow(
     workflow.add_conditional_edges("execute", route_after_execute, {"insight": "insight", "fix": "fix", "fail": "fail"})
     workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
     workflow.add_edge("insight", "claim_typing")
-    workflow.add_edge("claim_typing", "save_trace")
+    workflow.add_edge("claim_typing", "visualization_planner")
+    workflow.add_edge("visualization_planner", "save_trace")
     workflow.add_edge("fail", "save_trace")
     workflow.add_edge("early_response", "save_trace")
     workflow.add_edge("save_trace", END)
@@ -124,6 +132,7 @@ def run_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     analysis_planner_provider: LLMProvider | None = None,
+    visualization_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
@@ -139,6 +148,7 @@ def run_workflow(
     clarify_provider = clarification_provider or build_clarification_provider()
     planning_provider = sql_planning_provider or build_sql_planning_provider()
     planner_provider = analysis_planner_provider or build_analysis_planner_provider()
+    viz_provider = visualization_planner_provider or build_visualization_planner_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
     typing_provider = claim_typing_provider or build_claim_typing_provider()
     app = build_workflow(
@@ -146,6 +156,7 @@ def run_workflow(
         clarification_provider=clarify_provider,
         sql_planning_provider=planning_provider,
         analysis_planner_provider=planner_provider,
+        visualization_planner_provider=viz_provider,
         sql_candidate_provider=candidate_provider,
         claim_typing_provider=typing_provider,
     )

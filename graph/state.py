@@ -27,6 +27,7 @@ class AgentState(TypedDict, total=False):
     analysis_plan: dict[str, Any]
     scenario_type: str
     analysis_steps: list[dict[str, Any]]
+    visualization_plan: dict[str, Any]
     llm_sql_enhancement: dict[str, Any]
     action_plan: dict[str, Any]
     risk_assessment: dict[str, Any]

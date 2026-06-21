@@ -573,6 +573,88 @@ def _validate_analysis_planner(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"scenario_type": scenario_type, "analysis_steps": normalized_steps})
 
 
+def _validate_visualization_planner(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "visualization_planner"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "visualization_planner output must be an object")
+
+    blocked_fields = {
+        "sql",
+        "generated_sql",
+        "sql_candidates",
+        "candidate_sql",
+        "final_claims",
+        "claims",
+        "final_answer",
+        "action_payload",
+        "actions",
+        "created_actions",
+        "approval_status",
+    }
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"visualization_planner must not return blocked fields: {', '.join(leaked)}")
+
+    chart_type = str(content.get("chart_type", "")).strip().lower()
+    allowed_chart_types = {
+        "ranked_bar",
+        "line",
+        "grouped_bar",
+        "dual_axis_line",
+        "funnel",
+        "heatmap",
+        "scatter",
+        "risk_matrix",
+    }
+    if chart_type not in allowed_chart_types:
+        return _error(prompt_id, f"chart_type is not supported: {chart_type}")
+
+    title = str(content.get("title", "")).strip()
+    x = str(content.get("x", "")).strip()
+    y = str(content.get("y", "")).strip()
+    y_secondary = str(content.get("y_secondary", "") or "").strip()
+    series = str(content.get("series", "") or "").strip()
+    if not title:
+        return _error(prompt_id, "title is required")
+    if not x:
+        return _error(prompt_id, "x is required")
+    if not y:
+        return _error(prompt_id, "y is required")
+
+    required_ok, required_columns, message = _string_list(content.get("required_columns", []), "required_columns")
+    if not required_ok:
+        return _error(prompt_id, message)
+    explanation_ok, explanation_basis, message = _string_list(
+        content.get("explanation_basis", []),
+        "explanation_basis",
+    )
+    if not explanation_ok:
+        return _error(prompt_id, message)
+    if not explanation_basis:
+        return _error(prompt_id, "explanation_basis must not be empty")
+
+    all_referenced = list(dict.fromkeys([*required_columns, x, y, y_secondary, series]))
+    all_referenced = [column for column in all_referenced if column]
+    allowed_columns = set(schema_context.get("execution_columns", []))
+    missing = [column for column in all_referenced if allowed_columns and column not in allowed_columns]
+    if missing:
+        return _error(prompt_id, f"visualization_planner referenced missing execution columns: {', '.join(missing)}")
+
+    return _ok(
+        prompt_id,
+        {
+            "chart_type": chart_type,
+            "title": title,
+            "x": x,
+            "y": y,
+            "y_secondary": y_secondary,
+            "series": series,
+            "required_columns": all_referenced,
+            "explanation_basis": explanation_basis,
+        },
+    )
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -599,6 +681,8 @@ def validate_prompt_output(
         return _validate_sql_planning_router(content)
     if prompt_id == "analysis_planner":
         return _validate_analysis_planner(content)
+    if prompt_id == "visualization_planner":
+        return _validate_visualization_planner(content, context)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 

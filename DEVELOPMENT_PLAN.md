@@ -15,13 +15,13 @@ Update this table after every completed phase or task so the current project pos
 | P4 | Realistic Scenario Dataset | `[x]` Complete | Realistic ecommerce scenario tables, deterministic anomalies, table docs, business rules, and seed tests are complete. | Regression only |
 | P5 | Lightweight Semantic Layer | `[x]` Complete | `semantic_layer/` now loads metrics, dimensions, entities, and join paths; metric/context retrieval reads semantic metadata while preserving legacy metric compatibility. | Regression only |
 | P6 | Scenario Analysis Planner | `[x]` Complete | `agents/analysis_planner.py` now decomposes scenario questions into semantic analysis steps, supports provider fallback, and writes workflow trace state. | Regression only |
-| P7 | Visualization Intelligence | `[ ]` Next | Not started. | Build validated visualization planning after P6 |
-| P8 | Agent Pipeline UX | `[ ]` Not started | Not started. | Start after planner/visualization foundations |
+| P7 | Visualization Intelligence | `[x]` Complete | `visualization/` now validates chart specs against real execution columns, renders first-batch advanced charts from real rows, falls back safely for unsupported charts, and supports provider-backed visualization planning through PromptOps. | Regression only |
+| P8 | Agent Pipeline UX | `[ ]` Next | Not started. | Start after planner/visualization foundations |
 | P8.5 | Structural Slimming And UI Consolidation | `[ ]` Not started | Not started. | Start before P9 demo polish |
 | P9 | Realistic Eval And Demo Polish | `[ ]` Not started | Not started. | Start after P8.5 |
 | P10 | Lightweight Engineering Hardening | `[ ]` Not started | Not started. | Start after product shape stabilizes |
 
-Current development position: **P6 Scenario Analysis Planner is complete; P7 Visualization Intelligence is next.**
+Current development position: **P7 Visualization Intelligence is complete; P8 Agent Pipeline UX is next.**
 
 ## 1. Project Positioning
 
@@ -66,6 +66,7 @@ Use reference projects selectively. InsightFlow should borrow engineering ideas,
 | P4 - Realistic Scenario Dataset | Complete | Realistic scenario seed tables, deterministic anomaly profiles, business rules, table docs, and focused seed tests complete |
 | P5 - Lightweight Semantic Layer | Complete | Semantic metrics, dimensions, entities, join paths, loader/retriever, metric tool compatibility, and context semantic attachment complete |
 | P6 - Scenario Analysis Planner | Complete | Scenario-aware deterministic planner, provider-backed planner validation, workflow state/trace wiring, and P0-safe fallback are complete |
+| P7 - Visualization Intelligence | Complete | Deterministic and provider-backed visualization planning, chart spec validation, advanced renderer fallback, chart-agent integration, and workflow trace metadata are complete |
 
 ## 4. LLM Enhancement Development Roadmap
 
@@ -94,6 +95,7 @@ LLM participation rule: the model helps with understanding, planning, candidates
 | Provider-backed action and email drafting | Optional provider-backed task, alert, and email draft payload drafting inside the action workflow before Risk Assessor and Approval Gate; accepted drafts cannot create records or set approval state | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 | Template mining and LLM eval suite | Saved workflow trace mining for successful `llm_candidate` patterns plus schema-aware smoke evals for valid output, malformed JSON, and schema mismatch | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete |
 | Scenario analysis planner | Optional provider-backed scenario decomposition with deterministic fallback, semantic-layer metrics/dimensions/tables, and workflow trace metadata | `agents/analysis_planner.py`, `graph/workflow.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
+| Visualization planner | Optional provider-backed chart spec selection with deterministic fallback, execution-column validation, and safe renderer fallback | `agents/visualization_planner.py`, `visualization/`, `graph/workflow.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
 
 ### 4.2 Remaining LLM Enhancement Targets
 
@@ -259,11 +261,12 @@ Goal: standardize tool access, expose engineering interfaces, improve observabil
 
 ## 10. Current Next-Task Queue
 
-The next task should be selected from the remaining P3 engineering backlog. Do not start multiple future tasks at once.
+The next task should be selected from the P4-P10 platform evolution roadmap. Do not start multiple future tasks at once.
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
+| Next | P8 Agent Pipeline UX | Make agent, tool, LLM, fallback, and safety-gate participation clearer in Streamlit without changing backend boundaries |
+| Later | Docker / CI | Deferred unless explicitly selected; add repeatable environment and GitHub Actions while preserving current no-key baseline |
 | Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
 | Later | React dashboard | Only after dashboard data contracts are stable |
 | Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
@@ -288,6 +291,7 @@ The no-key deterministic baseline must continue to run without a provider, and P
 | Business review decomposition | P3 Task 24 | Break weekly/monthly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis into allowlisted subtasks | Each subtask still goes through SQL review, SQL execution, Evidence Validator, chart, and report tools |
 | Guarded insight claims | P2 Task 15B / P3 Task 26 | Suggest or classify claims from execution results, metric context, and business context | Evidence Validator decides which claims can be used |
 | Report writing / polishing | P3 Task 25 | Turn verified findings, hypotheses, SQL, chart paths, and trace paths into clearer business prose | Must not invent unsupported data or conclusions |
+| Visualization planning | P7 | Select chart type and chart spec fields from user intent, analysis steps, execution columns, and evidence outputs | Must only reference real execution columns and must not generate SQL, final claims, or action payloads |
 | Action drafting | P3 Task 27 | Draft task, alert, and email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
 | Email draft content | P3 Task 27 | Draft stakeholder-facing email text | Must create drafts only; no sending and no approval bypass |
 | Template mining feedback | P3 Task 28 | Summarize repeated successful `llm_candidate` intent patterns from saved workflow traces for future deterministic templates | Must not automatically modify production templates |
@@ -315,6 +319,7 @@ User Question
 -> validate_sql()
 -> run_sql()
 -> Evidence Validator
+-> Visualization Planner / Chart Renderer
 -> guarded insight/report polishing
 -> Chart Tool / Report Tool
 -> Action Plan Drafting

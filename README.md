@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, P2, P3, P4, P5, and P6 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, and action/email-drafting paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, and preserve SQL validation before any SQL execution.
+P0, P1, P2, P3, P4, P5, P6, and P7 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple and advanced chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-planning paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, generate validated visualization specs from real execution results, and preserve SQL validation before any SQL execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, and P6 - Scenario Analysis Planner are complete. P7 - Visualization Intelligence is next.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, and P7 - Visualization Intelligence are complete. P8 - Agent Pipeline UX is next.
 
 Implemented:
 
@@ -44,8 +44,9 @@ Implemented:
 - P4 realistic ecommerce scenario dataset with campaign, traffic, inventory, refund, review, promotion, pricing, and fulfillment tables
 - P5 lightweight semantic layer for metrics, dimensions, entities, join paths, semantic retrieval, metric-tool compatibility, and context semantic attachment
 - P6 Scenario Analysis Planner with deterministic and provider-backed scenario decomposition into `analysis_steps`, semantic-layer metrics/dimensions/tables, workflow state/trace metadata, and fallback on malformed or unsafe provider output
+- P7 Visualization Intelligence with validated chart specs for `ranked_bar`, `line`, `grouped_bar`, `dual_axis_line`, `funnel`, `heatmap`, `scatter`, and `risk_matrix`; renderer fallback for unsupported chart types; provider-backed visualization planning through PromptOps structured output; and workflow trace metadata without bypassing SQL or evidence boundaries
 
-P7 - Visualization Intelligence is the next planned phase. It should build on P6 planning and validated query results without bypassing SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+P8 - Agent Pipeline UX is the next planned phase. P7 visualization planning now builds on P6 planning and validated query results without bypassing SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
 
 Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
@@ -71,6 +72,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 action and email drafting**: Task 27 wires optional DeepSeek-backed `action_drafter` output into `run_action_planner_agent()`. The provider can draft task, metric-alert, and email-draft payloads from Evidence Validator outputs, but those drafts still flow through Risk Assessor, Approval Gate, Action Executor, and Audit Logger before any SQLite action record is created.
 - **P3 template mining and eval**: Task 28 writes safe template-mining metadata into accepted guarded SQL candidate trace events, mines saved workflow trace files for repeated successful `llm_candidate` intent signatures, and expands `run_llm_smoke_eval()` with prompt-specific structured validation plus expected malformed/schema-failure cases.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
+- **P7 provider-backed visualization planning**: Optional provider output can suggest chart specs only through `visualization_planner` structured validation and execution-column checks. Provider output cannot include SQL, final claims, or action payloads, and malformed or unsafe output falls back to deterministic visualization specs.
 
 LLM boundaries:
 
@@ -100,6 +102,16 @@ Runtime LLM development standard:
 - Keep the no-key deterministic baseline available.
 - Record `provider_called`, `fallback_used`, prompt id/version, validation status, and fallback errors in state or trace.
 - Add both mocked runtime tests and a live DeepSeek smoke test for the affected workflow path.
+
+Enable provider-backed visualization planning in the runtime workflow:
+
+```bash
+export INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_PLANNER=1
+export DEEPSEEK_API_KEY=...
+python -c "from graph.workflow import run_workflow; print(run_workflow('请画最近 30 天 GMV 趋势图')['visualization_plan'])"
+```
+
+The visualization provider can only return a chart spec. It cannot generate SQL, final claims, or action payloads, and every referenced column must exist in the real `execution_result`.
 
 ## Question Understanding And SQL Routing
 

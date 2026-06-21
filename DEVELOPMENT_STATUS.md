@@ -15,10 +15,10 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P7 - Visualization Intelligence |
+| Current phase | P8 - Agent Pipeline UX |
 | Current task | Not started |
-| Next planned task | Build validated visualization planning after P6 |
-| Last completed task | P6 Scenario Analysis Planner |
+| Next planned task | Make agent/tool/LLM/fallback/safety-gate participation clearer in Streamlit |
+| Last completed task | P7 Visualization Intelligence |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
 | Out of scope for current baseline | React frontend, Docker/CI, RBAC, full ActionOps product suite, external SaaS integrations, vector database, and unguarded LLM-driven SQL/report generation |
@@ -34,8 +34,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P4 | Realistic Scenario Dataset | `[x]` realistic scenario tables, deterministic anomaly profiles, business rules, table docs, metrics, and seed integration complete | `[x]` `tests/test_realistic_seed_data.py` passing; P0 eval preserved | `[x]` realistic scenario docs added to data docs and planning notes | `[x]` Done |
 | P5 | Lightweight Semantic Layer | `[x]` `semantic_layer/` metrics, dimensions, entities, join paths, loader, retriever, metric tool compatibility, and context semantic attachment complete | `[x]` semantic layer tests 6/6 passing; related regression 23/23 passing; full suite 203 passed / 9 skipped; P0 eval 20/20 passing | `[x]` DEVELOPMENT_PLAN and DEVELOPMENT_STATUS now expose phase status at the top | `[x]` Done |
 | P6 | Scenario Analysis Planner | `[x]` deterministic planner, provider-backed planner validation, runtime provider switch, workflow state, and trace metadata complete | `[x]` planner tests 9/9 passing; related regression 22/22 passing; full suite 212 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P7 | Visualization Intelligence | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P8 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P7 | Visualization Intelligence | `[x]` `visualization/` registry/spec/validator/renderer, deterministic/provider-backed `agents/visualization_planner.py`, chart-agent advanced rendering path, workflow state/trace metadata, and runtime provider switch complete | `[x]` visualization tests 8/8 passing; related regression 21/21 passing; full suite 220 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P8 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
 | P8.5 | Structural Slimming And UI Consolidation | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 | P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 | P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
@@ -541,6 +541,22 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Workflow adds planner state and trace evidence without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
 - `[x]` P0 workflow and P0 eval remain compatible and provider-independent by default.
 
+### P7 Visualization Intelligence Acceptance Tracker
+
+- `[x]` `visualization/chart_registry.py` registers `ranked_bar`, `line`, `grouped_bar`, `dual_axis_line`, `funnel`, `heatmap`, `scatter`, and `risk_matrix`.
+- `[x]` `visualization/chart_spec.py` normalizes chart specs with `chart_type`, `title`, `x`, `y`, `y_secondary`, `series`, `required_columns`, `explanation_basis`, `provider_called`, `fallback_used`, `prompt_id`, `validation_error`, and `provider_error`.
+- `[x]` `visualization/chart_validator.py` rejects chart specs that reference columns missing from `execution_result`.
+- `[x]` `visualization/chart_renderer.py` renders from real `execution_result.rows`, reports `data_row_count`, preserves rendered rows for traceability, and marks `fabricated_data: false`.
+- `[x]` Unsupported chart types fall back to a safe table or basic ranked bar chart instead of crashing.
+- `[x]` `agents/visualization_planner.py` generates deterministic chart specs from user question, P6 `analysis_steps`, `execution_result`, and `evidence_result`.
+- `[x]` Provider-backed visualization planning uses `llm_ops/runtime_provider.py`, `prompt_registry.py`, and `structured_output.py`.
+- `[x]` Provider output is rejected if it contains SQL, final claims, action payloads, approval fields, unsupported chart types, malformed fields, or columns absent from `execution_result`.
+- `[x]` Malformed provider output and provider/schema errors fall back to deterministic chart specs without crashing.
+- `[x]` `agents/chart_agent.py` preserves the old simple bar/line/pie path while using P7 visualization planning when analysis/evidence context is present.
+- `[x]` Workflow adds visualization plan state and trace metadata after SQL execution and insight/claim typing without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+- `[x]` Default no-key deterministic baseline works without an API key or provider.
+- `[x]` P0 workflow and P0 eval remain compatible and provider-independent by default.
+
 ## Update Rules
 
 After every task:
@@ -553,6 +569,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P7 verification:
+
+```bash
+python3 -m pytest tests/test_visualization_intelligence.py -q
+python3 -m pytest tests/test_chart_tool.py tests/test_chart_agent.py tests/test_analysis_planner.py tests/test_workflow.py tests/test_sql_validator.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: P7 visualization tests report 8/8 passed; chart tool/agent, analysis planner, workflow, and SQL validator regressions report 21/21 passed; the default full suite reports 220 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. P7 adds deterministic and provider-backed visualization planning, validates chart specs against real execution columns, renders first-batch advanced charts only from real execution rows, falls back safely for unsupported or malformed provider output, and preserves SQL validation, SQL execution, Evidence Validator, action approval, audit, and no-key baseline boundaries.
 
 P6 verification:
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agents.visualization_planner import plan_visualization
 from tools.chart_tool import DEFAULT_CHART_DIR, generate_chart
 from tools.trace_logger import append_trace
+from visualization.chart_renderer import render_chart
 
 
 def _is_number(value: Any) -> bool:
@@ -76,22 +78,38 @@ def _build_chart_spec(state: dict[str, Any], execution_result: dict[str, Any]) -
     }
 
 
+def _should_use_visualization_plan(state: dict[str, Any]) -> bool:
+    return bool(state.get("visualization_plan") or state.get("analysis_steps") or state.get("evidence_result"))
+
+
 def run_chart_agent(
     state: dict[str, Any],
     output_dir: str | Path = DEFAULT_CHART_DIR,
 ) -> dict[str, Any]:
     execution_result = state.get("execution_result")
+    visualization_plan: dict[str, Any] = {}
     if not execution_result or not execution_result.get("success"):
         result = _chart_failure("execution_result is required for chart generation")
     else:
         try:
-            chart_spec = _build_chart_spec(state, execution_result)
             data = {
                 "columns": execution_result.get("columns", []),
                 "rows": execution_result.get("rows", []),
             }
-            result = generate_chart(data, chart_spec, output_dir=output_dir)
+            if _should_use_visualization_plan(state):
+                visualization_plan = state.get("visualization_plan") or plan_visualization(
+                    state.get("user_question", ""),
+                    analysis_steps=state.get("analysis_steps", []),
+                    execution_result=execution_result,
+                    evidence_result=state.get("evidence_result", {}),
+                )
+                result = render_chart(execution_result, visualization_plan, output_dir=output_dir)
+            else:
+                visualization_plan = {}
+                chart_spec = _build_chart_spec(state, execution_result)
+                result = generate_chart(data, chart_spec, output_dir=output_dir)
         except Exception as exc:
+            visualization_plan = {}
             result = _chart_failure(str(exc))
 
     chart_path = result.get("chart_path", "") if result.get("success") else ""
@@ -105,6 +123,8 @@ def run_chart_agent(
         "chart_path": chart_path,
         "chart_paths": chart_paths,
     }
+    if visualization_plan:
+        updated["visualization_plan"] = visualization_plan
     if not result.get("success"):
         updated["chart_warning"] = result.get("error", "")
 

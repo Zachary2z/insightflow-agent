@@ -380,5 +380,42 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "existing Schema Agent, Metric Agent, SQL Reviewer, validate_sql, run_sql, and Evidence Validator."
             ),
         ),
+        PromptTemplate(
+            prompt_id="visualization_planner",
+            version="v1",
+            description="Choose a validated chart spec from user intent, analysis steps, execution columns, and evidence.",
+            required_variables=[
+                "user_question",
+                "analysis_steps",
+                "execution_columns",
+                "execution_sample_rows",
+                "evidence_result",
+                "deterministic_spec",
+            ],
+            safety_contract=[
+                "must_only_reference_execution_columns",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_generate_final_claims",
+                "must_not_create_action_payloads",
+                "must_not_bypass_evidence_validator",
+            ],
+            template=(
+                "Task: visualization planning.\n"
+                "User question: {user_question}\n"
+                "Analysis steps: {analysis_steps}\n"
+                "Execution columns: {execution_columns}\n"
+                "Execution sample rows: {execution_sample_rows}\n"
+                "Evidence Validator result: {evidence_result}\n"
+                "Deterministic fallback spec: {deterministic_spec}\n"
+                "Return JSON only with chart_type, title, x, y, y_secondary, series, "
+                "required_columns, and explanation_basis.\n"
+                "Allowed chart_type values: ranked_bar, line, grouped_bar, dual_axis_line, "
+                "funnel, heatmap, scatter, risk_matrix.\n"
+                "Safety: reference only execution columns; do not generate SQL, final claims, "
+                "final answers, action payloads, approval fields, or execution instructions. "
+                "The chart explanation basis must come from Evidence Validator outputs."
+            ),
+        ),
     ]
 )
