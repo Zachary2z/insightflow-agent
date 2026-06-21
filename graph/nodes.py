@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agents.analysis_planner import run_analysis_planner_agent
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
 from agents.insight_claim_typer import run_insight_claim_typer_agent
@@ -33,6 +34,10 @@ def clarification_node(state: AgentState, provider=None) -> AgentState:
 
 def sql_planning_node(state: AgentState, provider=None) -> AgentState:
     return run_sql_planning_router_agent(dict(state), provider=provider)
+
+
+def analysis_planner_node(state: AgentState, provider=None) -> AgentState:
+    return run_analysis_planner_agent(dict(state), provider=provider)
 
 
 def early_response_node(state: AgentState) -> AgentState:

@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 from agents.question_understanding import run_question_understanding_agent
 from agents.supervisor import initialize_run
 from graph.nodes import (
+    analysis_planner_node,
     clarification_node,
     claim_typing_node,
     early_response_node,
@@ -31,6 +32,7 @@ from graph.nodes import (
 from graph.state import AgentState
 from llm_ops.provider import LLMProvider
 from llm_ops.runtime_provider import (
+    build_analysis_planner_provider,
     build_clarification_provider,
     build_claim_typing_provider,
     build_question_understanding_provider,
@@ -43,6 +45,7 @@ def build_workflow(
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
+    analysis_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ):
@@ -58,6 +61,10 @@ def build_workflow(
     workflow.add_node(
         "sql_planning",
         lambda state: sql_planning_node(dict(state), provider=sql_planning_provider),
+    )
+    workflow.add_node(
+        "analysis_planner",
+        lambda state: analysis_planner_node(dict(state), provider=analysis_planner_provider),
     )
     workflow.add_node("schema", schema_node)
     workflow.add_node("metric", metric_node)
@@ -88,8 +95,9 @@ def build_workflow(
     workflow.add_conditional_edges(
         "sql_planning",
         route_after_sql_planning,
-        {"early_response": "early_response", "schema": "schema"},
+        {"early_response": "early_response", "schema": "analysis_planner"},
     )
+    workflow.add_edge("analysis_planner", "schema")
     workflow.add_edge("schema", "metric")
     workflow.add_edge("metric", "generate")
     workflow.add_edge("generate", "guarded_candidate")
@@ -115,6 +123,7 @@ def run_workflow(
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
+    analysis_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
@@ -129,12 +138,14 @@ def run_workflow(
     question_provider = question_understanding_provider or build_question_understanding_provider()
     clarify_provider = clarification_provider or build_clarification_provider()
     planning_provider = sql_planning_provider or build_sql_planning_provider()
+    planner_provider = analysis_planner_provider or build_analysis_planner_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
     typing_provider = claim_typing_provider or build_claim_typing_provider()
     app = build_workflow(
         question_understanding_provider=question_provider,
         clarification_provider=clarify_provider,
         sql_planning_provider=planning_provider,
+        analysis_planner_provider=planner_provider,
         sql_candidate_provider=candidate_provider,
         claim_typing_provider=typing_provider,
     )

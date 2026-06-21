@@ -348,5 +348,37 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "and do not bypass validate_sql."
             ),
         ),
+        PromptTemplate(
+            prompt_id="analysis_planner",
+            version="v1",
+            description="Decompose realistic BI scenarios into semantic analysis steps without SQL or final claims.",
+            required_variables=[
+                "user_question",
+                "semantic_context",
+                "deterministic_plan",
+                "supported_scenario_types",
+            ],
+            safety_contract=[
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_generate_final_claims",
+                "must_not_create_action_payloads",
+                "must_use_semantic_metrics_dimensions_and_tables",
+            ],
+            template=(
+                "Task: scenario analysis planning.\n"
+                "User question: {user_question}\n"
+                "Semantic context: {semantic_context}\n"
+                "Deterministic fallback plan: {deterministic_plan}\n"
+                "Supported scenario types: {supported_scenario_types}\n"
+                "Return JSON only with scenario_type and analysis_steps.\n"
+                "Schema: scenario_type must be one supported scenario type. analysis_steps must be an array "
+                "of objects with step_id, question, required_metrics, required_dimensions, and candidate_tables. "
+                "Use semantic layer metric ids, dimension ids, and table names only.\n"
+                "Safety: do not generate SQL, sql_candidates, final claims, final answers, action payloads, "
+                "approval fields, or execution instructions. Planning describes what to analyze before the "
+                "existing Schema Agent, Metric Agent, SQL Reviewer, validate_sql, run_sql, and Evidence Validator."
+            ),
+        ),
     ]
 )

@@ -24,6 +24,9 @@ class AgentState(TypedDict, total=False):
     clarification_result: dict[str, Any]
     sql_planning: dict[str, Any]
     sql_routing_strategy: str
+    analysis_plan: dict[str, Any]
+    scenario_type: str
+    analysis_steps: list[dict[str, Any]]
     llm_sql_enhancement: dict[str, Any]
     action_plan: dict[str, Any]
     risk_assessment: dict[str, Any]

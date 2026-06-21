@@ -482,6 +482,97 @@ def _validate_sql_planning_router(content: Any) -> dict[str, Any]:
     )
 
 
+def _validate_analysis_planner(content: Any) -> dict[str, Any]:
+    prompt_id = "analysis_planner"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "analysis_planner output must be an object")
+
+    blocked_fields = {
+        "sql",
+        "generated_sql",
+        "sql_candidates",
+        "candidate_sql",
+        "final_claims",
+        "claims",
+        "final_answer",
+        "action_payload",
+        "actions",
+        "created_actions",
+        "approval_status",
+    }
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"analysis_planner must not return blocked fields: {', '.join(leaked)}")
+
+    scenario_type = str(content.get("scenario_type", "")).strip()
+    allowed_scenario_types = {
+        "quick_metric_lookup",
+        "gmv_decline_diagnosis",
+        "marketing_roi_review",
+        "inventory_risk_analysis",
+        "refund_anomaly_analysis",
+        "promotion_review",
+        "customer_segment_analysis",
+        "general_non_template_analysis",
+    }
+    if scenario_type not in allowed_scenario_types:
+        return _error(prompt_id, f"scenario_type is not supported: {scenario_type}")
+
+    analysis_steps = content.get("analysis_steps", [])
+    if not isinstance(analysis_steps, list) or not analysis_steps:
+        return _error(prompt_id, "analysis_steps must be a non-empty list")
+
+    normalized_steps = []
+    for index, step in enumerate(analysis_steps):
+        if not isinstance(step, dict):
+            return _error(prompt_id, f"analysis_steps[{index}] must be an object")
+        leaked = sorted(blocked_fields & set(step))
+        if leaked:
+            return _error(prompt_id, f"analysis_steps[{index}] must not return blocked fields: {', '.join(leaked)}")
+
+        step_id = str(step.get("step_id", "")).strip()
+        question = str(step.get("question", "")).strip()
+        if not step_id:
+            return _error(prompt_id, f"analysis_steps[{index}].step_id is required")
+        if not question:
+            return _error(prompt_id, f"analysis_steps[{index}].question is required")
+
+        metrics_ok, required_metrics, message = _string_list(
+            step.get("required_metrics", []),
+            f"analysis_steps[{index}].required_metrics",
+        )
+        if not metrics_ok:
+            return _error(prompt_id, message)
+        dimensions_ok, required_dimensions, message = _string_list(
+            step.get("required_dimensions", []),
+            f"analysis_steps[{index}].required_dimensions",
+        )
+        if not dimensions_ok:
+            return _error(prompt_id, message)
+        tables_ok, candidate_tables, message = _string_list(
+            step.get("candidate_tables", []),
+            f"analysis_steps[{index}].candidate_tables",
+        )
+        if not tables_ok:
+            return _error(prompt_id, message)
+        if not required_metrics:
+            return _error(prompt_id, f"analysis_steps[{index}].required_metrics must not be empty")
+        if not candidate_tables:
+            return _error(prompt_id, f"analysis_steps[{index}].candidate_tables must not be empty")
+
+        normalized_steps.append(
+            {
+                "step_id": step_id,
+                "question": question,
+                "required_metrics": required_metrics,
+                "required_dimensions": required_dimensions,
+                "candidate_tables": candidate_tables,
+            }
+        )
+
+    return _ok(prompt_id, {"scenario_type": scenario_type, "analysis_steps": normalized_steps})
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -506,6 +597,8 @@ def validate_prompt_output(
         return _validate_clarification_router(content)
     if prompt_id == "sql_planning_router":
         return _validate_sql_planning_router(content)
+    if prompt_id == "analysis_planner":
+        return _validate_analysis_planner(content)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 
