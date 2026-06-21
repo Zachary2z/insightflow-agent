@@ -52,6 +52,91 @@ aov:
     - "order_items"
   description: "Average order value for paid orders."
 
+net_gmv:
+  name: "净 GMV"
+  aliases:
+    - "净 GMV"
+    - "净gmv"
+    - "net gmv"
+    - "net_gmv"
+    - "收入质量"
+  formula: "SUM(campaign_daily_metrics.net_gmv)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+  description: "Scenario net GMV after refund, discount, or quality adjustments."
+
+refund_rate:
+  name: "退款率"
+  aliases:
+    - "退款率"
+    - "refund rate"
+    - "refund_rate"
+    - "退款风险"
+    - "售后风险"
+  formula: "COUNT(refund_requests.id) * 1.0 / COUNT(DISTINCT orders.id)"
+  required_filters:
+    - "orders.status = 'paid'"
+  required_tables:
+    - "orders"
+    - "refund_requests"
+  description: "Refund requests divided by paid orders for the matching analysis grain."
+
+conversion_rate:
+  name: "转化率"
+  aliases:
+    - "转化率"
+    - "conversion rate"
+    - "conversion_rate"
+    - "CVR"
+  formula: "SUM(traffic_sessions.paid_orders) * 1.0 / SUM(traffic_sessions.sessions)"
+  required_filters: []
+  required_tables:
+    - "traffic_sessions"
+  description: "Paid orders divided by sessions for traffic funnel analysis."
+
+checkout_conversion_rate:
+  name: "Checkout 转化率"
+  aliases:
+    - "checkout conversion"
+    - "checkout conversion rate"
+    - "checkout_conversion_rate"
+    - "结账转化率"
+    - "支付链路转化"
+  formula: "SUM(traffic_sessions.checkout_starts) * 1.0 / SUM(traffic_sessions.add_to_carts)"
+  required_filters: []
+  required_tables:
+    - "traffic_sessions"
+  description: "Checkout starts divided by add-to-cart sessions."
+
+roi:
+  name: "投放 ROI"
+  aliases:
+    - "ROI"
+    - "roi"
+    - "投放回报"
+    - "营销效率"
+  formula: "SUM(campaign_daily_metrics.attributed_gmv) / SUM(campaign_daily_metrics.spend)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+    - "marketing_campaigns"
+  description: "Attributed GMV divided by marketing spend."
+
+cac:
+  name: "获客成本"
+  aliases:
+    - "CAC"
+    - "cac"
+    - "获客成本"
+    - "单客成本"
+  formula: "SUM(campaign_daily_metrics.spend) / SUM(campaign_daily_metrics.attributed_orders)"
+  required_filters: []
+  required_tables:
+    - "campaign_daily_metrics"
+    - "marketing_campaigns"
+  description: "Marketing spend divided by attributed orders."
+
 category_gmv:
   name: "品类销售额"
   aliases:

@@ -5,6 +5,19 @@ import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 
+try:
+    from data.seed_realistic_scenarios import (
+        drop_realistic_tables,
+        seed_realistic_scenarios,
+        table_counts as realistic_table_counts,
+    )
+except ModuleNotFoundError:
+    from seed_realistic_scenarios import (
+        drop_realistic_tables,
+        seed_realistic_scenarios,
+        table_counts as realistic_table_counts,
+    )
+
 
 DEFAULT_DB_PATH = Path(__file__).resolve().with_name("ecommerce.db")
 RANDOM_SEED = 42
@@ -113,6 +126,7 @@ LAST_NAMES = [
 
 
 def create_schema(conn: sqlite3.Connection) -> None:
+    drop_realistic_tables(conn)
     conn.executescript(
         """
         DROP TABLE IF EXISTS order_items;
@@ -274,10 +288,12 @@ def seed_orders(
 
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:
     tables = ["users", "orders", "order_items", "products", "categories"]
-    return {
+    counts = {
         table_name: conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
         for table_name in tables
     }
+    counts.update(realistic_table_counts(conn))
+    return counts
 
 
 def seed_database(db_path: str | Path = DEFAULT_DB_PATH) -> dict:
@@ -293,6 +309,7 @@ def seed_database(db_path: str | Path = DEFAULT_DB_PATH) -> dict:
         seed_users(conn, rng, reference_date)
         products = seed_categories_and_products(conn, rng, reference_date)
         seed_orders(conn, rng, products, reference_date)
+        seed_realistic_scenarios(conn)
         conn.commit()
         counts = table_counts(conn)
 
