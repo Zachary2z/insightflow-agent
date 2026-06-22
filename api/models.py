@@ -49,3 +49,40 @@ class RunEventsResponse(BaseModel):
     status: RunStatus
     events: list[dict[str, Any]]
 
+
+class WorkspaceCreateRequest(BaseModel):
+    name: str
+
+
+class WorkspaceResponse(BaseModel):
+    workspace_id: str
+    name: str
+    created_at: str
+    updated_at: str
+    root_path: str
+    analysis_db_path: str
+    profile_path: str
+    semantic_layer_path: str
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class WorkspaceProfileResponse(BaseModel):
+    success: bool
+    profile: dict[str, Any]
+
+
+class WorkspaceSemanticResponse(BaseModel):
+    success: bool
+    semantic_layer: dict[str, Any]
+
+
+class WorkspaceRunCreateRequest(BaseModel):
+    user_question: str
+    initial_sql: str | None = None
+
+
+class WorkspaceRunResponse(BaseModel):
+    success: bool
+    workspace_id: str
+    run_id: str | None = None
+    result: dict[str, Any]

@@ -8,8 +8,18 @@ from api.models import (
     RunEventsResponse,
     RunStatusResponse,
     RunTraceResponse,
+    WorkspaceCreateRequest,
+    WorkspaceProfileResponse,
+    WorkspaceResponse,
+    WorkspaceRunCreateRequest,
+    WorkspaceRunResponse,
+    WorkspaceSemanticResponse,
 )
 from api.run_manager import RunManager, RunRecord
+from workspaces.analysis_runner import run_workspace_analysis
+from workspaces.profiler import profile_workspace_database
+from workspaces.semantic_draft import generate_semantic_layer_draft
+from workspaces.store import WorkspaceStore
 
 
 def _not_found(run_id: str) -> HTTPException:
@@ -30,9 +40,59 @@ def _status_response(record: RunRecord) -> RunStatusResponse:
     )
 
 
-def create_app(run_manager: RunManager | None = None) -> FastAPI:
+def create_app(run_manager: RunManager | None = None, workspace_store: WorkspaceStore | None = None) -> FastAPI:
     manager = run_manager or RunManager()
+    store = workspace_store or WorkspaceStore()
     app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
+
+    @app.post("/api/workspaces", response_model=WorkspaceResponse)
+    def create_workspace(request: WorkspaceCreateRequest) -> dict:
+        return store.create_workspace(request.name)
+
+    @app.get("/api/workspaces")
+    def list_workspaces() -> dict:
+        return {"workspaces": store.list_workspaces()}
+
+    @app.get("/api/workspaces/{workspace_id}", response_model=WorkspaceResponse)
+    def get_workspace(workspace_id: str) -> dict:
+        try:
+            return store.get_workspace(workspace_id)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+
+    @app.post("/api/workspaces/{workspace_id}/profile", response_model=WorkspaceProfileResponse)
+    def create_profile(workspace_id: str) -> dict:
+        try:
+            return {"success": True, "profile": profile_workspace_database(store, workspace_id)}
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+
+    @app.post("/api/workspaces/{workspace_id}/semantic-layer/draft", response_model=WorkspaceSemanticResponse)
+    def create_semantic_draft(workspace_id: str) -> dict:
+        try:
+            profile = profile_workspace_database(store, workspace_id)
+            semantic_layer = generate_semantic_layer_draft(store, workspace_id, profile)
+            return {"success": True, "semantic_layer": semantic_layer}
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+
+    @app.post("/api/workspaces/{workspace_id}/runs", response_model=WorkspaceRunResponse)
+    def create_workspace_run(workspace_id: str, request: WorkspaceRunCreateRequest) -> dict:
+        try:
+            result = run_workspace_analysis(
+                store=store,
+                workspace_id=workspace_id,
+                user_question=request.user_question,
+                initial_sql=request.initial_sql,
+            )
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+        return {
+            "success": result.get("status") != "failed",
+            "workspace_id": workspace_id,
+            "run_id": result.get("run_id"),
+            "result": result,
+        }
 
     @app.post("/api/runs", response_model=RunCreateResponse, status_code=202)
     def create_run(request: RunCreateRequest) -> RunCreateResponse:
