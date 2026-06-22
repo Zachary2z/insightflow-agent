@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProfileSummary from "@/components/ProfileSummary";
 
 type ProfilePageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -16,10 +17,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
       </nav>
-      <section className="panel">
-        <h2>Profile Summary</h2>
-        <p>Table and column profile summaries will render here.</p>
-      </section>
+      <ProfileSummary profile={{ tables: [] }} />
     </main>
   );
 }

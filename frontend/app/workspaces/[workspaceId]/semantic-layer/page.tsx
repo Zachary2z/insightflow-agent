@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SemanticLayerEditor from "@/components/SemanticLayerEditor";
 
 type SemanticLayerPageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -16,10 +17,7 @@ export default async function SemanticLayerPage({ params }: SemanticLayerPagePro
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
       </nav>
-      <section className="panel">
-        <h2>Draft Semantic Model</h2>
-        <p>Draft metrics, dimensions, and entities will be editable here.</p>
-      </section>
+      <SemanticLayerEditor semanticLayer={{ metrics: [], dimensions: [] }} />
     </main>
   );
 }

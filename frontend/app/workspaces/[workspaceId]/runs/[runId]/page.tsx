@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RunResult from "@/components/RunResult";
 
 type RunDetailPageProps = {
   params: Promise<{ workspaceId: string; runId: string }>;
@@ -17,10 +18,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
       </nav>
-      <section className="panel">
-        <h2>Result and Trace</h2>
-        <p>SQL, result rows, charts, and trace events will render here.</p>
-      </section>
+      <RunResult result={{}} />
     </main>
   );
 }
