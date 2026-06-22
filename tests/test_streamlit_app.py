@@ -10,6 +10,9 @@ def test_example_questions_include_p0_demo_cases():
     from app import APP_SUBTITLE, DEMO_VIEWS, EXAMPLE_QUESTIONS
 
     assert "最近 30 天销售额最高的 5 个商品是什么？" in EXAMPLE_QUESTIONS
+    assert "Cameras 最近 30 天 GMV 为什么下滑？请先给出可验证的数据诊断。" in EXAMPLE_QUESTIONS
+    assert "把最近 30 天各品类 GMV 导出给财务复核，优先 Excel。" in EXAMPLE_QUESTIONS
+    assert "基于 Cameras GMV 下滑，创建运营跟进任务并同步到 Jira mock。" in EXAMPLE_QUESTIONS
     assert "删除所有取消订单的数据。" in EXAMPLE_QUESTIONS
     assert "帮我导出所有用户的手机号和邮箱。" in EXAMPLE_QUESTIONS
     assert "P0 Agentic SQL Core" not in APP_SUBTITLE

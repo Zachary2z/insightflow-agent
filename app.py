@@ -51,6 +51,9 @@ DEFAULT_TRACE_DIR = Path("logs/traces")
 DEFAULT_ACTION_DB_PATH_FOR_DEMO = DEFAULT_ACTION_DB_PATH
 EXAMPLE_QUESTIONS = [
     "最近 30 天销售额最高的 5 个商品是什么？",
+    "Cameras 最近 30 天 GMV 为什么下滑？请先给出可验证的数据诊断。",
+    "把最近 30 天各品类 GMV 导出给财务复核，优先 Excel。",
+    "基于 Cameras GMV 下滑，创建运营跟进任务并同步到 Jira mock。",
     "最近 3 个月销售额最高的品类是什么？",
     "每个城市的总销售额是多少？",
     "删除所有取消订单的数据。",

@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, P2, P3, P4, P5, P6, P7, P8.1, P8.2, P8.3, P8.4, and P8.5 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, draft insights from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports from explicit/provider-selected report sections, create provider-backed approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, insight-drafting, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI and Jira-style publishing without network access, preserve SQL validation before any SQL execution, and expose the cleaned agent/tool/validator/artifact path in Streamlit.
+P0, P1, P2, P3, P4, P5, P6, P7, P8.1, P8.2, P8.3, P8.4, P8.5, and P9 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, draft insights from real query output, save trace artifacts, run a 32-case realistic eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports from explicit/provider-selected report sections, create provider-backed approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, insight-drafting, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI and Jira-style publishing without network access, preserve SQL validation before any SQL execution, and expose the cleaned agent/tool/validator/artifact path in Streamlit.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, P8.1 - Visualization Agent Dedupe & External Tool Calling, P8.2 - Intent & SQL Planning Agent Cleanup, P8.3 - Report & Insight Agent Cleanup, P8.4 - Action Agent & Tool Adapter Cleanup, and P8.5 - Agent Pipeline UX are complete. P9 - Realistic Eval And Demo Polish is next.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, P8.1 - Visualization Agent Dedupe & External Tool Calling, P8.2 - Intent & SQL Planning Agent Cleanup, P8.3 - Report & Insight Agent Cleanup, P8.4 - Action Agent & Tool Adapter Cleanup, P8.5 - Agent Pipeline UX, and P9 - Realistic Eval And Demo Polish are complete. P10 - Lightweight Engineering Hardening is next.
 
 Implemented:
 
@@ -15,7 +15,7 @@ Implemented:
 - Supervisor, Schema, Metric, SQL Generator, SQL Reviewer, Error Fix, and Insight agents
 - LangGraph workflow with review, execution, one-retry repair, failure, insight, and trace-save paths
 - Streamlit glass-box demo
-- 20-case eval benchmark
+- 32-case realistic eval benchmark covering P0 safety plus P9 business scenarios, external-tool traces, fallback, provider validation errors, and unsafe rejection
 - P1 business context retrieval for business rules, table docs, and historical SQL examples
 - P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
 - P1/P8 visualization artifacts through the LLM-first `VisualizationAgent`, validated chart specs, local renderer, Excel exporter, and Power BI mock publisher
@@ -218,7 +218,7 @@ Copy `.env.example` to `.env` and fill in values as needed.
 python -m pytest
 ```
 
-Run the P0 eval benchmark:
+Run the P9 realistic eval benchmark:
 
 ```bash
 python eval/run_eval.py
@@ -501,7 +501,7 @@ INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 python
 
 ## Business Review Report
 
-Task 15 adds a deterministic P2 Report Supervisor for weekly business review reports. It decomposes a weekly report request into structured sections, then runs each SQL subtask through the existing schema, metric, SQL review, SQL execution, Evidence Validator, Chart Agent, Report Tool, and Trace Logger boundaries.
+Task 15 adds a deterministic P2 Report Supervisor for weekly business review reports. It decomposes a weekly report request into structured sections, then runs each SQL subtask through the existing schema, metric, SQL review, SQL execution, Evidence Validator, VisualizationAgent delivery path, Report Tool, and Trace Logger boundaries.
 
 Core sections:
 
@@ -1318,19 +1318,30 @@ Open the Streamlit URL. The unified demo now displays:
 - Integrations for MCP Tool Layer contracts and FastAPI Async Run API endpoints/local run demo
 - Capability Catalog for P0/P1/P2/P3 coverage including LLM Provider & PromptOps and Template Mining & Eval
 
-The Command Center preserves the original P0 glass-box workflow while making P1/P2/P3 capabilities, provider participation, fallback behavior, and safety gates visible from the same Streamlit app.
+The Command Center preserves the original glass-box workflow while making P1-P9 capabilities, provider participation, fallback behavior, external mock tools, and safety gates visible from the same Streamlit app. It remains a transition demo, not the final business product UI.
 
 ## Demo Questions
 
 - 最近 30 天销售额最高的 5 个商品是什么？
+- Cameras 最近 30 天 GMV 为什么下滑？请先给出可验证的数据诊断。
+- 最近一周哪个品类表现异常，需要运营重点关注？
+- 华东、华南等城市区域的 GMV 表现差异是什么？
+- 请找出 Top 和 Bottom 商品，帮助商品团队定位机会和风险。
+- 售后退款风险最高的品类有哪些？请用可追溯数据回答。
+- 帮我生成经营周报的核心数据底稿，覆盖 GMV、订单量和重点品类。
+- 把最近 30 天各品类 GMV 导出给财务复核，优先 Excel。
+- 把城市 GMV 表现发布到 Power BI 看板给老板看。
+- 基于 Cameras GMV 下滑，创建运营跟进任务并同步到 Jira mock。
 - 最近 3 个月销售额最高的品类是什么？
 - 每个城市的总销售额是多少？
 - 删除所有取消订单的数据。
 - 帮我导出所有用户的手机号和邮箱。
 
+No-key mode runs the deterministic safety and execution boundaries plus explicit provider-unavailable/fallback paths. Provider-backed mode is enabled only through environment switches and a configured DeepSeek-compatible provider; live provider tests remain opt-in. Power BI and Jira are mock external tools in this project: they return `mock://powerbi/...` and `mock://jira/...` URLs without network calls, OAuth, API keys, or real SaaS writes.
+
 ## Eval
 
-Run the P0 benchmark:
+Run the P9 benchmark:
 
 ```bash
 python eval/run_eval.py
@@ -1338,20 +1349,21 @@ python eval/run_eval.py
 
 Current eval summary:
 
-- Total cases: 20
-- Passed cases: 20
+- Total cases: 32
+- Passed cases: 32
 - Pass rate: 100.00%
-- SQL execution success rate: 92.31%
-- SQL first-pass success rate: 91.67%
+- SQL execution success rate: covers successful BI reads while excluded blocked unsafe cases remain stopped before execution
 - SQL repair success rate: 100.00%
 - Dangerous SQL block rate: 100.00%
 - Metric definition accuracy: 100.00%
+- Provider-called / fallback-used cases are counted.
+- Visualization delivery tool ids, external-tool-called flags, artifact type/path/url, action delivery tool ids, approval requirements, evidence success, unsupported claim rate, trace event count, tool call count, validation errors, and provider errors are included.
 
-The generated report is written to `eval/report.md`.
+The generated report is written to `eval/report.md`. Generated eval reports, traces, charts, action DBs, and mock artifacts are runtime artifacts and should not be committed.
 
 ## P0 Limits
 
 - The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
 - Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
 - React UI, persistent async jobs, RBAC, dashboard frontend views, Docker/CI, and full ActionOps product features remain outside the current baseline.
-- P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
+- P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, the current VisualizationAgent delivery path, and Report Agent are implemented.

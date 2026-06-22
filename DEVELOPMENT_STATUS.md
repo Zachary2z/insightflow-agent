@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P8.5 - Agent Pipeline UX complete |
-| Current task | P8.5 complete; P9 is next |
-| Next planned task | P9 - Realistic Eval And Demo Polish |
-| Last completed task | P8.5 Agent Pipeline UX |
+| Current phase | P9 - Realistic Eval And Demo Polish complete |
+| Current task | P9 complete; P10 is next |
+| Next planned task | P10 - Lightweight Engineering Hardening |
+| Last completed task | P9 Realistic Eval And Demo Polish |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P8.5 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
+| Out of scope for current P9 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, final business product UI, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -40,8 +40,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.3 | Report & Insight Agent Cleanup | `[x]` provider-backed report planning no longer falls back to fixed section selection; Report Supervisor stops on `provider_unavailable` unless sections are explicitly supplied; `insight_drafter` prompt/schema/runtime wiring drafts candidate claims before claim typing/Evidence Validator | `[x]` P8.3 focused tests 6/6 passing; related report/insight/runtime regression 71/71 passing; full suite 234 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` fixed action templates removed from the product path; provider-backed action planning returns contextual action payloads plus delivery-tool ids; missing providers return structured `provider_unavailable`; `agents/action_executor.py` owns approved execution through `action_delivery/` adapters | `[x]` P8.4 focused tests 5/5 passing; action/provider regression 30/30 passing; related regression 40/40 passing; full suite 239 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.5 | Agent Pipeline UX | `[x]` Streamlit run summaries now expose agent pipeline, tool-call cards, validator gates, artifact panel, source metadata, provider prompt ids, fallback flags, policy status, and mock external artifact URLs from existing state/trace data | `[x]` P8.5 focused test red/green verified; Streamlit tests 19/19 passing; related regression 42/42 passing; full suite 240 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P9 | Realistic Eval And Demo Polish | `[x]` 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo questions complete | `[x]` focused P9 eval and Streamlit tests passing; full verification recorded below | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
 
 ## P0 - Agentic SQL Core
 
@@ -107,14 +107,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 - `[x]` Task 12 has dedicated tests.
 - `[x]` Existing P0 tests and eval remain passing after Task 12.
 - `[x]` README and DEVELOPMENT_STATUS are updated for Task 12.
-- `[x]` Chart Tool generates real PNG files.
-- `[x]` Chart Agent infers bar charts for ranking questions.
-- `[x]` Chart Agent infers line charts for trend questions.
-- `[x]` Chart Agent writes `chart_path` and `chart_paths` into state.
-- `[x]` Chart generation emits trace-ready events and Agent appends them to trace.
-- `[x]` Task 13 has dedicated tests.
-- `[x]` Existing P0 tests and eval remain passing after Task 13.
-- `[x]` README and DEVELOPMENT_STATUS are updated for Task 13.
+- `[x]` Historical Chart Tool generated real PNG files before P8.1 superseded and deleted that product path.
+- `[x]` Historical Chart Agent bar/line decision behavior is superseded by the current `VisualizationAgent`.
+- `[x]` Current visualization output writes `chart_path` and `chart_paths` through `tools/external_visualization_tool.py` and `visualization_delivery/`.
+- `[x]` Current visualization delivery emits trace-ready events and appends them to trace.
+- `[x]` Historical Task 13 tests were replaced by current visualization/MCP tests after P8.1 cleanup.
+- `[x]` Existing P0 tests and eval remained passing after Task 13.
+- `[x]` README and DEVELOPMENT_STATUS were updated for Task 13 and later superseded by P8.1/P9 docs.
 - `[x]` Report Tool saves real Markdown reports.
 - `[x]` Report Agent writes `report_path` into state.
 - `[x]` Reports include user question, metrics, SQL, execution result summary, evidence findings, hypotheses, chart paths, and trace path.
@@ -560,22 +559,28 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 - `[x]` Historical P7 baseline: default no-key deterministic visualization planning worked without an API key or provider before the P8 cleanup.
 - `[x]` Historical P7 baseline: P0 workflow and P0 eval remained compatible and provider-independent before the P8 cleanup.
 
-### P8.1 Visualization Agent Dedupe & External Tool Calling Plan
+### P8.1 Visualization Agent Dedupe & External Tool Calling Status
 
-- `[ ]` Add `agents/visualization_agent.py` as the main visualization decision entry point.
-- `[ ]` Reuse P7 `visualization/` chart spec, validator, and renderer as safety/tool foundations instead of duplicating chart rules.
-- `[ ]` Add `visualization_delivery/tool_catalog.py` with registered delivery tools: `local_renderer`, `excel_exporter`, and `powerbi_publisher_mock`.
-- `[ ]` Add a structured `visualization_decision` prompt/schema that lets the provider select both chart spec and delivery tool.
-- `[ ]` Add `tools/external_visualization_tool.py` plus delivery adapters that validate tool policy before execution.
-- `[ ]` Keep deterministic code for column validation, tool existence, artifact policy, trace metadata, and adapter execution.
-- `[ ]` Avoid large keyword-rule trees for chart/tool choice; meaningful business-intent decisions should be provider-backed when enabled.
-- `[ ]` Delete old chart-decision behavior and obsolete tests instead of preserving parallel compatibility paths.
-- `[ ]` Reject provider output containing SQL, final claims, action payloads, approval fields, credentials, unknown tool ids, unsupported chart types, missing columns, malformed JSON, or fabricated rows.
-- `[ ]` Make Excel export write a real local workbook from `execution_result.rows`.
-- `[ ]` Make Power BI delivery an explicit mock external adapter returning `external_tool_called: true` and a `mock://powerbi/...` artifact URL; no real SaaS auth/API in P8.1.
-- `[ ]` Wire workflow state/trace after SQL execution and Evidence Validator without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
-- `[ ]` Add focused tests for provider success, provider malformed output, unsafe provider output, missing columns, unknown tool ids, real-row export/rendering, mock external publish trace, and retained workflow safety boundaries.
-- `[ ]` Run full pytest and P0 eval at P8.1 completion or before commit/push, not after every small edit or for deleted legacy behavior.
+- `[x]` `agents/visualization_agent.py` is the main visualization decision entry point.
+- `[x]` P7 `visualization/` chart spec, validator, and renderer are reused as safety/tool foundations.
+- `[x]` `visualization_delivery/tool_catalog.py` registers `local_renderer`, `excel_exporter`, and `powerbi_publisher_mock`.
+- `[x]` The `visualization_agent` prompt/schema lets the provider select both chart spec and delivery tool.
+- `[x]` `tools/external_visualization_tool.py` and delivery adapters validate tool policy before execution.
+- `[x]` Deterministic code owns column validation, tool existence, artifact policy, trace metadata, and adapter execution.
+- `[x]` Old chart-decision behavior and obsolete tests were deleted instead of preserved as parallel compatibility paths.
+- `[x]` Provider output containing SQL, final claims, action payloads, approval fields, credentials, unknown tool ids, unsupported chart types, missing columns, malformed JSON, or fabricated rows is rejected or safely falls back.
+- `[x]` Excel export writes a real local workbook from `execution_result.rows`.
+- `[x]` Power BI delivery is an explicit mock external adapter returning `external_tool_called: true` and `mock://powerbi/...`; no real SaaS auth/API is used.
+- `[x]` Workflow state/trace runs after SQL execution and Evidence Validator boundaries without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+- `[x]` Focused tests cover provider success, provider malformed output, unsafe provider output, missing columns, unknown tool ids, real-row export/rendering, mock external publish trace, and retained workflow safety boundaries.
+
+### P9 Realistic Eval And Demo Polish Status
+
+- `[x]` `eval/test_questions.json` now includes 32 cases: the original P0 guardrail cases plus P9 GMV decline, category anomaly, city/regional performance, Top/Bottom products, refund risk, weekly review, visualization delivery, action suggestion, unsafe/sensitive rejection, provider-unavailable fallback, and provider validation-error scenarios.
+- `[x]` `eval/run_eval.py` reports provider-called cases, fallback-used cases, visualization delivery tool id, external visualization tool calls, artifact type/path/url, action delivery tool ids, approval requirements, evidence success, unsupported claim rate, trace event count, tool call count, validation errors, and provider errors.
+- `[x]` No-key eval uses deterministic runtime plus explicit mock provider payloads in eval cases; it does not require a real DeepSeek API key.
+- `[x]` Excel exporter, Power BI mock, Jira mock, approval gate, validation-error fallback, provider-unavailable fallback, and unsafe sensitive-field rejection are visible in eval results.
+- `[x]` Streamlit demo questions now include realistic P9 business paths while remaining a transition demo, not the final product UI.
 
 ### P8.2-P8.5 Cleanup Program Status
 
@@ -583,7 +588,8 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 - `[x]` P8.3 Report & Insight Agent Cleanup is complete: provider-backed report planning is the product path for section selection, provider-unavailable plans do not auto-select fixed sections, Report Supervisor remains an orchestrator, and `insight_drafter` feeds candidate claims into claim typing/Evidence Validator.
 - `[x]` P8.4 Action Agent & Tool Adapter Cleanup is complete: `agents/action_planner.py` no longer emits fixed action templates in the product path, provider output drafts contextual actions plus `delivery_tool_id`, provider-unavailable mode is structured, `agents/action_executor.py` is split from Risk Assessor, and `action_delivery/` executes local SQLite plus mock Jira-style adapters only after approval.
 - `[x]` P8.5 Agent Pipeline UX is complete: Streamlit Command Center exposes the cleaned agent pipeline, tool-call cards, validator gates, artifact panel, and source metadata without changing workflow execution or safety boundaries.
-- `[ ]` P9 Realistic Eval And Demo Polish is next.
+- `[x]` P9 Realistic Eval And Demo Polish is complete.
+- `[ ]` P10 Lightweight Engineering Hardening is next.
 
 ## Update Rules
 
@@ -597,6 +603,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P9 verification:
+
+```bash
+python3 -m pytest tests/test_eval_runner.py tests/test_streamlit_app.py tests/test_visualization_agent_external_tools.py tests/test_action_agent_tool_adapter_cleanup.py -q
+python3 -m pytest tests/test_workflow.py tests/test_mcp_tool_layer.py tests/test_sql_validator.py tests/test_evidence_validator.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: P9 focused eval/Streamlit/visualization/action tests report 47/47 passed; workflow/MCP/SQL/Evidence regression reports 19/19 passed; the default full suite reports 245 passed and 9 opt-in live DeepSeek tests skipped by default; P9 eval reports 32/32 passed with SQL execution success rate 95.83%, SQL repair success rate 100.00%, dangerous SQL block rate 100.00%, metric definition accuracy 100.00%, provider-called cases 4, fallback-used cases 23, visualization external-tool-called cases 23, Excel exporter 1, Power BI mock 1, Jira mock 1, evidence success rate 100.00%, validation-error cases 1, and provider-error cases 20. P9 proves realistic scenario eval coverage, external visualization/action tool traceability, no-key mock provider coverage, provider-unavailable fallback, provider validation-error fallback, and unsafe/sensitive request blocking without restoring old chart/planner/tool product paths.
 
 P8.5 verification:
 

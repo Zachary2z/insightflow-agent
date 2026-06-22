@@ -8,7 +8,7 @@ Update this table after every completed phase or task so the current project pos
 
 | Phase | Name | Status | Latest result | Next action |
 |---|---|---|---|---|
-| P0 | Agentic SQL Core | `[x]` Complete | Core SQL workflow, validation, execution, trace, Streamlit demo, and 20-case eval are complete. | Regression only |
+| P0 | Agentic SQL Core | `[x]` Complete | Core SQL workflow, validation, execution, trace, Streamlit demo, and original 20-case P0 eval baseline are complete. | Regression only |
 | P1 | Reliable Analysis & Report Core | `[x]` Complete | Business context, evidence validation, charts, and Markdown reports are complete. | Regression only |
 | P2 | Business Review & Action Workflow | `[x]` Complete | Weekly/monthly reports, guarded LLM enhancement, and approval-gated local actions are complete. | Regression only |
 | P3 | MCP & Engineering Core | `[x]` Complete for scoped baseline | MCP contracts, FastAPI async API, trace dashboard data, Command Center UI, provider hardening, question understanding, SQL planning, and template mining are complete. | Defer Docker/CI unless explicitly selected |
@@ -21,10 +21,10 @@ Update this table after every completed phase or task so the current project pos
 | P8.3 | Report & Insight Agent Cleanup | `[x]` Complete | Provider-backed report planning is the product path for section selection; provider-unavailable plans do not auto-select fixed sections; `insight_drafter` now drafts candidate claims before claim typing/Evidence Validator. | Regression only |
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` Complete | Fixed action templates are removed from the product path; provider-backed action planning now selects contextual action payloads and delivery tools; execution moved to `agents/action_executor.py` and `action_delivery/` adapters behind approval/audit. | Regression only |
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
-| P9 | Realistic Eval And Demo Polish | `[ ]` Next | Not started. | Add scenario eval and demo polish after the cleanup path is stable |
-| P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Later | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
+| P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
+| P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Next | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
 
-Current development position: **P8.5 Agent Pipeline UX is complete; P9 Realistic Eval And Demo Polish is next.**
+Current development position: **P9 Realistic Eval And Demo Polish is complete; P10 MCP Contract & Lightweight Engineering Hardening is next.**
 
 ## 1. Project Positioning
 
@@ -277,7 +277,7 @@ LLM participation rule: the model helps with understanding, planning, candidates
 
 ### 4.2 Current LLM Enhancement Target
 
-The immediate model-assisted target is **P8.1 Visualization Agent Dedupe & External Tool Calling**. The broader P8 cleanup program then continues through intent/SQL planning, report/insight cleanup, and action/tool adapter cleanup.
+P8.1-P8.5 and P9 are complete. The current model-assisted product path is already wired through intent, SQL planning, scenario planning, insight/report wording, visualization delivery, and action drafting with deterministic validators and adapters as boundaries. The next target is P10 lightweight engineering hardening: tighten external contracts, artifact hygiene, and local quality without adding new business-decision rule trees.
 
 | Target | Why the LLM is useful | Planned task | Safety boundary |
 |---|---|---|---|
@@ -457,8 +457,8 @@ The next task should be selected from the P4-P10 platform evolution roadmap. Do 
 | Done | P8.3 Report & Insight Agent Cleanup | Replace fixed report sections and template insight generation with LLM-first planning/drafting gated by Evidence Validator. |
 | Done | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
 | Done | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
-| Next | P9 Realistic Eval And Demo Polish | Add eval/demo cases for realistic cleaned agent paths and external-tool traces. |
-| Later | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
+| Done | P9 Realistic Eval And Demo Polish | Added eval/demo cases for realistic cleaned agent paths and external-tool traces. |
+| Next | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
 
 ## 10.1 P8.1 Visualization Agent Dedupe & External Tool Calling
 
