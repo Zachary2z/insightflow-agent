@@ -314,7 +314,7 @@ def test_workflow_visualization_trace_records_provider_fallback_policy_and_tool_
             "WHERE o.status = 'paid' "
             "GROUP BY c.category_name ORDER BY gmv DESC LIMIT 5"
         ),
-        visualization_planner_provider=MockLLMProvider(_provider_output("powerbi_publisher_mock")),
+        visualization_agent_provider=MockLLMProvider(_provider_output("powerbi_publisher_mock")),
     )
 
     trace_event = next(event for event in result["trace"] if event.get("node") == "visualization_agent")

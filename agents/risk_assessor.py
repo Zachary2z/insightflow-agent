@@ -51,9 +51,3 @@ def run_risk_assessor_agent(state: dict[str, Any]) -> dict[str, Any]:
             "latency_ms": 0,
         },
     )
-
-
-def run_action_executor_agent(state: dict[str, Any]) -> dict[str, Any]:
-    from agents.action_executor import run_action_executor_agent as _run_action_executor_agent
-
-    return _run_action_executor_agent(state)

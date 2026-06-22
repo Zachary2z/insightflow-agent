@@ -50,7 +50,7 @@ def build_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     analysis_planner_provider: LLMProvider | None = None,
-    visualization_planner_provider: LLMProvider | None = None,
+    visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     insight_drafting_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
@@ -92,7 +92,7 @@ def build_workflow(
     )
     workflow.add_node(
         "visualization_agent",
-        lambda state: visualization_agent_node(dict(state), provider=visualization_planner_provider),
+        lambda state: visualization_agent_node(dict(state), provider=visualization_agent_provider),
     )
     workflow.add_node("fail", fail_response_node)
     workflow.add_node("early_response", early_response_node)
@@ -142,7 +142,7 @@ def run_workflow(
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
     analysis_planner_provider: LLMProvider | None = None,
-    visualization_planner_provider: LLMProvider | None = None,
+    visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     insight_drafting_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
@@ -159,7 +159,7 @@ def run_workflow(
     clarify_provider = clarification_provider or build_clarification_provider()
     planning_provider = sql_planning_provider or build_sql_planning_provider()
     planner_provider = analysis_planner_provider or build_analysis_planner_provider()
-    viz_provider = visualization_planner_provider or build_visualization_agent_provider()
+    viz_provider = visualization_agent_provider or build_visualization_agent_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
     insight_provider = insight_drafting_provider or build_insight_drafting_provider()
     typing_provider = claim_typing_provider or build_claim_typing_provider()
@@ -168,7 +168,7 @@ def run_workflow(
         clarification_provider=clarify_provider,
         sql_planning_provider=planning_provider,
         analysis_planner_provider=planner_provider,
-        visualization_planner_provider=viz_provider,
+        visualization_agent_provider=viz_provider,
         sql_candidate_provider=candidate_provider,
         insight_drafting_provider=insight_provider,
         claim_typing_provider=typing_provider,

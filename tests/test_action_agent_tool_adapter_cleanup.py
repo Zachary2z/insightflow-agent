@@ -97,10 +97,13 @@ def test_action_planner_uses_provider_contextual_actions_without_approval_or_rec
 
 
 def test_action_executor_is_split_from_risk_assessor_and_blocks_before_approval(tmp_path):
+    import agents.risk_assessor as risk_assessor
     from agents.action_executor import run_action_executor_agent
     from agents.action_planner import run_action_planner_agent
     from agents.risk_assessor import run_risk_assessor_agent
     from llm_ops.provider import MockLLMProvider
+
+    assert not hasattr(risk_assessor, "run_action_executor_agent")
 
     state = run_action_planner_agent(_state(tmp_path), action_draft_provider=MockLLMProvider(_provider_actions()))
     state = run_risk_assessor_agent(state)
