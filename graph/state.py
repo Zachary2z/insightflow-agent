@@ -46,6 +46,11 @@ class AgentState(TypedDict, total=False):
     db_path: str | Path
     trace_dir: str | Path
     initial_sql: str
+    workspace_id: str | None
+    workspace_root: str | None
+    profile_path: str | None
+    semantic_layer_path: str | None
+    run_artifact_dir: str | None
 
     database_schema: dict[str, Any]
     schema_text: str

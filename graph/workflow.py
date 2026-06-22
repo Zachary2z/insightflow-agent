@@ -138,6 +138,11 @@ def run_workflow(
     run_id: str | None = None,
     session_id: str | None = None,
     initial_sql: str | None = None,
+    workspace_id: str | None = None,
+    workspace_root: str | Path | None = None,
+    profile_path: str | Path | None = None,
+    semantic_layer_path: str | Path | None = None,
+    run_artifact_dir: str | Path | None = None,
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
@@ -152,6 +157,11 @@ def run_workflow(
     state["trace_dir"] = trace_dir
     state["execution_result"] = {}
     state["review_retry_count"] = 0
+    state["workspace_id"] = workspace_id
+    state["workspace_root"] = str(workspace_root) if workspace_root else None
+    state["profile_path"] = str(profile_path) if profile_path else None
+    state["semantic_layer_path"] = str(semantic_layer_path) if semantic_layer_path else None
+    state["run_artifact_dir"] = str(run_artifact_dir) if run_artifact_dir else None
     if initial_sql:
         state["initial_sql"] = initial_sql
 

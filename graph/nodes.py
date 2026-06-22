@@ -21,11 +21,41 @@ from tools.trace_logger import append_trace, save_trace
 from graph.state import AgentState
 
 
+def _artifact_dir(state: dict, child: str) -> str:
+    base = state.get("run_artifact_dir")
+    if base:
+        path = Path(base) / child
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+    return f"reports/{child}"
+
+
 def schema_node(state: AgentState) -> AgentState:
     return run_schema_agent(dict(state), state["db_path"])
 
 
 def metric_node(state: AgentState) -> AgentState:
+    if state.get("workspace_id"):
+        metric_context = {
+            "success": True,
+            "source": "workspace_semantic_layer",
+            "matched_metrics": [],
+            "metrics": {},
+            "semantic_layer_path": state.get("semantic_layer_path"),
+            "profile_path": state.get("profile_path"),
+        }
+        updated = {**state, "metric_context": metric_context}
+        return append_trace(
+            updated,
+            {
+                "node": "metric_agent",
+                "tool_name": "workspace_semantic_layer",
+                "tool_input_summary": state.get("semantic_layer_path") or "",
+                "tool_output_summary": "workspace semantic context attached",
+                "status": "success",
+                "latency_ms": 0,
+            },
+        )
     return run_metric_agent(dict(state))
 
 
@@ -168,7 +198,7 @@ def claim_typing_node(state: AgentState, provider=None) -> AgentState:
 def visualization_agent_node(state: AgentState, provider=None) -> AgentState:
     if state.get("status") != "completed":
         return dict(state)
-    return run_visualization_agent(dict(state), provider=provider)
+    return run_visualization_agent(dict(state), provider=provider, output_dir=_artifact_dir(state, "charts"))
 
 
 def fail_response_node(state: AgentState) -> AgentState:
