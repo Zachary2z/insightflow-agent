@@ -18,6 +18,9 @@ logs/traces/*
 logs/traces/**/*
 reports/charts/*
 reports/markdown/*
+workspaces/*
+!workspaces/
+!workspaces/*.py
 !logs/traces/.gitkeep
 !reports/charts/.gitkeep
 !reports/markdown/.gitkeep
