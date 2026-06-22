@@ -737,7 +737,7 @@ Task 16 does not introduce MCP, FastAPI, React, async jobs, RBAC, external SaaS 
 
 ## LLM Action and Email Drafting
 
-Task 27 adds an optional provider-backed action drafter inside the real action workflow. `run_action_planner_agent()` still builds the deterministic action plan first, then calls the DeepSeek-compatible `action_drafter` path only when a provider is supplied or `INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1` is enabled.
+P8.4 makes the provider-backed action drafter the product path for action suggestions. `run_action_planner_agent()` no longer builds fixed deterministic action templates; when no provider is supplied or configured it returns a structured `provider_unavailable` plan with no generated actions. When a provider is supplied or `INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1` is enabled, the DeepSeek-compatible `action_drafter` path drafts task, metric-alert, email-draft, and delivery-tool payloads from Evidence Validator output.
 
 Enable real DeepSeek-backed action drafting:
 
@@ -747,7 +747,7 @@ export DEEPSEEK_API_KEY=...
 python3 -c "from agents.supervisor import initialize_run; from agents.action_planner import run_action_planner_agent; s=initialize_run('请基于 Cameras GMV 下滑创建运营跟进任务、监控告警和邮件草稿。'); s['evidence_result']={'success': True, 'data_supported_findings': [{'claim': 'Cameras 的 GMV 变化为 -12000.0'}], 'hypotheses': [{'claim': '可能需要进一步验证广告流量和转化率数据。', 'needs_more_data': ['ad_impressions', 'conversion_rate']}], 'unsupported_claims_blocked': ['库存不足是确定原因']}; print(run_action_planner_agent(s)['action_draft_result'])"
 ```
 
-Accepted provider output writes `state["action_draft_result"]` with `provider_called`, `fallback_used`, prompt id/version, model, usage, latency, provider errors, and validation errors. Accepted drafts replace only the pending `action_plan.actions` payloads. They do not create tasks, create alerts, create email drafts, set approval status, send email, write audit records, or bypass Risk Assessor, Approval Gate, Action Executor, or Audit Logger.
+Accepted provider output writes `state["action_draft_result"]` with `provider_called`, `fallback_used`, prompt id/version, model, usage, latency, provider errors, and validation errors. Accepted drafts populate pending `action_plan.actions` only. They do not create tasks, create alerts, create email drafts, set approval status, send email, write audit records, or bypass Risk Assessor, Approval Gate, Action Executor, or Audit Logger.
 
 Live DeepSeek workflow smoke:
 

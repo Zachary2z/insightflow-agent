@@ -619,10 +619,10 @@ def _validate_analysis_planner(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"scenario_type": scenario_type, "analysis_steps": normalized_steps})
 
 
-def _validate_visualization_planner(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
-    prompt_id = "visualization_planner"
+def _validate_visualization_chart_spec(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "visualization_agent"
     if not isinstance(content, dict):
-        return _error(prompt_id, "visualization_planner output must be an object")
+        return _error(prompt_id, "chart_spec must be an object")
 
     blocked_fields = {
         "sql",
@@ -639,7 +639,7 @@ def _validate_visualization_planner(content: Any, schema_context: dict[str, Any]
     }
     leaked = sorted(blocked_fields & set(content))
     if leaked:
-        return _error(prompt_id, f"visualization_planner must not return blocked fields: {', '.join(leaked)}")
+        return _error(prompt_id, f"chart_spec must not return blocked fields: {', '.join(leaked)}")
 
     chart_type = str(content.get("chart_type", "")).strip().lower()
     allowed_chart_types = {
@@ -684,7 +684,7 @@ def _validate_visualization_planner(content: Any, schema_context: dict[str, Any]
     allowed_columns = set(schema_context.get("execution_columns", []))
     missing = [column for column in all_referenced if allowed_columns and column not in allowed_columns]
     if missing:
-        return _error(prompt_id, f"visualization_planner referenced missing execution columns: {', '.join(missing)}")
+        return _error(prompt_id, f"chart_spec referenced missing execution columns: {', '.join(missing)}")
 
     return _ok(
         prompt_id,
@@ -752,7 +752,7 @@ def _validate_visualization_agent(content: Any, schema_context: dict[str, Any]) 
     if not isinstance(chart_spec, dict):
         return _error(prompt_id, "chart_spec must be an object")
 
-    chart_validation = _validate_visualization_planner(chart_spec, schema_context)
+    chart_validation = _validate_visualization_chart_spec(chart_spec, schema_context)
     if not chart_validation.get("success"):
         return _error(prompt_id, chart_validation.get("error", "chart_spec validation failed"))
 
@@ -805,8 +805,6 @@ def validate_prompt_output(
         return _validate_sql_planning_router(content)
     if prompt_id == "analysis_planner":
         return _validate_analysis_planner(content)
-    if prompt_id == "visualization_planner":
-        return _validate_visualization_planner(content, context)
     if prompt_id == "visualization_agent":
         return _validate_visualization_agent(content, context)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
