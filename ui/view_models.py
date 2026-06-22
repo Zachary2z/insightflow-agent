@@ -17,6 +17,7 @@ from llm_ops.runtime_provider import (
     provider_report_writer_enabled,
     provider_sql_candidate_enabled,
     provider_sql_planning_enabled,
+    provider_visualization_agent_enabled,
 )
 
 
@@ -35,7 +36,15 @@ CAPABILITY_CATALOG: list[dict[str, Any]] = [
         "status": "available",
         "entrypoint": "run_report_generation_demo()",
         "requires_api_key": "no",
-        "safety_boundary": "Evidence Validator before Chart/Report output",
+        "safety_boundary": "Evidence Validator before visualization/report output",
+    },
+    {
+        "label": "Visualization Agent Delivery",
+        "phase": "P8",
+        "status": "provider-optional",
+        "entrypoint": "agents.visualization_agent.run_visualization_agent()",
+        "requires_api_key": "optional",
+        "safety_boundary": "Chart Validator, delivery policy, external visualization adapters",
     },
     {
         "label": "Weekly Business Review",
@@ -380,6 +389,31 @@ def build_artifact_panel(state: dict[str, Any]) -> list[dict[str, Any]]:
     return artifacts
 
 
+def build_visualization_delivery_summary(state: dict[str, Any]) -> dict[str, Any]:
+    raw_decision = state.get("visualization_decision", {}) or {}
+    raw_delivery = state.get("visualization_delivery_result", {}) or {}
+    decision = raw_decision if isinstance(raw_decision, dict) else {}
+    delivery = raw_delivery if isinstance(raw_delivery, dict) else {}
+    raw_chart_spec = decision.get("chart_spec", {}) or {}
+    chart_spec = raw_chart_spec if isinstance(raw_chart_spec, dict) else {}
+    artifact = str(delivery.get("artifact_url", "") or delivery.get("artifact_path", "") or "")
+    return {
+        "provider_called": bool(decision.get("provider_called", False)),
+        "fallback_used": bool(decision.get("fallback_used", False)),
+        "prompt_id": str(decision.get("prompt_id", "") or ""),
+        "delivery_tool_id": str(decision.get("delivery_tool_id", "") or delivery.get("delivery_tool_id", "") or ""),
+        "tool_reason": str(decision.get("tool_reason", "") or ""),
+        "chart_type": str(chart_spec.get("chart_type", "") or delivery.get("chart_type", "") or ""),
+        "external_tool_called": bool(delivery.get("external_tool_called", False)),
+        "tool_type": str(delivery.get("tool_type", "") or ""),
+        "artifact": artifact,
+        "data_row_count": int(delivery.get("data_row_count") or decision.get("data_row_count") or 0),
+        "fabricated_data": bool(delivery.get("fabricated_data", False)),
+        "validation_error": str(decision.get("validation_error", "") or ""),
+        "provider_error": str(decision.get("provider_error", "") or ""),
+    }
+
+
 def _rows_as_records(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
     columns = execution_result.get("columns", [])
     rows = execution_result.get("rows", [])
@@ -403,6 +437,7 @@ def build_run_detail_view_model(state: dict[str, Any]) -> dict[str, Any]:
         "sql_fix": state.get("sql_fix", {}),
         "evidence": evidence_result,
         "chart_paths": state.get("chart_paths") or ([state["chart_path"]] if state.get("chart_path") else []),
+        "visualization_delivery": build_visualization_delivery_summary(state),
         "report_path": state.get("report_path", "") or state.get("weekly_report_path", ""),
         "report_sections": state.get("report_sections", []),
         "report_sub_tasks": state.get("report_sub_tasks", []),
@@ -442,6 +477,7 @@ def build_llm_ops_summary(env: dict[str, str] | None = None, env_path: str | Pat
         "clarification_router": provider_clarification_router_enabled(values),
         "sql_planning_router": provider_sql_planning_enabled(values),
         "guarded_sql_candidate": provider_sql_candidate_enabled(values),
+        "visualization_agent": provider_visualization_agent_enabled(values),
         "business_review_planner": provider_business_review_planner_enabled(values),
         "report_writer": provider_report_writer_enabled(values),
         "insight_claim_typer": provider_claim_typing_enabled(values),

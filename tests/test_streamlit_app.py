@@ -162,6 +162,8 @@ def test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_art
             "prompt_id": "visualization_decision",
             "validation_error": "",
             "delivery_tool_id": "powerbi_publisher_mock",
+            "tool_reason": "Publish to external BI mock.",
+            "chart_spec": {"chart_type": "ranked_bar"},
         },
         "visualization_delivery_result": {
             "success": True,
@@ -169,6 +171,8 @@ def test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_art
             "tool_type": "mock_external_bi",
             "external_tool_called": True,
             "artifact_url": "mock://powerbi/run_1/chart",
+            "data_row_count": 1,
+            "fabricated_data": False,
             "policy_result": {"success": True, "validation_error": ""},
         },
         "action_plan": {"success": True, "source": "provider", "actions": []},
@@ -231,6 +235,13 @@ def test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_art
     assert gates["Evidence Validator"]["status"] == "passed"
     assert gates["Tool Policy"]["status"] == "passed"
     assert gates["Approval Gate"]["status"] == "approved"
+    visualization = view["visualization_delivery"]
+    assert visualization["delivery_tool_id"] == "powerbi_publisher_mock"
+    assert visualization["tool_type"] == "mock_external_bi"
+    assert visualization["external_tool_called"] is True
+    assert visualization["artifact"] == "mock://powerbi/run_1/chart"
+    assert visualization["data_row_count"] == 1
+    assert visualization["fabricated_data"] is False
     artifacts = {artifact["artifact_type"]: artifact for artifact in view["artifact_panel"]}
     assert artifacts["report"]["location"] == "reports/markdown/report.md"
     assert artifacts["trace"]["location"] == "logs/traces/run_1.json"
@@ -246,6 +257,7 @@ def test_no_key_llm_ops_status_shows_deterministic_not_configured():
     assert summary["provider"]["name"] == "DeepSeek"
     assert summary["provider"]["configured"] is False
     assert summary["provider"]["status"] == "deterministic / not configured"
+    assert summary["runtime_switches"]["visualization_agent"] is False
     assert summary["deterministic_baseline"]["available"] is True
 
 

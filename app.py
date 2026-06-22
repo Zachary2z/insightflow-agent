@@ -472,12 +472,13 @@ def _render_report_generation_view(st: Any, config: dict[str, Any]) -> None:
 
     result = st.session_state.get("report_demo_result")
     if not result:
-        st.info("运行后将展示 Evidence Validator、Chart Agent 和 Markdown Report 输出。")
+        st.info("运行后将展示 Evidence Validator、Visualization Agent delivery 和 Markdown Report 输出。")
         return
     st.metric("Workflow Status", result.get("status", "unknown"))
     st.metric("Evidence Unsupported Claim Rate", result.get("evidence_result", {}).get("unsupported_claim_rate", 0))
     summary = {
         "chart_path": result.get("chart_path", ""),
+        "visualization_delivery": result.get("visualization_delivery_result", {}),
         "report_path": result.get("report_path", ""),
         "trace_path": result.get("trace_path", ""),
     }
@@ -631,7 +632,7 @@ def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
         render_source_cards(st, view["sources"])
 
     st.subheader("Run Detail")
-    detail_tabs = st.tabs(["Intent", "SQL & Data", "Evidence", "Report", "Action", "Trace"])
+    detail_tabs = st.tabs(["Intent", "SQL & Data", "Evidence", "Visualization Delivery", "Report", "Action", "Trace"])
     with detail_tabs[0]:
         st.json(
             {
@@ -652,15 +653,29 @@ def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
         if view["chart_paths"]:
             st.dataframe([{"chart_path": path} for path in view["chart_paths"]], use_container_width=True, hide_index=True)
     with detail_tabs[3]:
+        visualization = view["visualization_delivery"]
+        render_metric_strip(
+            st,
+            {
+                "Delivery Tool": visualization.get("delivery_tool_id", ""),
+                "External Tool Called": visualization.get("external_tool_called", False),
+                "Fallback Used": visualization.get("fallback_used", False),
+                "Rows": visualization.get("data_row_count", 0),
+            },
+        )
+        if visualization.get("artifact"):
+            st.code(visualization["artifact"])
+        st.json(visualization, expanded=True)
+    with detail_tabs[4]:
         if view["report_path"]:
             st.code(view["report_path"])
         if view["report_sections"]:
             st.dataframe(view["report_sections"], use_container_width=True, hide_index=True)
         if view["report_sub_tasks"]:
             st.dataframe(view["report_sub_tasks"], use_container_width=True, hide_index=True)
-    with detail_tabs[4]:
-        st.json(view["action"], expanded=False)
     with detail_tabs[5]:
+        st.json(view["action"], expanded=False)
+    with detail_tabs[6]:
         if view["trace_path"]:
             st.code(view["trace_path"])
         render_trace_timeline(st, view["trace_timeline"])
