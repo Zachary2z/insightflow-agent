@@ -23,8 +23,9 @@ Update this table after every completed phase or task so the current project pos
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
+| P11 | General Data Analysis Product | `[x]` Complete | CSV/Excel/SQLite workspaces, profiling, semantic layer review, Next.js frontend, workspace-aware analysis, live DeepSeek acceptance, and old demo/mock cleanup complete. | P12 report productization |
 
-Current development position: **P10 MCP Contract & Lightweight Engineering Hardening is complete; future work should stay in regression or a newly selected next slice.**
+Current development position: **P11 General Data Analysis Product is complete; next planned slice is P12 report productization.**
 
 ## 1. Project Positioning
 

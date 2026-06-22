@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-22
+Last updated: 2026-06-23
 
 This file is the living development tracker for InsightFlow Agent. Update it after every completed task, test milestone, or scope change.
 
@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P10 - Lightweight Engineering Hardening complete |
-| Current task | P10 complete; next slice not selected |
-| Next planned task | Regression or a newly selected post-P10 slice |
-| Last completed task | P10 Lightweight Engineering Hardening |
-| Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
-| Active frontend | Streamlit |
-| Out of scope for current P10 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, final business product UI, and unguarded LLM-driven SQL/report/action execution |
+| Current phase | P11 - General Data Analysis Product complete |
+| Current task | P11 complete; ready for P12 report productization |
+| Next planned task | P12 report productization |
+| Last completed task | P11 General Data Analysis Product |
+| Main demo target | User workspace analysis over CSV, Excel, or SQLite data with profiling, semantic draft, validated SQL, evidence, charts, traces, and live DeepSeek acceptance |
+| Active frontend | Next.js + React + TypeScript |
+| Out of scope for current P11 | P12 automated report productization, P13 real Jira/Slack/Email/Power BI SaaS integrations, auth/RBAC, deployment, and unguarded LLM-driven execution |
 
 ## Phase Overview
 
@@ -42,6 +42,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.5 | Agent Pipeline UX | `[x]` Streamlit run summaries now expose agent pipeline, tool-call cards, validator gates, artifact panel, source metadata, provider prompt ids, fallback flags, policy status, and mock external artifact URLs from existing state/trace data | `[x]` P8.5 focused test red/green verified; Streamlit tests 19/19 passing; related regression 42/42 passing; full suite 240 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P9 | Realistic Eval And Demo Polish | `[x]` 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo questions complete | `[x]` focused P9 eval and Streamlit tests passing; full verification recorded below | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P10 | Lightweight Engineering Hardening | `[x]` external-safe MCP contract metadata, internal-tool exposure checks, eval artifact hygiene note, and generated-artifact ignore coverage complete | `[x]` focused tests, related regressions, full suite, eval, and legacy audit passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P11 | General Data Analysis Product | `[x]` workspace store/import/profile/semantic draft, synthetic workspace data, workspace-aware analysis, FastAPI workspace APIs, Next.js frontend scaffold/flow, live DeepSeek workspace acceptance, and old demo/mock cleanup complete | `[x]` backend suite 208 passed / 9 skipped; frontend 3/3 tests and production build passing; default live test skipped; opt-in live DeepSeek workspace acceptance passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 
 ## P0 - Agentic SQL Core
 

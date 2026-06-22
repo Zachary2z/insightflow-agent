@@ -1,12 +1,43 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
+InsightFlow Agent is a LangGraph-based multi-agent data analysis product.
 
-P0, P1, P2, P3, P4, P5, P6, P7, P8.1, P8.2, P8.3, P8.4, P8.5, P9, and the P10 lightweight hardening slice are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, draft insights from real query output, save trace artifacts, run a 32-case realistic eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports from explicit/provider-selected report sections, create provider-backed approval-gated action plans, expose selected tool capabilities through a P3/P10 external-safe MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, insight-drafting, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI and Jira-style publishing without network access, preserve SQL validation before any SQL execution, keep generated eval/report/trace/mock artifacts out of commits, and expose the cleaned agent/tool/validator/artifact path in Streamlit.
+InsightFlow Agent is now moving into P11 General Data Analysis Product development.
+
+The main product path is no longer the built-in ecommerce demo. P11 supports user workspaces backed by CSV, Excel, or SQLite imports, profiles the imported data, drafts a semantic layer, and runs DeepSeek-backed analysis over the workspace database with validated SQL, evidence-backed explanations, charts, and traces.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, P8.1 - Visualization Agent Dedupe & External Tool Calling, P8.2 - Intent & SQL Planning Agent Cleanup, P8.3 - Report & Insight Agent Cleanup, P8.4 - Action Agent & Tool Adapter Cleanup, P8.5 - Agent Pipeline UX, P9 - Realistic Eval And Demo Polish, and P10 - Lightweight Engineering Hardening are complete.
+P11 - General Data Analysis Product is complete for the current implementation slice: workspace store/import/profile/semantic draft, workspace-aware analysis, FastAPI workspace APIs, Next.js frontend scaffold and flow components, live DeepSeek workspace acceptance, and cleanup of replaced demo/mock product tests.
+
+P0-P10 remain as historical development phases and safety-boundary context. Any Streamlit, ecommerce demo, old eval, mock Jira, or action-demo references below this point are historical unless they explicitly describe a retained validator/tool boundary.
+
+## P11 Product Dev
+
+Backend:
+
+```bash
+uvicorn api.app:app --reload
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Live DeepSeek acceptance:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
+python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+```
 
 Implemented:
 

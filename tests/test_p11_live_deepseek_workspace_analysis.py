@@ -24,6 +24,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _require_live_deepseek_workspace_flags() -> None:
+    os.environ["INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER"] = "0"
     config = load_deepseek_config(require_api_key=True)
     if not config.success:
         pytest.skip("Set DEEPSEEK_API_KEY to run the live P11 workspace acceptance test.")
