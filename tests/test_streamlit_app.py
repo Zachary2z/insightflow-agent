@@ -281,6 +281,22 @@ def test_run_detail_view_model_exposes_vertical_section_order_for_block_layout()
     assert view["run_sections"][3]["summary"] == "Visualization Agent decision, delivery tool, artifact, and data hygiene."
 
 
+def test_command_center_home_sections_make_pre_run_layout_understandable():
+    from ui.view_models import build_command_center_sections
+
+    sections = build_command_center_sections()
+
+    assert [section["id"] for section in sections] == [
+        "ask",
+        "workflow_mode",
+        "run_output",
+    ]
+    assert sections[0]["title"] == "01 · Ask"
+    assert "business question" in sections[0]["summary"].lower()
+    assert sections[1]["title"] == "02 · Workflow Mode"
+    assert "visualization delivery" in sections[2]["summary"].lower()
+
+
 def test_no_key_llm_ops_status_shows_deterministic_not_configured():
     from ui.view_models import build_llm_ops_summary
 

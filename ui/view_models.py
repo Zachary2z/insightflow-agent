@@ -166,9 +166,31 @@ RUN_DETAIL_SECTIONS: list[dict[str, str]] = [
     },
 ]
 
+COMMAND_CENTER_SECTIONS: list[dict[str, str]] = [
+    {
+        "id": "ask",
+        "title": "01 · Ask",
+        "summary": "Enter the business question and confirm the data/trace context.",
+    },
+    {
+        "id": "workflow_mode",
+        "title": "02 · Workflow Mode",
+        "summary": "Choose whether this run should focus on SQL analysis, evidence reporting, business review, or actions.",
+    },
+    {
+        "id": "run_output",
+        "title": "03 · Run Output",
+        "summary": "After running, results appear as answer, data, visualization delivery, evidence, actions, and trace blocks.",
+    },
+]
+
 
 def build_capability_overview() -> list[dict[str, Any]]:
     return [dict(item) for item in CAPABILITY_CATALOG]
+
+
+def build_command_center_sections() -> list[dict[str, str]]:
+    return [dict(section) for section in COMMAND_CENTER_SECTIONS]
 
 
 def _source_label(source: str, provider_called: bool, fallback_used: bool) -> str:

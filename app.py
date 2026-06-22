@@ -36,6 +36,7 @@ from ui.components import (
 )
 from ui.view_models import (
     build_capability_overview as build_command_center_capability_overview,
+    build_command_center_sections,
     build_llm_ops_summary,
     build_observability_view_model,
     build_run_detail_view_model,
@@ -605,6 +606,13 @@ def _section(view: dict[str, Any], section_id: str) -> dict[str, str]:
     return {"id": section_id, "title": section_id.replace("_", " ").title(), "summary": ""}
 
 
+def _section_from_list(sections: list[dict[str, str]], section_id: str) -> dict[str, str]:
+    for section in sections:
+        if section.get("id") == section_id:
+            return section
+    return {"id": section_id, "title": section_id.replace("_", " ").title(), "summary": ""}
+
+
 def _render_block_header(st: Any, section: dict[str, str]) -> None:
     st.divider()
     st.subheader(section["title"])
@@ -701,21 +709,39 @@ def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
 
 def _render_command_center(st: Any, config: dict[str, Any]) -> None:
     sync_selected_question(st.session_state, config["selected_question"])
+    sections = build_command_center_sections()
+    provider = build_llm_ops_summary()["provider"]
+
+    _render_block_header(st, _section_from_list(sections, "ask"))
+    st.caption(f"Provider: {provider['status']} | deterministic baseline: available")
     question = st.text_area(
         "Business question",
         key="question_input",
         height=96,
         placeholder="最近 30 天销售额最高的 5 个商品是什么？",
     )
+    context_cols = st.columns(2)
+    context_cols[0].caption(f"SQLite database: {config['db_path']}")
+    context_cols[1].caption(f"Trace directory: {config['trace_dir']}")
+
+    _render_block_header(st, _section_from_list(sections, "workflow_mode"))
     run_type = st.radio(
         "Run type",
         ["SQL analysis", "Evidence report", "Business review", "Action workflow"],
         horizontal=True,
     )
+    st.caption(
+        {
+            "SQL analysis": "Answer a data question with guarded SQL, execution, evidence, and visualization.",
+            "Evidence report": "Generate an evidence-backed report with visualization artifacts.",
+            "Business review": "Run the multi-section weekly business review workflow.",
+            "Action workflow": "Draft approval-gated operational actions from evidence.",
+        }[run_type]
+    )
     controls = st.columns(3)
-    run_clicked = controls[0].button("Run analysis", type="primary")
-    report_clicked = controls[1].button("Generate report")
-    action_clicked = controls[2].button("Draft actions")
+    run_clicked = controls[0].button("Run selected workflow", type="primary")
+    report_clicked = controls[1].button("Generate evidence report")
+    action_clicked = controls[2].button("Draft approval actions")
 
     if run_clicked:
         with st.spinner("Running command center analysis..."):
@@ -751,13 +777,15 @@ def _render_command_center(st: Any, config: dict[str, Any]) -> None:
         with st.spinner("Drafting approval-gated actions..."):
             st.session_state["command_center_result"] = run_action_workflow_demo(approved=False)
 
-    provider = build_llm_ops_summary()["provider"]
-    st.caption(f"Provider: {provider['status']} | deterministic baseline: available")
+    _render_block_header(st, _section_from_list(sections, "run_output"))
     result = st.session_state.get("command_center_result")
     if result:
         _render_run_summary(st, result)
     else:
-        st.info("Run a workflow to inspect answer, SQL, evidence, report, action, and trace in one place.")
+        st.info(
+            "Run a workflow to inspect the answer, SQL/data, Visualization Delivery, Evidence & Report, "
+            "Action & Approval, and Trace & System Details blocks."
+        )
 
 
 def _render_reports_page(st: Any, config: dict[str, Any]) -> None:
