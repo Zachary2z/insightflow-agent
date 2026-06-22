@@ -94,6 +94,22 @@ def test_prompt_registry_renders_action_drafter_prompt_with_approval_boundary():
     assert "库存不足" in result["prompt"]
 
 
+def test_question_understanding_prompt_distinguishes_delivery_from_unsafe_operations():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    result = DEFAULT_PROMPT_REGISTRY.render(
+        "question_understanding",
+        {
+            "user_question": "最近 30 天销售额最高的 5 个商品是什么？请生成适合财务复核的可视化交付物。",
+        },
+    )
+
+    assert result["success"] is True
+    assert "chart/report/export/draft delivery" in result["prompt"]
+    assert "not unsafe_operation" in result["prompt"]
+    assert "sending externally" in result["prompt"]
+
+
 def test_prompt_registry_returns_structured_error_for_missing_variables():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 

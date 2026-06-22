@@ -190,6 +190,74 @@ def test_validated_request_returns_structured_error_for_schema_mismatch():
     assert result["trace_event"]["error_type"] == "llm_schema_validation_error"
 
 
+def test_guarded_sql_candidate_normalizes_safe_sql_string_and_alias_shapes():
+    from llm_ops.structured_output import validate_prompt_output
+
+    string_result = validate_prompt_output(
+        "guarded_sql_candidate",
+        {
+            "sql_candidates": [
+                "SELECT city, COUNT(*) AS order_count FROM orders GROUP BY city LIMIT 20",
+            ]
+        },
+    )
+    alias_result = validate_prompt_output(
+        "guarded_sql_candidate",
+        {
+            "sql_candidates": [
+                {
+                    "query": "SELECT product_name, SUM(gmv) AS gmv FROM product_sales GROUP BY product_name LIMIT 5",
+                    "reason": "Top product GMV candidate.",
+                }
+            ]
+        },
+    )
+
+    assert string_result["success"] is True
+    assert string_result["content"]["sql_candidates"] == [
+        {
+            "sql": "SELECT city, COUNT(*) AS order_count FROM orders GROUP BY city LIMIT 20",
+            "rationale": "",
+        }
+    ]
+    assert alias_result["success"] is True
+    assert alias_result["content"]["sql_candidates"] == [
+        {
+            "sql": "SELECT product_name, SUM(gmv) AS gmv FROM product_sales GROUP BY product_name LIMIT 5",
+            "rationale": "Top product GMV candidate.",
+        }
+    ]
+
+
+def test_visualization_agent_normalizes_explanation_basis_string():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "visualization_agent",
+        {
+            "chart_spec": {
+                "chart_type": "ranked_bar",
+                "title": "Top products",
+                "x": "product_name",
+                "y": "gmv",
+                "y_secondary": "",
+                "series": "",
+                "required_columns": ["product_name", "gmv"],
+                "explanation_basis": "supported_findings",
+            },
+            "delivery_tool_id": "local_renderer",
+            "tool_reason": "Quick local review.",
+        },
+        schema_context={
+            "execution_columns": ["product_name", "gmv"],
+            "delivery_tool_ids": ["local_renderer", "excel_exporter", "powerbi_publisher_mock"],
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["chart_spec"]["explanation_basis"] == ["supported_findings"]
+
+
 def test_malformed_json_returns_structured_error_without_crashing():
     from llm_ops.provider import LLMRequest, MockLLMProvider, run_llm_request
 

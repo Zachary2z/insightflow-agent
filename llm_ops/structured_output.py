@@ -81,12 +81,15 @@ def _validate_guarded_sql_candidate(content: Any) -> dict[str, Any]:
 
     normalized = []
     for index, item in enumerate(candidates):
+        if isinstance(item, str):
+            item = {"sql": item, "rationale": ""}
         if not isinstance(item, dict):
             return _error("guarded_sql_candidate", f"sql_candidates[{index}] must be an object")
-        sql = str(item.get("sql", "")).strip()
+        sql = str(item.get("sql") or item.get("query") or item.get("sql_query") or "").strip()
         if not sql:
             return _error("guarded_sql_candidate", f"sql_candidates[{index}].sql is required")
-        normalized.append({"sql": sql, "rationale": str(item.get("rationale", "")).strip()})
+        rationale = str(item.get("rationale") or item.get("reason") or "").strip()
+        normalized.append({"sql": sql, "rationale": rationale})
     return _ok("guarded_sql_candidate", {"sql_candidates": normalized})
 
 
@@ -358,6 +361,13 @@ def _string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
         if item:
             normalized.append(item)
     return True, normalized, ""
+
+
+def _string_or_string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
+    if isinstance(value, str):
+        item = value.strip()
+        return True, [item] if item else [], ""
+    return _string_list(value, field_name)
 
 
 def _validate_question_understanding(content: Any) -> dict[str, Any]:
@@ -670,7 +680,7 @@ def _validate_visualization_chart_spec(content: Any, schema_context: dict[str, A
     required_ok, required_columns, message = _string_list(content.get("required_columns", []), "required_columns")
     if not required_ok:
         return _error(prompt_id, message)
-    explanation_ok, explanation_basis, message = _string_list(
+    explanation_ok, explanation_basis, message = _string_or_string_list(
         content.get("explanation_basis", []),
         "explanation_basis",
     )

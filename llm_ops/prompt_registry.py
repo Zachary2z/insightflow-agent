@@ -138,7 +138,10 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Metric context: {metric_context}\n"
                 "Business context: {business_context}\n"
                 "Current deterministic SQL: {current_deterministic_sql}\n"
-                "Return JSON with sql_candidates only.\n"
+                "Return ONLY a JSON object with sql_candidates. Do not wrap it in markdown.\n"
+                "Exact schema: {{\"sql_candidates\": [{{\"sql\": \"single SELECT statement\", "
+                "\"rationale\": \"short reason grounded in schema and metric context\"}}]}}.\n"
+                "sql_candidates must be an array of objects, not an array of strings. The SQL key must be sql.\n"
                 "Safety: never execute SQL, never bypass validate_sql, never access sensitive fields, "
                 "and never use DML or DDL."
             ),
@@ -294,7 +297,10 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Intent schema: metric, dimension, and operation are strings or null; time_range is an object or null; "
                 "filters is a string array; limit is an integer or null; risk_flags is a string array.\n"
                 "Safety: do not generate SQL, do not execute SQL, do not select matched_template, "
-                "and preserve sensitive_field, unsafe_operation, or bulk_export risk flags."
+                "and preserve sensitive_field, unsafe_operation, or bulk_export risk flags. "
+                "A request for chart/report/export/draft delivery from already analyzed results is not unsafe_operation; "
+                "mark unsafe_operation only for data mutation, credential access, approval bypass, "
+                "or sending externally without approval."
             ),
         ),
         PromptTemplate(
@@ -448,6 +454,9 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "chart_spec schema: chart_type, title, x, y, y_secondary, series, required_columns, "
                 "and explanation_basis. Allowed chart_type values: ranked_bar, line, grouped_bar, "
                 "dual_axis_line, funnel, heatmap, scatter, risk_matrix.\n"
+                "required_columns and explanation_basis must be arrays of strings, for example "
+                "\"required_columns\": [\"product_name\", \"gmv\"] and "
+                "\"explanation_basis\": [\"supported_findings\"].\n"
                 "Allowed delivery_tool_id values: local_renderer, excel_exporter, powerbi_publisher_mock.\n"
                 "Safety: reference only execution columns; select only a known delivery tool; do not generate "
                 "SQL, final claims, final answers, action payloads, approval fields, credentials, secrets, "
