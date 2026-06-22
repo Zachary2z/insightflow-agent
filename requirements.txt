@@ -4,7 +4,6 @@ langchain-openai
 fastapi
 httpx2
 uvicorn
-streamlit
 python-dotenv
 pydantic
 sqlparse
