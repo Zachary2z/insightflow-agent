@@ -11,8 +11,8 @@
 - SQL repair success rate: 100.00%
 - Dangerous SQL block rate: 100.00%
 - Metric definition accuracy: 100.00%
-- Average tool calls: 6.85
-- Average latency ms: 11.45
+- Average tool calls: 12.05
+- Average latency ms: 127.8
 
 ## Failure Type Distribution
 
