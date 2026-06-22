@@ -20,11 +20,11 @@ Update this table after every completed phase or task so the current project pos
 | P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` Complete | Provider-backed question understanding and SQL planning are the product path when configured; unsafe/sensitive guards run before providers; provider failures return explicit `provider_unavailable`; provider `llm_candidate` skips `sql_generator.py`; provider templates render by matched template id. | Regression only |
 | P8.3 | Report & Insight Agent Cleanup | `[x]` Complete | Provider-backed report planning is the product path for section selection; provider-unavailable plans do not auto-select fixed sections; `insight_drafter` now drafts candidate claims before claim typing/Evidence Validator. | Regression only |
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` Complete | Fixed action templates are removed from the product path; provider-backed action planning now selects contextual action payloads and delivery tools; execution moved to `agents/action_executor.py` and `action_delivery/` adapters behind approval/audit. | Regression only |
-| P8.5 | Agent Pipeline UX | `[ ]` Next | Not started. | Make the cleaned multi-agent/tool-calling path visible after P8.1-P8.4 land |
-| P9 | Realistic Eval And Demo Polish | `[ ]` Later | Not started. | Add scenario eval and demo polish after the cleanup path is stable |
+| P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
+| P9 | Realistic Eval And Demo Polish | `[ ]` Next | Not started. | Add scenario eval and demo polish after the cleanup path is stable |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Later | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
 
-Current development position: **P8.4 Action Agent & Tool Adapter Cleanup is complete; P8.5 Agent Pipeline UX is next.**
+Current development position: **P8.5 Agent Pipeline UX is complete; P9 Realistic Eval And Demo Polish is next.**
 
 ## 1. Project Positioning
 
@@ -456,8 +456,8 @@ The next task should be selected from the P4-P10 platform evolution roadmap. Do 
 | Done | P8.2 Intent & SQL Planning Agent Cleanup | Replace keyword-heavy intent and SQL routing with LLM-first agents while preserving SQL Validator and SQL Executor boundaries. |
 | Done | P8.3 Report & Insight Agent Cleanup | Replace fixed report sections and template insight generation with LLM-first planning/drafting gated by Evidence Validator. |
 | Done | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
-| Next | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
-| Later | P9 Realistic Eval And Demo Polish | Add eval/demo cases for realistic cleaned agent paths and external-tool traces. |
+| Done | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
+| Next | P9 Realistic Eval And Demo Polish | Add eval/demo cases for realistic cleaned agent paths and external-tool traces. |
 | Later | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
 
 ## 10.1 P8.1 Visualization Agent Dedupe & External Tool Calling
@@ -621,6 +621,8 @@ Status: complete. `agents/action_planner.py` no longer builds fixed action templ
 
 Goal: after P8.1-P8.4 backend cleanup is complete, update Streamlit so users can clearly see the multi-agent and tool-calling path.
 
+Status: complete. `ui/view_models.py` now builds agent pipeline, tool-call, validator-gate, and artifact-panel structures from existing workflow state/trace data. `app.py` renders those panels in the Command Center run summary, and `ui/components.py` contains reusable table renderers.
+
 ### P8.5 Scope
 
 | UI area | Files likely affected | Development change |
@@ -632,10 +634,10 @@ Goal: after P8.1-P8.4 backend cleanup is complete, update Streamlit so users can
 
 ### P8.5 Acceptance
 
-- The UI makes the cleaned agent/tool/validator path visible.
-- Provider, fallback, validation, and tool-call metadata are easy to inspect.
-- No backend safety boundary is changed by the UI work.
-- Relevant Streamlit tests remain passing; full pytest and P0 eval run at P8.5 completion.
+- `[x]` The UI makes the cleaned agent/tool/validator path visible.
+- `[x]` Provider, fallback, validation, and tool-call metadata are easy to inspect.
+- `[x]` No backend safety boundary is changed by the UI work.
+- `[x]` Relevant Streamlit tests remain passing; full pytest and P0 eval run at P8.5 completion.
 
 ## 11. Final LLM Participation Boundary
 

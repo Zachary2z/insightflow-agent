@@ -24,11 +24,15 @@ from mcp_servers.report_server import get_tool_contract as get_report_mcp_contra
 from tools.approval_tool import record_approval
 from tools.action_tool import DEFAULT_ACTION_DB_PATH
 from ui.components import (
+    render_agent_pipeline,
+    render_artifact_panel,
     render_capability_catalog,
     render_json_expander,
     render_metric_strip,
     render_source_cards,
+    render_tool_call_cards,
     render_trace_timeline,
+    render_validator_gates,
 )
 from ui.view_models import (
     build_capability_overview as build_command_center_capability_overview,
@@ -613,8 +617,18 @@ def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
             st.error(view["answer"])
 
     st.subheader("Source & Safety")
-    render_source_cards(st, view["sources"])
-    st.dataframe(view["safety_boundaries"], use_container_width=True, hide_index=True)
+    safety_tabs = st.tabs(["Agent Pipeline", "Tool Calls", "Validator Gates", "Artifacts", "Source Metadata"])
+    with safety_tabs[0]:
+        render_agent_pipeline(st, view["agent_pipeline"])
+    with safety_tabs[1]:
+        render_tool_call_cards(st, view["tool_call_cards"])
+    with safety_tabs[2]:
+        render_validator_gates(st, view["validator_gates"])
+        st.dataframe(view["safety_boundaries"], use_container_width=True, hide_index=True)
+    with safety_tabs[3]:
+        render_artifact_panel(st, view["artifact_panel"])
+    with safety_tabs[4]:
+        render_source_cards(st, view["sources"])
 
     st.subheader("Run Detail")
     detail_tabs = st.tabs(["Intent", "SQL & Data", "Evidence", "Report", "Action", "Trace"])

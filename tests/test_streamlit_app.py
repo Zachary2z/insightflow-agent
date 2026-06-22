@@ -141,6 +141,103 @@ def test_trace_timeline_view_model_preserves_glass_box_fields():
     ]
 
 
+def test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_artifacts():
+    from ui.view_models import build_run_detail_view_model
+
+    state = {
+        "status": "completed",
+        "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
+        "generated_sql": "SELECT product_name, gmv FROM product_sales",
+        "review_result": {"approved": True, "reason": "safe select"},
+        "execution_result": {
+            "success": True,
+            "columns": ["product_name", "gmv"],
+            "rows": [["Laptop", 1000.0]],
+            "row_count": 1,
+        },
+        "evidence_result": {"success": True, "unsupported_claim_rate": 0.0},
+        "visualization_decision": {
+            "provider_called": True,
+            "fallback_used": False,
+            "prompt_id": "visualization_decision",
+            "validation_error": "",
+            "delivery_tool_id": "powerbi_publisher_mock",
+        },
+        "visualization_delivery_result": {
+            "success": True,
+            "delivery_tool_id": "powerbi_publisher_mock",
+            "tool_type": "mock_external_bi",
+            "external_tool_called": True,
+            "artifact_url": "mock://powerbi/run_1/chart",
+            "policy_result": {"success": True, "validation_error": ""},
+        },
+        "action_plan": {"success": True, "source": "provider", "actions": []},
+        "risk_assessment": {"requires_approval": True, "actions": []},
+        "approval_status": "approved",
+        "action_execution_result": {
+            "success": True,
+            "external_tool_called": True,
+            "delivery_results": [
+                {
+                    "success": True,
+                    "delivery_tool_id": "jira_ticket_mock",
+                    "tool_type": "mock_external_ticketing",
+                    "external_tool_called": True,
+                    "artifact_url": "mock://jira/run_1/ticket",
+                    "policy_result": {"success": True, "validation_error": ""},
+                }
+            ],
+        },
+        "audit_log_id": "audit_1",
+        "report_path": "reports/markdown/report.md",
+        "trace_path": "logs/traces/run_1.json",
+        "trace": [
+            {
+                "node": "question_understanding_agent",
+                "tool_name": "provider_backed_question_understanding",
+                "status": "success",
+                "provider_called": True,
+                "fallback_used": False,
+                "prompt_id": "question_understanding",
+            },
+            {
+                "node": "sql_reviewer_agent",
+                "tool_name": "validate_sql",
+                "status": "success",
+            },
+            {
+                "node": "visualization_agent",
+                "tool_name": "external_visualization_tool",
+                "status": "success",
+                "external_tool_called": True,
+            },
+            {
+                "node": "approval_gate",
+                "tool_name": "log_audit_event",
+                "status": "success",
+            },
+        ],
+    }
+
+    view = build_run_detail_view_model(state)
+
+    assert view["agent_pipeline"][0]["agent"] == "question_understanding_agent"
+    assert view["agent_pipeline"][0]["prompt_id"] == "question_understanding"
+    assert any(card["tool_name"] == "validate_sql" for card in view["tool_call_cards"])
+    assert any(card["delivery_tool_id"] == "powerbi_publisher_mock" for card in view["tool_call_cards"])
+    assert any(card["delivery_tool_id"] == "jira_ticket_mock" for card in view["tool_call_cards"])
+    gates = {gate["gate"]: gate for gate in view["validator_gates"]}
+    assert gates["SQL Validator"]["status"] == "passed"
+    assert gates["Evidence Validator"]["status"] == "passed"
+    assert gates["Tool Policy"]["status"] == "passed"
+    assert gates["Approval Gate"]["status"] == "approved"
+    artifacts = {artifact["artifact_type"]: artifact for artifact in view["artifact_panel"]}
+    assert artifacts["report"]["location"] == "reports/markdown/report.md"
+    assert artifacts["trace"]["location"] == "logs/traces/run_1.json"
+    assert artifacts["mock_external_bi"]["location"] == "mock://powerbi/run_1/chart"
+    assert artifacts["audit"]["location"] == "audit_1"
+
+
 def test_no_key_llm_ops_status_shows_deterministic_not_configured():
     from ui.view_models import build_llm_ops_summary
 

@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P8.4 - Action Agent & Tool Adapter Cleanup complete |
-| Current task | P8.4 complete; P8.5 is next |
-| Next planned task | P8.5 - Agent Pipeline UX |
-| Last completed task | P8.4 Action Agent & Tool Adapter Cleanup |
+| Current phase | P8.5 - Agent Pipeline UX complete |
+| Current task | P8.5 complete; P9 is next |
+| Next planned task | P9 - Realistic Eval And Demo Polish |
+| Last completed task | P8.5 Agent Pipeline UX |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P8.4 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
+| Out of scope for current P8.5 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -39,8 +39,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` provider-backed question understanding and SQL planning are the configured product paths; safety guard rejects unsafe/sensitive questions before provider calls; provider failures return `provider_unavailable`; provider `llm_candidate` paths skip `sql_generator.py`; provider template paths render by matched template id | `[x]` P8.2 focused tests 5/5 passing; related intent/SQL planning regression 47/47 passing; full suite 228 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.3 | Report & Insight Agent Cleanup | `[x]` provider-backed report planning no longer falls back to fixed section selection; Report Supervisor stops on `provider_unavailable` unless sections are explicitly supplied; `insight_drafter` prompt/schema/runtime wiring drafts candidate claims before claim typing/Evidence Validator | `[x]` P8.3 focused tests 6/6 passing; related report/insight/runtime regression 71/71 passing; full suite 234 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` fixed action templates removed from the product path; provider-backed action planning returns contextual action payloads plus delivery-tool ids; missing providers return structured `provider_unavailable`; `agents/action_executor.py` owns approved execution through `action_delivery/` adapters | `[x]` P8.4 focused tests 5/5 passing; action/provider regression 30/30 passing; related regression 40/40 passing; full suite 239 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P8.5 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P8.5 | Agent Pipeline UX | `[x]` Streamlit run summaries now expose agent pipeline, tool-call cards, validator gates, artifact panel, source metadata, provider prompt ids, fallback flags, policy status, and mock external artifact URLs from existing state/trace data | `[x]` P8.5 focused test red/green verified; Streamlit tests 19/19 passing; related regression 42/42 passing; full suite 240 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
 | P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 
 ## P0 - Agentic SQL Core
@@ -577,12 +577,13 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 - `[ ]` Add focused tests for provider success, provider malformed output, unsafe provider output, missing columns, unknown tool ids, real-row export/rendering, mock external publish trace, and retained workflow safety boundaries.
 - `[ ]` Run full pytest and P0 eval at P8.1 completion or before commit/push, not after every small edit or for deleted legacy behavior.
 
-### P8.2-P8.4 Cleanup Program Status
+### P8.2-P8.5 Cleanup Program Status
 
 - `[x]` P8.2 Intent & SQL Planning Agent Cleanup is complete: provider-backed intent and SQL planning are the configured product paths, unsafe/sensitive guards run before provider calls, provider failures return `provider_unavailable`, and provider candidate SQL still requires validation/review.
 - `[x]` P8.3 Report & Insight Agent Cleanup is complete: provider-backed report planning is the product path for section selection, provider-unavailable plans do not auto-select fixed sections, Report Supervisor remains an orchestrator, and `insight_drafter` feeds candidate claims into claim typing/Evidence Validator.
 - `[x]` P8.4 Action Agent & Tool Adapter Cleanup is complete: `agents/action_planner.py` no longer emits fixed action templates in the product path, provider output drafts contextual actions plus `delivery_tool_id`, provider-unavailable mode is structured, `agents/action_executor.py` is split from Risk Assessor, and `action_delivery/` executes local SQLite plus mock Jira-style adapters only after approval.
-- `[ ]` P8.5 Agent Pipeline UX is next now that P8.1-P8.4 backend cleanup is complete.
+- `[x]` P8.5 Agent Pipeline UX is complete: Streamlit Command Center exposes the cleaned agent pipeline, tool-call cards, validator gates, artifact panel, and source metadata without changing workflow execution or safety boundaries.
+- `[ ]` P9 Realistic Eval And Demo Polish is next.
 
 ## Update Rules
 
@@ -596,6 +597,18 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P8.5 verification:
+
+```bash
+python3 -m pytest tests/test_streamlit_app.py::test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_artifacts -q
+python3 -m pytest tests/test_streamlit_app.py -q
+python3 -m pytest tests/test_streamlit_app.py tests/test_workflow.py tests/test_visualization_agent_external_tools.py tests/test_action_agent_tool_adapter_cleanup.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: P8.5 red/green focused test first failed on missing `agent_pipeline` and then passed after implementation; Streamlit tests report 19/19 passed; related Streamlit/workflow/visualization/action regression reports 42/42 passed; the default full suite reports 240 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. P8.5 exposes agent pipeline, tool calls, validator gates, artifacts, provider prompts, fallback flags, policy status, and mock external URLs in Streamlit without changing backend safety boundaries.
 
 P8.4 verification:
 

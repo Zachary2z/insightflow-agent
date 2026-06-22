@@ -100,6 +100,7 @@ SOURCE_FIELDS: list[tuple[str, str, str]] = [
     ("Clarification Router", "clarification_result", "Stops incomplete provider clarification before SQL"),
     ("SQL Planning Router", "sql_planning", "Routes source but cannot return executable SQL directly"),
     ("Guarded SQL Candidate", "llm_sql_enhancement", "Accepted candidates still require validate_sql() and SQL Reviewer"),
+    ("Visualization Agent", "visualization_decision", "Chooses chart/delivery only; validators and policies execute tools"),
     ("Report Planner", "report_plan", "Selects allowlisted report sections only"),
     ("Claim Typing", "claim_typing_result", "Advisory only; Evidence Validator decides final evidence"),
     ("Report Writer", "report_writer_result", "Can polish only Evidence Validator-approved material"),
@@ -111,6 +112,8 @@ SAFETY_BOUNDARIES = [
     {"boundary": "SQL Reviewer", "status": "mandatory", "owner": "graph.review"},
     {"boundary": "SQL Execution", "status": "tool-owned", "owner": "run_sql()"},
     {"boundary": "Evidence Validator", "status": "mandatory before reports/actions", "owner": "agents.evidence_validator"},
+    {"boundary": "Chart Validator", "status": "mandatory before visualization delivery", "owner": "visualization.chart_validator"},
+    {"boundary": "Tool Policy", "status": "mandatory before external delivery adapters", "owner": "visualization_delivery/action_delivery"},
     {"boundary": "Approval Gate", "status": "mandatory for action creation", "owner": "tools.approval_tool"},
     {"boundary": "Audit Logger", "status": "mandatory for action workflow", "owner": "tools.audit_logger"},
     {"boundary": "Trace Logger", "status": "mandatory", "owner": "tools.trace_logger"},
@@ -184,6 +187,199 @@ def build_trace_timeline(state_or_trace: dict[str, Any] | list[dict[str, Any]]) 
     return timeline
 
 
+def _step_kind(event: dict[str, Any]) -> str:
+    node = str(event.get("node", "") or "").lower()
+    tool_name = str(event.get("tool_name", "") or "")
+    if "validator" in node or tool_name in {"validate_sql"}:
+        return "validator_gate"
+    if "approval" in node or "audit" in node:
+        return "approval_audit_gate"
+    if tool_name:
+        return "tool_call"
+    return "agent_decision"
+
+
+def build_agent_pipeline(state: dict[str, Any]) -> list[dict[str, Any]]:
+    pipeline = []
+    for index, event in enumerate(state.get("trace", []) or [], start=1):
+        pipeline.append(
+            {
+                "step": index,
+                "agent": str(event.get("node", "") or ""),
+                "kind": _step_kind(event),
+                "tool_name": str(event.get("tool_name", "") or ""),
+                "status": str(event.get("status", "") or ""),
+                "provider_called": bool(event.get("provider_called", False)),
+                "fallback_used": bool(event.get("fallback_used", False)),
+                "prompt_id": str(event.get("prompt_id", "") or event.get("provider_prompt_id", "") or ""),
+                "validation_error": str(event.get("validation_error", "") or ""),
+                "provider_error": str(event.get("provider_error", "") or ""),
+                "error": str(event.get("error", "") or ""),
+            }
+        )
+    return pipeline
+
+
+def _tool_category(tool_name: str) -> str:
+    if tool_name in {"get_database_schema", "retrieve_metric_definition"}:
+        return "context_tool"
+    if tool_name in {"validate_sql", "run_sql"}:
+        return "sql_tool"
+    if "chart" in tool_name or "visualization" in tool_name:
+        return "visualization_tool"
+    if "audit" in tool_name or "approval" in tool_name:
+        return "approval_audit_tool"
+    return "tool"
+
+
+def _delivery_tool_cards(state: dict[str, Any]) -> list[dict[str, Any]]:
+    cards = []
+    delivery_results = []
+    visualization_delivery = state.get("visualization_delivery_result", {})
+    if isinstance(visualization_delivery, dict) and visualization_delivery:
+        delivery_results.append(visualization_delivery)
+    action_execution = state.get("action_execution_result", {})
+    if isinstance(action_execution, dict):
+        delivery_results.extend(action_execution.get("delivery_results", []) or [])
+
+    for result in delivery_results:
+        if not isinstance(result, dict):
+            continue
+        cards.append(
+            {
+                "tool_name": str(result.get("delivery_tool_id", "") or ""),
+                "tool_category": "delivery_adapter",
+                "delivery_tool_id": str(result.get("delivery_tool_id", "") or ""),
+                "tool_type": str(result.get("tool_type", "") or ""),
+                "status": "success" if result.get("success") else "error",
+                "external_tool_called": bool(result.get("external_tool_called", False)),
+                "artifact": str(result.get("artifact_url", "") or result.get("artifact_path", "") or ""),
+                "policy_status": "passed" if (result.get("policy_result", {}) or {}).get("success", False) else "failed",
+                "error": str(result.get("error", "") or (result.get("policy_result", {}) or {}).get("validation_error", "") or ""),
+            }
+        )
+    return cards
+
+
+def build_tool_call_cards(state: dict[str, Any]) -> list[dict[str, Any]]:
+    cards = []
+    for event in state.get("trace", []) or []:
+        tool_name = str(event.get("tool_name", "") or "")
+        if not tool_name:
+            continue
+        cards.append(
+            {
+                "tool_name": tool_name,
+                "tool_category": _tool_category(tool_name),
+                "delivery_tool_id": "",
+                "tool_type": "",
+                "status": str(event.get("status", "") or ""),
+                "external_tool_called": bool(event.get("external_tool_called", False)),
+                "artifact": "",
+                "policy_status": "",
+                "error": str(event.get("error", "") or ""),
+            }
+        )
+    cards.extend(_delivery_tool_cards(state))
+    return cards
+
+
+def _gate_status_from_bool(value: Any) -> str:
+    if value is True:
+        return "passed"
+    if value is False:
+        return "failed"
+    return "not run"
+
+
+def build_validator_gates(state: dict[str, Any]) -> list[dict[str, Any]]:
+    review = state.get("review_result", {}) or {}
+    evidence = state.get("evidence_result", {}) or {}
+    visualization = state.get("visualization_decision", {}) or {}
+    delivery_cards = _delivery_tool_cards(state)
+    policy_failures = [card for card in delivery_cards if card["policy_status"] == "failed"]
+    policy_seen = bool(delivery_cards)
+    approval_status = str(state.get("approval_status", "") or "not run")
+    return [
+        {
+            "gate": "SQL Validator",
+            "owner": "validate_sql() / SQL Reviewer",
+            "status": _gate_status_from_bool(review.get("approved")) if review else "not run",
+            "detail": str(review.get("reason", "") or review.get("error", "") or ""),
+        },
+        {
+            "gate": "Evidence Validator",
+            "owner": "agents.evidence_validator",
+            "status": _gate_status_from_bool(evidence.get("success")) if evidence else "not run",
+            "detail": f"unsupported_claim_rate={evidence.get('unsupported_claim_rate', '')}" if evidence else "",
+        },
+        {
+            "gate": "Chart Validator",
+            "owner": "visualization.chart_validator",
+            "status": "failed" if visualization.get("validation_error") else ("passed" if visualization else "not run"),
+            "detail": str(visualization.get("validation_error", "") or visualization.get("delivery_tool_id", "") or ""),
+        },
+        {
+            "gate": "Tool Policy",
+            "owner": "visualization_delivery/action_delivery policy",
+            "status": "failed" if policy_failures else ("passed" if policy_seen else "not run"),
+            "detail": "; ".join(card["error"] for card in policy_failures if card["error"]),
+        },
+        {
+            "gate": "Approval Gate",
+            "owner": "tools.approval_tool",
+            "status": approval_status,
+            "detail": "required" if (state.get("risk_assessment", {}) or {}).get("requires_approval") else "",
+        },
+        {
+            "gate": "Audit Logger",
+            "owner": "tools.audit_logger",
+            "status": "passed" if state.get("audit_log_id") else "not run",
+            "detail": str(state.get("audit_log_id", "") or ""),
+        },
+    ]
+
+
+def build_artifact_panel(state: dict[str, Any]) -> list[dict[str, Any]]:
+    artifacts = []
+    for artifact_type, location in [
+        ("report", state.get("report_path", "") or state.get("weekly_report_path", "")),
+        ("trace", state.get("trace_path", "")),
+        ("audit", state.get("audit_log_id", "")),
+    ]:
+        if location:
+            artifacts.append({"artifact_type": artifact_type, "location": str(location), "source": "state"})
+
+    for path in state.get("chart_paths") or ([state["chart_path"]] if state.get("chart_path") else []):
+        artifacts.append({"artifact_type": "chart", "location": str(path), "source": "chart"})
+
+    for result in [state.get("visualization_delivery_result", {}) or {}]:
+        location = result.get("artifact_url") or result.get("artifact_path")
+        if location:
+            artifacts.append(
+                {
+                    "artifact_type": str(result.get("tool_type", "") or result.get("delivery_tool_id", "") or "visualization"),
+                    "location": str(location),
+                    "source": "visualization_delivery",
+                }
+            )
+
+    action_execution = state.get("action_execution_result", {}) or {}
+    for result in action_execution.get("delivery_results", []) or []:
+        if not isinstance(result, dict):
+            continue
+        location = result.get("artifact_url") or result.get("artifact_path")
+        if location:
+            artifacts.append(
+                {
+                    "artifact_type": str(result.get("tool_type", "") or result.get("delivery_tool_id", "") or "action_delivery"),
+                    "location": str(location),
+                    "source": "action_delivery",
+                }
+            )
+    return artifacts
+
+
 def _rows_as_records(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
     columns = execution_result.get("columns", [])
     rows = execution_result.get("rows", [])
@@ -220,6 +416,10 @@ def build_run_detail_view_model(state: dict[str, Any]) -> dict[str, Any]:
         },
         "trace_path": state.get("trace_path", ""),
         "trace_timeline": build_trace_timeline(state),
+        "agent_pipeline": build_agent_pipeline(state),
+        "tool_call_cards": build_tool_call_cards(state),
+        "validator_gates": build_validator_gates(state),
+        "artifact_panel": build_artifact_panel(state),
         "sources": build_source_cards(state),
         "safety_boundaries": list(SAFETY_BOUNDARIES),
     }
