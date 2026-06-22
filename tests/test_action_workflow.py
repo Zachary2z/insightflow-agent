@@ -33,6 +33,42 @@ def _base_state(tmp_path):
     return state
 
 
+def _fixture_action_plan():
+    return {
+        "success": True,
+        "plan_type": "business_action_plan",
+        "source": "test_fixture",
+        "actions": [
+            {
+                "action_id": "action_follow_up_task",
+                "action_type": "create_task",
+                "title": "复盘 Cameras GMV 下滑",
+                "description": "请运营团队复查：Cameras 的 GMV 变化为 -12000.0。",
+                "owner": "运营团队",
+                "priority": "high",
+                "delivery_tool_id": "local_sqlite",
+                "source_claims": ["Cameras 的 GMV 变化为 -12000.0"],
+            },
+            {
+                "action_id": "action_metric_alert",
+                "action_type": "create_metric_alert",
+                "metric_name": "category_gmv_change",
+                "condition": "below",
+                "threshold": "-10%",
+                "description": "监控 Cameras GMV 下滑。",
+                "delivery_tool_id": "local_sqlite",
+                "source_claims": ["Cameras 的 GMV 变化为 -12000.0"],
+            },
+        ],
+    }
+
+
+def _base_state_with_action_plan(tmp_path):
+    state = _base_state(tmp_path)
+    state["action_plan"] = _fixture_action_plan()
+    return state
+
+
 def test_action_tools_write_tasks_alerts_approvals_and_audit_logs(tmp_path):
     from tools.action_tool import create_metric_alert, create_task, verify_action_execution
     from tools.approval_tool import record_approval
@@ -109,7 +145,7 @@ def test_action_planner_and_risk_assessor_require_approval(tmp_path):
     from agents.action_planner import run_action_planner_agent
     from agents.risk_assessor import run_risk_assessor_agent
 
-    state = run_action_planner_agent(_base_state(tmp_path))
+    state = run_action_planner_agent(_base_state_with_action_plan(tmp_path))
     state = run_risk_assessor_agent(state)
 
     assert state["action_plan"]["success"] is True
@@ -124,9 +160,10 @@ def test_action_planner_and_risk_assessor_require_approval(tmp_path):
 
 def test_approval_gate_blocks_unapproved_actions_and_audits(tmp_path):
     from agents.action_planner import run_action_planner_agent
-    from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+    from agents.action_executor import run_action_executor_agent
+    from agents.risk_assessor import run_risk_assessor_agent
 
-    state = run_risk_assessor_agent(run_action_planner_agent(_base_state(tmp_path)))
+    state = run_risk_assessor_agent(run_action_planner_agent(_base_state_with_action_plan(tmp_path)))
     blocked = run_action_executor_agent(state)
 
     assert blocked["status"] == "waiting_for_approval"
@@ -143,11 +180,12 @@ def test_approval_gate_blocks_unapproved_actions_and_audits(tmp_path):
 
 def test_approved_action_workflow_creates_verifies_and_audits_actions(tmp_path):
     from agents.action_planner import run_action_planner_agent
+    from agents.action_executor import run_action_executor_agent
     from agents.action_verifier import run_action_verifier_agent
-    from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+    from agents.risk_assessor import run_risk_assessor_agent
     from tools.approval_tool import record_approval
 
-    state = run_risk_assessor_agent(run_action_planner_agent(_base_state(tmp_path)))
+    state = run_risk_assessor_agent(run_action_planner_agent(_base_state_with_action_plan(tmp_path)))
     approval = record_approval(
         state["action_db_path"],
         {

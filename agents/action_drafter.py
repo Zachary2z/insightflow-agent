@@ -37,8 +37,8 @@ def _fallback_result(
 ) -> dict[str, Any]:
     actions = list(state.get("action_plan", {}).get("actions", []))
     return {
-        "success": not provider_called,
-        "source": "deterministic",
+        "success": bool(actions) and not provider_called,
+        "source": "deterministic" if actions else "provider_unavailable",
         "provider_called": provider_called,
         "fallback_used": True,
         "actions": actions,
@@ -118,12 +118,19 @@ def run_action_drafter_agent(
     result = _provider_result(state, provider) if provider else _fallback_result(state, provider_called=False)
     action_plan = {
         **state.get("action_plan", {}),
+        "success": bool(result.get("actions")) and not result.get("validation_error") and not result.get("provider_error"),
+        "source": result.get("source", state.get("action_plan", {}).get("source", "")),
+        "provider_called": result.get("provider_called", False),
+        "fallback_used": result.get("fallback_used", False),
+        "provider_error": result.get("provider_error", ""),
+        "validation_error": result.get("validation_error", ""),
         "actions": result.get("actions", state.get("action_plan", {}).get("actions", [])),
     }
     updated = {
         **state,
         "action_plan": action_plan,
         "action_draft_result": result,
+        "status": "action_plan_created" if action_plan.get("success") else "action_plan_provider_unavailable",
     }
     return append_trace(
         updated,

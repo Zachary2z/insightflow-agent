@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-21
+Last updated: 2026-06-22
 
 This file is the living development tracker for InsightFlow Agent. Update it after every completed task, test milestone, or scope change.
 
@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P8.3 - Report & Insight Agent Cleanup complete |
-| Current task | P8.3 implemented and under final verification |
-| Next planned task | P8.4 - Action Agent & Tool Adapter Cleanup |
-| Last completed task | P8.3 Report & Insight Agent Cleanup |
+| Current phase | P8.4 - Action Agent & Tool Adapter Cleanup complete |
+| Current task | P8.4 complete; P8.5 is next |
+| Next planned task | P8.5 - Agent Pipeline UX |
+| Last completed task | P8.4 Action Agent & Tool Adapter Cleanup |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P8.3 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
+| Out of scope for current P8.4 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -38,8 +38,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` `agents/visualization_agent.py`, `visualization_delivery/`, and `tools/external_visualization_tool.py` complete; old `agents/chart_agent.py`, `agents/visualization_planner.py`, and `tools/chart_tool.py` deleted; MCP chart generation now delegates to the external visualization tool with `local_renderer` | `[x]` P8.1 tests 14/14 passing; focused visualization tests 17/17 passing; related regression 36/36 passing; full suite 223 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` provider-backed question understanding and SQL planning are the configured product paths; safety guard rejects unsafe/sensitive questions before provider calls; provider failures return `provider_unavailable`; provider `llm_candidate` paths skip `sql_generator.py`; provider template paths render by matched template id | `[x]` P8.2 focused tests 5/5 passing; related intent/SQL planning regression 47/47 passing; full suite 228 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.3 | Report & Insight Agent Cleanup | `[x]` provider-backed report planning no longer falls back to fixed section selection; Report Supervisor stops on `provider_unavailable` unless sections are explicitly supplied; `insight_drafter` prompt/schema/runtime wiring drafts candidate claims before claim typing/Evidence Validator | `[x]` P8.3 focused tests 6/6 passing; related report/insight/runtime regression 71/71 passing; full suite 234 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P8.5 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
+| P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` fixed action templates removed from the product path; provider-backed action planning returns contextual action payloads plus delivery-tool ids; missing providers return structured `provider_unavailable`; `agents/action_executor.py` owns approved execution through `action_delivery/` adapters | `[x]` P8.4 focused tests 5/5 passing; action/provider regression 30/30 passing; related regression 40/40 passing; full suite 239 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P8.5 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
 | P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 | P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 
@@ -581,8 +581,8 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 
 - `[x]` P8.2 Intent & SQL Planning Agent Cleanup is complete: provider-backed intent and SQL planning are the configured product paths, unsafe/sensitive guards run before provider calls, provider failures return `provider_unavailable`, and provider candidate SQL still requires validation/review.
 - `[x]` P8.3 Report & Insight Agent Cleanup is complete: provider-backed report planning is the product path for section selection, provider-unavailable plans do not auto-select fixed sections, Report Supervisor remains an orchestrator, and `insight_drafter` feeds candidate claims into claim typing/Evidence Validator.
-- `[ ]` P8.4 Action Agent & Tool Adapter Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
-- `[ ]` P8.5 Agent Pipeline UX starts only after P8.1-P8.4 backend cleanup is complete.
+- `[x]` P8.4 Action Agent & Tool Adapter Cleanup is complete: `agents/action_planner.py` no longer emits fixed action templates in the product path, provider output drafts contextual actions plus `delivery_tool_id`, provider-unavailable mode is structured, `agents/action_executor.py` is split from Risk Assessor, and `action_delivery/` executes local SQLite plus mock Jira-style adapters only after approval.
+- `[ ]` P8.5 Agent Pipeline UX is next now that P8.1-P8.4 backend cleanup is complete.
 
 ## Update Rules
 
@@ -596,6 +596,17 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P8.4 verification:
+
+```bash
+python3 -m pytest tests/test_action_agent_tool_adapter_cleanup.py tests/test_action_workflow.py tests/test_provider_backed_action_drafter.py tests/test_llm_provider_promptops.py tests/test_deepseek_provider_structured_output.py -q
+python3 -m pytest tests/test_mcp_tool_layer.py tests/test_workflow.py tests/test_sql_validator.py tests/test_evidence_validator.py tests/test_streamlit_app.py tests/test_runtime_provider.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+```
+
+Result: P8.4 focused/action/provider tests report 30/30 passed; related MCP/workflow/SQL/Evidence/Streamlit/runtime regression reports 40/40 passed; the default full suite reports 239 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. P8.4 removes fixed action templates from the product path, keeps provider-unavailable action planning structured, splits execution into `agents/action_executor.py`, and routes approved action delivery through local SQLite plus mock Jira-style adapters behind audit and approval.
 
 P7 verification:
 

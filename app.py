@@ -5,12 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from agents.action_planner import run_action_planner_agent
+from agents.action_executor import run_action_executor_agent
 from agents.action_verifier import run_action_verifier_agent
 from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.report_agent import run_report_agent
 from agents.report_supervisor import plan_business_review_sections, run_report_supervisor_agent
-from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+from agents.risk_assessor import run_risk_assessor_agent
 from agents.supervisor import initialize_run
 from agents.visualization_agent import run_visualization_agent
 from api.models import RunCreateRequest
@@ -176,6 +177,33 @@ def _demo_action_state(action_db_path: str | Path) -> dict[str, Any]:
             }
         ],
         "unsupported_claims_blocked": ["库存不足是确定原因"],
+    }
+    state["action_plan"] = {
+        "success": True,
+        "plan_type": "business_action_plan",
+        "source": "streamlit_demo_fixture",
+        "actions": [
+            {
+                "action_id": "action_follow_up_task",
+                "action_type": "create_task",
+                "title": "复盘 Cameras GMV 下滑",
+                "description": "请运营团队复查：Cameras 的 GMV 变化为 -12000.0。",
+                "owner": "运营团队",
+                "priority": "high",
+                "delivery_tool_id": "local_sqlite",
+                "source_claims": ["Cameras 的 GMV 变化为 -12000.0"],
+            },
+            {
+                "action_id": "action_metric_alert",
+                "action_type": "create_metric_alert",
+                "metric_name": "category_gmv_change",
+                "condition": "below",
+                "threshold": "-10%",
+                "description": "监控 Cameras GMV 下滑。",
+                "delivery_tool_id": "local_sqlite",
+                "source_claims": ["Cameras 的 GMV 变化为 -12000.0"],
+            },
+        ],
     }
     return state
 

@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, P2, P3, P4, P5, P6, P7, P8.1, P8.2, and P8.3 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, draft insights from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports from explicit/provider-selected report sections, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, insight-drafting, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI publishing without network access, and preserve SQL validation before any SQL execution.
+P0, P1, P2, P3, P4, P5, P6, P7, P8.1, P8.2, P8.3, and P8.4 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, draft insights from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports from explicit/provider-selected report sections, create provider-backed approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, insight-drafting, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI and Jira-style publishing without network access, and preserve SQL validation before any SQL execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, P8.1 - Visualization Agent Dedupe & External Tool Calling, P8.2 - Intent & SQL Planning Agent Cleanup, and P8.3 - Report & Insight Agent Cleanup are complete. P8.4 - Action Agent & Tool Adapter Cleanup is next.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, P8.1 - Visualization Agent Dedupe & External Tool Calling, P8.2 - Intent & SQL Planning Agent Cleanup, P8.3 - Report & Insight Agent Cleanup, and P8.4 - Action Agent & Tool Adapter Cleanup are complete. P8.5 - Agent Pipeline UX is next.
 
 Implemented:
 
@@ -23,7 +23,7 @@ Implemented:
 - P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
 - P2/P8.3 controlled LLM Report Planner for structured report section selection and clarification questions without LLM-generated SQL or final claims; provider-unavailable states do not auto-select fixed sections in the product path
 - P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
-- P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
+- P2/P8.4 Action Workflow with provider-backed contextual action plans, risk assessment, approval gate, local SQLite task/alert/email records, mock Jira-style ticket delivery, action verification, and audit logs
 - P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
 - P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
 - P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
@@ -40,7 +40,7 @@ Implemented:
 - P3 Evidence-backed Report Writing and Polishing with optional DeepSeek-backed report prose generated only from Evidence Validator outputs, SQL records, chart paths, and trace paths; unsupported claims are rejected and deterministic fallback is preserved
 - P8.3 Provider-backed Insight Drafting with `insight_drafter` structured output in the core workflow; provider candidate claims are passed to claim typing/Evidence Validator, and unsafe provider output falls back to real-row structured claims
 - P3 Guarded Insight Claim Typing with optional DeepSeek-backed claim classification before Evidence Validator, runtime workflow/report-supervisor trace, fallback metadata, and Evidence Validator final ownership
-- P3 LLM Action and Email Drafting with optional DeepSeek-backed task, alert, and email draft wording after Action Planner and before Risk Assessor, Approval Gate, Action Executor, and Audit Logger
+- P8.4 LLM Action and Email Planning with optional DeepSeek-backed task, alert, email draft, and delivery-tool selection before deterministic Risk Assessor, Approval Gate, Action Executor, adapters, and Audit Logger
 - P3 LLM Template Mining and Eval Suite with workflow-trace mining for repeated successful `llm_candidate` patterns, schema-aware LLM smoke evals, expected malformed/schema failure cases, and opt-in live DeepSeek eval coverage
 - P4 realistic ecommerce scenario dataset with campaign, traffic, inventory, refund, review, promotion, pricing, and fulfillment tables
 - P5 lightweight semantic layer for metrics, dimensions, entities, join paths, semantic retrieval, metric-tool compatibility, and context semantic attachment
@@ -49,7 +49,7 @@ Implemented:
 - P8.1 Visualization Agent Dedupe & External Tool Calling with `agents/visualization_agent.py` as the only business visualization entry point; provider-backed structured output chooses both `chart_spec` and `delivery_tool_id`; deterministic code validates chart columns and delivery policy, executes `local_renderer`, `excel_exporter`, or `powerbi_publisher_mock`, records trace metadata, and never fabricates rows
 - P8.2 Intent & SQL Planning Agent Cleanup with provider-backed question understanding and SQL planning as the product path; unsafe/sensitive guards run before providers; malformed provider intent/planning output returns explicit `provider_unavailable` states instead of reviving keyword/template routing; provider `llm_candidate` paths skip `sql_generator.py` and go directly to guarded SQL candidates, while provider-selected templates are rendered by matched template id rather than question keywords
 
-P8.1 deleted the old `agents/chart_agent.py`, `agents/visualization_planner.py`, and `tools/chart_tool.py` product paths. Visualization decisions now enter only through `agents/visualization_agent.py`; local rendering, Excel export, and Power BI mock publishing run through `tools/external_visualization_tool.py` plus `visualization_delivery/`. P8.2 moves intent and SQL strategy ownership to provider-backed agents when configured; provider failures no longer fall through to duplicate business keyword routing. P8.3 moves report-section selection and insight drafting to provider-backed paths when configured; provider-unavailable report planning does not auto-select fixed sections, while Streamlit's local weekly demo passes explicit demo sections. P8.4 continues the accepted cleanup plan for action/tool adapters; P8.5 makes the cleaned pipeline visible in Streamlit.
+P8.1 deleted the old `agents/chart_agent.py`, `agents/visualization_planner.py`, and `tools/chart_tool.py` product paths. Visualization decisions now enter only through `agents/visualization_agent.py`; local rendering, Excel export, and Power BI mock publishing run through `tools/external_visualization_tool.py` plus `visualization_delivery/`. P8.2 moves intent and SQL strategy ownership to provider-backed agents when configured; provider failures no longer fall through to duplicate business keyword routing. P8.3 moves report-section selection and insight drafting to provider-backed paths when configured; provider-unavailable report planning does not auto-select fixed sections, while Streamlit's local weekly demo passes explicit demo sections. P8.4 removes fixed action templates from the product path: `agents/action_planner.py` now routes provider-backed action/delivery decisions through PromptOps structured output, missing providers return `provider_unavailable`, and `agents/action_executor.py` calls `action_delivery/` adapters only after approval. P8.5 makes the cleaned pipeline visible in Streamlit.
 
 Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
@@ -72,7 +72,7 @@ LLM usage should now be the product path for business decisions, bounded by tool
 - **P8.3 provider-backed business review decomposition cleanup**: Report planning is the product path for section selection when a provider is configured. Provider output can select only allowlisted weekly/monthly report sections and is rejected if it supplies SQL or factual claims. Provider errors, malformed JSON, schema mismatch, unknown sections, or leaked SQL/claim fields return `source: "provider_unavailable"` with no auto-selected fixed sections.
 - **P3 evidence-backed report writing**: Task 25 wires optional DeepSeek-backed report prose into `run_report_agent()` and `run_report_supervisor_agent()` after Evidence Validator. Provider prose must pass the `report_writer` schema, reference only verified findings or hypotheses, and is rejected if it includes blocked unsupported claims.
 - **P8.3 provider-backed insight drafting and guarded claim typing**: `insight_drafter` can draft candidate claims and concise prose from real execution rows in the core workflow. Candidate claims then flow into `insight_claim_typer` and Evidence Validator; provider classification is advisory, and Evidence Validator still decides supported findings, hypotheses, and blocked unsupported claims.
-- **P3 action and email drafting**: Task 27 wires optional DeepSeek-backed `action_drafter` output into `run_action_planner_agent()`. The provider can draft task, metric-alert, and email-draft payloads from Evidence Validator outputs, but those drafts still flow through Risk Assessor, Approval Gate, Action Executor, and Audit Logger before any SQLite action record is created.
+- **P8.4 action and delivery planning**: `run_action_planner_agent()` is now LLM-first for action suggestions. Provider output can draft task, metric-alert, email-draft payloads, and `delivery_tool_id` values from Evidence Validator outputs; missing providers return structured `provider_unavailable` without fixed action templates. Deterministic code validates delivery policy and only `agents/action_executor.py` can call local SQLite or mock Jira-style adapters after approval.
 - **P3 template mining and eval**: Task 28 writes safe template-mining metadata into accepted guarded SQL candidate trace events, mines saved workflow trace files for repeated successful `llm_candidate` intent signatures, and expands `run_llm_smoke_eval()` with prompt-specific structured validation plus expected malformed/schema-failure cases.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
 - **P7 visualization safety layer**: Completed chart specs, validation, and rendering safety remain as reusable boundaries.
@@ -669,7 +669,7 @@ Task 15B does not introduce action tools, approvals, MCP, FastAPI, dashboard beh
 
 ## Action Workflow
 
-Task 16 adds a local, auditable action workflow that can turn evidence-backed analysis into operational follow-up records. It does not call external task systems, send emails, run background jobs, or bypass approval gates.
+Task 16 added a local, auditable action workflow; P8.4 makes action suggestions provider-backed and moves execution into explicit delivery adapters. It does not send real emails, run background jobs, call network SaaS APIs, or bypass approval gates.
 
 Workflow:
 
@@ -678,7 +678,8 @@ Evidence Validator
 -> Action Planner
 -> Risk Assessor
 -> Approval Gate
--> Action Tool
+-> Action Executor
+-> Action Delivery Adapter
 -> Action Verifier
 -> Audit Logger
 ```
@@ -689,15 +690,17 @@ Implemented tools:
 - `create_metric_alert()` writes metric alerts to SQLite.
 - `create_email_draft()` writes email drafts to SQLite.
 - `record_approval()` writes approval records to SQLite.
-- `verify_action_execution()` confirms created records exist.
+- `verify_action_execution()` confirms created local records exist.
 - `log_audit_event()` writes approval, execution, and verification audit events.
+- `action_delivery/` registers `local_sqlite` and `jira_ticket_mock`; the Jira adapter returns `mock://jira/...` without network or API keys.
 
 Agent interface:
 
 ```python
 from agents.action_planner import run_action_planner_agent
+from agents.action_executor import run_action_executor_agent
 from agents.action_verifier import run_action_verifier_agent
-from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+from agents.risk_assessor import run_risk_assessor_agent
 from tools.approval_tool import record_approval
 
 state = run_action_planner_agent(state)
@@ -727,7 +730,7 @@ Approval rules:
 
 - `create_task`, `create_metric_alert`, and `create_email_draft` require approval.
 - Unapproved actions are blocked and audited.
-- Approved actions create local SQLite records, then verifier confirms they exist.
+- Approved local actions create SQLite records, mock external actions return explicit `mock://...` artifact URLs, and local records are verified.
 - Audit logs preserve approval blocking, action execution, and action verification events.
 
 Task 16 does not introduce MCP, FastAPI, React, async jobs, RBAC, external SaaS task creation, or real email sending.

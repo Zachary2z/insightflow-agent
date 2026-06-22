@@ -19,12 +19,12 @@ Update this table after every completed phase or task so the current project pos
 | P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` Complete | `agents/visualization_agent.py` is the only visualization business entry point; provider output selects chart spec plus delivery tool; local renderer, XLSX exporter, and Power BI mock run behind chart/tool validation; old chart agent/planner product paths were deleted. | Regression only |
 | P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` Complete | Provider-backed question understanding and SQL planning are the product path when configured; unsafe/sensitive guards run before providers; provider failures return explicit `provider_unavailable`; provider `llm_candidate` skips `sql_generator.py`; provider templates render by matched template id. | Regression only |
 | P8.3 | Report & Insight Agent Cleanup | `[x]` Complete | Provider-backed report planning is the product path for section selection; provider-unavailable plans do not auto-select fixed sections; `insight_drafter` now drafts candidate claims before claim typing/Evidence Validator. | Regression only |
-| P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` Next | Not started. | Replace fixed action templates with LLM-first action planning and add realistic action delivery adapters behind approval/audit |
-| P8.5 | Agent Pipeline UX | `[ ]` Later | Not started. | Make the cleaned multi-agent/tool-calling path visible after P8.1-P8.4 land |
+| P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` Complete | Fixed action templates are removed from the product path; provider-backed action planning now selects contextual action payloads and delivery tools; execution moved to `agents/action_executor.py` and `action_delivery/` adapters behind approval/audit. | Regression only |
+| P8.5 | Agent Pipeline UX | `[ ]` Next | Not started. | Make the cleaned multi-agent/tool-calling path visible after P8.1-P8.4 land |
 | P9 | Realistic Eval And Demo Polish | `[ ]` Later | Not started. | Add scenario eval and demo polish after the cleanup path is stable |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Later | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
 
-Current development position: **P8.3 Report & Insight Agent Cleanup is complete; P8.4 Action Agent & Tool Adapter Cleanup is next.**
+Current development position: **P8.4 Action Agent & Tool Adapter Cleanup is complete; P8.5 Agent Pipeline UX is next.**
 
 ## 1. Project Positioning
 
@@ -455,8 +455,8 @@ The next task should be selected from the P4-P10 platform evolution roadmap. Do 
 | Done | P8.1 Visualization Agent Dedupe & External Tool Calling | Consolidate chart and delivery decisions into a Visualization Agent. The provider chooses chart spec and delivery tool from a catalog; validators and adapters enforce safety. |
 | Done | P8.2 Intent & SQL Planning Agent Cleanup | Replace keyword-heavy intent and SQL routing with LLM-first agents while preserving SQL Validator and SQL Executor boundaries. |
 | Done | P8.3 Report & Insight Agent Cleanup | Replace fixed report sections and template insight generation with LLM-first planning/drafting gated by Evidence Validator. |
-| Next | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
-| Later | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
+| Done | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
+| Next | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
 | Later | P9 Realistic Eval And Demo Polish | Add eval/demo cases for realistic cleaned agent paths and external-tool traces. |
 | Later | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
 
@@ -586,6 +586,8 @@ Goal: remove fixed report-section and template-insight ownership from the produc
 
 Goal: replace fixed action templates with contextual LLM-backed action planning, while keeping risk, approval, execution, verification, audit, and tool adapters deterministic.
 
+Status: complete. `agents/action_planner.py` no longer builds fixed action templates in the product path; missing providers return structured `provider_unavailable`. Provider-backed structured output drafts action payloads and delivery-tool ids, then deterministic policy/adapters execute only after risk assessment and approval.
+
 ### P8.4 Scope
 
 | Component | Files likely affected | Development change |
@@ -607,13 +609,13 @@ Goal: replace fixed action templates with contextual LLM-backed action planning,
 
 ### P8.4 Acceptance
 
-- Action suggestions are contextual and LLM-backed in the product path.
-- Fixed action templates are removed from the product path.
-- Risk assessment, approval, execution, verification, and audit are separate traceable steps.
-- Realistic action delivery adapters are tool-callable but cannot bypass approval.
-- Provider failures and missing-provider mode remain structured.
-- Obsolete fixed-action-template tests are deleted or rewritten.
-- P0 workflow and P0 eval are verified at P8.4 completion.
+- `[x]` Action suggestions are contextual and LLM-backed in the product path.
+- `[x]` Fixed action templates are removed from the product path.
+- `[x]` Risk assessment, approval, execution, verification, and audit are separate traceable steps.
+- `[x]` Realistic action delivery adapters are tool-callable but cannot bypass approval.
+- `[x]` Provider failures and missing-provider mode remain structured.
+- `[x]` Obsolete fixed-action-template tests are deleted or rewritten.
+- `[x]` P0 workflow and P0 eval are verified at P8.4 completion.
 
 ## 10.5 P8.5 Agent Pipeline UX
 

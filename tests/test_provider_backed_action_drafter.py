@@ -135,7 +135,7 @@ def test_action_drafter_rejects_approval_bypass_and_unsupported_claims(tmp_path)
         ),
     )
 
-    assert drafted["action_draft_result"]["source"] == "deterministic"
+    assert drafted["action_draft_result"]["source"] == "provider_unavailable"
     assert drafted["action_draft_result"]["provider_called"] is True
     assert drafted["action_draft_result"]["fallback_used"] is True
     assert drafted["action_draft_result"]["validation_error"]
@@ -206,7 +206,8 @@ def test_action_drafter_ignores_top_level_provider_status_metadata(tmp_path):
 
 def test_action_planner_runtime_provider_and_no_key_baseline(tmp_path, monkeypatch):
     from agents.action_planner import run_action_planner_agent
-    from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+    from agents.action_executor import run_action_executor_agent
+    from agents.risk_assessor import run_risk_assessor_agent
     from agents.supervisor import initialize_run
     from llm_ops.provider import MockLLMProvider
 
@@ -248,6 +249,7 @@ def test_action_planner_runtime_provider_and_no_key_baseline(tmp_path, monkeypat
     fallback_state["evidence_result"] = _base_state(tmp_path)["evidence_result"]
     fallback = run_action_planner_agent(fallback_state)
 
-    assert fallback["action_draft_result"]["source"] == "deterministic"
+    assert fallback["action_draft_result"]["source"] == "provider_unavailable"
     assert fallback["action_draft_result"]["provider_called"] is False
-    assert fallback["status"] == "action_plan_created"
+    assert fallback["action_plan"]["actions"] == []
+    assert fallback["status"] == "action_plan_provider_unavailable"

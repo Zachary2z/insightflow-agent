@@ -5,7 +5,8 @@ import pytest
 
 def test_live_deepseek_action_drafter_enters_action_workflow_before_approval(tmp_path):
     from agents.action_planner import run_action_planner_agent
-    from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
+    from agents.action_executor import run_action_executor_agent
+    from agents.risk_assessor import run_risk_assessor_agent
     from agents.supervisor import initialize_run
     from llm_ops.deepseek_provider import load_deepseek_config
     from llm_ops.runtime_provider import provider_action_drafter_enabled

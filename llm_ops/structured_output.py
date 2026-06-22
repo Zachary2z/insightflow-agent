@@ -310,6 +310,7 @@ def _validate_action_drafter(content: Any, schema_context: dict[str, Any]) -> di
             "action_type": action_type,
             "source": "provider_action_drafter",
             "source_claims": source_claims,
+            "delivery_tool_id": str(action.get("delivery_tool_id") or "local_sqlite").strip() or "local_sqlite",
         }
         if action_type == "create_task":
             for field in ("title", "description", "owner", "priority"):
