@@ -24,6 +24,11 @@ DEFAULT_CASES_PATH = ROOT / "eval" / "test_questions.json"
 DEFAULT_REPORT_PATH = ROOT / "eval" / "report.md"
 DEFAULT_TRACE_DIR = ROOT / "logs" / "traces" / "eval"
 DEFAULT_DB_PATH = ROOT / "data" / "ecommerce.db"
+ARTIFACT_HYGIENE_NOTE = (
+    "Do not commit generated eval reports, trace files, action DBs, or chart/workbook outputs. "
+    "Default generated paths include eval/report.md, logs/traces/eval, data/action_ops.db, "
+    "reports/charts/*, and reports/markdown/*."
+)
 
 
 def load_cases(path: str | Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
@@ -392,6 +397,7 @@ def _summarize(case_results: list[dict[str, Any]], report_path: Path) -> dict[st
         "validation_error_cases": sum(1 for result in case_results if result.get("validation_errors")),
         "provider_error_cases": sum(1 for result in case_results if result.get("provider_errors")),
         "failure_type_distribution": dict(Counter(result["failure_type"] for result in case_results)),
+        "artifact_hygiene_note": ARTIFACT_HYGIENE_NOTE,
         "report_path": str(report_path),
         "case_results": case_results,
     }
@@ -415,6 +421,10 @@ def _markdown_report(summary: dict[str, Any]) -> str:
         f"- Average trace events: {summary['average_trace_event_count']}",
         f"- Average tool calls: {summary['average_tool_call_count']}",
         f"- Average latency ms: {summary['average_latency_ms']}",
+        "",
+        "## Artifact Hygiene",
+        "",
+        summary["artifact_hygiene_note"],
         "",
         "## Provider / Fallback / External Tool Metrics",
         "",

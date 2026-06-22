@@ -22,9 +22,9 @@ Update this table after every completed phase or task so the current project pos
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` Complete | Fixed action templates are removed from the product path; provider-backed action planning now selects contextual action payloads and delivery tools; execution moved to `agents/action_executor.py` and `action_delivery/` adapters behind approval/audit. | Regression only |
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
-| P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Next | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
+| P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
 
-Current development position: **P9 Realistic Eval And Demo Polish is complete; P10 MCP Contract & Lightweight Engineering Hardening is next.**
+Current development position: **P10 MCP Contract & Lightweight Engineering Hardening is complete; future work should stay in regression or a newly selected next slice.**
 
 ## 1. Project Positioning
 
@@ -277,7 +277,7 @@ LLM participation rule: the model helps with understanding, planning, candidates
 
 ### 4.2 Current LLM Enhancement Target
 
-P8.1-P8.5 and P9 are complete. The current model-assisted product path is already wired through intent, SQL planning, scenario planning, insight/report wording, visualization delivery, and action drafting with deterministic validators and adapters as boundaries. The next target is P10 lightweight engineering hardening: tighten external contracts, artifact hygiene, and local quality without adding new business-decision rule trees.
+P8.1-P8.5, P9, and the P10 lightweight hardening slice are complete. The current model-assisted product path is already wired through intent, SQL planning, scenario planning, insight/report wording, visualization delivery, and action drafting with deterministic validators and adapters as boundaries. P10 tightened external contracts, artifact hygiene, and local quality without adding new business-decision rule trees.
 
 | Target | Why the LLM is useful | Planned task | Safety boundary |
 |---|---|---|---|
@@ -458,7 +458,7 @@ The next task should be selected from the P4-P10 platform evolution roadmap. Do 
 | Done | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
 | Done | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
 | Done | P9 Realistic Eval And Demo Polish | Added eval/demo cases for realistic cleaned agent paths and external-tool traces. |
-| Next | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
+| Done | P10 MCP Contract & Lightweight Engineering Hardening | External MCP contracts are marked as external-safe, internal validator/audit/trace tools are kept out of the public contract, and generated eval/report/trace/mock artifacts are documented and ignored. |
 
 ## 10.1 P8.1 Visualization Agent Dedupe & External Tool Calling
 

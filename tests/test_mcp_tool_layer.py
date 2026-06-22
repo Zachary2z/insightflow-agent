@@ -37,9 +37,17 @@ def test_mcp_servers_expose_json_compatible_tool_contracts():
 
     serialized = json.dumps(contracts, ensure_ascii=False)
     assert "validate_sql" not in serialized
+    assert "approval_tool" not in serialized
+    assert "audit_logger" not in serialized
+    assert "trace_logger" not in serialized
     assert "permission_checker" not in serialized
     assert "log_trace" not in serialized
     assert "eval_runner" not in serialized
+    assert "chart_tool" not in serialized
+
+    for contract in contracts:
+        assert contract["contract_scope"] == "external_safe_tool_contract"
+        assert contract["internal_tools_exposed"] is False
 
 
 def test_database_mcp_layer_wraps_schema_sample_and_validated_sql_execution():

@@ -7,6 +7,8 @@ def build_contract(server_name: str, tools: list[dict[str, Any]]) -> dict[str, A
     return {
         "server_name": server_name,
         "protocol_style": "mcp-style-json-tool-contract",
+        "contract_scope": "external_safe_tool_contract",
+        "internal_tools_exposed": False,
         "tools": tools,
     }
 
@@ -52,4 +54,3 @@ def wrap_failure(
         "result": result or {},
         **extra,
     }
-

@@ -8,8 +8,14 @@ venv/
 env/
 tmp/
 .superpowers/
+docs/superpowers/plans/*
+data/ecommerce.db
+data/action_ops.db
+eval/report.md
 logs/traces/*.json
 logs/traces/**/*.json
+logs/traces/*
+logs/traces/**/*
 reports/charts/*
 reports/markdown/*
 !logs/traces/.gitkeep

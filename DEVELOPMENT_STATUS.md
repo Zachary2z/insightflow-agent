@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P9 - Realistic Eval And Demo Polish complete |
-| Current task | P9 complete; P10 is next |
-| Next planned task | P10 - Lightweight Engineering Hardening |
-| Last completed task | P9 Realistic Eval And Demo Polish |
+| Current phase | P10 - Lightweight Engineering Hardening complete |
+| Current task | P10 complete; next slice not selected |
+| Next planned task | Regression or a newly selected post-P10 slice |
+| Last completed task | P10 Lightweight Engineering Hardening |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P9 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, final business product UI, and unguarded LLM-driven SQL/report/action execution |
+| Out of scope for current P10 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, final business product UI, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -41,7 +41,7 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` fixed action templates removed from the product path; provider-backed action planning returns contextual action payloads plus delivery-tool ids; missing providers return structured `provider_unavailable`; `agents/action_executor.py` owns approved execution through `action_delivery/` adapters | `[x]` P8.4 focused tests 5/5 passing; action/provider regression 30/30 passing; related regression 40/40 passing; full suite 239 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.5 | Agent Pipeline UX | `[x]` Streamlit run summaries now expose agent pipeline, tool-call cards, validator gates, artifact panel, source metadata, provider prompt ids, fallback flags, policy status, and mock external artifact URLs from existing state/trace data | `[x]` P8.5 focused test red/green verified; Streamlit tests 19/19 passing; related regression 42/42 passing; full suite 240 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P9 | Realistic Eval And Demo Polish | `[x]` 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo questions complete | `[x]` focused P9 eval and Streamlit tests passing; full verification recorded below | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
+| P10 | Lightweight Engineering Hardening | `[x]` external-safe MCP contract metadata, internal-tool exposure checks, eval artifact hygiene note, and generated-artifact ignore coverage complete | `[x]` focused tests, related regressions, full suite, eval, and legacy audit passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 
 ## P0 - Agentic SQL Core
 
@@ -589,7 +589,7 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 - `[x]` P8.4 Action Agent & Tool Adapter Cleanup is complete: `agents/action_planner.py` no longer emits fixed action templates in the product path, provider output drafts contextual actions plus `delivery_tool_id`, provider-unavailable mode is structured, `agents/action_executor.py` is split from Risk Assessor, and `action_delivery/` executes local SQLite plus mock Jira-style adapters only after approval.
 - `[x]` P8.5 Agent Pipeline UX is complete: Streamlit Command Center exposes the cleaned agent pipeline, tool-call cards, validator gates, artifact panel, and source metadata without changing workflow execution or safety boundaries.
 - `[x]` P9 Realistic Eval And Demo Polish is complete.
-- `[ ]` P10 Lightweight Engineering Hardening is next.
+- `[x]` P10 Lightweight Engineering Hardening is complete at implementation/doc level: MCP contracts advertise an external-safe scope, public MCP contracts do not expose internal validator/audit/trace tools, eval reports include artifact hygiene notes, and generated DB/report/trace/chart/workbook/mock output paths are covered by `.gitignore`.
 
 ## Update Rules
 
@@ -603,6 +603,19 @@ After every task:
 6. Record the exact verification command in the final response for that task.
 
 ## Latest Verification
+
+P10 verification:
+
+```bash
+python3 -m pytest tests/test_mcp_tool_layer.py tests/test_eval_runner.py -q
+python3 -m pytest tests/test_mcp_tool_layer.py tests/test_eval_runner.py tests/test_streamlit_app.py -q
+python3 -m pytest tests/test_visualization_agent_external_tools.py tests/test_action_agent_tool_adapter_cleanup.py tests/test_workflow.py -q
+python3 -m pytest
+python3 eval/run_eval.py
+rg -n "chart_agent|visualization_planner|chart_tool|old|legacy|TODO|deprecated|fixed template|deterministic action template|keyword inference"
+```
+
+Result: P10 red/green focused tests first failed on missing MCP `contract_scope`, missing eval `artifact_hygiene_note`, and missing generated-artifact `.gitignore` entries; after implementation, the focused MCP/eval tests report 13/13 passed. The suggested MCP/eval/Streamlit regression reports 34/34 passed, the visualization/action/workflow regression reports 23/23 passed, the default full suite reports 246 passed and 9 opt-in live DeepSeek tests skipped by default, and `python3 eval/run_eval.py` reports 32/32 passed with SQL execution success rate 95.83%, SQL repair success rate 100.00%, dangerous SQL block rate 100.00%, metric definition accuracy 100.00%, provider-called cases 4, fallback-used cases 23, visualization external-tool-called cases 23, Excel exporter 1, Power BI mock 1, Jira mock 1, evidence success rate 100.00%, validation-error cases 1, provider-error cases 20, and an artifact hygiene note in the eval summary/report. The legacy audit only found superseded historical documentation/test assertions, schema field names such as `old_price`, and action alert `threshold` fields; it did not find active old chart agent/planner/tool product paths.
 
 P9 verification:
 

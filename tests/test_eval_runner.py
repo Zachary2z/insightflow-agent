@@ -80,11 +80,16 @@ def test_run_eval_cases_returns_p9_summary_metrics_and_writes_report(tmp_path):
     assert summary["validation_error_cases"] >= 1
     assert summary["provider_error_cases"] >= 1
     assert "failure_type_distribution" in summary
+    assert "artifact_hygiene_note" in summary
+    assert "eval/report.md" in summary["artifact_hygiene_note"]
+    assert "logs/traces/eval" in summary["artifact_hygiene_note"]
     assert "p9_001" in {result["case_id"] for result in summary["case_results"]}
     assert Path(summary["report_path"]).is_file()
     report_text = Path(summary["report_path"]).read_text(encoding="utf-8")
     assert "InsightFlow Agent P9 Eval Report" in report_text
     assert "Provider / Fallback / External Tool Metrics" in report_text
+    assert "Artifact Hygiene" in report_text
+    assert "Do not commit generated eval reports, trace files, action DBs, or chart/workbook outputs." in report_text
 
 
 def test_eval_runner_does_not_require_real_api_key(monkeypatch, tmp_path):
@@ -170,3 +175,20 @@ def test_run_eval_script_executes_from_repo_root(tmp_path):
 
     assert completed.returncode == 0, completed.stderr
     assert (tmp_path / "report.md").is_file()
+
+
+def test_generated_artifact_paths_are_declared_gitignored():
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    for generated_path in (
+        "data/ecommerce.db",
+        "data/action_ops.db",
+        "eval/report.md",
+        "reports/charts/*",
+        "reports/markdown/*",
+        "logs/traces/*",
+        "logs/traces/**/*",
+        "docs/superpowers/plans/*",
+        ".superpowers/",
+    ):
+        assert generated_path in gitignore
