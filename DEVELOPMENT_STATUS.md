@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P8.1 - Visualization Agent Dedupe & External Tool Calling complete |
-| Current task | P8.1 implemented and under final verification |
-| Next planned task | P8.2 - Intent & SQL Planning Agent Cleanup |
-| Last completed task | P8.1 Visualization Agent Dedupe & External Tool Calling |
+| Current phase | P8.2 - Intent & SQL Planning Agent Cleanup complete |
+| Current task | P8.2 implemented and under final verification |
+| Next planned task | P8.3 - Report & Insight Agent Cleanup |
+| Last completed task | P8.2 Intent & SQL Planning Agent Cleanup |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current P8.1 | Real Power BI OAuth/API publishing, React frontend, Docker/CI, RBAC, vector database, full ActionOps product suite, and unguarded LLM-driven SQL/report/action execution |
+| Out of scope for current P8.2 | React frontend, Docker/CI, RBAC, vector database, real external SaaS integrations, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -36,8 +36,8 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P6 | Scenario Analysis Planner | `[x]` deterministic planner, provider-backed planner validation, runtime provider switch, workflow state, and trace metadata complete | `[x]` planner tests 9/9 passing; related regression 22/22 passing; full suite 212 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P7 | Visualization Intelligence | `[x]` `visualization/` registry/spec/validator/renderer and workflow trace metadata complete; P8.1 later replaced the old planner/agent product path | `[x]` visualization tests preserved | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` `agents/visualization_agent.py`, `visualization_delivery/`, and `tools/external_visualization_tool.py` complete; old `agents/chart_agent.py` and `agents/visualization_planner.py` deleted; `tools/chart_tool.py` reduced to a render-only compatibility wrapper | `[x]` P8.1 tests 14/14 passing; focused visualization tests 17/17 passing; related regression 36/36 passing; full suite 223 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P8.2 | Intent & SQL Planning Agent Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P8.3 | Report & Insight Agent Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
+| P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` provider-backed question understanding and SQL planning are the configured product paths; safety guard rejects unsafe/sensitive questions before provider calls; provider failures return `provider_unavailable`; provider `llm_candidate` paths skip `sql_generator.py`; provider template paths render by matched template id | `[x]` P8.2 focused tests 5/5 passing; related intent/SQL planning regression 47/47 passing; full suite 228 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P8.3 | Report & Insight Agent Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
 | P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
 | P8.5 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
 | P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
@@ -579,7 +579,7 @@ These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 c
 
 ### P8.2-P8.4 Cleanup Program Status
 
-- `[ ]` P8.2 Intent & SQL Planning Agent Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
+- `[x]` P8.2 Intent & SQL Planning Agent Cleanup is complete: provider-backed intent and SQL planning are the configured product paths, unsafe/sensitive guards run before provider calls, provider failures return `provider_unavailable`, and provider candidate SQL still requires validation/review.
 - `[ ]` P8.3 Report & Insight Agent Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
 - `[ ]` P8.4 Action Agent & Tool Adapter Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
 - `[ ]` P8.5 Agent Pipeline UX starts only after P8.1-P8.4 backend cleanup is complete.

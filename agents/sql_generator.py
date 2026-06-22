@@ -88,19 +88,54 @@ LIMIT 100
     }
 
 
+def _city_order_count_sql() -> dict[str, Any]:
+    return {
+        "sql": """
+SELECT u.city, COUNT(*) AS order_count
+FROM orders o
+JOIN users u ON o.user_id = u.id
+WHERE o.status = 'paid'
+GROUP BY u.city
+ORDER BY order_count DESC
+LIMIT 100
+""".strip(),
+        "tables": ["orders", "users"],
+        "reason": "Aggregate paid order count by user city.",
+    }
+
+
+def _template_sql(template_id: str, variables: dict[str, Any]) -> dict[str, Any] | None:
+    limit = int(variables.get("limit") or 5)
+    if template_id == "top_products_gmv":
+        return _top_product_gmv_sql(limit)
+    if template_id == "top_categories_gmv":
+        return _category_gmv_sql(limit)
+    if template_id == "city_gmv_summary":
+        return _city_gmv_sql()
+    if template_id == "city_order_count_summary":
+        return _city_order_count_sql()
+    return None
+
+
 def run_sql_generator(state: dict[str, Any]) -> dict[str, Any]:
     question = state.get("user_question", "")
     metric_context = state.get("metric_context", {})
-    limit = _limit_from_question(question)
+    planning = state.get("sql_planning", {})
+    matched_template = str(planning.get("matched_template", "") or "")
 
-    if _question_contains(question, "品类", "类别", "category"):
-        generated = _category_gmv_sql(limit)
-    elif _question_contains(question, "城市", "city"):
-        generated = _city_gmv_sql()
-    elif _question_contains(question, "订单数", "订单量", "订单总数", "order_count"):
-        generated = _order_count_sql()
+    template_generated = _template_sql(matched_template, dict(planning.get("template_variables", {})))
+    if template_generated:
+        generated = template_generated
     else:
-        generated = _top_product_gmv_sql(limit)
+        limit = _limit_from_question(question)
+        if _question_contains(question, "品类", "类别", "category"):
+            generated = _category_gmv_sql(limit)
+        elif _question_contains(question, "城市", "city"):
+            generated = _city_gmv_sql()
+        elif _question_contains(question, "订单数", "订单量", "订单总数", "order_count"):
+            generated = _order_count_sql()
+        else:
+            generated = _top_product_gmv_sql(limit)
 
     output = {
         "success": True,

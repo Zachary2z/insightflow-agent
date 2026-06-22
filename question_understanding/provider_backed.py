@@ -9,6 +9,9 @@ from question_understanding.router import understand_question
 
 
 _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "selected_tables"}
+_UNSAFE_TERMS = ("删除", "更新", "写入", "插入", "drop", "delete", "update", "insert")
+_SENSITIVE_TERMS = ("手机号", "电话", "邮箱", "email", "phone", "地址", "身份证", "payment")
+_BULK_TERMS = ("导出所有", "全部用户", "所有用户", "批量导出")
 _METRIC_ALIASES = {
     "销售额": "gmv",
     "成交额": "gmv",
@@ -94,6 +97,47 @@ def _normalize_provider_content(content: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _contains(text: str, terms: tuple[str, ...]) -> bool:
+    normalized = text.lower().replace(" ", "")
+    return any(term.lower().replace(" ", "") in normalized for term in terms)
+
+
+def _safety_guard_result(question: str) -> dict[str, Any] | None:
+    risk_flags = []
+    if _contains(question, _UNSAFE_TERMS):
+        risk_flags.append("unsafe_operation")
+    if _contains(question, _SENSITIVE_TERMS):
+        risk_flags.append("sensitive_field")
+    if _contains(question, _BULK_TERMS):
+        risk_flags.append("bulk_export")
+    if not risk_flags:
+        return None
+    intent = {
+        "metric": "",
+        "dimension": "",
+        "time_range": None,
+        "filters": [],
+        "operation": "unsafe_write" if "unsafe_operation" in risk_flags else "",
+        "limit": None,
+        "risk_flags": risk_flags,
+    }
+    return {
+        "success": True,
+        "strategy": "reject",
+        "intent": intent,
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": risk_flags,
+        "rejection_reason": "Request asks for sensitive fields or unsafe data access.",
+        "reason": "Safety guard rejected the request before provider question understanding.",
+        "source": "safety_guard",
+        "provider_called": False,
+        "fallback_used": False,
+        "provider_error": "",
+        "validation_error": "",
+    }
+
+
 def _fallback_result(
     question: str,
     *,
@@ -105,6 +149,37 @@ def _fallback_result(
     return {
         **fallback,
         "source": "deterministic",
+        "provider_called": provider_called,
+        "fallback_used": provider_called,
+        "provider_error": provider_error,
+        "validation_error": validation_error,
+    }
+
+
+def _provider_unavailable_result(
+    *,
+    provider_called: bool,
+    provider_error: str = "",
+    validation_error: str = "",
+) -> dict[str, Any]:
+    return {
+        "success": True,
+        "strategy": "clarify",
+        "intent": {
+            "metric": "",
+            "dimension": "",
+            "time_range": None,
+            "filters": [],
+            "operation": "",
+            "limit": None,
+            "risk_flags": [],
+        },
+        "missing_slots": ["provider_output"],
+        "clarification_questions": ["Provider question understanding is unavailable; please retry with a configured provider."],
+        "risk_flags": [],
+        "rejection_reason": "",
+        "reason": "Provider question understanding failed; deterministic business keyword routing was not used.",
+        "source": "provider_unavailable",
         "provider_called": provider_called,
         "fallback_used": provider_called,
         "provider_error": provider_error,
@@ -142,6 +217,10 @@ def understand_question_with_provider(
     provider: LLMProvider | None = None,
     deterministic_fallback: bool = True,
 ) -> dict[str, Any]:
+    safety_result = _safety_guard_result(question)
+    if safety_result is not None:
+        return safety_result
+
     if provider is None:
         return _fallback_result(question, provider_called=False)
 
@@ -185,5 +264,5 @@ def understand_question_with_provider(
         }
 
     if error_type == "llm_schema_validation_error":
-        return _fallback_result(question, provider_called=True, validation_error=error)
-    return _fallback_result(question, provider_called=True, provider_error=error)
+        return _provider_unavailable_result(provider_called=True, validation_error=error)
+    return _provider_unavailable_result(provider_called=True, provider_error=error)

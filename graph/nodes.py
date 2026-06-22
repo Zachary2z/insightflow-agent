@@ -29,6 +29,13 @@ def metric_node(state: AgentState) -> AgentState:
     return run_metric_agent(dict(state))
 
 
+def route_after_metric(state: AgentState) -> str:
+    planning = state.get("sql_planning", {})
+    if planning.get("source") == "provider" and planning.get("strategy") == "llm_candidate":
+        return "guarded_candidate"
+    return "generate"
+
+
 def clarification_node(state: AgentState, provider=None) -> AgentState:
     return run_clarification_router_agent(dict(state), provider=provider)
 
@@ -241,6 +248,11 @@ def route_after_clarification(state: AgentState) -> str:
         return "schema"
     if state.get("routing_strategy") == "reject":
         return "early_response"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("question_understanding", {}).get("source") == "provider_unavailable"
+    ):
+        return "early_response"
     if state.get("routing_strategy") == "clarify" and state.get("clarification_result", {}).get("provider_called"):
         return "early_response"
     return "schema"
@@ -250,6 +262,6 @@ def route_after_sql_planning(state: AgentState) -> str:
     if state.get("initial_sql"):
         return "schema"
     planning = state.get("sql_planning", {})
-    if planning.get("source") == "provider" and planning.get("strategy") in {"clarify", "reject"}:
+    if planning.get("source") in {"provider", "provider_unavailable"} and planning.get("strategy") in {"clarify", "reject"}:
         return "early_response"
     return "schema"

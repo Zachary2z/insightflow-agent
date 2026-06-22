@@ -65,11 +65,11 @@ def test_provider_assisted_sql_planning_falls_back_on_malformed_json():
     )
 
     assert result["success"] is True
-    assert result["source"] == "deterministic"
+    assert result["source"] == "provider_unavailable"
     assert result["provider_called"] is True
     assert result["fallback_used"] is True
     assert result["provider_error"]
-    assert result["strategy"] == "llm_candidate"
+    assert result["strategy"] == "clarify"
 
 
 def test_provider_assisted_sql_planning_falls_back_on_schema_mismatch_or_sql_leak():
@@ -84,11 +84,11 @@ def test_provider_assisted_sql_planning_falls_back_on_schema_mismatch_or_sql_lea
     )
 
     assert result["success"] is True
-    assert result["source"] == "deterministic"
+    assert result["source"] == "provider_unavailable"
     assert result["provider_called"] is True
     assert result["fallback_used"] is True
     assert result["validation_error"]
-    assert result["strategy"] == "llm_candidate"
+    assert result["strategy"] == "clarify"
     assert "sql" not in result
     assert "generated_sql" not in result
 
@@ -141,7 +141,7 @@ def test_core_workflow_uses_provider_planning_and_validated_sql_candidate(tmp_pa
     assert result["review_result"]["approved"] is True
     assert result["execution_result"]["success"] is True
     trace_nodes = [event["node"] for event in result["trace"]]
-    assert trace_nodes.index("sql_planning_router_agent") < trace_nodes.index("sql_generator_agent")
+    assert "sql_generator_agent" not in trace_nodes
     assert trace_nodes.index("guarded_sql_candidate_agent") < trace_nodes.index("sql_reviewer_agent")
     assert "run_sql" not in result["llm_sql_enhancement"]
 
@@ -166,13 +166,13 @@ def test_core_workflow_rejects_unsafe_provider_sql_candidate_and_keeps_reviewer_
         ),
     )
 
-    assert result["status"] == "completed"
+    assert result["status"] == "failed"
     assert result["llm_sql_enhancement"]["provider_called"] is True
     assert result["llm_sql_enhancement"]["accepted"] is False
     assert result["llm_sql_enhancement"]["fallback_used"] is True
-    assert result["review_result"]["approved"] is True
-    assert result["execution_result"]["success"] is True
-    assert result["generated_sql"].lower().startswith("select")
+    assert result.get("review_result", {}).get("approved") is False
+    assert result.get("execution_result", {}) == {}
+    assert not result.get("generated_sql", "")
 
 
 def test_core_workflow_sql_planning_no_key_baseline_preserves_sql_workflow(tmp_path, monkeypatch):

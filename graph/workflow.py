@@ -17,6 +17,7 @@ from graph.nodes import (
     guarded_sql_candidate_node,
     insight_node,
     metric_node,
+    route_after_metric,
     route_after_execute,
     route_after_fix,
     route_after_clarification,
@@ -106,7 +107,11 @@ def build_workflow(
     )
     workflow.add_edge("analysis_planner", "schema")
     workflow.add_edge("schema", "metric")
-    workflow.add_edge("metric", "generate")
+    workflow.add_conditional_edges(
+        "metric",
+        route_after_metric,
+        {"guarded_candidate": "guarded_candidate", "generate": "generate"},
+    )
     workflow.add_edge("generate", "guarded_candidate")
     workflow.add_edge("guarded_candidate", "review")
     workflow.add_conditional_edges("review", route_after_review, {"execute": "execute", "fail": "fail"})

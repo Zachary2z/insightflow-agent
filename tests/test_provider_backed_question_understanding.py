@@ -62,13 +62,13 @@ def test_provider_backed_question_understanding_falls_back_on_malformed_json():
     )
 
     assert result["success"] is True
-    assert result["source"] == "deterministic"
+    assert result["source"] == "provider_unavailable"
     assert result["provider_called"] is True
     assert result["fallback_used"] is True
     assert result["provider_error"]
-    assert result["strategy"] == "template"
-    assert result["intent"]["metric"] == "gmv"
-    assert result["intent"]["dimension"] == "product"
+    assert result["strategy"] == "clarify"
+    assert result["intent"]["metric"] == ""
+    assert result["intent"]["dimension"] == ""
     assert "sql" not in result
     assert "matched_template" not in result
 
@@ -86,12 +86,12 @@ def test_provider_backed_question_understanding_falls_back_on_schema_mismatch():
     )
 
     assert result["success"] is True
-    assert result["source"] == "deterministic"
+    assert result["source"] == "provider_unavailable"
     assert result["provider_called"] is True
     assert result["fallback_used"] is True
     assert result["validation_error"]
-    assert result["strategy"] == "template"
-    assert result["intent"]["dimension"] == "product"
+    assert result["strategy"] == "clarify"
+    assert result["intent"]["dimension"] == ""
 
 
 def test_provider_none_keeps_deterministic_no_key_baseline():
@@ -126,8 +126,8 @@ def test_provider_backed_question_understanding_preserves_unsafe_risk_flags_as_r
     )
 
     assert result["success"] is True
-    assert result["source"] == "provider"
-    assert result["provider_called"] is True
+    assert result["source"] == "safety_guard"
+    assert result["provider_called"] is False
     assert result["fallback_used"] is False
     assert result["strategy"] == "reject"
     assert result["risk_flags"] == ["sensitive_field", "bulk_export"]
