@@ -6,13 +6,13 @@ from typing import Any
 
 from agents.action_planner import run_action_planner_agent
 from agents.action_verifier import run_action_verifier_agent
-from agents.chart_agent import run_chart_agent
 from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.report_agent import run_report_agent
 from agents.report_supervisor import run_report_supervisor_agent
 from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
 from agents.supervisor import initialize_run
+from agents.visualization_agent import run_visualization_agent
 from api.models import RunCreateRequest
 from api.run_manager import RunManager
 from dashboard.trace_dashboard import build_trace_dashboard
@@ -127,7 +127,7 @@ def run_report_generation_demo(
         return state
     state = run_context_retriever_agent(state)
     state = run_evidence_validator_agent(state)
-    state = run_chart_agent(state, output_dir=chart_dir)
+    state = run_visualization_agent(state, output_dir=chart_dir)
     state = run_report_agent(state, output_dir=report_dir)
     return state
 

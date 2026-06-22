@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agents.chart_agent import run_chart_agent
 from agents.context_retriever import run_context_retriever_agent
 from agents.evidence_validator import run_evidence_validator_agent
 from agents.insight_claim_typer import run_insight_claim_typer_agent
 from agents.metric_agent import run_metric_agent
 from agents.report_planner import LLMProvider, run_report_planner_agent
 from agents.report_writer import run_report_writer_agent
+from agents.visualization_agent import run_visualization_agent
 from llm_ops.runtime_provider import build_business_review_planner_provider
 from llm_ops.runtime_provider import build_claim_typing_provider
 from llm_ops.runtime_provider import build_report_writer_provider
@@ -250,20 +250,10 @@ def _claims_for_section(section: dict[str, Any], execution_result: dict[str, Any
     return [f"{section['title']} 返回 {execution_result.get('row_count', 0)} 行数据"]
 
 
-def _chart_spec(section: dict[str, Any], state: dict[str, Any]) -> dict[str, Any] | None:
-    if section.get("expected_chart_type") == "none":
-        return None
+def _has_visualization_data(state: dict[str, Any]) -> bool:
     execution_result = state.get("execution_result", {})
     columns = execution_result.get("columns") or []
-    if len(columns) < 2 or not execution_result.get("rows"):
-        return None
-    return {
-        "chart_type": section.get("expected_chart_type", "bar"),
-        "x": columns[0],
-        "y": columns[-1],
-        "title": section["section_id"],
-        "run_id": f"{state.get('run_id', 'run_unknown')}_{section['section_id']}",
-    }
+    return len(columns) >= 2 and bool(execution_result.get("rows"))
 
 
 def _run_section(
@@ -305,10 +295,8 @@ def _run_section(
         task_state = run_evidence_validator_agent(task_state)
 
     chart_paths: list[str] = []
-    chart_spec = _chart_spec(section, task_state)
-    if chart_spec:
-        task_state["chart_spec"] = chart_spec
-        task_state = run_chart_agent(task_state, output_dir=chart_dir)
+    if _has_visualization_data(task_state):
+        task_state = run_visualization_agent(task_state, output_dir=chart_dir)
         chart_paths = task_state.get("chart_paths", [])
 
     status = "completed" if review_result.get("approved") and execution_result.get("success") else "failed"

@@ -417,5 +417,47 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "The chart explanation basis must come from Evidence Validator outputs."
             ),
         ),
+        PromptTemplate(
+            prompt_id="visualization_agent",
+            version="v1",
+            description="Choose a validated chart spec and visualization delivery tool from real execution evidence.",
+            required_variables=[
+                "user_question",
+                "analysis_steps",
+                "execution_columns",
+                "execution_sample_rows",
+                "evidence_result",
+                "delivery_tool_catalog",
+            ],
+            safety_contract=[
+                "must_only_reference_execution_columns",
+                "must_select_known_delivery_tool",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_generate_final_claims",
+                "must_not_create_action_payloads",
+                "must_not_return_credentials_or_secrets",
+                "must_not_fabricate_rows_or_metrics",
+                "must_not_bypass_evidence_validator",
+            ],
+            template=(
+                "Task: visualization agent decision.\n"
+                "User question: {user_question}\n"
+                "Analysis steps: {analysis_steps}\n"
+                "Execution columns: {execution_columns}\n"
+                "Execution sample rows: {execution_sample_rows}\n"
+                "Evidence Validator result: {evidence_result}\n"
+                "Delivery tool catalog: {delivery_tool_catalog}\n"
+                "Return JSON only with chart_spec, delivery_tool_id, and tool_reason.\n"
+                "chart_spec schema: chart_type, title, x, y, y_secondary, series, required_columns, "
+                "and explanation_basis. Allowed chart_type values: ranked_bar, line, grouped_bar, "
+                "dual_axis_line, funnel, heatmap, scatter, risk_matrix.\n"
+                "Allowed delivery_tool_id values: local_renderer, excel_exporter, powerbi_publisher_mock.\n"
+                "Safety: reference only execution columns; select only a known delivery tool; do not generate "
+                "SQL, final claims, final answers, action payloads, approval fields, credentials, secrets, "
+                "fabricated rows, or fabricated metrics. The chart explanation basis must come from Evidence "
+                "Validator outputs."
+            ),
+        ),
     ]
 )

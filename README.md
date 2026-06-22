@@ -2,11 +2,11 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
 
-P0, P1, P2, P3, P4, P5, P6, and P7 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple and advanced chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-planning paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, generate validated visualization specs from real execution results, and preserve SQL validation before any SQL execution.
+P0, P1, P2, P3, P4, P5, P6, P7, and P8.1 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, action/email-drafting, and visualization-agent paths, mine validated `llm_candidate` trace patterns for future template recommendations, seed realistic ecommerce scenario tables, retrieve semantic metrics/dimensions/entities/join paths, decompose realistic business questions into scenario analysis steps, choose validated visualization specs and delivery tools from real execution results, export real rows to XLSX, mock external Power BI publishing without network access, and preserve SQL validation before any SQL execution.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, and P7 - Visualization Intelligence are complete. P8 - Agent Pipeline UX is next.
+P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, P2 - Business Review & Action Workflow, P3 - MCP & Engineering Core, P4 - Realistic Scenario Dataset, P5 - Lightweight Semantic Layer, P6 - Scenario Analysis Planner, P7 - Visualization Intelligence, and P8.1 - Visualization Agent Dedupe & External Tool Calling are complete. P8.2 - Intent & SQL Planning Agent Cleanup is next.
 
 Implemented:
 
@@ -18,7 +18,7 @@ Implemented:
 - 20-case eval benchmark
 - P1 business context retrieval for business rules, table docs, and historical SQL examples
 - P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
-- P1 chart generation for bar, line, and optional pie charts
+- P1/P8 visualization artifacts through the LLM-first `VisualizationAgent`, validated chart specs, local renderer, Excel exporter, and Power BI mock publisher
 - P1 Markdown report generation with SQL, execution evidence, charts, and trace links
 - P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
 - P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
@@ -45,8 +45,9 @@ Implemented:
 - P5 lightweight semantic layer for metrics, dimensions, entities, join paths, semantic retrieval, metric-tool compatibility, and context semantic attachment
 - P6 Scenario Analysis Planner with deterministic and provider-backed scenario decomposition into `analysis_steps`, semantic-layer metrics/dimensions/tables, workflow state/trace metadata, and fallback on malformed or unsafe provider output
 - P7 Visualization Intelligence with validated chart specs for `ranked_bar`, `line`, `grouped_bar`, `dual_axis_line`, `funnel`, `heatmap`, `scatter`, and `risk_matrix`; renderer fallback for unsupported chart types; provider-backed visualization planning through PromptOps structured output; and workflow trace metadata without bypassing SQL or evidence boundaries
+- P8.1 Visualization Agent Dedupe & External Tool Calling with `agents/visualization_agent.py` as the only business visualization entry point; provider-backed structured output chooses both `chart_spec` and `delivery_tool_id`; deterministic code validates chart columns and delivery policy, executes `local_renderer`, `excel_exporter`, or `powerbi_publisher_mock`, records trace metadata, and never fabricates rows
 
-P8 - Agent Pipeline UX is the next planned phase. P7 visualization planning now builds on P6 planning and validated query results without bypassing SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+P8.1 deleted the old `agents/chart_agent.py` and `agents/visualization_planner.py` product paths. `tools/chart_tool.py` remains only as a thin compatibility renderer that accepts an already-decided chart spec and delegates to `visualization/chart_renderer.py`; it no longer infers chart type or builds business chart specs. P8.2-P8.4 continue the accepted cleanup plan for intent/SQL planning, report/insight cleanup, and action/tool adapters; P8.5 makes the cleaned pipeline visible in Streamlit.
 
 Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
@@ -54,9 +55,9 @@ Track current phase, task status, test status, acceptance progress, and remainin
 
 The default P0/P1/P2 workflow is deterministic and does not call a real LLM, so an API key is not required for the completed workflow. P3 Task 20 adds no-key provider and PromptOps infrastructure with a mock provider contract. P3 Task 20C adds a production `DeepSeekProvider`, but live DeepSeek calls remain explicitly opt-in through `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`.
 
-LLM usage should be additive, optional, and bounded by tools, validators, and trace:
+LLM usage should now be the product path for business decisions, bounded by tools, validators, and trace. Completed deterministic features remain historical context or safety boundaries, but conflicting old product paths can be deleted during cleanup:
 
-- **Current baseline**: deterministic Agent state transitions, SQL validation, SQL execution, evidence validation, chart generation, report saving, and trace logging remain the source of truth.
+- **Current retained baseline**: SQL validation, SQL execution, evidence validation, report saving, approval, audit, and trace logging remain deterministic safety/execution boundaries.
 - **P2 controlled enhancement**: introduce an optional LLM adapter for report task planning, report section outlining, business-language polishing, and user clarification questions. LLM outputs must be structured and checked before use.
 - **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
 - **P3 question understanding**: Task 20A adds a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
@@ -64,7 +65,7 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
 - **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
 - **P3 provider-backed question understanding**: Task 21 adds an optional provider-backed path behind the deterministic question-understanding router. Provider output must pass the `question_understanding` structured-output validator, is normalized to the existing intent schema, and falls back deterministically on provider errors, malformed JSON, schema mismatch, or missing provider configuration.
-- **P3 provider-backed clarification**: Task 22 adds an optional provider-backed clarification router. When provider clarification is active, ambiguous questions stop before schema/SQL generation and return provider-generated follow-up questions; no-key deterministic baseline continues through the existing P0 SQL workflow.
+- **P3 provider-backed clarification**: Task 22 added an optional provider-backed clarification router. In the current cleanup direction, provider-backed clarification is the product path when enabled; missing-provider behavior should be structured and should not grow into a duplicate business-rule engine.
 - **P3 provider-assisted SQL planning and candidates**: Task 23 wires optional DeepSeek-backed SQL planning and guarded SQL candidate generation into `run_workflow()`. Planning output cannot contain SQL, candidate SQL must pass `validate_sql()`, and the original SQL Reviewer still approves SQL before execution.
 - **P3 provider-backed business review decomposition**: Task 24 wires optional DeepSeek-backed report planning into `run_report_supervisor_agent()`. Provider output can select only allowlisted weekly/monthly report sections, is rejected if it supplies SQL or factual claims, and falls back to deterministic review planning on provider or validation failure.
 - **P3 evidence-backed report writing**: Task 25 wires optional DeepSeek-backed report prose into `run_report_agent()` and `run_report_supervisor_agent()` after Evidence Validator. Provider prose must pass the `report_writer` schema, reference only verified findings or hypotheses, and is rejected if it includes blocked unsupported claims.
@@ -72,7 +73,8 @@ LLM usage should be additive, optional, and bounded by tools, validators, and tr
 - **P3 action and email drafting**: Task 27 wires optional DeepSeek-backed `action_drafter` output into `run_action_planner_agent()`. The provider can draft task, metric-alert, and email-draft payloads from Evidence Validator outputs, but those drafts still flow through Risk Assessor, Approval Gate, Action Executor, and Audit Logger before any SQLite action record is created.
 - **P3 template mining and eval**: Task 28 writes safe template-mining metadata into accepted guarded SQL candidate trace events, mines saved workflow trace files for repeated successful `llm_candidate` intent signatures, and expands `run_llm_smoke_eval()` with prompt-specific structured validation plus expected malformed/schema-failure cases.
 - **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
-- **P7 provider-backed visualization planning**: Optional provider output can suggest chart specs only through `visualization_planner` structured validation and execution-column checks. Provider output cannot include SQL, final claims, or action payloads, and malformed or unsafe output falls back to deterministic visualization specs.
+- **P7 visualization safety layer**: Completed chart specs, validation, and rendering safety remain as reusable boundaries.
+- **P8.1 LLM-first visualization delivery**: `VisualizationAgent` is now the only visualization business entry point. Provider output chooses both a validated chart spec and a registered delivery tool such as local rendering, Excel export, or a Power BI mock publisher. Deterministic code handles chart validation, tool policy validation, adapter execution, artifact hygiene, and trace metadata. Old chart-decision rules and obsolete chart-agent/chart-tool tests were deleted.
 
 LLM boundaries:
 
@@ -83,7 +85,7 @@ Final LLM participation map:
 
 | Area | LLM role | Hard boundary |
 |---|---|---|
-| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Must not change the no-key deterministic baseline |
+| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Must preserve deterministic safety boundaries and structured provider-unavailable handling |
 | Question understanding | Extract metric, dimension, time range, filters, operation, limit, and risk flags | Must not generate or execute SQL |
 | Clarification routing | Ask focused follow-up questions for ambiguous requests | Must not guess missing SQL requirements |
 | SQL planning | Choose template, guarded `llm_candidate`, clarify, or reject strategy | Must not return executable SQL directly |
@@ -91,6 +93,7 @@ Final LLM participation map:
 | Report planning | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
 | Insight/report wording | Suggest claims or polish business-language summaries | Every claim must pass Evidence Validator before use |
 | Action drafting | Draft task, alert, or email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
+| Visualization delivery | Choose chart spec and delivery tool from a validated catalog | Must pass chart validation, tool policy validation, adapter execution boundaries, and no-fabricated-data checks |
 | Template mining feedback | Summarize repeated successful `llm_candidate` patterns from saved workflow traces | Must not automatically modify production templates |
 | LLM eval / smoke tests | Validate provider availability, JSON shape, prompt schemas, and failure handling | Live provider tests must remain explicit opt-in |
 
@@ -99,19 +102,19 @@ The development plan tracks this as the final LLM participation boundary: LLMs m
 Runtime LLM development standard:
 
 - Do not stop at standalone provider helpers; each LLM task must be wired into `graph.workflow`, FastAPI, Streamlit helpers, report supervisor, or action workflow.
-- Keep the no-key deterministic baseline available.
+- Keep provider-unavailable behavior structured; do not preserve duplicate business-rule engines just for no-key mode.
 - Record `provider_called`, `fallback_used`, prompt id/version, validation status, and fallback errors in state or trace.
 - Add both mocked runtime tests and a live DeepSeek smoke test for the affected workflow path.
 
-Enable provider-backed visualization planning in the runtime workflow:
+Enable provider-backed visualization decisions in the runtime workflow:
 
 ```bash
-export INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_PLANNER=1
+export INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1
 export DEEPSEEK_API_KEY=...
-python -c "from graph.workflow import run_workflow; print(run_workflow('请画最近 30 天 GMV 趋势图')['visualization_plan'])"
+python -c "from graph.workflow import run_workflow; print(run_workflow('请画最近 30 天 GMV 趋势图')['visualization_decision'])"
 ```
 
-The visualization provider can only return a chart spec. It cannot generate SQL, final claims, or action payloads, and every referenced column must exist in the real `execution_result`.
+The visualization provider can only return a chart spec, delivery tool id, and tool reason. It cannot generate SQL, final claims, action payloads, credentials, secrets, fabricated rows, or fabricated metrics, and every referenced column must exist in the real `execution_result`.
 
 ## Question Understanding And SQL Routing
 
@@ -364,17 +367,23 @@ print(state["trace"][-1])
 
 The Agent writes `state["evidence_result"]` and appends trace. It does not run SQL, generate charts, or save reports.
 
-## Chart Agent
+## Visualization Agent
 
-Task 13 adds chart generation for P1. The Chart Agent infers simple chart specs from the user question and `execution_result`, then calls `generate_chart()` to write PNG files under `reports/charts/` by default.
+P8.1 makes `agents/visualization_agent.py` the only business visualization entry point. It receives the user question, `analysis_steps`, `execution_result`, and `evidence_result`, then asks the provider for structured output containing:
 
-Rules:
+- `chart_spec`
+- `delivery_tool_id`
+- `tool_reason`
 
-- ranking / top questions -> bar chart
-- trend / monthly questions -> line chart
-- share / percentage questions -> pie chart, when requested
+Provider output is rejected if it contains SQL, final claims, action payloads, credentials, secrets, fabricated rows, fabricated metrics, unknown chart types, unknown delivery tools, or columns not present in the real `execution_result`. Rejected or unavailable provider output falls back to a minimal local-renderer decision based only on mechanical column availability.
 
-Tool interface:
+Delivery tools:
+
+- `local_renderer`: delegates to `visualization/chart_renderer.py` and renders only real execution rows.
+- `excel_exporter`: writes a local `.xlsx` workbook containing only `execution_result.columns` and `execution_result.rows`.
+- `powerbi_publisher_mock`: simulates external BI publishing without OAuth, API keys, network access, or real Power BI calls, returning `mock://powerbi/{run_id}/{artifact_name}`.
+
+Compatibility render tool:
 
 ```python
 from tools.chart_tool import generate_chart
@@ -385,7 +394,7 @@ result = generate_chart(
         "rows": [["Laptop Pro 14", 511248.56], ["Camera A", 456050.99]],
     },
     chart_spec={
-        "chart_type": "bar",
+        "chart_type": "ranked_bar",
         "x": "product_name",
         "y": "gmv",
         "title": "Top Products by GMV",
@@ -396,18 +405,7 @@ print(result["chart_path"])
 print(result["trace_event"])
 ```
 
-Agent interface:
-
-```python
-from agents.chart_agent import run_chart_agent
-
-state = run_chart_agent(state)
-print(state["chart_path"])
-print(state["chart_paths"])
-print(state["trace"][-1])
-```
-
-The Agent writes `state["chart_result"]`, `state["chart_path"]`, and `state["chart_paths"]`, and appends trace. It does not run SQL or save reports.
+This lower-level `generate_chart()` compatibility wrapper only accepts an already-decided chart spec and calls `visualization/chart_renderer.py`. It does not infer chart types or create business chart specs.
 
 ## Report Agent
 
@@ -1000,7 +998,7 @@ Task 21A runtime behavior:
 
 - `run_workflow()` always writes `question_understanding`, `intent_slots`, and `routing_strategy` into workflow state.
 - With `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1` and a valid `DEEPSEEK_API_KEY`, the workflow creates a `DeepSeekProvider` and calls the provider-backed path.
-- Without the flag or without a key, the same workflow uses deterministic question understanding.
+- Without the flag or without a key, this historical path uses deterministic question understanding; P8 cleanup should not expand that rule path and may replace it with structured provider-unavailable handling where it conflicts with the LLM-first product path.
 - Streamlit demo helpers and FastAPI async runs inherit this through the core workflow.
 - A live workflow smoke test is available with:
 
@@ -1014,7 +1012,7 @@ Task 22 runtime behavior:
 - `run_workflow()` now runs a clarification router after question understanding and before schema retrieval.
 - With `INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1` and a valid `DEEPSEEK_API_KEY`, ambiguous questions call the DeepSeek-backed clarification prompt and return focused follow-up questions.
 - Provider clarification stops before schema retrieval, SQL generation, SQL execution, and SQL planning.
-- Without the flag or without a key, the no-key deterministic baseline continues through the existing P0 SQL workflow.
+- Without the flag or without a key, this historical path continues through the existing P0 SQL workflow; P8 cleanup should not expand that path into a duplicate product experience.
 - Provider output must pass the `clarification_router` structured-output validator before it is used.
 
 Example:

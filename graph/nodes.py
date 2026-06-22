@@ -14,7 +14,7 @@ from agents.schema_agent import run_schema_agent
 from agents.sql_planning_router import run_sql_planning_router_agent
 from agents.sql_generator import run_sql_generator
 from agents.sql_reviewer import run_sql_reviewer
-from agents.visualization_planner import run_visualization_planner_agent
+from agents.visualization_agent import run_visualization_agent
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
 
@@ -158,10 +158,10 @@ def claim_typing_node(state: AgentState, provider=None) -> AgentState:
     return run_insight_claim_typer_agent(dict(state), provider=provider)
 
 
-def visualization_planner_node(state: AgentState, provider=None) -> AgentState:
+def visualization_agent_node(state: AgentState, provider=None) -> AgentState:
     if state.get("status") != "completed":
         return dict(state)
-    return run_visualization_planner_agent(dict(state), provider=provider)
+    return run_visualization_agent(dict(state), provider=provider)
 
 
 def fail_response_node(state: AgentState) -> AgentState:

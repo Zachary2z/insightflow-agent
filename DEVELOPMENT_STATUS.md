@@ -15,13 +15,13 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P8 - Agent Pipeline UX |
-| Current task | Not started |
-| Next planned task | Make agent/tool/LLM/fallback/safety-gate participation clearer in Streamlit |
-| Last completed task | P7 Visualization Intelligence |
+| Current phase | P8.1 - Visualization Agent Dedupe & External Tool Calling complete |
+| Current task | P8.1 implemented and under final verification |
+| Next planned task | P8.2 - Intent & SQL Planning Agent Cleanup |
+| Last completed task | P8.1 Visualization Agent Dedupe & External Tool Calling |
 | Main demo target | Realistic Agentic BI analysis with semantic planning, validated SQL, evidence, and visualization |
 | Active frontend | Streamlit |
-| Out of scope for current baseline | React frontend, Docker/CI, RBAC, full ActionOps product suite, external SaaS integrations, vector database, and unguarded LLM-driven SQL/report generation |
+| Out of scope for current P8.1 | Real Power BI OAuth/API publishing, React frontend, Docker/CI, RBAC, vector database, full ActionOps product suite, and unguarded LLM-driven SQL/report/action execution |
 
 ## Phase Overview
 
@@ -34,9 +34,12 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P4 | Realistic Scenario Dataset | `[x]` realistic scenario tables, deterministic anomaly profiles, business rules, table docs, metrics, and seed integration complete | `[x]` `tests/test_realistic_seed_data.py` passing; P0 eval preserved | `[x]` realistic scenario docs added to data docs and planning notes | `[x]` Done |
 | P5 | Lightweight Semantic Layer | `[x]` `semantic_layer/` metrics, dimensions, entities, join paths, loader, retriever, metric tool compatibility, and context semantic attachment complete | `[x]` semantic layer tests 6/6 passing; related regression 23/23 passing; full suite 203 passed / 9 skipped; P0 eval 20/20 passing | `[x]` DEVELOPMENT_PLAN and DEVELOPMENT_STATUS now expose phase status at the top | `[x]` Done |
 | P6 | Scenario Analysis Planner | `[x]` deterministic planner, provider-backed planner validation, runtime provider switch, workflow state, and trace metadata complete | `[x]` planner tests 9/9 passing; related regression 22/22 passing; full suite 212 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P7 | Visualization Intelligence | `[x]` `visualization/` registry/spec/validator/renderer, deterministic/provider-backed `agents/visualization_planner.py`, chart-agent advanced rendering path, workflow state/trace metadata, and runtime provider switch complete | `[x]` visualization tests 8/8 passing; related regression 21/21 passing; full suite 220 passed / 9 skipped; P0 eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P8 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
-| P8.5 | Structural Slimming And UI Consolidation | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
+| P7 | Visualization Intelligence | `[x]` `visualization/` registry/spec/validator/renderer and workflow trace metadata complete; P8.1 later replaced the old planner/agent product path | `[x]` visualization tests preserved | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` `agents/visualization_agent.py`, `visualization_delivery/`, and `tools/external_visualization_tool.py` complete; old `agents/chart_agent.py` and `agents/visualization_planner.py` deleted; `tools/chart_tool.py` reduced to a render-only compatibility wrapper | `[x]` P8.1 tests 14/14 passing; focused visualization tests 17/17 passing; related regression 36/36 passing; full suite 223 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P8.2 | Intent & SQL Planning Agent Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Next |
+| P8.3 | Report & Insight Agent Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
+| P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
+| P8.5 | Agent Pipeline UX | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Later |
 | P9 | Realistic Eval And Demo Polish | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 | P10 | Lightweight Engineering Hardening | `[ ]` not started | `[ ]` tests pending | `[ ]` docs pending | `[ ]` Not started |
 
@@ -145,7 +148,7 @@ Final LLM participation map added to the tracked [DEVELOPMENT_PLAN.md](DEVELOPME
 
 | Area | Intended LLM role | Boundary |
 |---|---|---|
-| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Preserve no-key deterministic baseline |
+| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Preserve deterministic safety boundaries and structured provider-unavailable handling |
 | Question understanding and clarification | Extract intent slots and ask missing-context questions | No SQL generation or execution |
 | SQL planning and guarded SQL candidates | Route to deterministic templates or propose validated candidates for clear non-template questions | `validate_sql()` remains mandatory before `run_sql()` |
 | Report planning and business review decomposition | Select allowlisted report sections and organize subtasks | No provider-supplied SQL or final factual claims |
@@ -157,7 +160,7 @@ Non-negotiable deterministic ownership remains with `validate_sql()`, `run_sql()
 
 ### LLM Enhancement Task Backlog
 
-These tasks are the concrete development plan for future model-enhanced behavior. They must be implemented one task at a time using TDD, and each task must preserve the no-key deterministic baseline, full test suite, and P0 eval.
+These completed tasks are historical LLM enhancement records. Future P8.1-P8.5 cleanup follows the newer rule in `DEVELOPMENT_PLAN.md`: conflicting legacy product paths may be deleted, obsolete tests may be removed or rewritten, focused tests are enough during a migration slice, and full pytest/P0 eval run at phase completion or before commit/push.
 
 | Task | Development | Tests | Docs | Status |
 |---|---|---|---|---|
@@ -175,14 +178,14 @@ These tasks are the concrete development plan for future model-enhanced behavior
 
 - `[ ]` Each task must have dedicated tests before implementation.
 - `[ ]` Each LLM task must wire the feature into at least one real project runtime path: `graph.workflow`, FastAPI run API, Streamlit helper/demo, report supervisor, or action workflow.
-- `[ ]` Each LLM task must expose trace/state evidence showing whether the provider was called and whether fallback was used.
-- `[ ]` Each LLM task must include a live DeepSeek smoke test for its runtime path, not only mock-provider unit tests.
+- `[ ]` Each LLM task must expose trace/state evidence showing whether the provider was called and how provider-unavailable or validation failures were handled.
+- `[ ]` Live DeepSeek smoke tests are required for major provider-backed phase completion, not every small cleanup edit.
 - `[ ]` Each task must return structured dict / JSON-compatible outputs.
-- `[ ]` Provider failures must return `success: false` or deterministic fallback instead of crashing workflows.
+- `[ ]` Provider failures must return `success: false` or explicit provider-unavailable states instead of crashing workflows.
 - `[ ]` No task may bypass `validate_sql()`, `run_sql()`, Evidence Validator, Approval Gate, Audit Logger, Trace Logger, or MCP safety wrappers.
-- `[ ]` The default workflow must keep running without an API key.
-- `[ ]` `python3 -m pytest` must pass after every task.
-- `[ ]` `python3 eval/run_eval.py` must remain 20/20 passed after every task.
+- `[ ]` Missing-provider behavior must be structured and must not revive removed rule trees.
+- `[ ]` Focused tests should pass during each migration slice.
+- `[ ]` Full pytest and `python3 eval/run_eval.py` must pass at phase completion or before commit/push.
 - `[ ]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS must be updated after every task.
 
 ## P2 - Business Review & Action Workflow
@@ -554,8 +557,32 @@ These tasks are the concrete development plan for future model-enhanced behavior
 - `[x]` Malformed provider output and provider/schema errors fall back to deterministic chart specs without crashing.
 - `[x]` `agents/chart_agent.py` preserves the old simple bar/line/pie path while using P7 visualization planning when analysis/evidence context is present.
 - `[x]` Workflow adds visualization plan state and trace metadata after SQL execution and insight/claim typing without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
-- `[x]` Default no-key deterministic baseline works without an API key or provider.
-- `[x]` P0 workflow and P0 eval remain compatible and provider-independent by default.
+- `[x]` Historical P7 baseline: default no-key deterministic visualization planning worked without an API key or provider before the P8 cleanup.
+- `[x]` Historical P7 baseline: P0 workflow and P0 eval remained compatible and provider-independent before the P8 cleanup.
+
+### P8.1 Visualization Agent Dedupe & External Tool Calling Plan
+
+- `[ ]` Add `agents/visualization_agent.py` as the main visualization decision entry point.
+- `[ ]` Reuse P7 `visualization/` chart spec, validator, and renderer as safety/tool foundations instead of duplicating chart rules.
+- `[ ]` Add `visualization_delivery/tool_catalog.py` with registered delivery tools: `local_renderer`, `excel_exporter`, and `powerbi_publisher_mock`.
+- `[ ]` Add a structured `visualization_decision` prompt/schema that lets the provider select both chart spec and delivery tool.
+- `[ ]` Add `tools/external_visualization_tool.py` plus delivery adapters that validate tool policy before execution.
+- `[ ]` Keep deterministic code for column validation, tool existence, artifact policy, trace metadata, and adapter execution.
+- `[ ]` Avoid large keyword-rule trees for chart/tool choice; meaningful business-intent decisions should be provider-backed when enabled.
+- `[ ]` Delete old chart-decision behavior and obsolete tests instead of preserving parallel compatibility paths.
+- `[ ]` Reject provider output containing SQL, final claims, action payloads, approval fields, credentials, unknown tool ids, unsupported chart types, missing columns, malformed JSON, or fabricated rows.
+- `[ ]` Make Excel export write a real local workbook from `execution_result.rows`.
+- `[ ]` Make Power BI delivery an explicit mock external adapter returning `external_tool_called: true` and a `mock://powerbi/...` artifact URL; no real SaaS auth/API in P8.1.
+- `[ ]` Wire workflow state/trace after SQL execution and Evidence Validator without bypassing Schema Agent, Metric Agent, SQL Reviewer, `validate_sql()`, `run_sql()`, or Evidence Validator.
+- `[ ]` Add focused tests for provider success, provider malformed output, unsafe provider output, missing columns, unknown tool ids, real-row export/rendering, mock external publish trace, and retained workflow safety boundaries.
+- `[ ]` Run full pytest and P0 eval at P8.1 completion or before commit/push, not after every small edit or for deleted legacy behavior.
+
+### P8.2-P8.4 Cleanup Program Status
+
+- `[ ]` P8.2 Intent & SQL Planning Agent Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
+- `[ ]` P8.3 Report & Insight Agent Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
+- `[ ]` P8.4 Action Agent & Tool Adapter Cleanup is planned in `DEVELOPMENT_PLAN.md`; implementation not started.
+- `[ ]` P8.5 Agent Pipeline UX starts only after P8.1-P8.4 backend cleanup is complete.
 
 ## Update Rules
 
@@ -574,12 +601,11 @@ P7 verification:
 
 ```bash
 python3 -m pytest tests/test_visualization_intelligence.py -q
-python3 -m pytest tests/test_chart_tool.py tests/test_chart_agent.py tests/test_analysis_planner.py tests/test_workflow.py tests/test_sql_validator.py -q
 python3 -m pytest
 python3 eval/run_eval.py
 ```
 
-Result: P7 visualization tests report 8/8 passed; chart tool/agent, analysis planner, workflow, and SQL validator regressions report 21/21 passed; the default full suite reports 220 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reports 20/20 passed. P7 adds deterministic and provider-backed visualization planning, validates chart specs against real execution columns, renders first-batch advanced charts only from real execution rows, falls back safely for unsupported or malformed provider output, and preserves SQL validation, SQL execution, Evidence Validator, action approval, audit, and no-key baseline boundaries.
+Result: Historical P7 verification passed before P8 cleanup. The retained P7 boundary is chart spec validation and no-fabricated-data rendering; obsolete chart-tool/chart-agent product-path tests are deleted during P8.1 cleanup. The historical default full suite reported 220 passed and 9 opt-in live DeepSeek tests skipped by default; P0 eval reported 20/20 passed.
 
 P6 verification:
 
@@ -847,12 +873,11 @@ Result: Task 14 tests report 5/5 passed; the full test suite reports 77/77 passe
 Task 13 verification:
 
 ```bash
-python3 -m pytest tests/test_chart_tool.py tests/test_chart_agent.py
 python3 -m pytest
 python3 eval/run_eval.py
 ```
 
-Result: Task 13 tests report 6/6 passed; the full test suite reports 72/72 passed; P0 eval reports 20/20 passed. Chart Tool generates real PNG chart files, Chart Agent infers bar and line charts, writes `chart_path` and `chart_paths` into state, and appends trace without running SQL or generating reports.
+Result: Historical Task 13 verification passed before P8 cleanup. The old Chart Tool / Chart Agent business path is no longer retained as the planned product path; P8.1 replaces it with one LLM-first Visualization Agent plus approved external visualization tool adapters.
 
 Task 12 verification:
 

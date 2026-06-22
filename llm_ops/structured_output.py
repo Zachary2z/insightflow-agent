@@ -655,6 +655,82 @@ def _validate_visualization_planner(content: Any, schema_context: dict[str, Any]
     )
 
 
+def _blocked_key_paths(value: Any, blocked_fields: set[str], prefix: str = "") -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            path = f"{prefix}.{key_text}" if prefix else key_text
+            normalized_key = key_text.strip().lower()
+            if normalized_key in blocked_fields:
+                paths.append(path)
+            paths.extend(_blocked_key_paths(child, blocked_fields, path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            paths.extend(_blocked_key_paths(child, blocked_fields, f"{prefix}[{index}]"))
+    return paths
+
+
+def _validate_visualization_agent(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "visualization_agent"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "visualization_agent output must be an object")
+
+    blocked_fields = {
+        "sql",
+        "generated_sql",
+        "sql_candidates",
+        "candidate_sql",
+        "final_claims",
+        "claims",
+        "final_answer",
+        "action_payload",
+        "actions",
+        "created_actions",
+        "approval_status",
+        "credentials",
+        "credential",
+        "secrets",
+        "secret",
+        "api_key",
+        "token",
+        "password",
+        "fabricated_rows",
+        "fabricated_metrics",
+    }
+    leaked = _blocked_key_paths(content, blocked_fields)
+    if leaked:
+        return _error(prompt_id, f"visualization_agent must not return blocked fields: {', '.join(sorted(leaked))}")
+
+    chart_spec = content.get("chart_spec")
+    if not isinstance(chart_spec, dict):
+        return _error(prompt_id, "chart_spec must be an object")
+
+    chart_validation = _validate_visualization_planner(chart_spec, schema_context)
+    if not chart_validation.get("success"):
+        return _error(prompt_id, chart_validation.get("error", "chart_spec validation failed"))
+
+    delivery_tool_id = str(content.get("delivery_tool_id", "")).strip()
+    allowed_tools = set(schema_context.get("delivery_tool_ids", []))
+    if not delivery_tool_id:
+        return _error(prompt_id, "delivery_tool_id is required")
+    if allowed_tools and delivery_tool_id not in allowed_tools:
+        return _error(prompt_id, f"delivery_tool_id is not allowed: {delivery_tool_id}")
+
+    tool_reason = str(content.get("tool_reason", "")).strip()
+    if not tool_reason:
+        return _error(prompt_id, "tool_reason is required")
+
+    return _ok(
+        prompt_id,
+        {
+            "chart_spec": chart_validation["content"],
+            "delivery_tool_id": delivery_tool_id,
+            "tool_reason": tool_reason,
+        },
+    )
+
+
 def validate_prompt_output(
     prompt_id: str,
     content: Any,
@@ -683,6 +759,8 @@ def validate_prompt_output(
         return _validate_analysis_planner(content)
     if prompt_id == "visualization_planner":
         return _validate_visualization_planner(content, context)
+    if prompt_id == "visualization_agent":
+        return _validate_visualization_agent(content, context)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")
 
 
