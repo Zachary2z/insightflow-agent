@@ -128,6 +128,44 @@ SAFETY_BOUNDARIES = [
     {"boundary": "Trace Logger", "status": "mandatory", "owner": "tools.trace_logger"},
 ]
 
+RUN_DETAIL_SECTIONS: list[dict[str, str]] = [
+    {
+        "id": "ask",
+        "title": "01 · Ask",
+        "summary": "Business question, selected run context, and provider mode.",
+    },
+    {
+        "id": "executive_answer",
+        "title": "02 · Executive Answer",
+        "summary": "Final answer, workflow status, row count, evidence status, and safety status.",
+    },
+    {
+        "id": "data",
+        "title": "03 · Data",
+        "summary": "Generated SQL, SQL review, execution table, and repair details.",
+    },
+    {
+        "id": "visualization_delivery",
+        "title": "04 · Visualization Delivery",
+        "summary": "Visualization Agent decision, delivery tool, artifact, and data hygiene.",
+    },
+    {
+        "id": "evidence_report",
+        "title": "05 · Evidence & Report",
+        "summary": "Evidence Validator results, unsupported claims, chart paths, and report outputs.",
+    },
+    {
+        "id": "action_approval",
+        "title": "06 · Action & Approval",
+        "summary": "Action drafts, risk assessment, approval state, created actions, and audit id.",
+    },
+    {
+        "id": "trace_system",
+        "title": "07 · Trace & System Details",
+        "summary": "Agent pipeline, tool calls, validator gates, artifacts, source metadata, and trace JSON.",
+    },
+]
+
 
 def build_capability_overview() -> list[dict[str, Any]]:
     return [dict(item) for item in CAPABILITY_CATALOG]
@@ -457,6 +495,7 @@ def build_run_detail_view_model(state: dict[str, Any]) -> dict[str, Any]:
         "artifact_panel": build_artifact_panel(state),
         "sources": build_source_cards(state),
         "safety_boundaries": list(SAFETY_BOUNDARIES),
+        "run_sections": [dict(section) for section in RUN_DETAIL_SECTIONS],
     }
 
 

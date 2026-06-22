@@ -598,10 +598,36 @@ def _render_trace_dashboard_view(st: Any, config: dict[str, Any]) -> None:
         st.json(summary, expanded=False)
 
 
+def _section(view: dict[str, Any], section_id: str) -> dict[str, str]:
+    for section in view.get("run_sections", []):
+        if section.get("id") == section_id:
+            return section
+    return {"id": section_id, "title": section_id.replace("_", " ").title(), "summary": ""}
+
+
+def _render_block_header(st: Any, section: dict[str, str]) -> None:
+    st.divider()
+    st.subheader(section["title"])
+    if section.get("summary"):
+        st.caption(section["summary"])
+
+
 def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
     view = build_run_detail_view_model(result)
     execution_result = view["execution_result"]
     evidence = view["evidence"]
+
+    _render_block_header(st, _section(view, "ask"))
+    st.write(view["question"] or result.get("user_question", ""))
+    st.json(
+        {
+            "intent": view["intent"],
+            "clarification_questions": view["clarification_questions"],
+        },
+        expanded=False,
+    )
+
+    _render_block_header(st, _section(view, "executive_answer"))
     render_metric_strip(
         st,
         {
@@ -617,69 +643,60 @@ def _render_run_summary(st: Any, result: dict[str, Any]) -> None:
         else:
             st.error(view["answer"])
 
-    st.subheader("Source & Safety")
-    safety_tabs = st.tabs(["Agent Pipeline", "Tool Calls", "Validator Gates", "Artifacts", "Source Metadata"])
-    with safety_tabs[0]:
+    _render_block_header(st, _section(view, "data"))
+    st.code(view["sql"], language="sql")
+    st.json(view["review_result"], expanded=False)
+    if view["execution_rows"]:
+        st.dataframe(view["execution_rows"], use_container_width=True, hide_index=True)
+    render_json_expander(st, "Execution Result", view["execution_result"])
+    render_json_expander(st, "Repair Attempt", view["sql_fix"])
+
+    _render_block_header(st, _section(view, "visualization_delivery"))
+    visualization = view["visualization_delivery"]
+    render_metric_strip(
+        st,
+        {
+            "Delivery Tool": visualization.get("delivery_tool_id", ""),
+            "External Tool Called": visualization.get("external_tool_called", False),
+            "Fallback Used": visualization.get("fallback_used", False),
+            "Rows": visualization.get("data_row_count", 0),
+        },
+    )
+    if visualization.get("artifact"):
+        st.code(visualization["artifact"])
+    st.json(visualization, expanded=True)
+
+    _render_block_header(st, _section(view, "evidence_report"))
+    st.json(view["evidence"], expanded=False)
+    if view["chart_paths"]:
+        st.dataframe([{"chart_path": path} for path in view["chart_paths"]], use_container_width=True, hide_index=True)
+    if view["report_path"]:
+        st.code(view["report_path"])
+    if view["report_sections"]:
+        st.dataframe(view["report_sections"], use_container_width=True, hide_index=True)
+    if view["report_sub_tasks"]:
+        st.dataframe(view["report_sub_tasks"], use_container_width=True, hide_index=True)
+
+    _render_block_header(st, _section(view, "action_approval"))
+    st.json(view["action"], expanded=False)
+
+    _render_block_header(st, _section(view, "trace_system"))
+    with st.expander("Agent Pipeline", expanded=True):
         render_agent_pipeline(st, view["agent_pipeline"])
-    with safety_tabs[1]:
+    with st.expander("Tool Calls", expanded=True):
         render_tool_call_cards(st, view["tool_call_cards"])
-    with safety_tabs[2]:
+    with st.expander("Validator Gates", expanded=True):
         render_validator_gates(st, view["validator_gates"])
         st.dataframe(view["safety_boundaries"], use_container_width=True, hide_index=True)
-    with safety_tabs[3]:
+    with st.expander("Artifacts", expanded=False):
         render_artifact_panel(st, view["artifact_panel"])
-    with safety_tabs[4]:
+    with st.expander("Source Metadata", expanded=False):
         render_source_cards(st, view["sources"])
-
-    st.subheader("Run Detail")
-    detail_tabs = st.tabs(["Intent", "SQL & Data", "Evidence", "Visualization Delivery", "Report", "Action", "Trace"])
-    with detail_tabs[0]:
-        st.json(
-            {
-                "intent": view["intent"],
-                "clarification_questions": view["clarification_questions"],
-            },
-            expanded=True,
-        )
-    with detail_tabs[1]:
-        st.code(view["sql"], language="sql")
-        st.json(view["review_result"], expanded=False)
-        if view["execution_rows"]:
-            st.dataframe(view["execution_rows"], use_container_width=True, hide_index=True)
-        render_json_expander(st, "Execution Result", view["execution_result"])
-        render_json_expander(st, "Repair Attempt", view["sql_fix"])
-    with detail_tabs[2]:
-        st.json(view["evidence"], expanded=False)
-        if view["chart_paths"]:
-            st.dataframe([{"chart_path": path} for path in view["chart_paths"]], use_container_width=True, hide_index=True)
-    with detail_tabs[3]:
-        visualization = view["visualization_delivery"]
-        render_metric_strip(
-            st,
-            {
-                "Delivery Tool": visualization.get("delivery_tool_id", ""),
-                "External Tool Called": visualization.get("external_tool_called", False),
-                "Fallback Used": visualization.get("fallback_used", False),
-                "Rows": visualization.get("data_row_count", 0),
-            },
-        )
-        if visualization.get("artifact"):
-            st.code(visualization["artifact"])
-        st.json(visualization, expanded=True)
-    with detail_tabs[4]:
-        if view["report_path"]:
-            st.code(view["report_path"])
-        if view["report_sections"]:
-            st.dataframe(view["report_sections"], use_container_width=True, hide_index=True)
-        if view["report_sub_tasks"]:
-            st.dataframe(view["report_sub_tasks"], use_container_width=True, hide_index=True)
-    with detail_tabs[5]:
-        st.json(view["action"], expanded=False)
-    with detail_tabs[6]:
+    with st.expander("Trace", expanded=False):
         if view["trace_path"]:
             st.code(view["trace_path"])
         render_trace_timeline(st, view["trace_timeline"])
-        render_json_expander(st, "Trace JSON", load_trace_file(view["trace_path"]) if view["trace_path"] else {})
+        st.json(load_trace_file(view["trace_path"]) if view["trace_path"] else {}, expanded=False)
 
 
 def _render_command_center(st: Any, config: dict[str, Any]) -> None:

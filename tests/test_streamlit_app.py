@@ -249,6 +249,38 @@ def test_run_detail_view_model_exposes_cleaned_agent_pipeline_tool_gates_and_art
     assert artifacts["audit"]["location"] == "audit_1"
 
 
+def test_run_detail_view_model_exposes_vertical_section_order_for_block_layout():
+    from ui.view_models import build_run_detail_view_model
+
+    view = build_run_detail_view_model(
+        {
+            "status": "completed",
+            "final_answer": "Top product is Laptop.",
+            "execution_result": {"columns": ["product_name", "gmv"], "rows": [["Laptop", 1000.0]], "row_count": 1},
+            "evidence_result": {"success": True, "unsupported_claim_rate": 0.0},
+            "visualization_decision": {"delivery_tool_id": "local_renderer"},
+            "visualization_delivery_result": {
+                "delivery_tool_id": "local_renderer",
+                "external_tool_called": True,
+                "data_row_count": 1,
+            },
+            "trace": [],
+        }
+    )
+
+    assert [section["id"] for section in view["run_sections"]] == [
+        "ask",
+        "executive_answer",
+        "data",
+        "visualization_delivery",
+        "evidence_report",
+        "action_approval",
+        "trace_system",
+    ]
+    assert view["run_sections"][3]["title"] == "04 · Visualization Delivery"
+    assert view["run_sections"][3]["summary"] == "Visualization Agent decision, delivery tool, artifact, and data hygiene."
+
+
 def test_no_key_llm_ops_status_shows_deterministic_not_configured():
     from ui.view_models import build_llm_ops_summary
 
