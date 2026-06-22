@@ -381,6 +381,38 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
+            prompt_id="insight_drafter",
+            version="v1",
+            description="Draft candidate insight claims and concise prose from real execution rows before evidence validation.",
+            required_variables=[
+                "user_question",
+                "execution_result",
+                "business_context",
+                "metric_context",
+            ],
+            safety_contract=[
+                "must_only_use_execution_result_rows",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_generate_final_claims",
+                "must_not_create_action_payloads",
+                "must_not_bypass_evidence_validator",
+            ],
+            template=(
+                "Task: insight drafting.\n"
+                "User question: {user_question}\n"
+                "Execution result: {execution_result}\n"
+                "Business context: {business_context}\n"
+                "Metric context: {metric_context}\n"
+                "Return JSON only with candidate_claims and draft_summary.\n"
+                "candidate_claims must be factual candidate claims that can be checked by Evidence Validator. "
+                "draft_summary is concise prose and must not present unsupported causes as final truth.\n"
+                "Safety: use only execution_result rows and provided context; do not generate SQL, final claims, "
+                "final answers, action payloads, approval fields, credentials, or secrets. Evidence Validator "
+                "decides which candidate claims survive."
+            ),
+        ),
+        PromptTemplate(
             prompt_id="visualization_planner",
             version="v1",
             description="Choose a validated chart spec from user intent, analysis steps, execution columns, and evidence.",

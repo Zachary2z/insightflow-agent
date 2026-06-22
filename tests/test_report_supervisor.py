@@ -27,7 +27,7 @@ def test_report_supervisor_decomposes_weekly_report_question():
 
 
 def test_report_supervisor_runs_multiple_sql_subtasks_and_saves_weekly_report(tmp_path):
-    from agents.report_supervisor import run_report_supervisor_agent
+    from agents.report_supervisor import plan_business_review_sections, run_report_supervisor_agent
     from agents.supervisor import initialize_run
 
     state = initialize_run(
@@ -37,6 +37,7 @@ def test_report_supervisor_runs_multiple_sql_subtasks_and_saves_weekly_report(tm
     )
     state["db_path"] = DB_PATH
     state["trace_dir"] = tmp_path / "traces"
+    state["report_sections"] = plan_business_review_sections(state["user_question"])
 
     result = run_report_supervisor_agent(
         state,
@@ -151,6 +152,7 @@ def test_report_supervisor_decomposes_monthly_review_question_and_saves_monthly_
     )
     state["db_path"] = DB_PATH
     state["trace_dir"] = tmp_path / "traces"
+    state["report_sections"] = sections
 
     result = run_report_supervisor_agent(
         state,

@@ -119,7 +119,7 @@ def test_report_agent_writes_provider_polished_sections_after_evidence_validatio
 
 
 def test_report_supervisor_uses_runtime_report_writer_provider_and_preserves_no_key_baseline(tmp_path, monkeypatch):
-    from agents.report_supervisor import run_report_supervisor_agent
+    from agents.report_supervisor import plan_business_review_sections, run_report_supervisor_agent
     from agents.supervisor import initialize_run
     from llm_ops.provider import MockLLMProvider
 
@@ -130,6 +130,7 @@ def test_report_supervisor_uses_runtime_report_writer_provider_and_preserves_no_
     )
     state["db_path"] = DB_PATH
     state["trace_dir"] = tmp_path / "traces"
+    state["report_sections"] = plan_business_review_sections(state["user_question"])
 
     result = run_report_supervisor_agent(
         state,
@@ -161,6 +162,7 @@ def test_report_supervisor_uses_runtime_report_writer_provider_and_preserves_no_
     )
     fallback_state["db_path"] = DB_PATH
     fallback_state["trace_dir"] = tmp_path / "fallback_traces"
+    fallback_state["report_sections"] = plan_business_review_sections(fallback_state["user_question"])
 
     fallback = run_report_supervisor_agent(
         fallback_state,

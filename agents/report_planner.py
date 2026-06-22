@@ -54,21 +54,26 @@ def _parse_provider_response(response: dict[str, Any] | str) -> dict[str, Any]:
     raise ValueError("provider response must be a dict or JSON string")
 
 
-def _fallback_plan(reason: str, provider_called: bool, user_question: str = "") -> dict[str, Any]:
-    sections = list(_section_templates(user_question).values())
-    report_type = sections[0].get("report_type", "weekly_business_report") if sections else "weekly_business_report"
+def _provider_unavailable_plan(
+    reason: str,
+    provider_called: bool,
+    user_question: str = "",
+    validation_error: str = "",
+) -> dict[str, Any]:
+    templates = _section_templates(user_question)
+    report_type = next(iter(templates.values())).get("report_type", "weekly_business_report") if templates else "weekly_business_report"
     return {
-        "success": False if provider_called else True,
+        "success": False,
         "report_type": report_type,
-        "sections": [{"section_id": section["section_id"]} for section in sections],
+        "sections": [],
         "fallback_used": True,
         "provider_called": provider_called,
-        "source": "deterministic",
+        "source": "provider_unavailable",
         "requires_clarification": False,
         "clarification_questions": [],
         "error": reason,
         "provider_error": reason if provider_called else "",
-        "validation_error": "",
+        "validation_error": validation_error,
     }
 
 
@@ -107,7 +112,12 @@ def _validated_provider_plan(payload: dict[str, Any], provider_called: bool, use
             seen.add(section_id)
 
     if not sections:
-        return _fallback_plan("no allowed sections in provider response", provider_called, user_question=user_question)
+        return _provider_unavailable_plan(
+            "no allowed sections in provider response",
+            provider_called,
+            user_question=user_question,
+            validation_error="no allowed sections in provider response",
+        )
 
     return {
         "success": True,
@@ -147,7 +157,11 @@ def _promptops_provider_plan(
         },
     )
     if not rendered.get("success"):
-        return _fallback_plan(rendered.get("error", ""), provider_called=True, user_question=state.get("user_question", ""))
+        return _provider_unavailable_plan(
+            rendered.get("error", ""),
+            provider_called=True,
+            user_question=state.get("user_question", ""),
+        )
 
     request = LLMRequest(
         prompt=rendered["prompt"],
@@ -161,7 +175,7 @@ def _promptops_provider_plan(
         request,
         schema_context={
             "allowed_section_ids": allowed_section_ids,
-            "report_type": _fallback_plan("", provider_called=False, user_question=state.get("user_question", "")).get("report_type"),
+            "report_type": _provider_unavailable_plan("", provider_called=False, user_question=state.get("user_question", "")).get("report_type"),
         },
     )
     if response.get("success"):
@@ -177,7 +191,7 @@ def _promptops_provider_plan(
         )
         return plan
 
-    fallback = _fallback_plan(response.get("error", ""), provider_called=True, user_question=state.get("user_question", ""))
+    fallback = _provider_unavailable_plan(response.get("error", ""), provider_called=True, user_question=state.get("user_question", ""))
     if response.get("error_type") == "llm_schema_validation_error":
         fallback["validation_error"] = response.get("error", "")
         fallback["provider_error"] = ""
@@ -194,7 +208,7 @@ def run_report_planner_agent(
     provider_called = llm_provider is not None
 
     if not llm_provider:
-        report_plan = _fallback_plan("llm_provider is not configured", provider_called=False, user_question=question)
+        report_plan = _provider_unavailable_plan("llm_provider is not configured", provider_called=False, user_question=question)
     elif hasattr(llm_provider, "generate"):
         report_plan = _promptops_provider_plan(state, llm_provider, allowed_section_ids)
     else:
@@ -203,9 +217,9 @@ def run_report_planner_agent(
             payload = _parse_provider_response(llm_provider(prompt))
             report_plan = _validated_provider_plan(payload, provider_called=True, user_question=question)
         except Exception as exc:
-            report_plan = _fallback_plan(str(exc), provider_called=True, user_question=question)
+            report_plan = _provider_unavailable_plan(str(exc), provider_called=True, user_question=question)
 
-    sections = [] if report_plan.get("requires_clarification") else _sections_from_plan(report_plan, question)
+    sections = [] if report_plan.get("requires_clarification") or not report_plan.get("success") else _sections_from_plan(report_plan, question)
     updated = {
         **state,
         "report_plan": report_plan,
@@ -213,6 +227,8 @@ def run_report_planner_agent(
     }
     if report_plan.get("requires_clarification"):
         updated["status"] = "report_plan_needs_clarification"
+    elif not report_plan.get("success"):
+        updated["status"] = "report_plan_provider_unavailable"
 
     return append_trace(
         updated,

@@ -152,8 +152,8 @@ def error_fix_node(state: AgentState) -> AgentState:
     return fixed
 
 
-def insight_node(state: AgentState) -> AgentState:
-    updated = run_insight_agent(dict(state))
+def insight_node(state: AgentState, provider=None) -> AgentState:
+    updated = run_insight_agent(dict(state), provider=provider)
     updated["status"] = "completed" if updated.get("insight", {}).get("success") else "failed"
     updated["data_used"] = updated.get("insight", {}).get("data_used", False)
     return updated

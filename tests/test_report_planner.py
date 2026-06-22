@@ -47,7 +47,7 @@ def test_report_planner_uses_mock_llm_plan_without_accepting_sql():
     assert result["trace"][-1]["node"] == "report_planner_agent"
 
 
-def test_report_planner_falls_back_when_provider_missing_or_malformed():
+def test_report_planner_returns_provider_unavailable_when_provider_missing_or_malformed():
     from agents.report_planner import run_report_planner_agent
     from agents.supervisor import initialize_run
 
@@ -58,10 +58,12 @@ def test_report_planner_falls_back_when_provider_missing_or_malformed():
     )
 
     no_provider_result = run_report_planner_agent(state)
-    assert no_provider_result["report_plan"]["success"] is True
+    assert no_provider_result["report_plan"]["success"] is False
     assert no_provider_result["report_plan"]["fallback_used"] is True
     assert no_provider_result["report_plan"]["provider_called"] is False
-    assert len(no_provider_result["report_sections"]) >= 7
+    assert no_provider_result["report_plan"]["source"] == "provider_unavailable"
+    assert no_provider_result["report_sections"] == []
+    assert no_provider_result["status"] == "report_plan_provider_unavailable"
 
     malformed_result = run_report_planner_agent(
         state,
@@ -70,7 +72,8 @@ def test_report_planner_falls_back_when_provider_missing_or_malformed():
     assert malformed_result["report_plan"]["success"] is False
     assert malformed_result["report_plan"]["fallback_used"] is True
     assert "no allowed sections" in malformed_result["report_plan"]["error"]
-    assert len(malformed_result["report_sections"]) >= 7
+    assert malformed_result["report_plan"]["source"] == "provider_unavailable"
+    assert malformed_result["report_sections"] == []
 
 
 def test_report_planner_supports_clarification_questions():
@@ -176,11 +179,11 @@ def test_report_planner_uses_promptops_provider_and_rejects_provider_sql():
         ),
     )
 
-    assert leaked_sql["report_plan"]["source"] == "deterministic"
+    assert leaked_sql["report_plan"]["source"] == "provider_unavailable"
     assert leaked_sql["report_plan"]["provider_called"] is True
     assert leaked_sql["report_plan"]["fallback_used"] is True
     assert leaked_sql["report_plan"]["validation_error"]
-    assert all(task["sql"].lower().startswith("select") for task in leaked_sql["report_sections"])
+    assert leaked_sql["report_sections"] == []
 
 
 def test_report_supervisor_runtime_provider_factory_and_no_key_baseline(tmp_path, monkeypatch):
@@ -232,6 +235,7 @@ def test_report_supervisor_runtime_provider_factory_and_no_key_baseline(tmp_path
         chart_dir=tmp_path / "fallback_charts",
     )
 
-    assert fallback["report_plan"]["source"] == "deterministic"
+    assert fallback["report_plan"]["source"] == "provider_unavailable"
     assert fallback["report_plan"]["provider_called"] is False
-    assert fallback["status"] == "business_review_report_completed"
+    assert fallback["status"] == "report_plan_provider_unavailable"
+    assert fallback["report_sections"] == []

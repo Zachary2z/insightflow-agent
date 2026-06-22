@@ -18,13 +18,13 @@ Update this table after every completed phase or task so the current project pos
 | P7 | Visualization Intelligence | `[x]` Complete | `visualization/` now validates chart specs against real execution columns, renders first-batch advanced charts from real rows, falls back safely for unsupported charts, and supports provider-backed visualization planning through PromptOps. | Regression only |
 | P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` Complete | `agents/visualization_agent.py` is the only visualization business entry point; provider output selects chart spec plus delivery tool; local renderer, XLSX exporter, and Power BI mock run behind chart/tool validation; old chart agent/planner product paths were deleted. | Regression only |
 | P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` Complete | Provider-backed question understanding and SQL planning are the product path when configured; unsafe/sensitive guards run before providers; provider failures return explicit `provider_unavailable`; provider `llm_candidate` skips `sql_generator.py`; provider templates render by matched template id. | Regression only |
-| P8.3 | Report & Insight Agent Cleanup | `[ ]` Next | Not started. | Replace fixed report sections and template insights with LLM-first planning/drafting gated by Evidence Validator |
-| P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` Later | Not started. | Replace fixed action templates with LLM-first action planning and add realistic action delivery adapters behind approval/audit |
+| P8.3 | Report & Insight Agent Cleanup | `[x]` Complete | Provider-backed report planning is the product path for section selection; provider-unavailable plans do not auto-select fixed sections; `insight_drafter` now drafts candidate claims before claim typing/Evidence Validator. | Regression only |
+| P8.4 | Action Agent & Tool Adapter Cleanup | `[ ]` Next | Not started. | Replace fixed action templates with LLM-first action planning and add realistic action delivery adapters behind approval/audit |
 | P8.5 | Agent Pipeline UX | `[ ]` Later | Not started. | Make the cleaned multi-agent/tool-calling path visible after P8.1-P8.4 land |
 | P9 | Realistic Eval And Demo Polish | `[ ]` Later | Not started. | Add scenario eval and demo polish after the cleanup path is stable |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[ ]` Later | Not started. | Clean external contracts, local quality, and artifact hygiene once the product path stabilizes |
 
-Current development position: **P8.2 Intent & SQL Planning Agent Cleanup is complete; P8.3 Report & Insight Agent Cleanup is next.**
+Current development position: **P8.3 Report & Insight Agent Cleanup is complete; P8.4 Action Agent & Tool Adapter Cleanup is next.**
 
 ## 1. Project Positioning
 
@@ -452,10 +452,10 @@ The next task should be selected from the P4-P10 platform evolution roadmap. Do 
 
 | Priority | Candidate task | Notes |
 |---|---|---|
-| Next | P8.1 Visualization Agent Dedupe & External Tool Calling | Consolidate chart and delivery decisions into a Visualization Agent. The provider chooses chart spec and delivery tool from a catalog; validators and adapters enforce safety. |
-| Later | P8.2 Intent & SQL Planning Agent Cleanup | Replace keyword-heavy intent and SQL routing with LLM-first agents while preserving SQL Validator and SQL Executor boundaries. |
-| Later | P8.3 Report & Insight Agent Cleanup | Replace fixed report sections and template insight generation with LLM-first planning/drafting gated by Evidence Validator. |
-| Later | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
+| Done | P8.1 Visualization Agent Dedupe & External Tool Calling | Consolidate chart and delivery decisions into a Visualization Agent. The provider chooses chart spec and delivery tool from a catalog; validators and adapters enforce safety. |
+| Done | P8.2 Intent & SQL Planning Agent Cleanup | Replace keyword-heavy intent and SQL routing with LLM-first agents while preserving SQL Validator and SQL Executor boundaries. |
+| Done | P8.3 Report & Insight Agent Cleanup | Replace fixed report sections and template insight generation with LLM-first planning/drafting gated by Evidence Validator. |
+| Next | P8.4 Action Agent & Tool Adapter Cleanup | Replace fixed action templates with LLM-first action planning and realistic action delivery adapters behind approval/audit. |
 | Later | P8.5 Agent Pipeline UX | Make the cleaned P8.1-P8.4 multi-agent/tool-calling path visible in Streamlit after backend behavior is real. |
 | Later | P9 Realistic Eval And Demo Polish | Add eval/demo cases for realistic cleaned agent paths and external-tool traces. |
 | Later | P10 MCP Contract & Lightweight Engineering Hardening | Clean external contracts, local quality, and artifact hygiene after the product path stabilizes. |
@@ -574,13 +574,13 @@ Goal: remove fixed report-section and template-insight ownership from the produc
 
 ### P8.3 Acceptance
 
-- Report planning is LLM-first in the product path.
-- Report Supervisor is an orchestrator, not a section-rule owner.
-- Insight drafting is contextual, not template-only.
-- Evidence Validator remains final authority for all findings.
-- Reports remain traceable to SQL, execution rows, evidence, charts, and trace paths.
-- Obsolete fixed-section tests are deleted or rewritten.
-- P0 workflow and P0 eval are verified at P8.3 completion.
+- `[x]` Report planning is LLM-first in the product path.
+- `[x]` Report Supervisor is an orchestrator, not a section-rule owner.
+- `[x]` Insight drafting is contextual, not template-only.
+- `[x]` Evidence Validator remains final authority for all findings.
+- `[x]` Reports remain traceable to SQL, execution rows, evidence, charts, and trace paths.
+- `[x]` Obsolete fixed-section tests are deleted or rewritten.
+- `[x]` P0 workflow and P0 eval are verified at P8.3 completion.
 
 ## 10.4 P8.4 Action Agent & Tool Adapter Cleanup
 

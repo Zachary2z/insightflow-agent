@@ -449,7 +449,14 @@ def run_report_supervisor_agent(
     )
     if planned_state.get("status") == "report_plan_needs_clarification":
         return planned_state
-    sections = planned_state.get("report_sections") or plan_business_review_sections(state.get("user_question", ""))
+    if planned_state.get("status") == "report_plan_provider_unavailable":
+        return {
+            **planned_state,
+            "report_sub_tasks": [],
+            "weekly_report_result": {},
+            "weekly_report_path": "",
+        }
+    sections = planned_state.get("report_sections") or []
     report_type = planned_state.get("report_plan", {}).get("report_type") or (
         sections[0].get("report_type") if sections else "weekly_business_report"
     )

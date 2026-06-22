@@ -208,6 +208,51 @@ def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
 
 
+def _validate_insight_drafter(content: Any) -> dict[str, Any]:
+    prompt_id = "insight_drafter"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "insight_drafter output must be an object")
+
+    blocked_fields = {
+        "sql",
+        "generated_sql",
+        "sql_candidates",
+        "candidate_sql",
+        "final_claims",
+        "claims",
+        "final_answer",
+        "action_payload",
+        "actions",
+        "created_actions",
+        "approval_status",
+        "credentials",
+        "credential",
+        "secrets",
+        "secret",
+        "api_key",
+        "token",
+        "password",
+    }
+    leaked = sorted(blocked_fields & set(content))
+    if leaked:
+        return _error(prompt_id, f"insight_drafter must not return blocked fields: {', '.join(leaked)}")
+
+    claims_ok, candidate_claims, message = _string_list(content.get("candidate_claims", []), "candidate_claims")
+    if not claims_ok:
+        return _error(prompt_id, message)
+    if not candidate_claims:
+        return _error(prompt_id, "candidate_claims must not be empty")
+
+    draft_summary = content.get("draft_summary", "")
+    if not isinstance(draft_summary, str):
+        return _error(prompt_id, "draft_summary must be a string")
+    draft_summary = draft_summary.strip()
+    if not draft_summary:
+        return _error(prompt_id, "draft_summary is required")
+
+    return _ok(prompt_id, {"candidate_claims": candidate_claims, "draft_summary": draft_summary})
+
+
 def _validate_action_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
     prompt_id = "action_drafter"
     if not isinstance(content, dict):
@@ -747,6 +792,8 @@ def validate_prompt_output(
         return _validate_report_writer(content, context)
     if prompt_id == "insight_claim_typer":
         return _validate_insight_claim_typer(content)
+    if prompt_id == "insight_drafter":
+        return _validate_insight_drafter(content)
     if prompt_id == "action_drafter":
         return _validate_action_drafter(content, context)
     if prompt_id == "question_understanding":
