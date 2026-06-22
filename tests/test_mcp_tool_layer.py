@@ -92,10 +92,12 @@ def test_database_mcp_run_sql_rejects_sql_that_fails_validator_before_execution(
 def test_report_mcp_layer_generates_chart_and_requires_evidence_for_report_save(tmp_path):
     from mcp_servers.report_server import mcp_generate_chart, mcp_save_report
 
+    assert not (ROOT / "tools" / "chart_tool.py").exists()
+
     chart_result = mcp_generate_chart(
         data={"columns": ["product_name", "gmv"], "rows": [["Laptop", 1200.0], ["Camera", 800.0]]},
         chart_spec={
-            "chart_type": "bar",
+            "chart_type": "ranked_bar",
             "x": "product_name",
             "y": "gmv",
             "title": "Top products",
@@ -122,6 +124,9 @@ def test_report_mcp_layer_generates_chart_and_requires_evidence_for_report_save(
 
     assert chart_result["success"] is True
     assert Path(chart_result["result"]["chart_path"]).exists()
+    assert chart_result["result"]["delivery_tool_id"] == "local_renderer"
+    assert chart_result["result"]["external_tool_called"] is True
+    assert chart_result["result"]["trace_event"]["tool_name"] == "external_visualization_tool"
     assert chart_result["mcp_server"] == "report-mcp-server"
 
     assert blocked_report["success"] is False

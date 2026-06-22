@@ -127,8 +127,8 @@ These areas should no longer grow as keyword or template rule systems. Conflicti
 | `agents/action_planner.py::build_action_plan()` | Fixed action templates make recommendations look scripted. | Replace product path with LLM-backed `ActionPlanningAgent`; Risk Assessor, Approval Gate, Executor, and Audit stay deterministic. |
 | `agents/insight_agent.py` template insight generation | Template claims are less useful than contextual insight drafting. | Replace product path with LLM-backed insight drafting; Evidence Validator keeps final authority. |
 | `agents/visualization_planner.py` chart keyword inference | Chart selection is exactly where agentic judgment should show. | Replace product path with P8.1 `VisualizationAgent`; chart validator and renderer remain deterministic. |
-| `agents/chart_agent.py` old chart decision path | Duplicates P7/P8 visualization planning. | Remove old chart decision behavior after the new Visualization Agent owns the path. |
-| `tools/chart_tool.py` chart type inference | A tool should render, not decide business visualization intent. | Delete chart-type inference; use `visualization/chart_renderer.py` or external visualization adapters for rendering. |
+| `agents/chart_agent.py` old chart decision path | Duplicates P7/P8 visualization planning. | Deleted after the new Visualization Agent took ownership. |
+| `tools/chart_tool.py` chart type inference | A tool should render, not decide business visualization intent. | Deleted; retained rendering is reached through `tools/external_visualization_tool.py` and `visualization_delivery/` adapters. |
 
 ### 1.2.3 Target Agent Ownership After Cleanup
 
@@ -194,7 +194,7 @@ The tool layer should resemble tools a real business analyst, operator, or BI te
 | `tools/sql_executor.py` | High | Keep | Continue as read-only execution tool. |
 | `tools/evidence_tool.py` | High | Keep | Continue as factual-claim boundary. |
 | `tools/context_tool.py` | Medium-high | Keep and improve later | Keep as local business knowledge source; later can become a knowledge-base adapter. |
-| `tools/chart_tool.py` | Low-medium | Delete decision role | Stop using it for chart decisions; delete inference logic and route retained rendering to `visualization/chart_renderer.py` or external adapters. |
+| `tools/chart_tool.py` | Low-medium | Delete | Removed after P8.1; local rendering now runs via `tools/external_visualization_tool.py` and `visualization_delivery/` adapters. |
 | `visualization/chart_renderer.py` | Medium | Keep as local renderer | Use for quick local PNG/structured output from real rows. |
 | Planned `excel_exporter` | High | Add in P8.1 | Export real execution rows and chart-ready workbook for finance/ops review. |
 | Planned `powerbi_publisher_mock` | High as business analogy, mock in implementation | Add in P8.1 as explicit mock | Demonstrate external BI publishing without OAuth/SaaS complexity. Return `mock://powerbi/...` and trace metadata. |
@@ -207,7 +207,7 @@ The tool layer should resemble tools a real business analyst, operator, or BI te
 
 | Slice | Scope | Files likely affected | Acceptance |
 |---|---|---|---|
-| Tool Slice 1 | Visualization external tools | `agents/visualization_agent.py`, `visualization_delivery/`, `tools/external_visualization_tool.py`, `agents/chart_agent.py`, `tools/chart_tool.py` | LLM selects local/Excel/Power BI mock; validators approve; adapter executes; old chart decisions and obsolete tests are deleted. |
+| Tool Slice 1 | Visualization external tools | `agents/visualization_agent.py`, `visualization_delivery/`, `tools/external_visualization_tool.py`, deleted `agents/chart_agent.py`, deleted `tools/chart_tool.py` | LLM selects local/Excel/Power BI mock; validators approve; adapter executes; old chart decisions and obsolete tests are deleted. |
 | Tool Slice 2 | Action external adapters | `agents/action_planner.py`, `agents/action_drafter.py`, `agents/risk_assessor.py`, `tools/action_tool.py`, future `action_delivery/` | LLM suggests business actions; deterministic approval/audit gates; local SQLite tool becomes one adapter among mocked Jira/Slack/Email-style tools. |
 | Tool Slice 3 | Report delivery adapters | `agents/report_agent.py`, `agents/report_writer.py`, `tools/report_tool.py`, future `report_delivery/` | Markdown remains base; optional PDF/PPT/Notion-style mock delivery proves report tool-calling without real SaaS. |
 | Tool Slice 4 | MCP contract cleanup | `mcp_servers/` | External contracts expose the new tool adapters without exposing internal validators as bypassable tools. |
@@ -381,7 +381,7 @@ Goal: produce traceable business analysis artifacts, not just SQL answers.
 |---|---|---|---|
 | Task 11 | Business context retrieval | `data/business_rules.md`, `data/table_docs.md`, `data/sql_examples.json`, `tools/context_tool.py`, `agents/context_retriever.py` | Returns relevant rules, examples, and field docs into state |
 | Task 12 | Evidence Validator | `tools/evidence_tool.py`, `agents/evidence_validator.py` | Separates data-supported findings, hypotheses, and unsupported claims |
-| Task 13 | Chart Agent | `tools/chart_tool.py`, `agents/chart_agent.py` | Ranking -> bar, trend -> line, optional share -> pie, paths written to state |
+| Task 13 | Chart Agent | Historical P1 path, superseded by `agents/visualization_agent.py`, `tools/external_visualization_tool.py`, and `visualization_delivery/` | Current path uses provider-backed visualization decisions plus validated delivery adapters |
 | Task 14 | Report Agent | `tools/report_tool.py`, `agents/report_agent.py` | Saves Markdown report with SQL, execution result, evidence, chart paths, trace path |
 
 ### P1 Acceptance Standard
@@ -474,7 +474,7 @@ Goal: redesign visualization so it demonstrates agentic tool use instead of a la
 | Delivery Decision Schema | `visualization_delivery/decision.py`, `llm_ops/structured_output.py`, `llm_ops/prompt_registry.py` | Structured provider output for chart spec plus selected delivery tool, reason, expected artifact, and fallback metadata. |
 | External Visualization Tool | `tools/external_visualization_tool.py`, `visualization_delivery/delivery_tool.py`, `visualization_delivery/adapters.py` | Deterministic tool wrapper that validates the selected tool and calls the adapter. Adapters execute real local work or explicit mocks. |
 | Workflow Integration | `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | Add visualization decision, delivery result, and trace metadata after SQL execution and Evidence Validator. Do not move or bypass SQL/evidence safety nodes. |
-| Legacy deletion | `agents/chart_agent.py`, `tools/chart_tool.py` | Delete old chart-decision behavior and obsolete tests once the new Visualization Agent owns the product path. Keep only import-safe wrappers if needed, with no decision logic. |
+| Legacy deletion | `agents/chart_agent.py`, `agents/visualization_planner.py`, `tools/chart_tool.py` | Deleted old chart-decision behavior and obsolete tests once the new Visualization Agent owned the product path. No import-safe wrapper is retained. |
 
 ### P8.1 Tool Catalog
 

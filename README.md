@@ -48,7 +48,7 @@ Implemented:
 - P8.1 Visualization Agent Dedupe & External Tool Calling with `agents/visualization_agent.py` as the only business visualization entry point; provider-backed structured output chooses both `chart_spec` and `delivery_tool_id`; deterministic code validates chart columns and delivery policy, executes `local_renderer`, `excel_exporter`, or `powerbi_publisher_mock`, records trace metadata, and never fabricates rows
 - P8.2 Intent & SQL Planning Agent Cleanup with provider-backed question understanding and SQL planning as the product path; unsafe/sensitive guards run before providers; malformed provider intent/planning output returns explicit `provider_unavailable` states instead of reviving keyword/template routing; provider `llm_candidate` paths skip `sql_generator.py` and go directly to guarded SQL candidates, while provider-selected templates are rendered by matched template id rather than question keywords
 
-P8.1 deleted the old `agents/chart_agent.py` and `agents/visualization_planner.py` product paths. `tools/chart_tool.py` remains only as a thin compatibility renderer that accepts an already-decided chart spec and delegates to `visualization/chart_renderer.py`; it no longer infers chart type or builds business chart specs. P8.2 moves intent and SQL strategy ownership to provider-backed agents when configured; the no-key baseline remains available for local eval/demo compatibility, but provider failures no longer fall through to duplicate business keyword routing. P8.3-P8.4 continue the accepted cleanup plan for report/insight cleanup and action/tool adapters; P8.5 makes the cleaned pipeline visible in Streamlit.
+P8.1 deleted the old `agents/chart_agent.py`, `agents/visualization_planner.py`, and `tools/chart_tool.py` product paths. Visualization decisions now enter only through `agents/visualization_agent.py`; local rendering, Excel export, and Power BI mock publishing run through `tools/external_visualization_tool.py` plus `visualization_delivery/`. P8.2 moves intent and SQL strategy ownership to provider-backed agents when configured; the no-key baseline remains available for local eval/demo compatibility, but provider failures no longer fall through to duplicate business keyword routing. P8.3-P8.4 continue the accepted cleanup plan for report/insight cleanup and action/tool adapters; P8.5 makes the cleaned pipeline visible in Streamlit.
 
 Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
@@ -384,15 +384,18 @@ Delivery tools:
 - `excel_exporter`: writes a local `.xlsx` workbook containing only `execution_result.columns` and `execution_result.rows`.
 - `powerbi_publisher_mock`: simulates external BI publishing without OAuth, API keys, network access, or real Power BI calls, returning `mock://powerbi/{run_id}/{artifact_name}`.
 
-Compatibility render tool:
+External visualization tool:
 
 ```python
-from tools.chart_tool import generate_chart
+from tools.external_visualization_tool import call_external_visualization_tool
 
-result = generate_chart(
-    data={
+result = call_external_visualization_tool(
+    delivery_tool_id="local_renderer",
+    execution_result={
+        "success": True,
         "columns": ["product_name", "gmv"],
         "rows": [["Laptop Pro 14", 511248.56], ["Camera A", 456050.99]],
+        "row_count": 2,
     },
     chart_spec={
         "chart_type": "ranked_bar",
@@ -401,12 +404,13 @@ result = generate_chart(
         "title": "Top Products by GMV",
         "run_id": "run_001",
     },
+    run_id="run_001",
 )
-print(result["chart_path"])
+print(result["artifact_path"])
 print(result["trace_event"])
 ```
 
-This lower-level `generate_chart()` compatibility wrapper only accepts an already-decided chart spec and calls `visualization/chart_renderer.py`. It does not infer chart types or create business chart specs.
+MCP still exposes a `generate_chart` tool name for compatibility, but internally it calls `tools/external_visualization_tool.py` with `delivery_tool_id="local_renderer"`. There is no legacy `tools/chart_tool.py` business or rendering entry point.
 
 ## Report Agent
 
