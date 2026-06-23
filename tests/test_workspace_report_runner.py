@@ -149,6 +149,11 @@ def test_business_review_section_questions_are_specific_internal_analysis_prompt
         report_type="business_review",
         section_plan=sections["top_channels_or_products"],
     )
+    overall_question = _section_question(
+        report_goal=report_goal,
+        report_type="business_review",
+        section_plan=sections["overall_revenue"],
+    )
     trend_question = _section_question(
         report_goal=report_goal,
         report_type="business_review",
@@ -161,6 +166,11 @@ def test_business_review_section_questions_are_specific_internal_analysis_prompt
     assert "channel" in channel_question
     assert "收入" in channel_question
     assert "产品或其他" not in channel_question
+    assert "只使用订单、渠道、收入、日期等聚合字段" in overall_question
+    assert "非个人级聚合" in overall_question
+    assert "不访问个人身份字段" in overall_question
+    assert "customer_id" not in overall_question
+    assert "客户数" not in overall_question
     assert "order_date" in trend_question
     assert "最近 90 天" in trend_question
     assert "按月" in trend_question or "按周" in trend_question
