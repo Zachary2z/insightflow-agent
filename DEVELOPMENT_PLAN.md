@@ -23,7 +23,7 @@ Update this table after every completed phase or task so the current project pos
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
-| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, and live DeepSeek acceptance exist; audit found API upload endpoints, real frontend wiring, old UI/API cleanup, stronger natural-language live acceptance, and docs cleanup still required. | Complete P11 Product Hardening before P12 |
+| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, live DeepSeek acceptance, and H1 FastAPI data source endpoints exist; real frontend wiring, old UI/API cleanup, stronger natural-language live acceptance, and docs cleanup still remain. | Complete H2-H5 before P12 |
 
 Current development position: **P11 General Data Analysis Product is implemented as a working backend/product prototype, but P11 Product Hardening is still required before P12.**
 
@@ -32,6 +32,8 @@ Current development position: **P11 General Data Analysis Product is implemented
 This checklist records the required cleanup after the P11 implementation audit on 2026-06-23. P11 is not considered product-complete until these tasks pass.
 
 ### Task H1 - FastAPI Data Source Endpoints
+
+Status: complete. `api/app.py` now exposes CSV/Excel upload, SQLite import, and source listing endpoints backed by the existing workspace importers. `api/models.py` includes source response/request contracts, `tests/test_workspace_api.py` covers upload/import/list/error paths, and `requirements.txt` includes `python-multipart` for FastAPI file uploads.
 
 Goal: expose the existing CSV, Excel, and SQLite importers through product APIs instead of requiring Python-only test calls.
 

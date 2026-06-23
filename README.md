@@ -12,8 +12,8 @@ P11 - General Data Analysis Product has a working implementation slice: workspac
 
 P11 is **not yet product-complete**. The 2026-06-23 audit found five required hardening tasks before P12 report productization can begin:
 
-1. Add FastAPI CSV/Excel upload, SQLite source registration, and source listing endpoints.
-2. Wire the Next.js pages into real API-backed workspace create, data source, profile, semantic-layer, analysis, and run-result flows.
+1. Completed: add FastAPI CSV/Excel upload, SQLite source registration, and source listing endpoints.
+2. Next: wire the Next.js pages into real API-backed workspace create, data source, profile, semantic-layer, analysis, and run-result flows.
 3. Delete the remaining tracked Streamlit `ui/` package and remove or isolate the old ecommerce-style `/api/runs` product entry.
 4. Strengthen the P11 live DeepSeek acceptance test so it uses a natural business question instead of a SQL-shaped prompt.
 5. Clean current docs so Streamlit, ecommerce eval, mock Jira/Power BI, and old demo references are historical only.
