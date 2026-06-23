@@ -39,6 +39,23 @@ def test_workspace_api_create_profile_semantic_and_run(tmp_path):
     assert run["workspace_id"] == workspace_id
 
 
+def test_workspace_api_allows_local_nextjs_origin(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+
+    response = client.options(
+        "/api/workspaces",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
 def test_workspace_source_api_imports_csv_excel_sqlite_and_lists_sources(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     app = create_app(workspace_store=store)

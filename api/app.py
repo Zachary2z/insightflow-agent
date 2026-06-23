@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.models import (
     RunCreateRequest,
@@ -57,6 +58,16 @@ def create_app(run_manager: RunManager | None = None, workspace_store: Workspace
     manager = run_manager or RunManager()
     store = workspace_store or WorkspaceStore()
     app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.post("/api/workspaces", response_model=WorkspaceResponse)
     def create_workspace(request: WorkspaceCreateRequest) -> dict:
