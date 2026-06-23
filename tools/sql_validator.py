@@ -40,6 +40,7 @@ def _base_checks() -> dict[str, bool]:
         "sensitive_fields_blocked": True,
         "metric_formula_correct": True,
         "paid_filter_included": True,
+        "sqlite_compatible": True,
     }
 
 
@@ -181,6 +182,12 @@ def _validate_metric_context(
         issues.append("GMV queries must include orders.status = 'paid'")
 
 
+def _validate_sqlite_compatibility(sql: str, issues: list[str], checks: dict[str, bool]) -> None:
+    if re.search(r"\bINTERVAL\s+['\"]?\d+['\"]?\s+\w+", sql, flags=re.IGNORECASE):
+        checks["sqlite_compatible"] = False
+        issues.append("SQLite does not support INTERVAL date arithmetic; use date() or julianday() syntax")
+
+
 def validate_sql(
     sql: str,
     schema: dict[str, Any],
@@ -200,6 +207,8 @@ def validate_sql(
     if _contains_dangerous_keyword(sql):
         checks["no_dangerous_keywords"] = False
         issues.append("SQL contains a dangerous keyword")
+
+    _validate_sqlite_compatibility(sql, issues, checks)
 
     expression = None
     try:
@@ -234,6 +243,7 @@ def validate_sql(
         "sensitive_fields_blocked",
         "metric_formula_correct",
         "paid_filter_included",
+        "sqlite_compatible",
     ]
     approved = all(checks[check] for check in blocking_checks)
     risk_level = "low" if approved else "high"

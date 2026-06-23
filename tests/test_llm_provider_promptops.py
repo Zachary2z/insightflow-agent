@@ -19,6 +19,8 @@ def test_prompt_registry_renders_versioned_prompt_with_safety_contract():
     assert "最近 30 天" in result["prompt"]
     assert "orders" in result["prompt"]
     assert "validate_sql" in result["prompt"]
+    assert "SQLite" in result["prompt"]
+    assert "Do not use INTERVAL" in result["prompt"]
     assert result["metadata"]["required_variables"] == [
         "user_question",
         "schema_text",

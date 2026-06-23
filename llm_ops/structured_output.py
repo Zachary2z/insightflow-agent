@@ -405,7 +405,7 @@ def _validate_question_understanding(content: Any) -> dict[str, Any]:
     if limit is not None and not isinstance(limit, int):
         return _error(prompt_id, "intent.limit must be an int or null")
 
-    intent_risk_ok, intent_risk_flags, message = _string_or_string_list(intent.get("risk_flags"), "intent.risk_flags")
+    intent_risk_ok, intent_risk_flags, message = _string_or_string_list(intent.get("risk_flags", []), "intent.risk_flags")
     if not intent_risk_ok:
         return _error(prompt_id, message)
 
@@ -418,7 +418,7 @@ def _validate_question_understanding(content: Any) -> dict[str, Any]:
     )
     if not questions_ok:
         return _error(prompt_id, message)
-    risk_ok, risk_flags, message = _string_or_string_list(content.get("risk_flags"), "risk_flags")
+    risk_ok, risk_flags, message = _string_or_string_list(content.get("risk_flags", []), "risk_flags")
     if not risk_ok:
         return _error(prompt_id, message)
 

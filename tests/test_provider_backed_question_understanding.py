@@ -182,6 +182,24 @@ def test_provider_backed_question_understanding_normalizes_provider_slot_aliases
     assert result["intent"]["operation"] == "top_n"
 
 
+def test_provider_backed_question_understanding_treats_missing_intent_risk_flags_as_empty():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["intent"] = dict(payload["intent"])
+    payload["intent"].pop("risk_flags")
+
+    result = understand_question_with_provider(
+        "以这份数据的最近 90 天为周期，收入最高的前 5 个获客渠道分别是谁？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["risk_flags"] == []
+    assert result["intent"]["risk_flags"] == []
+
+
 def test_provider_backed_question_understanding_includes_workspace_context_in_prompt():
     from question_understanding.provider_backed import understand_question_with_provider
 

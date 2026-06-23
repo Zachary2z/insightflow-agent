@@ -135,3 +135,34 @@ def test_validate_sql_detects_metric_formula_and_paid_filter_errors():
     assert filter_result["approved"] is False
     assert filter_result["checks"]["paid_filter_included"] is False
     assert "GMV queries must include orders.status = 'paid'" in filter_result["issues"]
+
+
+def test_validate_sql_rejects_non_sqlite_interval_syntax():
+    from tools.sql_validator import validate_sql
+
+    sql = """
+        SELECT channel, SUM(revenue) AS total_revenue
+        FROM orders
+        WHERE order_date >= (SELECT MAX(order_date) FROM orders) - INTERVAL '90' DAY
+        GROUP BY channel
+        ORDER BY total_revenue DESC
+        LIMIT 5
+    """
+    schema = {
+        "tables": [
+            {
+                "table_name": "orders",
+                "columns": [
+                    {"name": "channel"},
+                    {"name": "revenue"},
+                    {"name": "order_date"},
+                ],
+            }
+        ]
+    }
+
+    result = validate_sql(sql, schema)
+
+    assert result["approved"] is False
+    assert result["checks"]["sqlite_compatible"] is False
+    assert any("SQLite does not support INTERVAL date arithmetic" in issue for issue in result["issues"])
