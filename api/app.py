@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+import shutil
+import sqlite3
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 
 from api.models import (
     RunCreateRequest,
@@ -14,9 +19,13 @@ from api.models import (
     WorkspaceRunCreateRequest,
     WorkspaceRunResponse,
     WorkspaceSemanticResponse,
+    WorkspaceSourceImportResponse,
+    WorkspaceSourcesResponse,
+    WorkspaceSqliteSourceRequest,
 )
 from api.run_manager import RunManager, RunRecord
 from workspaces.analysis_runner import run_workspace_analysis
+from workspaces.importers import import_csv, import_excel, import_sqlite
 from workspaces.profiler import profile_workspace_database
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
@@ -24,6 +33,10 @@ from workspaces.store import WorkspaceStore
 
 def _not_found(run_id: str) -> HTTPException:
     return HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+
+
+def _workspace_not_found(workspace_id: str) -> HTTPException:
+    return HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
 
 
 def _status_response(record: RunRecord) -> RunStatusResponse:
@@ -58,14 +71,57 @@ def create_app(run_manager: RunManager | None = None, workspace_store: Workspace
         try:
             return store.get_workspace(workspace_id)
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+            raise _workspace_not_found(workspace_id)
+
+    @app.post("/api/workspaces/{workspace_id}/sources/upload", response_model=WorkspaceSourceImportResponse)
+    def upload_workspace_source(workspace_id: str, file: UploadFile = File(...)) -> dict:
+        try:
+            store.get_workspace(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+
+        original_name = Path(file.filename or "").name
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in {".csv", ".xlsx", ".xls"}:
+            raise HTTPException(status_code=400, detail=f"Unsupported source file extension: {suffix or '<none>'}")
+
+        with TemporaryDirectory() as tmp_dir:
+            upload_path = Path(tmp_dir) / original_name
+            with upload_path.open("wb") as output:
+                shutil.copyfileobj(file.file, output)
+            if suffix == ".csv":
+                return import_csv(store, workspace_id, upload_path)
+            return import_excel(store, workspace_id, upload_path)
+
+    @app.post("/api/workspaces/{workspace_id}/sources/sqlite", response_model=WorkspaceSourceImportResponse)
+    def create_sqlite_source(workspace_id: str, request: WorkspaceSqliteSourceRequest) -> dict:
+        try:
+            store.get_workspace(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+
+        sqlite_path = Path(request.sqlite_path)
+        if not sqlite_path.exists() or not sqlite_path.is_file():
+            raise HTTPException(status_code=400, detail=f"SQLite source is not readable: {request.sqlite_path}")
+        try:
+            return import_sqlite(store, workspace_id, sqlite_path)
+        except (OSError, sqlite3.DatabaseError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"SQLite source is not readable: {exc}") from exc
+
+    @app.get("/api/workspaces/{workspace_id}/sources", response_model=WorkspaceSourcesResponse)
+    def list_workspace_sources(workspace_id: str) -> dict:
+        try:
+            workspace = store.get_workspace(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        return {"sources": workspace.get("sources", [])}
 
     @app.post("/api/workspaces/{workspace_id}/profile", response_model=WorkspaceProfileResponse)
     def create_profile(workspace_id: str) -> dict:
         try:
             return {"success": True, "profile": profile_workspace_database(store, workspace_id)}
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+            raise _workspace_not_found(workspace_id)
 
     @app.post("/api/workspaces/{workspace_id}/semantic-layer/draft", response_model=WorkspaceSemanticResponse)
     def create_semantic_draft(workspace_id: str) -> dict:
@@ -74,7 +130,7 @@ def create_app(run_manager: RunManager | None = None, workspace_store: Workspace
             semantic_layer = generate_semantic_layer_draft(store, workspace_id, profile)
             return {"success": True, "semantic_layer": semantic_layer}
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+            raise _workspace_not_found(workspace_id)
 
     @app.post("/api/workspaces/{workspace_id}/runs", response_model=WorkspaceRunResponse)
     def create_workspace_run(workspace_id: str, request: WorkspaceRunCreateRequest) -> dict:
@@ -86,7 +142,7 @@ def create_app(run_manager: RunManager | None = None, workspace_store: Workspace
                 initial_sql=request.initial_sql,
             )
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+            raise _workspace_not_found(workspace_id)
         return {
             "success": result.get("status") != "failed",
             "workspace_id": workspace_id,

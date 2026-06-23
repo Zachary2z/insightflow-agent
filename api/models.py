@@ -66,6 +66,20 @@ class WorkspaceResponse(BaseModel):
     sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class WorkspaceSourceImportResponse(BaseModel):
+    success: bool
+    source: dict[str, Any]
+    imported_tables: list[str]
+
+
+class WorkspaceSourcesResponse(BaseModel):
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class WorkspaceSqliteSourceRequest(BaseModel):
+    sqlite_path: str = Field(..., min_length=1)
+
+
 class WorkspaceProfileResponse(BaseModel):
     success: bool
     profile: dict[str, Any]
