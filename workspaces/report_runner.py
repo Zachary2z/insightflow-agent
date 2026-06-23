@@ -15,6 +15,7 @@ from workspaces.store import WorkspaceStore
 
 
 SectionRunner = Callable[..., dict[str, Any]]
+SECTION_ANALYSIS_MAX_ATTEMPTS = 2
 
 
 REPORT_TYPE_PRESETS: dict[str, dict[str, Any]] = {
@@ -24,26 +25,43 @@ REPORT_TYPE_PRESETS: dict[str, dict[str, Any]] = {
             {
                 "section_id": "overall_revenue",
                 "title": "Overall Revenue",
-                "purpose": "Summarize overall revenue performance for the report goal.",
-                "question": "基于当前工作区数据，总结整体收入表现，并给出经营复盘结论。",
+                "purpose": "Summarize recent revenue scale and channel mix using the current workspace data.",
+                "intent_hint": "metric=收入; dimension=渠道; time_range=最近 90 天; operation=summary",
+                "question": (
+                    "统计最近 90 天订单收入概览：按渠道汇总收入、订单数和平均订单收入，输出渠道分组结果表，"
+                    "并用这些结果概述收入表现；不需要总计行。"
+                ),
             },
             {
                 "section_id": "top_channels_or_products",
-                "title": "Top Channels Or Products",
-                "purpose": "Identify the strongest contributors in the available business dimensions.",
-                "question": "找出当前数据中收入贡献最高的渠道、产品或其他关键维度，并解释主要贡献来源。",
+                "title": "Channel Revenue Ranking",
+                "purpose": "Rank revenue contribution by acquisition channel using the current workspace data.",
+                "intent_hint": "metric=收入; dimension=渠道; time_range=最近 90 天; operation=top_n; limit=5",
+                "question": (
+                    "以渠道收入排行为主，使用工作区 schema 中的 channel、revenue 和 order_date "
+                    "或语义层中的等价字段，汇总最近 90 天收入最高的前 5 个渠道，解释主要贡献来源并生成适合对比的图表。"
+                ),
             },
             {
                 "section_id": "trend_or_recent_change",
                 "title": "Trend Or Recent Change",
-                "purpose": "Describe revenue movement over time or recent-period changes when time fields exist.",
-                "question": "分析收入随时间的趋势，指出最近周期变化，并说明对经营复盘的影响。",
+                "purpose": "Describe recent revenue movement over time using the current workspace date field.",
+                "intent_hint": "metric=收入; dimension=时间; time_range=最近 90 天; operation=trend",
+                "question": (
+                    "使用 order_date 或语义层中的等价时间字段，基于数据集中最大日期推导最近 90 天，"
+                    "按月或按周分析收入趋势，指出最近周期变化，并说明对经营复盘的影响。"
+                ),
             },
             {
                 "section_id": "evidence_backed_recommendations",
                 "title": "Evidence Backed Recommendations",
-                "purpose": "Turn grounded findings into concise recommendations.",
-                "question": "基于当前工作区数据和前述目标，给出有数据证据支撑的经营建议。",
+                "purpose": "Produce channel-level evidence that can support concise recommendations.",
+                "intent_hint": "metric=收入; dimension=渠道; time_range=最近 90 天; operation=summary",
+                "question": (
+                    "按渠道汇总最近 90 天收入、订单数和平均订单收入，输出一张渠道分组结果表，"
+                    "并用结果指出高收入和低收入渠道，作为后续经营建议的数据证据；"
+                    "本节只需要一个数据查询和证据摘要，不需要行动计划、外部投放建议或多步骤分析。"
+                ),
             },
         ],
     },
@@ -133,7 +151,8 @@ def run_workspace_report(
             section_plan=section_plan,
         )
         try:
-            analysis_result = runner(
+            analysis_result = _run_section_analysis_with_retry(
+                runner=runner,
                 store=store,
                 workspace_id=workspace_id,
                 user_question=section_question,
@@ -187,6 +206,50 @@ def run_workspace_report(
     }
 
 
+def _run_section_analysis_with_retry(
+    *,
+    runner: SectionRunner,
+    store: WorkspaceStore,
+    workspace_id: str,
+    user_question: str,
+    providers: dict | None,
+) -> dict[str, Any]:
+    last_result: dict[str, Any] = {}
+    for attempt in range(SECTION_ANALYSIS_MAX_ATTEMPTS):
+        last_result = runner(
+            store=store,
+            workspace_id=workspace_id,
+            user_question=user_question,
+            providers=providers,
+        )
+        if attempt == SECTION_ANALYSIS_MAX_ATTEMPTS - 1:
+            return last_result
+        if not _retryable_provider_section_failure(last_result):
+            return last_result
+    return last_result
+
+
+def _retryable_provider_section_failure(analysis_result: dict[str, Any]) -> bool:
+    understanding = analysis_result.get("question_understanding") or {}
+    missing_slots = set(understanding.get("missing_slots") or [])
+    if (
+        understanding.get("provider_called") is True
+        and understanding.get("fallback_used") is True
+        and (
+            understanding.get("source") == "provider_unavailable"
+            or "provider_output" in missing_slots
+        )
+    ):
+        return True
+
+    enhancement = analysis_result.get("llm_sql_enhancement") or {}
+    return (
+        enhancement.get("provider_called") is True
+        and enhancement.get("fallback_used") is True
+        and not enhancement.get("accepted")
+    )
+
+
 def _ensure_profile(store: WorkspaceStore, workspace: dict[str, Any]) -> dict[str, Any]:
     profile_path = Path(workspace["profile_path"])
     if profile_path.exists():
@@ -212,9 +275,14 @@ def _section_question(
     section_plan: dict[str, str],
 ) -> str:
     return (
+        "这是自动报告内部 section，不是用户澄清轮次。"
+        "请基于当前 workspace schema、profile 和 semantic layer 选择可用表字段；"
+        "不要请求用户补充字段、表名、数据源或时间范围。"
+        "如果报告目标包含最近 90 天，请使用数据集中最大可用日期推导最近 90 天。\n"
         f"报告类型：{report_type}。\n"
         f"报告目标：{report_goal}\n"
         f"本节目的：{section_plan['purpose']}\n"
+        f"本节意图提示：{section_plan.get('intent_hint', '使用本节问题中的完整分析意图')}\n"
         f"本节问题：{section_plan['question']}"
     )
 

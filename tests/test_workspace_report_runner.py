@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from workspaces.report_runner import run_workspace_report
+from workspaces.report_runner import REPORT_TYPE_PRESETS, _section_question, run_workspace_report
 from workspaces.store import WorkspaceStore
 
 
@@ -137,6 +137,36 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
     assert any(event["event"] == "section_completed" for event in trace["events"])
 
 
+def test_business_review_section_questions_are_specific_internal_analysis_prompts():
+    report_goal = "基于最近 90 天的订单、客户和营销数据，生成面向管理层的收入复盘报告。"
+    sections = {
+        section["section_id"]: section
+        for section in REPORT_TYPE_PRESETS["business_review"]["sections"]
+    }
+
+    channel_question = _section_question(
+        report_goal=report_goal,
+        report_type="business_review",
+        section_plan=sections["top_channels_or_products"],
+    )
+    trend_question = _section_question(
+        report_goal=report_goal,
+        report_type="business_review",
+        section_plan=sections["trend_or_recent_change"],
+    )
+
+    assert "报告内部 section" in channel_question
+    assert "不要请求用户补充" in channel_question
+    assert "渠道" in channel_question
+    assert "channel" in channel_question
+    assert "收入" in channel_question
+    assert "产品或其他" not in channel_question
+    assert "order_date" in trend_question
+    assert "最近 90 天" in trend_question
+    assert "按月" in trend_question or "按周" in trend_question
+    assert "不要请求用户补充" in trend_question
+
+
 def test_existing_semantic_layer_is_not_overwritten(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
     existing_semantic = {
@@ -164,6 +194,52 @@ def test_existing_semantic_layer_is_not_overwritten(tmp_path):
         Path(workspace["semantic_layer_path"]).read_text(encoding="utf-8")
     )
     assert loaded["metrics"][0]["name"] == "reviewed_revenue"
+
+
+def test_provider_unavailable_section_is_retried_before_marking_failed(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = []
+
+    def retryable_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        calls.append(user_question)
+        if len(calls) == 1:
+            return {
+                "status": "waiting_for_clarification",
+                "final_answer": (
+                    "需要补充信息后才能继续分析：Provider question understanding is unavailable; "
+                    "please retry with a configured provider."
+                ),
+                "execution_result": {},
+                "question_understanding": {
+                    "provider_called": True,
+                    "source": "provider_unavailable",
+                    "strategy": "clarify",
+                    "missing_slots": ["provider_output"],
+                    "fallback_used": True,
+                },
+                "trace": [
+                    {"node": "question_understanding_agent"},
+                    {"node": "clarification_router_agent"},
+                    {"node": "early_response_node"},
+                ],
+            }
+        return _fake_section_runner([])(
+            store, workspace_id, user_question, initial_sql, providers
+        )
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "分析最近 90 天收入趋势。",
+        section_runner=retryable_runner,
+    )
+
+    assert result["success"] is True
+    assert result["report"]["status"] == "completed"
+    assert len(calls) == len(result["report"]["sections"]) + 1
+    assert result["report"]["sections"][0]["status"] == "completed"
+    assert "early_response_node" not in result["report"]["sections"][0]["trace_nodes"]
 
 
 def test_one_section_failure_marks_report_partial(tmp_path):
