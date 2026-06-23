@@ -15,10 +15,10 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P12 - Report Productization planning |
-| Current task | P12 design/spec documented; implementation not started |
-| Next planned task | Review P12 design, then create an implementation plan before code changes |
-| Last completed task | H5 current product documentation cleanup |
+| Current phase | P12 - Report Productization |
+| Current task | P12-H2 synchronous report runner |
+| Next planned task | Implement synchronous workspace report generation through P11-safe analysis boundaries |
+| Last completed task | P12-H1 report domain model, storage layout, and Markdown renderer |
 | Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -45,7 +45,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[~]` Planned; implementation not started |
+| P12 | Report Productization | `[~]` In progress; H1 foundation complete |
 
 ## P11 Product Hardening
 
@@ -145,8 +145,8 @@ Planned task queue:
 
 | Task | Scope | Status |
 |---|---|---|
-| P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[ ]` Not started |
-| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[ ]` Not started |
+| P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[x]` Complete |
+| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[~]` Next |
 | P12-H3 | FastAPI report APIs | `[ ]` Not started |
 | P12-H4 | Next.js reports UI and Markdown download | `[ ]` Not started |
 | P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |

@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is planned but implementation has not started. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization implementation has started with the report storage and Markdown foundation. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -42,7 +42,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P9 | Realistic Eval And Demo Polish | Complete | Historical eval/demo polish |
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
-| P12 | Report Productization | Planned; implementation not started | MVP scope is synchronous workspace report generation with page display and Markdown download |
+| P12 | Report Productization | In progress | H1 report storage and Markdown foundation complete; next is synchronous workspace report generation |
 
 ## P11 Product Hardening Plan
 
@@ -209,8 +209,8 @@ Likely components:
 
 | Task | Scope | Status |
 |---|---|---|
-| P12-H1 | Report domain model, report directory layout, Markdown renderer; no provider calls yet | Not started |
-| P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries; presets create section purposes/questions, not SQL templates or keyword rule trees | Not started |
+| P12-H1 | Report domain model, report directory layout, Markdown renderer; no provider calls yet | Complete |
+| P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries; presets create section purposes/questions, not SQL templates or keyword rule trees | Next |
 | P12-H3 | FastAPI report create/list/detail/download APIs | Not started |
 | P12-H4 | Next.js reports list/generate/detail UI with Markdown download | Not started |
 | P12-H5 | Live DeepSeek workspace report acceptance test | Not started |
