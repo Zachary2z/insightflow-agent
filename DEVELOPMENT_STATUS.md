@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P12 - Report Productization |
-| Current task | P12-H2 synchronous report runner |
-| Next planned task | Implement synchronous workspace report generation through P11-safe analysis boundaries |
-| Last completed task | P12-H1 report domain model, storage layout, and Markdown renderer |
+| Current task | P12-H3 FastAPI report APIs |
+| Next planned task | Implement FastAPI report create/list/detail/download APIs |
+| Last completed task | P12-H2 synchronous workspace report runner |
 | Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -45,7 +45,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[~]` In progress; H1 foundation complete |
+| P12 | Report Productization | `[~]` In progress; H1 foundation and H2 synchronous runner complete |
 
 ## P11 Product Hardening
 
@@ -146,8 +146,8 @@ Planned task queue:
 | Task | Scope | Status |
 |---|---|---|
 | P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[x]` Complete |
-| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[~]` Next |
-| P12-H3 | FastAPI report APIs | `[ ]` Not started |
+| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[x]` Complete |
+| P12-H3 | FastAPI report APIs | `[~]` Next |
 | P12-H4 | Next.js reports UI and Markdown download | `[ ]` Not started |
 | P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |
 | P12-H6 | Docs, artifact audit, final verification | `[ ]` Not started |
