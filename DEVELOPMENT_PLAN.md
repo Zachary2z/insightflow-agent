@@ -23,7 +23,7 @@ Update this table after every completed phase or task so the current project pos
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
-| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, live DeepSeek acceptance, and H1 FastAPI data source endpoints exist; real frontend wiring, old UI/API cleanup, stronger natural-language live acceptance, and docs cleanup still remain. | Complete H2-H5 before P12 |
+| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, live DeepSeek acceptance, H1 FastAPI data source endpoints, H2 frontend wiring, and H3 old UI/API cleanup are complete; stronger natural-language live acceptance and docs cleanup still remain. | Complete H4-H5 before P12 |
 
 Current development position: **P11 General Data Analysis Product is implemented as a working backend/product prototype, but P11 Product Hardening is still required before P12.**
 
@@ -106,6 +106,8 @@ npm run build
 ```
 
 ### Task H3 - Delete Replaced Streamlit UI And Old Ecommerce API Entry
+
+Status: complete. The tracked `ui/` package, old in-memory `RunManager`, legacy async run API tests, old `/api/runs` FastAPI routes, and `RunCreateRequest` ecommerce default were removed from the current product path. Workspace-scoped `/api/workspaces/{workspace_id}/runs` remains the product analysis entry.
 
 Goal: prevent the old demo product path from steering future development.
 

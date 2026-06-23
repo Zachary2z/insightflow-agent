@@ -43,3 +43,16 @@ def test_fastapi_product_entrypoint_is_importable():
     app = create_app()
 
     assert app.title == "InsightFlow Agent API"
+
+
+def test_legacy_streamlit_ui_is_not_part_of_product_scaffold():
+    assert not (ROOT / "app.py").exists()
+    assert not (ROOT / "ui").exists()
+
+
+def test_fastapi_product_entrypoint_excludes_legacy_runs_api():
+    from api.app import create_app
+
+    app = create_app()
+
+    assert all(not route.path.startswith("/api/runs") for route in app.routes)

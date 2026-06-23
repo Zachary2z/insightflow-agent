@@ -14,8 +14,8 @@ P11 is **not yet product-complete**. The 2026-06-23 audit found five required ha
 
 1. Completed: add FastAPI CSV/Excel upload, SQLite source registration, and source listing endpoints.
 2. Completed: wire the Next.js pages into real API-backed workspace create, data source, profile, semantic-layer, analysis, and run-result flows.
-3. Next: delete the remaining tracked Streamlit `ui/` package and remove or isolate the old ecommerce-style `/api/runs` product entry.
-4. Strengthen the P11 live DeepSeek acceptance test so it uses a natural business question instead of a SQL-shaped prompt.
+3. Completed: delete the remaining tracked Streamlit `ui/` package and remove the old ecommerce-style `/api/runs` product entry.
+4. Next: strengthen the P11 live DeepSeek acceptance test so it uses a natural business question instead of a SQL-shaped prompt.
 5. Clean current docs so Streamlit, ecommerce eval, mock Jira/Power BI, and old demo references are historical only.
 
 P0-P10 remain as historical development phases and safety-boundary context. Any Streamlit, ecommerce demo, old eval, mock Jira, or action-demo references below this point are historical unless they explicitly describe a retained validator/tool boundary.
