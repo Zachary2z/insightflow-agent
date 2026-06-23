@@ -15,11 +15,11 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P12 - Report Productization |
-| Current task | P12-H6 docs/artifact audit/final verification |
-| Next planned task | Complete P12 documentation, generated-artifact audit, and final verification |
-| Last completed task | P12-H5 live DeepSeek workspace report acceptance |
-| Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
+| Current phase | P12 complete / ready for next planning |
+| Current task | None / next phase planning |
+| Next planned task | Define P13 only after a separate design is written and selected |
+| Last completed task | P12-H6 docs, artifact audit, final verification |
+| Main product target | P11 ad hoc workspace analysis remains available; P12 synchronous workspace reports support page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
@@ -45,7 +45,8 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[~]` In progress; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, and H5 live DeepSeek report acceptance complete |
+| P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
+| P13 | Next phase | `[ ]` Not started; no selected design yet |
 
 ## P11 Product Hardening
 
@@ -81,29 +82,42 @@ workspace
 
 No H1-H5 implementation or verification work remains.
 
-## Final Verification Plan
+## Final Verification Summary
 
-Latest result: passed on 2026-06-23.
+Latest P12 result: passed on 2026-06-23.
 
-Required H5/P11 commands:
+Required P12-H6 commands:
 
 ```bash
-python3 -m pytest tests/test_p11_cleanup_boundaries.py tests/test_project_initialization.py -q
-python3 -m pytest -q
-cd frontend && npm test
-cd frontend && npm run build
+python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
+python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
+set -a; [ -f .env ] && source .env; set +a; \
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
 INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
-python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
+python3 -m pytest -q
+cd frontend && npm test
+cd frontend && npm run build
 ```
 
-Required audits:
+Final verification result summary:
+
+- Targeted P12 backend report tests passed: `28 passed`.
+- Non-live P12 DeepSeek acceptance command passed by opt-in skip when `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS` is unset: `1 skipped`.
+- Live DeepSeek P12 report acceptance passed with provider flags enabled: `1 passed`, with expected matplotlib CJK glyph warnings.
+- Full backend pytest suite passed: `246 passed, 10 skipped`, with matplotlib CJK glyph warnings.
+- Frontend unit tests passed: `19 passed`.
+- Frontend production build passed: Next.js compiled successfully and generated all app routes.
+
+Required audits completed:
 
 - Documentation audit: every remaining old-term hit must be in an explicit Historical, Superseded, legacy, or retained low-level fixture context.
 - Tracked artifact audit: no tracked old UI/API/eval files, generated frontend build output, generated report/chart artifacts, or generated trace JSON.
+- Artifact hygiene audit: `.env`, `.venv/`, `frontend/node_modules/`, `frontend/.next/`, `.pytest_cache/`, `__pycache__/`, `reports/charts/*`, `logs/traces/*`, `workspaces/*/reports/*`, `eval/report.md`, `data/action_ops.db`, `docs/superpowers/plans/*`, and `.superpowers/*` are ignored or untracked. Only intentional `.gitkeep` placeholders remain tracked for empty artifact directories.
+- Legacy path audit command run: `rg -n "chart_agent|visualization_planner|chart_tool|old|legacy|TODO|deprecated|fixed template|deterministic action template|keyword inference"`. Hits were Historical/Superseded docs, cleanup-boundary tests, or false positives such as `old_price`, `threshold`, `stakeholder`, and `placeholder`; no active legacy chart/Streamlit/eval path was restored.
 
 ## Historical / Superseded Notes
 
@@ -116,7 +130,7 @@ The following terms are intentionally retained only in historical notes or fixtu
 
 After future verification:
 
-1. Keep P12 implementation tasks marked `[ ] Not started` until implementation begins.
+1. Keep P13 marked `[ ] Not started` until a design is written and implementation begins.
 2. Record exact verification results in this file or in the final task response.
 
 ## P12 Planning Snapshot
@@ -141,7 +155,7 @@ GET  /api/workspaces/{workspace_id}/reports/{report_id}
 GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
 ```
 
-Planned task queue:
+Completed task queue:
 
 | Task | Scope | Status |
 |---|---|---|
@@ -150,6 +164,6 @@ Planned task queue:
 | P12-H3 | FastAPI report APIs | `[x]` Complete |
 | P12-H4 | Next.js reports UI and Markdown download | `[x]` Complete |
 | P12-H5 | Live DeepSeek workspace report acceptance | `[x]` Complete |
-| P12-H6 | Docs, artifact audit, final verification | `[~]` Next |
+| P12-H6 | Docs, artifact audit, final verification | `[x]` Complete |
 
 P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, hardcoded SQL templates, keyword-heavy report rule trees, silent semantic-layer overwrites, and any restoration of historical Streamlit/ecommerce/eval product paths.

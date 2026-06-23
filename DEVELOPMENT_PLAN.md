@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization implementation has added the report storage, Markdown foundation, synchronous workspace report runner, FastAPI report APIs, and Next.js reports UI. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -13,11 +13,12 @@ FastAPI backend
 + CSV/Excel/SQLite imports
 + workspace database profile
 + semantic-layer draft
-+ natural business question
++ natural business question for P11 ad hoc analysis
++ structured P12 workspace reports
 + live DeepSeek/provider-backed understanding and planning
 + guarded SQL candidate
 + validated SQL execution
-+ visualization/artifact/trace output
++ visualization/artifact/report/trace output
 ```
 
 The current product is not the historical Streamlit demo, not the old ecommerce-only demo, not the old eval benchmark, and not mock SaaS integration work.
@@ -42,11 +43,12 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P9 | Realistic Eval And Demo Polish | Complete | Historical eval/demo polish |
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
-| P12 | Report Productization | In progress | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; next is docs, artifact audit, and final verification |
+| P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
+| P13 | Next phase | Not started | No P13 design has been selected or started |
 
 ## P11 Product Hardening Plan
 
-P11 is the active phase. It makes the project read and behave like a general workspace data-analysis product rather than a demo sequence.
+P11 is complete. It makes the project read and behave like a general workspace data-analysis product rather than a demo sequence.
 
 | Task | Goal | Status | Acceptance |
 |---|---|---|---|
@@ -131,7 +133,7 @@ P0-P10 content is retained as historical context only. It explains how the safet
 
 ## P12 Report Productization Plan
 
-P12 turns P11 single-question workspace analysis into a separate structured report product. P11 remains the ad hoc analysis entry point at `/workspaces/{workspace_id}/analysis`; P12 adds report generation under `/workspaces/{workspace_id}/reports`.
+P12 is complete. It turns P11 single-question workspace analysis into a separate structured report product. P11 remains the ad hoc analysis entry point at `/workspaces/{workspace_id}/analysis`; P12 adds report generation under `/workspaces/{workspace_id}/reports`.
 
 Design spec: `docs/superpowers/specs/2026-06-23-p12-workspace-report-productization-design.md`.
 
@@ -214,7 +216,7 @@ Likely components:
 | P12-H3 | FastAPI report create/list/detail/download APIs | Complete |
 | P12-H4 | Next.js reports list/generate/detail UI with Markdown download | Complete |
 | P12-H5 | Live DeepSeek workspace report acceptance test | Complete |
-| P12-H6 | P12 docs, artifact audit, final verification | Next |
+| P12-H6 | P12 docs, artifact audit, final verification | Complete |
 
 ### P12 Out Of Scope
 
@@ -227,6 +229,8 @@ Likely components:
 - Deployment.
 - Replacing P11 ad hoc analysis.
 - Restoring historical Streamlit/ecommerce/eval product paths.
+
+P13 has not started. Do not infer or add a P13 scope until a separate design is written and selected.
 
 ### P12 Acceptance
 
@@ -242,6 +246,47 @@ Likely components:
 - Existing semantic-layer files are not silently overwritten.
 - P12 opt-in live DeepSeek report acceptance passes.
 - Full backend tests, frontend tests, frontend build, tracked artifact audit, and docs audit pass.
+
+### P12 Final Verification Checklist
+
+Latest result: passed on 2026-06-23.
+
+Run these before any future P12 completion claim:
+
+```bash
+python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
+python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
+python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
+python3 -m pytest -q
+cd frontend && npm test
+cd frontend && npm run build
+```
+
+Artifact hygiene audit scope:
+
+```text
+.env
+.venv/
+frontend/node_modules/
+frontend/.next/
+.pytest_cache/
+__pycache__/
+reports/charts/*
+logs/traces/*
+workspaces/*/reports/*
+eval/report.md
+data/action_ops.db
+docs/superpowers/plans/*
+.superpowers/*
+```
+
+Expected result: no generated artifacts from this list are committed. Existing `.gitkeep` files may remain only to preserve empty artifact directories.
 
 ## P12 Guardrail
 
