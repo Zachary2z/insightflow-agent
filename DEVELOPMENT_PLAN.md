@@ -42,7 +42,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P9 | Realistic Eval And Demo Polish | Complete | Historical eval/demo polish |
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
-| P12 | Report Productization | In progress | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; next is live DeepSeek report acceptance |
+| P12 | Report Productization | In progress | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; next is docs, artifact audit, and final verification |
 
 ## P11 Product Hardening Plan
 
@@ -213,8 +213,8 @@ Likely components:
 | P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries; presets create section purposes/questions, not SQL templates or keyword rule trees | Complete |
 | P12-H3 | FastAPI report create/list/detail/download APIs | Complete |
 | P12-H4 | Next.js reports list/generate/detail UI with Markdown download | Complete |
-| P12-H5 | Live DeepSeek workspace report acceptance test | Next |
-| P12-H6 | P12 docs, artifact audit, final verification | Not started |
+| P12-H5 | Live DeepSeek workspace report acceptance test | Complete |
+| P12-H6 | P12 docs, artifact audit, final verification | Next |
 
 ### P12 Out Of Scope
 
