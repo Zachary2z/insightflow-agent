@@ -252,6 +252,90 @@ def test_provider_unavailable_section_is_retried_before_marking_failed(tmp_path)
     assert "early_response_node" not in result["report"]["sections"][0]["trace_nodes"]
 
 
+def test_provider_unavailable_section_can_retry_twice_before_success(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = []
+
+    def retryable_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        calls.append(user_question)
+        if len(calls) <= 2:
+            return {
+                "status": "waiting_for_clarification",
+                "final_answer": (
+                    "需要补充信息后才能继续分析：Provider question understanding is unavailable; "
+                    "please retry with a configured provider."
+                ),
+                "execution_result": {},
+                "question_understanding": {
+                    "provider_called": True,
+                    "source": "provider_unavailable",
+                    "strategy": "clarify",
+                    "missing_slots": ["provider_output"],
+                    "fallback_used": True,
+                    "validation_error": "question_understanding schema validation failed",
+                },
+                "trace": [
+                    {"node": "question_understanding_agent"},
+                    {"node": "clarification_router_agent"},
+                    {"node": "early_response_node"},
+                ],
+            }
+        return _fake_section_runner([])(
+            store, workspace_id, user_question, initial_sql, providers
+        )
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "分析最近 90 天收入趋势。",
+        section_runner=retryable_runner,
+    )
+
+    assert result["success"] is True
+    assert result["report"]["status"] == "completed"
+    assert len(calls) == len(result["report"]["sections"]) + 2
+    assert result["report"]["sections"][0]["status"] == "completed"
+
+
+def test_safety_reject_section_is_not_retried_into_completed(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = []
+
+    def rejecting_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        calls.append(user_question)
+        return {
+            "status": "failed",
+            "final_answer": "请求包含敏感字段或不安全操作，已在 SQL 生成前拒绝。",
+            "execution_result": {},
+            "question_understanding": {
+                "provider_called": True,
+                "source": "provider",
+                "strategy": "reject",
+                "risk_flags": ["sensitive_field"],
+                "rejection_reason": "Request asks for sensitive fields or unsafe data access.",
+                "fallback_used": False,
+            },
+            "trace": [
+                {"node": "question_understanding_agent"},
+                {"node": "early_response_node"},
+            ],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "分析最近 90 天收入趋势。",
+        section_runner=rejecting_runner,
+    )
+
+    assert result["success"] is False
+    assert result["report"]["status"] == "failed"
+    assert len(calls) == len(result["report"]["sections"])
+    assert all(section["status"] == "failed" for section in result["report"]["sections"])
+
+
 def test_one_section_failure_marks_report_partial(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
     calls = []

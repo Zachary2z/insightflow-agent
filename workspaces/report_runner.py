@@ -15,7 +15,7 @@ from workspaces.store import WorkspaceStore
 
 
 SectionRunner = Callable[..., dict[str, Any]]
-SECTION_ANALYSIS_MAX_ATTEMPTS = 2
+SECTION_ANALYSIS_MAX_ATTEMPTS = 3
 
 
 REPORT_TYPE_PRESETS: dict[str, dict[str, Any]] = {
@@ -231,14 +231,41 @@ def _run_section_analysis_with_retry(
 
 def _retryable_provider_section_failure(analysis_result: dict[str, Any]) -> bool:
     understanding = analysis_result.get("question_understanding") or {}
+    if (
+        understanding.get("strategy") == "reject"
+        or understanding.get("risk_flags")
+        or understanding.get("rejection_reason")
+    ):
+        return False
+
     missing_slots = set(understanding.get("missing_slots") or [])
+    trace_nodes = {
+        str(event.get("node"))
+        for event in analysis_result.get("trace") or []
+        if event.get("node")
+    }
+    provider_unavailable = (
+        understanding.get("source") == "provider_unavailable"
+        or "provider_output" in missing_slots
+        or "Provider question understanding is unavailable"
+        in str(analysis_result.get("final_answer") or "")
+    )
     if (
         understanding.get("provider_called") is True
         and understanding.get("fallback_used") is True
+        and provider_unavailable
         and (
-            understanding.get("source") == "provider_unavailable"
-            or "provider_output" in missing_slots
+            "early_response_node" in trace_nodes
+            or analysis_result.get("status") == "waiting_for_clarification"
         )
+    ):
+        return True
+
+    planning = analysis_result.get("sql_planning") or {}
+    if (
+        planning.get("provider_called") is True
+        and planning.get("fallback_used") is True
+        and planning.get("source") == "provider_unavailable"
     ):
         return True
 
