@@ -60,6 +60,7 @@ button:disabled {
 }
 
 input,
+select,
 textarea {
   border: 1px solid #c7d2e5;
   border-radius: 8px;

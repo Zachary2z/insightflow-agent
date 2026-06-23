@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createProfile,
+  createWorkspaceReport,
   createSemanticDraft,
   createWorkspace,
+  getWorkspaceReport,
+  getWorkspaceReportDownloadUrl,
   importSqliteSource,
+  listWorkspaceReports,
   listSources,
   listWorkspaces,
   runAnalysis,
@@ -126,6 +130,69 @@ describe("api client", () => {
           initial_sql: "SELECT channel FROM orders",
         }),
       }),
+    );
+  });
+
+  it("creates, lists, loads, and links workspace reports", async () => {
+    const report = {
+      report_id: "report_1",
+      workspace_id: "ws_1",
+      report_type: "business_review",
+      report_goal: "Create a revenue review.",
+      title: "Business Review",
+      status: "completed",
+      executive_summary: ["Revenue grew."],
+      sections: [],
+      markdown_path: "workspaces/ws_1/reports/report_1/report.md",
+      json_path: "workspaces/ws_1/reports/report_1/report.json",
+      trace_path: "workspaces/ws_1/reports/report_1/trace.json",
+      artifact_dir: "workspaces/ws_1/reports/report_1/artifacts",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, workspace_id: "ws_1", report_id: "report_1", report }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ workspace_id: "ws_1", reports: [report] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ workspace_id: "ws_1", report_id: "report_1", report }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const created = await createWorkspaceReport("ws_1", {
+      reportType: "business_review",
+      reportGoal: "Create a revenue review.",
+    });
+    const reports = await listWorkspaceReports("ws_1");
+    const detail = await getWorkspaceReport("ws_1", "report_1");
+
+    expect(created.report_id).toBe("report_1");
+    expect(reports.reports[0].title).toBe("Business Review");
+    expect(detail.report.executive_summary).toEqual(["Revenue grew."]);
+    expect(getWorkspaceReportDownloadUrl("ws_1", "report_1")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:8000/api/workspaces/ws_1/reports",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report_type: "business_review",
+          report_goal: "Create a revenue review.",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://localhost:8000/api/workspaces/ws_1/reports");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1",
     );
   });
 });

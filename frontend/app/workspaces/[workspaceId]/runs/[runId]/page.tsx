@@ -17,6 +17,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
         <Link href={`/workspaces/${workspaceId}/analysis`}>Back to analysis</Link>
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
+        <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
       </nav>
       <RunResultLoader workspaceId={workspaceId} runId={runId} />
     </main>

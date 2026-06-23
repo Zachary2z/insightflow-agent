@@ -16,6 +16,7 @@ export default async function SemanticLayerPage({ params }: SemanticLayerPagePro
         <Link href={`/workspaces/${workspaceId}/datasets`}>Datasets</Link>
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
+        <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
       </nav>
       <SemanticLayerWorkspace workspaceId={workspaceId} />
     </main>

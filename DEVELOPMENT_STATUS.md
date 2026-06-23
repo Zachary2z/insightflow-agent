@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P12 - Report Productization |
-| Current task | P12-H4 Next.js reports UI |
-| Next planned task | Implement Next.js reports list/generate/detail UI with Markdown download |
-| Last completed task | P12-H3 FastAPI report APIs |
+| Current task | P12-H5 live DeepSeek workspace report acceptance |
+| Next planned task | Add opt-in live DeepSeek workspace report acceptance coverage |
+| Last completed task | P12-H4 Next.js reports UI |
 | Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -45,7 +45,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[~]` In progress; H1 foundation, H2 synchronous runner, and H3 FastAPI APIs complete |
+| P12 | Report Productization | `[~]` In progress; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, and H4 Next.js reports UI complete |
 
 ## P11 Product Hardening
 
@@ -148,8 +148,8 @@ Planned task queue:
 | P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[x]` Complete |
 | P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[x]` Complete |
 | P12-H3 | FastAPI report APIs | `[x]` Complete |
-| P12-H4 | Next.js reports UI and Markdown download | `[~]` Next |
-| P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |
+| P12-H4 | Next.js reports UI and Markdown download | `[x]` Complete |
+| P12-H5 | Live DeepSeek workspace report acceptance | `[~]` Next |
 | P12-H6 | Docs, artifact audit, final verification | `[ ]` Not started |
 
 P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, hardcoded SQL templates, keyword-heavy report rule trees, silent semantic-layer overwrites, and any restoration of historical Streamlit/ecommerce/eval product paths.

@@ -55,6 +55,66 @@ export type WorkspaceRunResponse = {
   result: Record<string, unknown>;
 };
 
+export type ReportType = "business_review" | "channel_performance" | "revenue_trend";
+
+export type WorkspaceReportSection = {
+  section_id: string;
+  title: string;
+  purpose?: string;
+  status: string;
+  question?: string;
+  summary?: string;
+  sql?: string;
+  columns?: string[];
+  rows_preview?: Array<Record<string, unknown>>;
+  artifact_paths?: string[];
+  evidence_notes?: string[];
+  provider_metadata?: Record<string, unknown>;
+  trace_nodes?: string[];
+  error?: string | null;
+};
+
+export type WorkspaceReport = {
+  report_id: string;
+  workspace_id: string;
+  report_type: ReportType | string;
+  report_goal: string;
+  title: string;
+  status: string;
+  executive_summary?: string[];
+  sections?: WorkspaceReportSection[];
+  markdown_path?: string;
+  json_path?: string;
+  trace_path?: string;
+  artifact_dir?: string;
+  created_at?: string;
+  updated_at?: string;
+  provider_metadata?: Record<string, unknown>;
+};
+
+export type CreateWorkspaceReportRequest = {
+  reportType: ReportType;
+  reportGoal: string;
+};
+
+export type WorkspaceReportCreateResponse = {
+  success: boolean;
+  workspace_id: string;
+  report_id: string;
+  report: WorkspaceReport;
+};
+
+export type WorkspaceReportsResponse = {
+  workspace_id: string;
+  reports: WorkspaceReport[];
+};
+
+export type WorkspaceReportResponse = {
+  workspace_id: string;
+  report_id: string;
+  report: WorkspaceReport;
+};
+
 async function parseJsonResponse(response: Response, message: string) {
   if (!response.ok) {
     let detail = "";
@@ -140,4 +200,36 @@ export async function runAnalysis(
     body: JSON.stringify(payload),
   });
   return parseJsonResponse(response, "Failed to run analysis");
+}
+
+export async function createWorkspaceReport(
+  workspaceId: string,
+  request: CreateWorkspaceReportRequest,
+): Promise<WorkspaceReportCreateResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/reports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      report_type: request.reportType,
+      report_goal: request.reportGoal,
+    }),
+  });
+  return parseJsonResponse(response, "Failed to create report");
+}
+
+export async function listWorkspaceReports(workspaceId: string): Promise<WorkspaceReportsResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/reports`);
+  return parseJsonResponse(response, "Failed to list reports");
+}
+
+export async function getWorkspaceReport(
+  workspaceId: string,
+  reportId: string,
+): Promise<WorkspaceReportResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}`);
+  return parseJsonResponse(response, "Failed to load report");
+}
+
+export function getWorkspaceReportDownloadUrl(workspaceId: string, reportId: string): string {
+  return `${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}/download`;
 }
