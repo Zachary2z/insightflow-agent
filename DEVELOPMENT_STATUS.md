@@ -15,11 +15,11 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 
 | Field | Status |
 |---|---|
-| Current phase | P11 - General Data Analysis Product complete |
-| Current task | P11 complete; ready for P12 report productization |
-| Next planned task | P12 report productization |
-| Last completed task | P11 General Data Analysis Product |
-| Main demo target | User workspace analysis over CSV, Excel, or SQLite data with profiling, semantic draft, validated SQL, evidence, charts, traces, and live DeepSeek acceptance |
+| Current phase | P11 - General Data Analysis Product hardening |
+| Current task | P11 Product Hardening H1-H5 planned after implementation audit |
+| Next planned task | H1 FastAPI data source endpoints |
+| Last completed task | P11 implementation audit and hardening plan |
+| Main demo target | User workspace analysis over CSV, Excel, or SQLite data with real upload/API flow, profiling, semantic draft, validated SQL, evidence, charts, traces, Next.js UI, and live DeepSeek acceptance |
 | Active frontend | Next.js + React + TypeScript |
 | Out of scope for current P11 | P12 automated report productization, P13 real Jira/Slack/Email/Power BI SaaS integrations, auth/RBAC, deployment, and unguarded LLM-driven execution |
 
@@ -42,7 +42,42 @@ This file is the living development tracker for InsightFlow Agent. Update it aft
 | P8.5 | Agent Pipeline UX | `[x]` Streamlit run summaries now expose agent pipeline, tool-call cards, validator gates, artifact panel, source metadata, provider prompt ids, fallback flags, policy status, and mock external artifact URLs from existing state/trace data | `[x]` P8.5 focused test red/green verified; Streamlit tests 19/19 passing; related regression 42/42 passing; full suite 240 passed / 9 skipped; eval 20/20 passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P9 | Realistic Eval And Demo Polish | `[x]` 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo questions complete | `[x]` focused P9 eval and Streamlit tests passing; full verification recorded below | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
 | P10 | Lightweight Engineering Hardening | `[x]` external-safe MCP contract metadata, internal-tool exposure checks, eval artifact hygiene note, and generated-artifact ignore coverage complete | `[x]` focused tests, related regressions, full suite, eval, and legacy audit passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
-| P11 | General Data Analysis Product | `[x]` workspace store/import/profile/semantic draft, synthetic workspace data, workspace-aware analysis, FastAPI workspace APIs, Next.js frontend scaffold/flow, live DeepSeek workspace acceptance, and old demo/mock cleanup complete | `[x]` backend suite 208 passed / 9 skipped; frontend 3/3 tests and production build passing; default live test skipped; opt-in live DeepSeek workspace acceptance passing | `[x]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS updated | `[x]` Done |
+| P11 | General Data Analysis Product | `[~]` workspace store/import/profile/semantic draft, synthetic workspace data, workspace-aware analysis, FastAPI workspace APIs, Next.js scaffold, live DeepSeek acceptance, and old demo/mock cleanup are present; H1-H5 hardening remains | `[x]` audit verification: backend suite 208 passed / 9 skipped; frontend 3/3 tests and production build passing; opt-in live DeepSeek workspace acceptance passing | `[~]` docs now track P11 hardening plan | `[~]` In progress |
+
+## P11 Product Hardening
+
+Audit date: 2026-06-23
+
+The P11 implementation is functional but not product-complete. The audit found five required hardening tasks before P12 can begin.
+
+### Audit Findings
+
+- `[!]` FastAPI exposes workspace create/profile/semantic/run APIs, but does not yet expose CSV/Excel upload or SQLite source endpoints.
+- `[!]` Next.js builds and has route scaffolding, but workspace pages still contain placeholder text and do not yet drive the real product flow.
+- `[!]` `app.py` and old Streamlit tests are gone, but tracked `ui/` modules and old ecommerce-style `/api/runs` defaults still remain.
+- `[!]` P11 live DeepSeek acceptance passes, but the current question is too SQL-shaped and should be replaced by a natural business question.
+- `[!]` README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS still contain many historical Streamlit/ecommerce/eval references; current-product sections must be cleaned so future agents do not revert to the old demo path.
+
+### Hardening Task Checklist
+
+| Task | Scope | Status | Required verification |
+|---|---|---|---|
+| H1 | Add `POST /api/workspaces/{workspace_id}/sources/upload`, `POST /sources/sqlite`, and `GET /sources`; wire to `import_csv`, `import_excel`, and `import_sqlite` | `[ ]` Not started | `python3 -m pytest tests/test_workspace_api.py tests/test_workspace_importers.py -q` |
+| H2 | Replace Next.js placeholder pages with real API-backed workspace list, create, data source, profile, semantic-layer, analysis, and run-result flows | `[ ]` Not started | `cd frontend && npm test && npm run build` |
+| H3 | Delete tracked `ui/`; remove or isolate old `/api/runs` ecommerce product entry; update cleanup/project-initialization tests | `[ ]` Not started | `python3 -m pytest tests/test_p11_cleanup_boundaries.py tests/test_project_initialization.py tests/test_workspace_api.py tests/test_workspace_analysis_runner.py -q` |
+| H4 | Strengthen P11 live DeepSeek test with a natural business question and workspace-rooted artifact assertions | `[ ]` Not started | `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q` |
+| H5 | Clean current docs so Streamlit/ecommerce/eval/mock references are historical only, not current product guidance | `[~]` Started | `rg -n "streamlit run app.py|eval/run_eval.py|data/ecommerce.db|mock jira|powerbi_publisher_mock|fixed template|deterministic action template|keyword inference" README.md DEVELOPMENT_PLAN.md DEVELOPMENT_STATUS.md` |
+
+### Hardening Final Acceptance
+
+P11 can be marked complete only after:
+
+- `[ ]` H1-H5 are complete.
+- `[ ]` `python3 -m pytest` passes.
+- `[ ]` `cd frontend && npm test && npm run build` passes.
+- `[ ]` P11 opt-in live DeepSeek acceptance passes with a natural business question.
+- `[ ]` `git ls-files` shows no tracked Streamlit app, `ui/`, old eval runner/questions, mock-action acceptance tests, generated DB/report/trace/chart artifacts, `frontend/node_modules`, or `frontend/.next`.
+- `[ ]` Docs make P11 workspace + FastAPI + Next.js the current product path and clearly mark historical P0-P10 references as superseded.
 
 ## P0 - Agentic SQL Core
 

@@ -2,13 +2,21 @@
 
 InsightFlow Agent is a LangGraph-based multi-agent data analysis product.
 
-InsightFlow Agent is now moving into P11 General Data Analysis Product development.
+InsightFlow Agent is in P11 General Data Analysis Product hardening.
 
 The main product path is no longer the built-in ecommerce demo. P11 supports user workspaces backed by CSV, Excel, or SQLite imports, profiles the imported data, drafts a semantic layer, and runs DeepSeek-backed analysis over the workspace database with validated SQL, evidence-backed explanations, charts, and traces.
 
 ## Current Status
 
-P11 - General Data Analysis Product is complete for the current implementation slice: workspace store/import/profile/semantic draft, workspace-aware analysis, FastAPI workspace APIs, Next.js frontend scaffold and flow components, live DeepSeek workspace acceptance, and cleanup of replaced demo/mock product tests.
+P11 - General Data Analysis Product has a working implementation slice: workspace store/import/profile/semantic draft, workspace-aware analysis, FastAPI workspace APIs, Next.js frontend scaffold, live DeepSeek workspace acceptance, and cleanup of several replaced demo/mock tests.
+
+P11 is **not yet product-complete**. The 2026-06-23 audit found five required hardening tasks before P12 report productization can begin:
+
+1. Add FastAPI CSV/Excel upload, SQLite source registration, and source listing endpoints.
+2. Wire the Next.js pages into real API-backed workspace create, data source, profile, semantic-layer, analysis, and run-result flows.
+3. Delete the remaining tracked Streamlit `ui/` package and remove or isolate the old ecommerce-style `/api/runs` product entry.
+4. Strengthen the P11 live DeepSeek acceptance test so it uses a natural business question instead of a SQL-shaped prompt.
+5. Clean current docs so Streamlit, ecommerce eval, mock Jira/Power BI, and old demo references are historical only.
 
 P0-P10 remain as historical development phases and safety-boundary context. Any Streamlit, ecommerce demo, old eval, mock Jira, or action-demo references below this point are historical unless they explicitly describe a retained validator/tool boundary.
 

@@ -23,9 +23,196 @@ Update this table after every completed phase or task so the current project pos
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
-| P11 | General Data Analysis Product | `[x]` Complete | CSV/Excel/SQLite workspaces, profiling, semantic layer review, Next.js frontend, workspace-aware analysis, live DeepSeek acceptance, and old demo/mock cleanup complete. | P12 report productization |
+| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, and live DeepSeek acceptance exist; audit found API upload endpoints, real frontend wiring, old UI/API cleanup, stronger natural-language live acceptance, and docs cleanup still required. | Complete P11 Product Hardening before P12 |
 
-Current development position: **P11 General Data Analysis Product is complete; next planned slice is P12 report productization.**
+Current development position: **P11 General Data Analysis Product is implemented as a working backend/product prototype, but P11 Product Hardening is still required before P12.**
+
+## P11 Product Hardening Plan
+
+This checklist records the required cleanup after the P11 implementation audit on 2026-06-23. P11 is not considered product-complete until these tasks pass.
+
+### Task H1 - FastAPI Data Source Endpoints
+
+Goal: expose the existing CSV, Excel, and SQLite importers through product APIs instead of requiring Python-only test calls.
+
+Required endpoints:
+
+```text
+POST /api/workspaces/{workspace_id}/sources/upload
+POST /api/workspaces/{workspace_id}/sources/sqlite
+GET  /api/workspaces/{workspace_id}/sources
+```
+
+Files:
+
+- Modify `api/app.py`.
+- Modify `api/models.py`.
+- Extend `tests/test_workspace_api.py`.
+
+Acceptance:
+
+- CSV upload imports a table into the workspace `analysis.db`.
+- Excel upload imports one table per sheet.
+- SQLite registration/import copies user tables into the workspace `analysis.db`.
+- `GET /sources` returns source metadata from `workspace.json`.
+- Unsupported file types return HTTP 400.
+- Missing workspace returns HTTP 404.
+
+Verification:
+
+```bash
+python3 -m pytest tests/test_workspace_api.py tests/test_workspace_importers.py -q
+```
+
+### Task H2 - Wire Next.js Into The Product APIs
+
+Goal: replace placeholder pages with a usable product flow.
+
+Files:
+
+- Modify `frontend/lib/api.ts`.
+- Modify `frontend/app/workspaces/page.tsx`.
+- Modify `frontend/app/workspaces/new/page.tsx`.
+- Modify `frontend/app/workspaces/[workspaceId]/datasets/page.tsx`.
+- Modify `frontend/app/workspaces/[workspaceId]/profile/page.tsx`.
+- Modify `frontend/app/workspaces/[workspaceId]/semantic-layer/page.tsx`.
+- Modify `frontend/app/workspaces/[workspaceId]/analysis/page.tsx`.
+- Modify `frontend/app/workspaces/[workspaceId]/runs/[runId]/page.tsx`.
+- Modify or add components under `frontend/components/`.
+- Extend `frontend/tests/api-client.test.ts`.
+- Extend `frontend/tests/workspace-flow.test.tsx`.
+
+Acceptance:
+
+- `/workspaces` loads and renders workspace list from FastAPI.
+- `/workspaces/new` can create a workspace through the API.
+- `/datasets` can upload CSV/Excel, register SQLite path, and show sources.
+- `/profile` can trigger and render profile generation.
+- `/semantic-layer` can trigger and render semantic-layer draft.
+- `/analysis` can submit a natural-language question to the workspace run API.
+- `/runs/[runId]` renders SQL, result rows, chart/artifact path, trace path, and provider metadata.
+- No page contains placeholder text such as "will load", "will connect", "will appear", or "will call".
+
+Verification:
+
+```bash
+cd frontend
+npm test
+npm run build
+```
+
+### Task H3 - Delete Replaced Streamlit UI And Old Ecommerce API Entry
+
+Goal: prevent the old demo product path from steering future development.
+
+Files:
+
+- Delete `ui/__init__.py`.
+- Delete `ui/components.py`.
+- Delete `ui/view_models.py`.
+- Modify `api/app.py`.
+- Modify `api/models.py`.
+- Modify or delete `api/run_manager.py` tests as needed.
+- Modify `tests/test_async_run_api.py`.
+- Modify `tests/test_project_initialization.py`.
+- Extend `tests/test_p11_cleanup_boundaries.py`.
+
+Acceptance:
+
+- The tracked `ui/` package is gone.
+- Old `/api/runs` endpoints are removed from the product API or explicitly moved out of the product path.
+- `RunCreateRequest` no longer defaults to `data/ecommerce.db`.
+- `test_project_initialization.py` no longer expects Streamlit/old UI files.
+- `test_p11_cleanup_boundaries.py` asserts `app.py`, `ui/`, old eval files, and old mock-action acceptance tests are absent.
+- `data/ecommerce.db` may remain only as a low-level validator/executor fixture, not as an API default or main product entry.
+
+Verification:
+
+```bash
+python3 -m pytest tests/test_p11_cleanup_boundaries.py tests/test_project_initialization.py -q
+python3 -m pytest tests/test_workspace_api.py tests/test_workspace_analysis_runner.py -q
+```
+
+### Task H4 - Strengthen Live DeepSeek Workspace Acceptance
+
+Goal: prove the product handles a natural business question, not a SQL-shaped prompt.
+
+Files:
+
+- Modify `tests/test_p11_live_deepseek_workspace_analysis.py`.
+- Modify `llm_ops/prompt_registry.py` or `llm_ops/structured_output.py` only if the live failure shows a prompt/schema gap.
+- Modify `workspaces/semantic_draft.py` only if the semantic context is insufficient for natural questions.
+
+New live question should be business-natural, for example:
+
+```text
+最近 90 天哪个渠道收入下降最明显？请按渠道对比收入表现，并生成适合业务复盘的图表。
+```
+
+Acceptance:
+
+- The test does not pass `initial_sql`.
+- The test does not spell out SQL formulas, exact table names, or exact SELECT clauses in the user question.
+- `question_understanding.provider_called` is true.
+- `sql_planning.provider_called` is true.
+- `llm_sql_enhancement.provider_called` is true.
+- `visualization_trace.provider_called` is true.
+- SQL review approves the generated SQL.
+- SQL executes against workspace `analysis.db`.
+- Chart/artifact output is rooted under the workspace run directory, not `reports/charts/`.
+- Trace contains `question_understanding_agent`, `sql_planning_router_agent`, `guarded_sql_candidate_agent`, and `visualization_agent` provider events.
+
+Verification:
+
+```bash
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
+python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+```
+
+### Task H5 - Clean Current Product Documentation
+
+Goal: make docs guide future agents toward P11, not historical Streamlit/ecommerce/eval work.
+
+Files:
+
+- Modify `README.md`.
+- Modify `DEVELOPMENT_PLAN.md`.
+- Modify `DEVELOPMENT_STATUS.md`.
+
+Acceptance:
+
+- Top-level current status says P11 Product Hardening is in progress until H1-H4 are complete.
+- Current quickstart uses FastAPI and Next.js.
+- Historical `streamlit run app.py`, `eval/run_eval.py`, and `data/ecommerce.db` references are either removed from current sections or clearly marked `Historical` / `Superseded`.
+- Mock Jira/Power BI/action-delivery references are not described as current P11 product acceptance.
+- P12 is not started until P11 hardening is complete.
+
+Audit:
+
+```bash
+rg -n "streamlit run app.py|eval/run_eval.py|data/ecommerce.db|mock jira|powerbi_publisher_mock|fixed template|deterministic action template|keyword inference" README.md DEVELOPMENT_PLAN.md DEVELOPMENT_STATUS.md
+```
+
+### P11 Hardening Final Verification
+
+Run before marking P11 complete:
+
+```bash
+python3 -m pytest
+cd frontend && npm test && npm run build
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
+python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+git status --short --ignored
+git ls-files | rg -n "(^app.py$|^ui/|^eval/run_eval.py$|^eval/test_questions.json$|test_streamlit_app|test_action_workflow|test_provider_backed_action_drafter|test_deepseek_action_drafter_live|data/action_ops.db|eval/report.md|frontend/(node_modules|\\.next)|reports/charts/.+\\.(png|xlsx)|logs/traces/.+json)" || true
+```
 
 ## 1. Project Positioning
 
