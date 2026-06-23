@@ -4,13 +4,19 @@ import shutil
 import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, Callable
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from api.models import (
     WorkspaceCreateRequest,
     WorkspaceProfileResponse,
+    WorkspaceReportCreateRequest,
+    WorkspaceReportCreateResponse,
+    WorkspaceReportResponse,
+    WorkspaceReportsResponse,
     WorkspaceResponse,
     WorkspaceRunCreateRequest,
     WorkspaceRunResponse,
@@ -22,16 +28,26 @@ from api.models import (
 from workspaces.analysis_runner import run_workspace_analysis
 from workspaces.importers import import_csv, import_excel, import_sqlite
 from workspaces.profiler import profile_workspace_database
+from workspaces.report_runner import run_workspace_report
+from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
+
+
+ReportRunner = Callable[..., dict[str, Any]]
 
 
 def _workspace_not_found(workspace_id: str) -> HTTPException:
     return HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
 
 
-def create_app(workspace_store: WorkspaceStore | None = None) -> FastAPI:
+def create_app(
+    workspace_store: WorkspaceStore | None = None,
+    report_runner: ReportRunner | None = None,
+) -> FastAPI:
     store = workspace_store or WorkspaceStore()
+    selected_report_runner = report_runner or run_workspace_report
+    report_store = WorkspaceReportStore(store)
     app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
@@ -135,6 +151,66 @@ def create_app(workspace_store: WorkspaceStore | None = None) -> FastAPI:
             "run_id": result.get("run_id"),
             "result": result,
         }
+
+    @app.post("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportCreateResponse)
+    def create_workspace_report(workspace_id: str, request: WorkspaceReportCreateRequest) -> dict:
+        try:
+            return selected_report_runner(
+                store=store,
+                workspace_id=workspace_id,
+                report_type=request.report_type,
+                report_goal=request.report_goal,
+            )
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportsResponse)
+    def list_workspace_reports(workspace_id: str) -> dict:
+        try:
+            reports = report_store.list_reports(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        return {
+            "workspace_id": workspace_id,
+            "reports": [report.to_dict() for report in reports],
+        }
+
+    @app.get("/api/workspaces/{workspace_id}/reports/{report_id}", response_model=WorkspaceReportResponse)
+    def get_workspace_report(workspace_id: str, report_id: str) -> dict:
+        try:
+            report = report_store.load_report(workspace_id, report_id)
+        except ReportNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        return {
+            "workspace_id": workspace_id,
+            "report_id": report_id,
+            "report": report.to_dict(),
+        }
+
+    @app.get("/api/workspaces/{workspace_id}/reports/{report_id}/download")
+    def download_workspace_report(workspace_id: str, report_id: str) -> FileResponse:
+        try:
+            report = report_store.load_report(workspace_id, report_id)
+        except ReportNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+
+        markdown_path = Path(report.markdown_path)
+        if not markdown_path.exists() or not markdown_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Report Markdown not found: {report_id}",
+            )
+        return FileResponse(
+            markdown_path,
+            media_type="text/markdown",
+            filename=f"{report_id}.md",
+        )
 
     return app
 

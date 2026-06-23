@@ -55,3 +55,26 @@ class WorkspaceRunResponse(BaseModel):
     workspace_id: str
     run_id: str | None = None
     result: dict[str, Any]
+
+
+class WorkspaceReportCreateRequest(BaseModel):
+    report_type: str = Field(..., min_length=1)
+    report_goal: str = Field(..., min_length=1)
+
+
+class WorkspaceReportCreateResponse(BaseModel):
+    success: bool
+    workspace_id: str
+    report_id: str
+    report: dict[str, Any]
+
+
+class WorkspaceReportsResponse(BaseModel):
+    workspace_id: str
+    reports: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class WorkspaceReportResponse(BaseModel):
+    workspace_id: str
+    report_id: str
+    report: dict[str, Any]

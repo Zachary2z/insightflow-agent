@@ -16,13 +16,13 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P12 - Report Productization |
-| Current task | P12-H3 FastAPI report APIs |
-| Next planned task | Implement FastAPI report create/list/detail/download APIs |
-| Last completed task | P12-H2 synchronous workspace report runner |
+| Current task | P12-H4 Next.js reports UI |
+| Next planned task | Implement Next.js reports list/generate/detail UI with Markdown download |
+| Last completed task | P12-H3 FastAPI report APIs |
 | Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
-| Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12 planned: `POST /api/workspaces/{workspace_id}/reports` |
+| Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
 | Out of scope for P12 MVP | PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
@@ -45,7 +45,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[~]` In progress; H1 foundation and H2 synchronous runner complete |
+| P12 | Report Productization | `[~]` In progress; H1 foundation, H2 synchronous runner, and H3 FastAPI APIs complete |
 
 ## P11 Product Hardening
 
@@ -132,7 +132,7 @@ MVP decisions:
 - P11 single-question analysis remains separate at `/workspaces/{workspace_id}/analysis`.
 - P12 reports live at `/workspaces/{workspace_id}/reports`.
 
-Planned backend APIs:
+Backend report APIs:
 
 ```text
 POST /api/workspaces/{workspace_id}/reports
@@ -147,8 +147,8 @@ Planned task queue:
 |---|---|---|
 | P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[x]` Complete |
 | P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[x]` Complete |
-| P12-H3 | FastAPI report APIs | `[~]` Next |
-| P12-H4 | Next.js reports UI and Markdown download | `[ ]` Not started |
+| P12-H3 | FastAPI report APIs | `[x]` Complete |
+| P12-H4 | Next.js reports UI and Markdown download | `[~]` Next |
 | P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |
 | P12-H6 | Docs, artifact audit, final verification | `[ ]` Not started |
 
