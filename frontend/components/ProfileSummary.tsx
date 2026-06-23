@@ -2,6 +2,9 @@ import React from "react";
 
 type ProfileColumn = {
   name: string;
+  sql_type?: string;
+  null_count?: number;
+  distinct_count?: number;
   role_candidates?: Record<string, boolean>;
 };
 
@@ -13,15 +16,18 @@ type ProfileTable = {
 
 type ProfileSummaryProps = {
   profile: {
-    tables: ProfileTable[];
+    tables?: ProfileTable[];
   };
 };
 
 export default function ProfileSummary({ profile }: ProfileSummaryProps) {
+  const tables = profile.tables ?? [];
+
   return (
-    <section>
+    <section className="stack">
       <h2>Data Profile</h2>
-      {profile.tables.map((table) => (
+      {tables.length === 0 ? <p>No profile tables returned.</p> : null}
+      {tables.map((table) => (
         <article className="panel" key={table.table_name}>
           <h3>{table.table_name}</h3>
           <p>{table.row_count} rows</p>
@@ -33,6 +39,7 @@ export default function ProfileSummary({ profile }: ProfileSummaryProps) {
               return (
                 <li key={column.name}>
                   <span>{column.name}</span>
+                  {column.sql_type ? <span> ({column.sql_type})</span> : null}
                   {roles.length ? (
                     <span>
                       {" "}
@@ -44,6 +51,8 @@ export default function ProfileSummary({ profile }: ProfileSummaryProps) {
                       ))}
                     </span>
                   ) : null}
+                  {typeof column.null_count === "number" ? <span> nulls: {column.null_count}</span> : null}
+                  {typeof column.distinct_count === "number" ? <span> distinct: {column.distinct_count}</span> : null}
                 </li>
               );
             })}

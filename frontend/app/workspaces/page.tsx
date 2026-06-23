@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WorkspaceList from "@/components/WorkspaceList";
 
 export default function WorkspacesPage() {
   return (
@@ -7,10 +8,7 @@ export default function WorkspacesPage() {
       <nav>
         <Link href="/workspaces/new">Create workspace</Link>
       </nav>
-      <section className="panel">
-        <h2>Workspace List</h2>
-        <p>Workspace data will load from the InsightFlow API in the next frontend flow slice.</p>
-      </section>
+      <WorkspaceList />
     </main>
   );
 }

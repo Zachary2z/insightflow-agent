@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DatasetManager from "@/components/DatasetManager";
 
 type DatasetsPageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -16,10 +17,7 @@ export default async function DatasetsPage({ params }: DatasetsPageProps) {
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
       </nav>
-      <section className="panel">
-        <h2>Imported Data</h2>
-        <p>CSV, Excel, and SQLite sources will appear here after upload/import support lands.</p>
-      </section>
+      <DatasetManager workspaceId={workspaceId} />
     </main>
   );
 }

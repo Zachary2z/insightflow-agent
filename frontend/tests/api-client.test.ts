@@ -1,7 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
-import { createWorkspace } from "../lib/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createProfile,
+  createSemanticDraft,
+  createWorkspace,
+  importSqliteSource,
+  listSources,
+  listWorkspaces,
+  runAnalysis,
+  uploadSource,
+} from "../lib/api";
 
 describe("api client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("creates a workspace through FastAPI", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -15,6 +28,104 @@ describe("api client", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/api/workspaces",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("lists workspaces from FastAPI", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ workspaces: [{ workspace_id: "ws_1", name: "Finance" }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await listWorkspaces();
+
+    expect(result.workspaces[0].name).toBe("Finance");
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/api/workspaces");
+  });
+
+  it("uploads CSV or Excel files with multipart form data", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, imported_tables: ["orders"] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["order_id,revenue\n1,100"], "orders.csv", { type: "text/csv" });
+
+    const result = await uploadSource("ws_1", file);
+
+    expect(result.imported_tables).toEqual(["orders"]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/sources/upload",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(FormData),
+      }),
+    );
+  });
+
+  it("registers SQLite sources and lists imported source metadata", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, imported_tables: ["invoices"] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ sources: [{ source_type: "sqlite", imported_tables: ["invoices"] }] }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await importSqliteSource("ws_1", "/tmp/source.db");
+    const sources = await listSources("ws_1");
+
+    expect(sources.sources[0].source_type).toBe("sqlite");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:8000/api/workspaces/ws_1/sources/sqlite",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sqlite_path: "/tmp/source.db" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://localhost:8000/api/workspaces/ws_1/sources");
+  });
+
+  it("posts profile, semantic draft, and analysis requests", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, profile: { tables: [] } }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, semantic_layer: { metrics: [] } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, run_id: "run_1", result: { final_answer: "Done" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createProfile("ws_1");
+    await createSemanticDraft("ws_1");
+    const run = await runAnalysis("ws_1", {
+      userQuestion: "Which channel has the most revenue?",
+      initialSql: "SELECT channel FROM orders",
+    });
+
+    expect(run.run_id).toBe("run_1");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "http://localhost:8000/api/workspaces/ws_1/runs",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_question: "Which channel has the most revenue?",
+          initial_sql: "SELECT channel FROM orders",
+        }),
+      }),
     );
   });
 });

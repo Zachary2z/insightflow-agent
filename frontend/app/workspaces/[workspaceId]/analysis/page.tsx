@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AnalysisRunner from "@/components/AnalysisRunner";
 
 type AnalysisPageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -16,10 +17,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
       </nav>
-      <section className="panel">
-        <h2>Analysis Question</h2>
-        <p>Natural-language analysis controls will call the workspace run API here.</p>
-      </section>
+      <AnalysisRunner workspaceId={workspaceId} />
     </main>
   );
 }

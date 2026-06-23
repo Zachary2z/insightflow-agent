@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WorkspaceNewForm from "@/components/WorkspaceNewForm";
 
 export default function NewWorkspacePage() {
   return (
@@ -7,10 +8,7 @@ export default function NewWorkspacePage() {
       <nav>
         <Link href="/workspaces">Back to workspaces</Link>
       </nav>
-      <section className="panel">
-        <h2>Workspace Details</h2>
-        <p>Create workspace controls will connect to the API client in the next frontend flow slice.</p>
-      </section>
+      <WorkspaceNewForm />
     </main>
   );
 }

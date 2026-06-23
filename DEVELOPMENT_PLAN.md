@@ -68,6 +68,8 @@ python3 -m pytest tests/test_workspace_api.py tests/test_workspace_importers.py 
 
 ### Task H2 - Wire Next.js Into The Product APIs
 
+Status: complete. The Next.js workspace routes now call the product API client for workspace listing and creation, source upload/import/list, profile generation, semantic draft generation, workspace analysis submission, and defensive run-result rendering. Frontend tests cover the API client and interactive product flow, and placeholder H2 copy has been removed.
+
 Goal: replace placeholder pages with a usable product flow.
 
 Files:
