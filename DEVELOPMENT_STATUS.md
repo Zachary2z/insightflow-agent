@@ -145,11 +145,11 @@ Planned task queue:
 
 | Task | Scope | Status |
 |---|---|---|
-| P12-H1 | Report domain model, storage layout, Markdown renderer | `[ ]` Not started |
-| P12-H2 | Synchronous workspace report runner | `[ ]` Not started |
+| P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[ ]` Not started |
+| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[ ]` Not started |
 | P12-H3 | FastAPI report APIs | `[ ]` Not started |
 | P12-H4 | Next.js reports UI and Markdown download | `[ ]` Not started |
 | P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |
 | P12-H6 | Docs, artifact audit, final verification | `[ ]` Not started |
 
-P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, and any restoration of historical Streamlit/ecommerce/eval product paths.
+P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, hardcoded SQL templates, keyword-heavy report rule trees, silent semantic-layer overwrites, and any restoration of historical Streamlit/ecommerce/eval product paths.

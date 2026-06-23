@@ -184,6 +184,10 @@ workspaces/{workspace_id}/reports/{report_id}/trace.json
 workspaces/{workspace_id}/reports/{report_id}/artifacts/
 ```
 
+Report-facing artifacts must be rooted under the report directory. If a section reuses P11 run internals, copy or regenerate any chart/report-facing artifact into `reports/{report_id}/artifacts/` before writing `report.json` and `report.md`.
+
+Existing workspace semantic-layer files must not be silently overwritten. Generate profile/semantic-layer draft context only when missing, or create an explicit report-local context snapshot.
+
 ### P12 Frontend Target
 
 Add report routes:
@@ -205,8 +209,8 @@ Likely components:
 
 | Task | Scope | Status |
 |---|---|---|
-| P12-H1 | Report domain model, report directory layout, Markdown renderer | Not started |
-| P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries | Not started |
+| P12-H1 | Report domain model, report directory layout, Markdown renderer; no provider calls yet | Not started |
+| P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries; presets create section purposes/questions, not SQL templates or keyword rule trees | Not started |
 | P12-H3 | FastAPI report create/list/detail/download APIs | Not started |
 | P12-H4 | Next.js reports list/generate/detail UI with Markdown download | Not started |
 | P12-H5 | Live DeepSeek workspace report acceptance test | Not started |
@@ -234,6 +238,8 @@ Likely components:
 - Backend persists `report.json`, `report.md`, `trace.json`, and artifacts under the workspace report directory.
 - Backend exposes create/list/detail/download report APIs.
 - Report sections preserve P11 SQL validation, SQL execution, evidence validation, visualization, and trace boundaries.
+- Report presets do not contain hardcoded SQL, fixed table rules, keyword inference, or deterministic SQL templates.
+- Existing semantic-layer files are not silently overwritten.
 - P12 opt-in live DeepSeek report acceptance passes.
 - Full backend tests, frontend tests, frontend build, tracked artifact audit, and docs audit pass.
 

@@ -86,7 +86,7 @@ Initial section targets:
 - Recent-period summary
 - Notable changes
 
-These are report-type presets, not old fixed SQL templates. They constrain the product experience and give the provider/report planner a safe set of section purposes. Each section still uses the P11 safety path for SQL planning, SQL validation, SQL execution, evidence, visualization, artifacts, and trace.
+These are report-type presets, not old fixed SQL templates. They constrain the product experience and give the provider/report planner a safe set of section purposes. Presets may define section purposes and natural-language section questions, but they must not include hardcoded SQL, table-specific rule trees, keyword inference, or deterministic SQL templates. Each section still uses the P11 safety path for SQL planning, SQL validation, SQL execution, evidence, visualization, artifacts, and trace.
 
 ## Backend API
 
@@ -141,7 +141,9 @@ workspaces/{workspace_id}/reports/{report_id}/
   artifacts/
 ```
 
-`report.json` is the canonical machine-readable report. `report.md` is the first downloadable user artifact. `trace.json` records report-level and section-level events. `artifacts/` stores section chart files or linked generated artifacts.
+`report.json` is the canonical machine-readable report. `report.md` is the first downloadable user artifact. `trace.json` records report-level and section-level events. `artifacts/` stores section chart files or copied/generated section artifacts.
+
+All report-facing artifacts must be rooted under the report directory. If a reused P11 section run creates charts or traces in a workspace run directory, the report runner must copy or regenerate the report-facing artifact into `reports/{report_id}/artifacts/` and reference that report-local path from `report.json` and `report.md`. The final downloadable Markdown must not depend on transient section run directories.
 
 Generated Markdown and chart files are runtime outputs and must not be committed.
 
@@ -152,7 +154,7 @@ Add a workspace report runner under `workspaces/report_runner.py`.
 Responsibilities:
 
 - load workspace metadata;
-- ensure profile and semantic-layer context exist or generate them;
+- ensure profile and semantic-layer context exist or generate missing draft context;
 - create a report directory;
 - build a section plan from `report_type` plus `report_goal`;
 - run each section through P11 workspace analysis capabilities;
@@ -162,6 +164,13 @@ Responsibilities:
 - return a structured response to FastAPI.
 
 The runner should keep P11 ad hoc analysis untouched. P12 is a separate orchestrator that can reuse P11 internals.
+
+Profile and semantic-layer rules:
+
+- If a workspace profile is missing, the runner may generate it and persist it to the existing workspace profile path.
+- If a semantic-layer file is missing, the runner may generate a draft and persist it to the existing workspace semantic-layer path.
+- If a semantic-layer file already exists, the runner must not silently overwrite it. It may read it, include it in context, or create an explicit report-local derived context snapshot.
+- P12-H1 should implement the report model, directory layout, and Markdown renderer without provider calls. Provider-backed section generation starts in P12-H2.
 
 ## Section Execution
 
@@ -182,7 +191,8 @@ Each section must preserve these boundaries:
 - `run_sql()` executes only against the workspace `analysis.db`;
 - Evidence Validator remains the final factual boundary;
 - VisualizationAgent chooses chart/artifact output;
-- artifacts and traces must live under the report directory or workspace run/report directory.
+- section-local execution may reuse P11 workspace run directories internally;
+- report-facing artifacts, report-level trace, `report.json`, and `report.md` must live under the report directory.
 
 ## Frontend
 
