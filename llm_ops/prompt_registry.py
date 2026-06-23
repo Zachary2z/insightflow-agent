@@ -121,6 +121,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             required_variables=[
                 "user_question",
                 "schema_text",
+                "workspace_context",
                 "metric_context",
                 "business_context",
                 "current_deterministic_sql",
@@ -135,6 +136,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Task: guarded SQL candidate generation.\n"
                 "User question: {user_question}\n"
                 "Schema: {schema_text}\n"
+                "Workspace context: {workspace_context}\n"
                 "Metric context: {metric_context}\n"
                 "Business context: {business_context}\n"
                 "Current deterministic SQL: {current_deterministic_sql}\n"
@@ -142,6 +144,10 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Exact schema: {{\"sql_candidates\": [{{\"sql\": \"single SELECT statement\", "
                 "\"rationale\": \"short reason grounded in schema and metric context\"}}]}}.\n"
                 "sql_candidates must be an array of objects, not an array of strings. The SQL key must be sql.\n"
+                "When the user asks for a dataset-relative recent window, use the latest available time value "
+                "from Workspace context instead of DATE('now').\n"
+                "Do not use WITH or CTE clauses; prefer a single SELECT with scalar subqueries over real "
+                "workspace tables when you need a max date.\n"
                 "Safety: never execute SQL, never bypass validate_sql, never access sensitive fields, "
                 "and never use DML or DDL."
             ),
@@ -282,7 +288,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             prompt_id="question_understanding",
             version="v1",
             description="Extract structured BI intent slots without generating SQL.",
-            required_variables=["user_question"],
+            required_variables=["user_question", "workspace_context"],
             safety_contract=[
                 "must_not_generate_sql",
                 "must_not_execute_sql",
@@ -292,10 +298,13 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             template=(
                 "Task: provider-backed question understanding.\n"
                 "User question: {user_question}\n"
+                "Workspace context: {workspace_context}\n"
                 "Return JSON only with strategy, intent, missing_slots, clarification_questions, risk_flags, and reason.\n"
                 "Allowed strategy values: template, llm_candidate, clarify, reject.\n"
                 "Intent schema: metric, dimension, and operation are strings or null; time_range is an object or null; "
                 "filters is a string array; limit is an integer or null; risk_flags is a string array.\n"
+                "If Workspace context says a current workspace analysis database is selected, do not ask the user "
+                "to specify a data source, table name, or field name before SQL planning.\n"
                 "Safety: do not generate SQL, do not execute SQL, do not select matched_template, "
                 "and preserve sensitive_field, unsafe_operation, or bulk_export risk flags. "
                 "A request for chart/report/export/draft delivery from already analyzed results is not unsafe_operation; "

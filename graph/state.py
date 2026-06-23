@@ -50,6 +50,7 @@ class AgentState(TypedDict, total=False):
     workspace_root: str | None
     profile_path: str | None
     semantic_layer_path: str | None
+    workspace_context: dict[str, Any]
     run_artifact_dir: str | None
 
     database_schema: dict[str, Any]

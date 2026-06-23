@@ -1,4 +1,6 @@
 import os
+import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -45,6 +47,21 @@ def _provider_trace(result: dict, node: str) -> dict:
     return {}
 
 
+def _trace_node(result: dict, node: str) -> dict:
+    for event in result.get("trace", []):
+        if event.get("node") == node:
+            return event
+    return {}
+
+
+def _flatten_execution_values(result: dict) -> set[str]:
+    values = set()
+    for row in result.get("execution_result", {}).get("rows", []):
+        for value in row:
+            values.add(str(value))
+    return values
+
+
 def test_live_deepseek_analyzes_uploaded_workspace_data(tmp_path):
     _require_live_deepseek_workspace_flags()
 
@@ -52,35 +69,64 @@ def test_live_deepseek_analyzes_uploaded_workspace_data(tmp_path):
     generate_general_business_dataset(dataset_dir, months=12)
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Live DeepSeek Workspace")
+    workspace_db = Path(workspace["analysis_db_path"])
     import_csv(store, workspace["workspace_id"], dataset_dir / "orders.csv")
     import_csv(store, workspace["workspace_id"], dataset_dir / "customers.csv")
     import_csv(store, workspace["workspace_id"], dataset_dir / "marketing_spend.csv")
     profile = profile_workspace_database(store, workspace["workspace_id"])
     semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    with sqlite3.connect(workspace_db) as conn:
+        workspace_channels = {
+            row[0]
+            for row in conn.execute("SELECT DISTINCT channel FROM orders ORDER BY channel").fetchall()
+        }
 
     result = run_workspace_analysis(
         store=store,
         workspace_id=workspace["workspace_id"],
         user_question=(
-            "使用 SQLite 的 orders 表，字段包含 order_id、order_date、customer_id、revenue、channel、status。"
-            "请按 channel 分组，计算 SUM(revenue) AS total_revenue，按 total_revenue 降序返回前 5 个渠道。"
-            "问题信息完整，不需要澄清。"
+            "以这份数据的最近 90 天为周期，收入最高的前 5 个获客渠道分别是谁？"
+            "请给我一个可用于经营复盘的结论，并生成一张便于对比的图表。"
         ),
     )
 
     assert semantic_layer["metrics"]
+    assert semantic_layer["dimensions"]
     assert result["status"] == "completed"
+    assert result.get("initial_sql") in (None, "")
+    assert result["database_schema"]["db_path"] == str(workspace_db)
+    assert result["database_schema"]["db_path"].endswith("/analysis.db")
+    assert "data/ecommerce.db" not in result["database_schema"]["db_path"]
     assert result["execution_result"]["success"] is True
     assert result["execution_result"]["row_count"] > 0
     assert result["review_result"]["approved"] is True
+    assert result["generated_sql"]
+    assert result["llm_sql_enhancement"]["accepted"] is True
+    assert any(
+        candidate["accepted"] and candidate["review_result"]["approved"]
+        for candidate in result["llm_sql_enhancement"]["candidates"]
+    )
+    assert set(_flatten_execution_values(result)) & workspace_channels
+    assert result["final_answer"].strip()
+    assert any(str(value) in result["final_answer"] for value in _flatten_execution_values(result))
     assert result["question_understanding"]["provider_called"] is True
+    assert result["question_understanding"]["source"] == "provider"
     assert result["sql_planning"]["provider_called"] is True
+    assert result["sql_planning"]["source"] == "provider"
     assert result["sql_planning"]["strategy"] == "llm_candidate"
     assert result["llm_sql_enhancement"]["provider_called"] is True
     assert result["visualization_trace"]["provider_called"] is True
+    assert result["visualization_trace"]["external_tool_called"] is True
+    artifact_path = Path(result["visualization_trace"]["artifact_path"])
+    run_dir = Path(result["workspace_run_dir"])
+    assert artifact_path.exists()
+    assert artifact_path.is_relative_to(run_dir)
     assert _provider_trace(result, "question_understanding_agent")
     assert _provider_trace(result, "sql_planning_router_agent")
     assert _provider_trace(result, "guarded_sql_candidate_agent")
     assert _provider_trace(result, "visualization_agent")
+    assert _trace_node(result, "sql_reviewer_agent")
+    assert _trace_node(result, "sql_executor_node")
     assert result.get("trace_path")
-    assert result.get("workspace_run_dir")
+    assert Path(result["trace_path"]).exists()
+    assert Path(result["trace_path"]).is_relative_to(run_dir)

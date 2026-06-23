@@ -14,7 +14,10 @@ def test_live_deepseek_llm_eval_suite_validates_provider_output():
             {
                 "case_id": "live_question_understanding_schema",
                 "prompt_id": "question_understanding",
-                "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
+                "variables": {
+                    "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
+                    "workspace_context": {},
+                },
                 "expected_keys": ["strategy", "intent", "missing_slots", "clarification_questions", "risk_flags"],
                 "validate_output": True,
                 "expected_success": True,

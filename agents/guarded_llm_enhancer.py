@@ -28,6 +28,7 @@ def _sql_prompt(state: dict[str, Any]) -> dict[str, Any]:
         "task": "guarded_sql_candidate_generation",
         "user_question": state.get("user_question", ""),
         "schema_text": state.get("schema_text", ""),
+        "workspace_context": state.get("workspace_context", {}),
         "metric_context": state.get("metric_context", {}),
         "business_context": state.get("business_context", {}),
         "current_deterministic_sql": state.get("generated_sql", ""),
@@ -50,6 +51,7 @@ def _sql_prompt_variables(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "user_question": state.get("user_question", ""),
         "schema_text": state.get("schema_text", ""),
+        "workspace_context": state.get("workspace_context", {}),
         "metric_context": state.get("metric_context", {}),
         "business_context": state.get("business_context", {}),
         "current_deterministic_sql": state.get("generated_sql", ""),

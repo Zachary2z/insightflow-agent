@@ -229,6 +229,37 @@ def test_guarded_sql_candidate_normalizes_safe_sql_string_and_alias_shapes():
     ]
 
 
+def test_question_understanding_normalizes_string_list_fields():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "question_understanding",
+        {
+            "strategy": "llm_candidate",
+            "intent": {
+                "metric": "收入",
+                "dimension": "渠道",
+                "time_range": {"raw_text": "最近"},
+                "filters": "",
+                "operation": "对比",
+                "limit": None,
+                "risk_flags": "",
+            },
+            "missing_slots": "",
+            "clarification_questions": "",
+            "risk_flags": "",
+            "reason": "Natural business question is complete enough for SQL candidate planning.",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["intent"]["filters"] == []
+    assert result["content"]["intent"]["risk_flags"] == []
+    assert result["content"]["missing_slots"] == []
+    assert result["content"]["clarification_questions"] == []
+    assert result["content"]["risk_flags"] == []
+
+
 def test_visualization_agent_normalizes_explanation_basis_string():
     from llm_ops.structured_output import validate_prompt_output
 

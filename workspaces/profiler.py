@@ -42,6 +42,7 @@ def _column_profile(conn: sqlite3.Connection, table_name: str, column: tuple, ro
             f'SELECT DISTINCT {quoted} FROM "{table_name}" WHERE {quoted} IS NOT NULL LIMIT 5'
         ).fetchall()
     ]
+    role_candidates = _role_candidates(column_name, sql_type, distinct_count, row_count)
     profile = {
         "name": column_name,
         "original_name": column_name,
@@ -50,13 +51,18 @@ def _column_profile(conn: sqlite3.Connection, table_name: str, column: tuple, ro
         "null_rate": null_count / row_count if row_count else 0.0,
         "distinct_count": distinct_count,
         "examples": examples,
-        "role_candidates": _role_candidates(column_name, sql_type, distinct_count, row_count),
+        "role_candidates": role_candidates,
     }
     if any(token in sql_type.lower() for token in ("int", "real", "num", "float", "double", "decimal")):
         stats = conn.execute(
             f'SELECT MIN({quoted}), MAX({quoted}), AVG({quoted}) FROM "{table_name}" WHERE {quoted} IS NOT NULL'
         ).fetchone()
         profile["numeric_stats"] = {"min": stats[0], "max": stats[1], "mean": stats[2]}
+    if role_candidates.get("time"):
+        bounds = conn.execute(
+            f'SELECT MIN({quoted}), MAX({quoted}) FROM "{table_name}" WHERE {quoted} IS NOT NULL'
+        ).fetchone()
+        profile["value_range"] = {"min": bounds[0], "max": bounds[1]}
     return profile
 
 

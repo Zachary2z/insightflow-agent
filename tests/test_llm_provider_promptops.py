@@ -6,6 +6,7 @@ def test_prompt_registry_renders_versioned_prompt_with_safety_contract():
         {
             "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
             "schema_text": "orders(id, status), order_items(order_id, quantity, unit_price)",
+            "workspace_context": {},
             "metric_context": {"metric_name": "gmv"},
             "business_context": {"time_window": "last_30_days"},
             "current_deterministic_sql": "SELECT 1",
@@ -21,6 +22,7 @@ def test_prompt_registry_renders_versioned_prompt_with_safety_contract():
     assert result["metadata"]["required_variables"] == [
         "user_question",
         "schema_text",
+        "workspace_context",
         "metric_context",
         "business_context",
         "current_deterministic_sql",
@@ -101,6 +103,7 @@ def test_question_understanding_prompt_distinguishes_delivery_from_unsafe_operat
         "question_understanding",
         {
             "user_question": "最近 30 天销售额最高的 5 个商品是什么？请生成适合财务复核的可视化交付物。",
+            "workspace_context": {},
         },
     )
 

@@ -70,6 +70,35 @@ LIMIT 3
     assert result["trace"][-1]["node"] == "guarded_sql_candidate_agent"
 
 
+def test_guarded_sql_candidate_prompt_includes_workspace_context():
+    from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
+
+    captured = {}
+
+    def mock_sql_provider(prompt):
+        captured["prompt"] = prompt
+        return {
+            "sql_candidates": [
+                {
+                    "sql": "SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status LIMIT 5",
+                    "rationale": "Use workspace revenue by channel.",
+                }
+            ]
+        }
+
+    state = _prepared_state()
+    state["workspace_context"] = {
+        "workspace_data_source_selected": True,
+        "guidance": ["Use max order_date for dataset-relative recent windows."],
+        "tables": [{"table_name": "orders", "columns": [{"name": "order_date", "value_range": {"max": "2025-12-26"}}]}],
+    }
+    result = run_guarded_sql_candidate_agent(state, llm_provider=mock_sql_provider)
+
+    assert result["llm_sql_enhancement"]["provider_called"] is True
+    assert captured["prompt"]["workspace_context"]["workspace_data_source_selected"] is True
+    assert captured["prompt"]["workspace_context"]["tables"][0]["columns"][0]["value_range"]["max"] == "2025-12-26"
+
+
 def test_guarded_sql_candidate_rejects_unsafe_sql_and_keeps_deterministic_sql():
     from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 

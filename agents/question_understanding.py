@@ -6,13 +6,23 @@ from llm_ops.provider import LLMProvider
 from question_understanding.provider_backed import understand_question_with_provider
 from question_understanding.router import understand_question
 from tools.trace_logger import append_trace
+from workspaces.context_summary import build_workspace_context_summary
 
 
 def run_question_understanding_agent(state: dict[str, Any], provider: LLMProvider | None = None) -> dict[str, Any]:
     question = state.get("user_question", "")
-    result = understand_question_with_provider(question, provider=provider) if provider is not None else understand_question(question)
+    workspace_context = state.get("workspace_context") or build_workspace_context_summary(
+        profile_path=state.get("profile_path"),
+        semantic_layer_path=state.get("semantic_layer_path"),
+    )
+    result = (
+        understand_question_with_provider(question, provider=provider, workspace_context=workspace_context)
+        if provider is not None
+        else understand_question(question)
+    )
     updated = {
         **state,
+        "workspace_context": workspace_context,
         "question_understanding": result,
         "intent_slots": result.get("intent", {}),
         "routing_strategy": result.get("strategy", ""),

@@ -216,6 +216,7 @@ def understand_question_with_provider(
     question: str,
     provider: LLMProvider | None = None,
     deterministic_fallback: bool = True,
+    workspace_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     safety_result = _safety_guard_result(question)
     if safety_result is not None:
@@ -224,7 +225,13 @@ def understand_question_with_provider(
     if provider is None:
         return _fallback_result(question, provider_called=False)
 
-    rendered = DEFAULT_PROMPT_REGISTRY.render("question_understanding", {"user_question": question})
+    rendered = DEFAULT_PROMPT_REGISTRY.render(
+        "question_understanding",
+        {
+            "user_question": question,
+            "workspace_context": workspace_context or {},
+        },
+    )
     if not rendered.get("success"):
         if deterministic_fallback:
             return _fallback_result(question, provider_called=False, provider_error=rendered.get("error", ""))

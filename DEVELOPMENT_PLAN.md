@@ -23,7 +23,7 @@ Update this table after every completed phase or task so the current project pos
 | P8.5 | Agent Pipeline UX | `[x]` Complete | Streamlit run summaries now expose agent pipeline steps, tool-call cards, validator gates, artifact links, provider prompt/fallback metadata, and source metadata without changing backend boundaries. | Regression only |
 | P9 | Realistic Eval And Demo Polish | `[x]` Complete | 32-case realistic eval, P9 metrics, no-key mock provider/action coverage, unsafe rejection, and demo question polish are complete. | Regression only |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete | External-safe MCP contract metadata, internal-tool exposure tests, eval artifact hygiene notes, and generated-artifact ignore coverage are complete. | Regression only |
-| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, live DeepSeek acceptance, H1 FastAPI data source endpoints, H2 frontend wiring, and H3 old UI/API cleanup are complete; stronger natural-language live acceptance and docs cleanup still remain. | Complete H4-H5 before P12 |
+| P11 | General Data Analysis Product | `[~]` Product hardening in progress | Core workspace backend, importers, profiling, semantic draft, workspace-aware analysis, Next.js scaffold, strengthened natural-language live DeepSeek acceptance, H1 FastAPI data source endpoints, H2 frontend wiring, and H3 old UI/API cleanup are complete; docs cleanup still remains. | Complete H5 before P12 |
 
 Current development position: **P11 General Data Analysis Product is implemented as a working backend/product prototype, but P11 Product Hardening is still required before P12.**
 
@@ -140,6 +140,8 @@ python3 -m pytest tests/test_workspace_api.py tests/test_workspace_analysis_runn
 ```
 
 ### Task H4 - Strengthen Live DeepSeek Workspace Acceptance
+
+Status: complete. The opt-in live DeepSeek workspace acceptance now uses a natural Chinese business question about the top revenue acquisition channels over the dataset's latest 90 days. The test asserts provider calls for question understanding, SQL planning, guarded SQL candidate generation, and visualization; validates that the accepted SQL passed `validate_sql()` and executed against the workspace `analysis.db`; checks the final answer references real execution rows; and verifies visualization artifacts/traces are rooted under the workspace run directory. Minimal hardening added workspace profile/semantic context to provider prompts and normalized natural provider list-shaped fields.
 
 Goal: prove the product handles a natural business question, not a SQL-shaped prompt.
 

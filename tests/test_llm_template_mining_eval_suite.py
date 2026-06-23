@@ -92,7 +92,10 @@ def test_llm_smoke_eval_validates_schema_and_expected_failures():
             {
                 "case_id": "valid_question_understanding",
                 "prompt_id": "question_understanding",
-                "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
+                "variables": {
+                    "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
+                    "workspace_context": {},
+                },
                 "expected_keys": ["strategy", "intent", "missing_slots", "clarification_questions", "risk_flags"],
                 "validate_output": True,
                 "expected_success": True,
@@ -100,7 +103,10 @@ def test_llm_smoke_eval_validates_schema_and_expected_failures():
             {
                 "case_id": "malformed_json_is_expected_failure",
                 "prompt_id": "question_understanding",
-                "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
+                "variables": {
+                    "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
+                    "workspace_context": {},
+                },
                 "expected_keys": ["strategy"],
                 "validate_output": True,
                 "expected_success": False,
@@ -109,7 +115,10 @@ def test_llm_smoke_eval_validates_schema_and_expected_failures():
             {
                 "case_id": "schema_mismatch_is_expected_failure",
                 "prompt_id": "question_understanding",
-                "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
+                "variables": {
+                    "user_question": "最近 30 天销售额最高的 5 个商品是什么？",
+                    "workspace_context": {},
+                },
                 "expected_keys": ["strategy"],
                 "validate_output": True,
                 "expected_success": False,

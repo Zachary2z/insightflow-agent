@@ -78,7 +78,7 @@ def test_provider_backed_question_understanding_falls_back_on_schema_mismatch():
     from question_understanding.provider_backed import understand_question_with_provider
 
     invalid_payload = _valid_provider_payload()
-    invalid_payload["intent"] = {**invalid_payload["intent"], "filters": "paid_orders"}
+    invalid_payload["intent"] = {**invalid_payload["intent"], "limit": "five"}
 
     result = understand_question_with_provider(
         "最近 30 天销售额最高的 5 个商品是什么？",
@@ -180,6 +180,34 @@ def test_provider_backed_question_understanding_normalizes_provider_slot_aliases
     assert result["intent"]["metric"] == "gmv"
     assert result["intent"]["dimension"] == "product"
     assert result["intent"]["operation"] == "top_n"
+
+
+def test_provider_backed_question_understanding_includes_workspace_context_in_prompt():
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    captured = {}
+
+    class CapturingProvider:
+        model = "mock-free"
+
+        def generate(self, request):
+            captured["prompt"] = request.prompt
+            return _valid_provider_payload()
+
+    result = understand_question_with_provider(
+        "以这份数据的最近 90 天为周期，收入最高的前 5 个获客渠道分别是谁？",
+        provider=CapturingProvider(),
+        workspace_context={
+            "workspace_data_source_selected": True,
+            "guidance": ["Use the current workspace analysis database; do not ask for a data source."],
+            "tables": [{"table_name": "orders", "columns": [{"name": "order_date", "value_range": {"max": "2025-12-26"}}]}],
+        },
+    )
+
+    assert result["source"] == "provider"
+    assert "Workspace context" in captured["prompt"]
+    assert "current workspace analysis database" in captured["prompt"]
+    assert "2025-12-26" in captured["prompt"]
 
 
 def test_question_understanding_agent_accepts_provider_and_traces_fallback_flags():
