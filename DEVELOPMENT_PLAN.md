@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. The current work is P11 General Data Analysis Product hardening. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is planned but implementation has not started. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -42,7 +42,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P9 | Realistic Eval And Demo Polish | Complete | Historical eval/demo polish |
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
-| P12 | Report Productization | Not started | Do not begin until P11 final verification is complete |
+| P12 | Report Productization | Planned; implementation not started | MVP scope is synchronous workspace report generation with page display and Markdown download |
 
 ## P11 Product Hardening Plan
 
@@ -129,6 +129,114 @@ P0-P10 content is retained as historical context only. It explains how the safet
 - Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level tests still use it for schema, validator, executor, workflow, report, MCP, and provider regressions. It is not the API default, not the quickstart database, and not the current product data source.
 - Historical mock adapters demonstrate tool-call boundaries only. They do not mean real SaaS integration, auth/RBAC, deployment, or P12 report productization has started.
 
+## P12 Report Productization Plan
+
+P12 turns P11 single-question workspace analysis into a separate structured report product. P11 remains the ad hoc analysis entry point at `/workspaces/{workspace_id}/analysis`; P12 adds report generation under `/workspaces/{workspace_id}/reports`.
+
+Design spec: `docs/superpowers/specs/2026-06-23-p12-workspace-report-productization-design.md`.
+
+### P12 MVP Decisions
+
+- UI output: page display.
+- Download output: Markdown file.
+- Generation mode: synchronous first.
+- Future upgrade: async generation and polling.
+- First report types: `business_review`, `channel_performance`, `revenue_trend`.
+- P11 analysis remains separate and unchanged.
+
+### P12 MVP Product Flow
+
+```text
+workspace
+-> reports page
+-> select report type
+-> enter report goal
+-> synchronously generate report
+-> run each section through P11-safe analysis boundaries
+-> persist report.json, report.md, trace.json, artifacts
+-> display report page
+-> download Markdown
+```
+
+### P12 Backend Target
+
+Add workspace report APIs:
+
+```text
+POST /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports/{report_id}
+GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
+```
+
+Add a report runner:
+
+```text
+workspaces/report_runner.py
+```
+
+Report storage:
+
+```text
+workspaces/{workspace_id}/reports/{report_id}/report.json
+workspaces/{workspace_id}/reports/{report_id}/report.md
+workspaces/{workspace_id}/reports/{report_id}/trace.json
+workspaces/{workspace_id}/reports/{report_id}/artifacts/
+```
+
+### P12 Frontend Target
+
+Add report routes:
+
+```text
+frontend/app/workspaces/[workspaceId]/reports/page.tsx
+frontend/app/workspaces/[workspaceId]/reports/[reportId]/page.tsx
+```
+
+Likely components:
+
+- `ReportGenerator`
+- `ReportList`
+- `ReportViewer`
+- `ReportSection`
+- `ReportDownloadLink`
+
+### P12 Task Queue
+
+| Task | Scope | Status |
+|---|---|---|
+| P12-H1 | Report domain model, report directory layout, Markdown renderer | Not started |
+| P12-H2 | Synchronous workspace report runner that creates multi-section reports through P11-safe analysis boundaries | Not started |
+| P12-H3 | FastAPI report create/list/detail/download APIs | Not started |
+| P12-H4 | Next.js reports list/generate/detail UI with Markdown download | Not started |
+| P12-H5 | Live DeepSeek workspace report acceptance test | Not started |
+| P12-H6 | P12 docs, artifact audit, final verification | Not started |
+
+### P12 Out Of Scope
+
+- PDF/PPT export.
+- Async report generation.
+- Scheduled reports.
+- Email delivery.
+- Real Slack/Jira/Power BI/Notion integrations.
+- Auth/RBAC.
+- Deployment.
+- Replacing P11 ad hoc analysis.
+- Restoring historical Streamlit/ecommerce/eval product paths.
+
+### P12 Acceptance
+
+- P11 `/analysis` remains available as a single-question product entry.
+- P12 `/reports` is separate.
+- User can generate a synchronous workspace report from Next.js.
+- User can view the report in the UI.
+- User can download `report.md`.
+- Backend persists `report.json`, `report.md`, `trace.json`, and artifacts under the workspace report directory.
+- Backend exposes create/list/detail/download report APIs.
+- Report sections preserve P11 SQL validation, SQL execution, evidence validation, visualization, and trace boundaries.
+- P12 opt-in live DeepSeek report acceptance passes.
+- Full backend tests, frontend tests, frontend build, tracked artifact audit, and docs audit pass.
+
 ## P12 Guardrail
 
-P12 automated report productization is not started. Do not add report product flows, scheduled report generation, report packaging, auth/RBAC, deployment, or real SaaS integrations as part of P11 hardening.
+P12 implementation has not started. Do not add PDF/PPT, scheduled reports, async queues, auth/RBAC, deployment, or real SaaS integrations in the MVP unless explicitly selected later.

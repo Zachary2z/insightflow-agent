@@ -15,15 +15,15 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P11 - General Data Analysis Product hardening complete |
-| Current task | P11 hardening complete |
-| Next planned task | P12 report productization is not started; wait for explicit selection |
+| Current phase | P12 - Report Productization planning |
+| Current task | P12 design/spec documented; implementation not started |
+| Next planned task | Review P12 design, then create an implementation plan before code changes |
 | Last completed task | H5 current product documentation cleanup |
-| Main product target | Workspace analysis over CSV, Excel, or SQLite data with FastAPI APIs, Next.js UI, workspace profile, semantic draft, live DeepSeek/provider-backed understanding and planning, validated SQL, evidence, visualization, and traces |
+| Main product target | P11 ad hoc workspace analysis remains available; P12 target is synchronous workspace reports with page display and Markdown download |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
-| Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
-| Out of scope for P11 | P12 report productization, real SaaS integrations, auth/RBAC, deployment, old demo restoration, and unguarded LLM execution |
+| Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12 planned: `POST /api/workspaces/{workspace_id}/reports` |
+| Out of scope for P12 MVP | PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
 
@@ -45,7 +45,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[ ]` Not started |
+| P12 | Report Productization | `[~]` Planned; implementation not started |
 
 ## P11 Product Hardening
 
@@ -116,5 +116,40 @@ The following terms are intentionally retained only in historical notes or fixtu
 
 After future verification:
 
-1. Keep P12 marked `[ ] Not started` until explicitly selected.
+1. Keep P12 implementation tasks marked `[ ] Not started` until implementation begins.
 2. Record exact verification results in this file or in the final task response.
+
+## P12 Planning Snapshot
+
+Design spec: `docs/superpowers/specs/2026-06-23-p12-workspace-report-productization-design.md`.
+
+MVP decisions:
+
+- Page display plus Markdown download.
+- Synchronous generation first.
+- Async generation is deferred.
+- First report types: `business_review`, `channel_performance`, `revenue_trend`.
+- P11 single-question analysis remains separate at `/workspaces/{workspace_id}/analysis`.
+- P12 reports live at `/workspaces/{workspace_id}/reports`.
+
+Planned backend APIs:
+
+```text
+POST /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports/{report_id}
+GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
+```
+
+Planned task queue:
+
+| Task | Scope | Status |
+|---|---|---|
+| P12-H1 | Report domain model, storage layout, Markdown renderer | `[ ]` Not started |
+| P12-H2 | Synchronous workspace report runner | `[ ]` Not started |
+| P12-H3 | FastAPI report APIs | `[ ]` Not started |
+| P12-H4 | Next.js reports UI and Markdown download | `[ ]` Not started |
+| P12-H5 | Live DeepSeek workspace report acceptance | `[ ]` Not started |
+| P12-H6 | Docs, artifact audit, final verification | `[ ]` Not started |
+
+P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, and any restoration of historical Streamlit/ecommerce/eval product paths.
