@@ -478,7 +478,7 @@ describe("workspace product components", () => {
     );
   });
 
-  it("renders report detail fields and Markdown download link", async () => {
+  it("renders business report detail with a collapsed technical appendix and Markdown download link", async () => {
     vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
@@ -508,6 +508,14 @@ describe("workspace product components", () => {
             evidence_notes: ["Rows preview came from workspace data."],
             provider_metadata: { sql_planning: { provider_called: true } },
             trace_nodes: ["sql_reviewer"],
+            technical_details: {
+              internal_question: "这是自动报告内部 section。Which channels led revenue?",
+              purpose: "Compare channels.",
+              sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+              rows_preview: [{ channel: "paid_search", revenue: 200 }],
+              provider_metadata: { sql_planning: { provider_called: true } },
+              trace_nodes: ["sql_reviewer"],
+            },
           },
         ],
         markdown_path: "workspaces/ws_1/reports/report_1/report.md",
@@ -521,17 +529,72 @@ describe("workspace product components", () => {
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
     expect(await screen.findByText("Business Review")).toBeTruthy();
-    expect(screen.getAllByText("Status: completed").length).toBeGreaterThan(0);
+    expect(screen.getByText("状态：已完成")).toBeTruthy();
+    expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
     expect(screen.getByText("Revenue grew.")).toBeTruthy();
     expect(screen.getByText("Paid search led revenue.")).toBeTruthy();
-    expect(screen.getByText(/SELECT channel/)).toBeTruthy();
-    expect(screen.getByText("paid_search")).toBeTruthy();
     expect(screen.getByText("Rows preview came from workspace data.")).toBeTruthy();
     expect(screen.getByText("artifacts/revenue_by_channel_1.png")).toBeTruthy();
-    expect(screen.getByText(/trace.json/)).toBeTruthy();
+    expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText("paid_search")).toBeNull();
+    expect(screen.queryByText(/provider_called/)).toBeNull();
+    expect(screen.queryByText(/sql_reviewer/)).toBeNull();
+    expect(screen.queryByText(/trace.json/)).toBeNull();
+
+    const appendix = screen.getByText("技术附录").closest("details");
+    expect(appendix?.hasAttribute("open")).toBe(false);
+    fireEvent.click(screen.getByText("技术附录"));
+    expect(screen.getByText(/SELECT channel/)).toBeTruthy();
+    expect(screen.getByText(/provider_called/)).toBeTruthy();
+    expect(screen.getByText(/sql_reviewer/)).toBeTruthy();
+    expect(screen.getByText(/这是自动报告内部 section/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Download Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
+  });
+
+  it.each([
+    ["completed", "已完成", "进度：1/1 个章节已完成"],
+    ["partial", "部分完成", "进度：1/2 个章节已完成，1 个章节失败"],
+    ["failed", "失败", "进度：0/1 个章节已完成，1 个章节失败"],
+    ["running", "生成中", "进度：0/1 个章节已完成，仍在生成"],
+  ])("shows clear report status and progress for %s reports", async (status, label, progress) => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "Review revenue.",
+        title: "Business Review",
+        status,
+        executive_summary: [],
+        sections:
+          status === "partial"
+            ? [
+                { section_id: "done", title: "Done", status: "completed", summary: "Done." },
+                { section_id: "failed", title: "Failed", status: "failed", error: "Failed." },
+              ]
+            : [
+                {
+                  section_id: "section",
+                  title: "Section",
+                  status: status === "completed" ? "completed" : status === "running" ? "running" : "failed",
+                  summary: status === "completed" ? "Done." : "",
+                  error: status === "failed" ? "Failed." : null,
+                },
+              ],
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    expect(await screen.findByText(`状态：${label}`)).toBeTruthy();
+    expect(screen.getByText(progress)).toBeTruthy();
   });
 
   it("renders report API errors", async () => {

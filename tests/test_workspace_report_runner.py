@@ -46,7 +46,7 @@ def _fake_section_runner(calls):
         )
         return {
             "status": "completed",
-            "final_answer": f"Section answer {call_index}",
+            "final_answer": f"Section answer {call_index} with business recommendation.",
             "generated_sql": (
                 "SELECT channel, SUM(revenue) AS revenue "
                 "FROM orders GROUP BY channel LIMIT 20"
@@ -111,13 +111,31 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
 
     saved = json.loads((report_dir / "report.json").read_text(encoding="utf-8"))
     markdown = (report_dir / "report.md").read_text(encoding="utf-8")
-    assert saved["sections"][0]["summary"] == "Section answer 1"
+    assert saved["sections"][0]["summary"] == "Section answer 1 with business recommendation."
+    assert "SELECT channel" not in saved["sections"][0]["summary"]
+    assert "provider_called" not in saved["sections"][0]["summary"]
+    assert "question_understanding_agent" not in saved["sections"][0]["summary"]
     assert saved["sections"][0]["columns"] == ["channel", "revenue"]
     assert saved["sections"][0]["rows_preview"][0] == {
         "channel": "paid_search",
         "revenue": 200.0,
     }
     assert saved["sections"][0]["trace_nodes"] == [
+        "question_understanding_agent",
+        "sql_reviewer_agent",
+        "sql_executor_node",
+        "visualization_agent",
+    ]
+    technical_details = saved["sections"][0]["technical_details"]
+    assert technical_details["internal_question"].startswith("这是自动报告内部 section")
+    assert technical_details["purpose"] == "Summarize recent revenue scale and channel mix using the current workspace data."
+    assert technical_details["sql"].startswith("SELECT channel")
+    assert technical_details["rows_preview"][0] == {
+        "channel": "paid_search",
+        "revenue": 200.0,
+    }
+    assert technical_details["provider_metadata"]["fake"]["call_index"] == 1
+    assert technical_details["trace_nodes"] == [
         "question_understanding_agent",
         "sql_reviewer_agent",
         "sql_executor_node",

@@ -132,6 +132,14 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
         assert section["summary"].strip()
         assert section["sql"].strip()
         assert section["rows_preview"]
+        assert "SELECT " not in section["summary"].upper()
+        assert "provider_called" not in section["summary"]
+        assert "这是自动报告内部 section" not in section["summary"]
+        assert section["technical_details"]["internal_question"].startswith(
+            "这是自动报告内部 section"
+        )
+        assert section["technical_details"]["sql"] == section["sql"]
+        assert section["technical_details"]["provider_metadata"]
         assert "data/ecommerce.db" not in section["sql"]
         assert "sql_reviewer_agent" in section["trace_nodes"]
         assert "sql_executor_node" in section["trace_nodes"]
@@ -188,8 +196,16 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
     markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
     assert "# Business Review" in markdown
     assert "## Executive Summary" in markdown
-    assert "## Sections" in markdown
-    assert "```sql" in markdown
+    assert "## Business Sections" in markdown
+    assert "## Technical Appendix" in markdown
+    assert markdown.index("## Executive Summary") < markdown.index("## Technical Appendix")
+    business_body = markdown.split("## Technical Appendix", 1)[0]
+    appendix = markdown.split("## Technical Appendix", 1)[1]
+    assert "```sql" not in business_body
+    assert "provider_called" not in business_body
+    assert "这是自动报告内部 section" not in business_body
+    assert "```sql" in appendix
+    assert "provider_called" in appendix
     assert first_artifact_path in markdown
 
     trace = _load_report_trace(report)

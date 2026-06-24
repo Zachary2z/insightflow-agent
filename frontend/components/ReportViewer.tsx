@@ -4,11 +4,39 @@ import React, { useEffect, useState } from "react";
 import { getWorkspaceReport, type WorkspaceReport } from "../lib/api";
 import ReportDownloadLink from "./ReportDownloadLink";
 import ReportSection from "./ReportSection";
+import ReportTechnicalAppendix from "./ReportTechnicalAppendix";
 
 type ReportViewerProps = {
   workspaceId: string;
   reportId: string;
 };
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    completed: "已完成",
+    partial: "部分完成",
+    failed: "失败",
+    running: "生成中",
+    draft: "草稿",
+  };
+  return labels[status] ?? status;
+}
+
+function progressSummary(report: WorkspaceReport) {
+  const sections = report.sections ?? [];
+  const total = sections.length;
+  const completed = sections.filter((section) => section.status === "completed").length;
+  const failed = sections.filter((section) => section.status === "failed").length;
+  const running = sections.filter((section) => section.status === "running").length;
+  const parts = [`进度：${completed}/${total} 个章节已完成`];
+  if (failed > 0) {
+    parts.push(`${failed} 个章节失败`);
+  }
+  if (running > 0 || report.status === "running") {
+    parts.push("仍在生成");
+  }
+  return parts.join("，");
+}
 
 export default function ReportViewer({ workspaceId, reportId }: ReportViewerProps) {
   const [report, setReport] = useState<WorkspaceReport | null>(null);
@@ -64,9 +92,10 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
         <div className="item-row">
           <div>
             <h2>{report.title}</h2>
-            <p>Status: {report.status}</p>
-            <p>Type: {report.report_type}</p>
-            <p>Goal: {report.report_goal}</p>
+            <p>状态：{statusLabel(report.status)}</p>
+            <p>{progressSummary(report)}</p>
+            <p>类型：{report.report_type}</p>
+            <p>目标：{report.report_goal}</p>
           </div>
           <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} />
         </div>
@@ -80,30 +109,16 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
             </ul>
           </section>
         ) : null}
-        <section>
-          <h3>Artifact Paths</h3>
-          <ul>
-            {report.markdown_path ? <li>Markdown: {report.markdown_path}</li> : null}
-            {report.json_path ? <li>JSON: {report.json_path}</li> : null}
-            {report.trace_path ? <li>Trace: {report.trace_path}</li> : null}
-            {report.artifact_dir ? <li>Artifacts: {report.artifact_dir}</li> : null}
-          </ul>
-        </section>
-        {report.provider_metadata && Object.keys(report.provider_metadata).length ? (
-          <section>
-            <h3>Provider Metadata</h3>
-            <pre>{JSON.stringify(report.provider_metadata, null, 2)}</pre>
-          </section>
-        ) : null}
       </article>
       <section className="stack">
-        <h2>Sections</h2>
+        <h2>业务章节</h2>
         {report.sections?.length ? (
           report.sections.map((section) => <ReportSection key={section.section_id} section={section} />)
         ) : (
           <p>No report sections returned.</p>
         )}
       </section>
+      <ReportTechnicalAppendix report={report} />
     </section>
   );
 }

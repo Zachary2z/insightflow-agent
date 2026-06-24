@@ -133,6 +133,19 @@ export type WorkspaceReportSection = {
   rows_preview?: Array<Record<string, unknown>>;
   artifact_paths?: string[];
   evidence_notes?: string[];
+  business_artifacts?: Array<Record<string, unknown>>;
+  technical_details?: {
+    internal_question?: string;
+    purpose?: string;
+    sql?: string;
+    columns?: string[];
+    rows_preview?: Array<Record<string, unknown>>;
+    provider_metadata?: Record<string, unknown>;
+    trace_nodes?: string[];
+    trace_path?: string;
+    workspace_run_dir?: string;
+    error?: string | null;
+  };
   provider_metadata?: Record<string, unknown>;
   trace_nodes?: string[];
   error?: string | null;

@@ -19,9 +19,40 @@ class ReportSection:
     rows_preview: list[dict[str, Any]] = field(default_factory=list)
     artifact_paths: list[str] = field(default_factory=list)
     evidence_notes: list[str] = field(default_factory=list)
+    business_artifacts: list[dict[str, Any]] = field(default_factory=list)
+    technical_details: dict[str, Any] = field(default_factory=dict)
     provider_metadata: dict[str, Any] = field(default_factory=dict)
     trace_nodes: list[str] = field(default_factory=list)
     error: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.technical_details:
+            self.technical_details = self._legacy_technical_details()
+        if not self.business_artifacts and self.artifact_paths:
+            self.business_artifacts = [
+                {"type": "chart", "path": path, "title": self.title}
+                for path in self.artifact_paths
+            ]
+
+    def _legacy_technical_details(self) -> dict[str, Any]:
+        details: dict[str, Any] = {}
+        if self.question:
+            details["internal_question"] = self.question
+        if self.purpose:
+            details["purpose"] = self.purpose
+        if self.sql:
+            details["sql"] = self.sql
+        if self.columns:
+            details["columns"] = list(self.columns)
+        if self.rows_preview:
+            details["rows_preview"] = list(self.rows_preview)
+        if self.provider_metadata:
+            details["provider_metadata"] = dict(self.provider_metadata)
+        if self.trace_nodes:
+            details["trace_nodes"] = list(self.trace_nodes)
+        if self.error:
+            details["error"] = self.error
+        return details
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -40,6 +71,8 @@ class ReportSection:
             rows_preview=list(data.get("rows_preview", [])),
             artifact_paths=list(data.get("artifact_paths", [])),
             evidence_notes=list(data.get("evidence_notes", [])),
+            business_artifacts=list(data.get("business_artifacts", [])),
+            technical_details=dict(data.get("technical_details", {})),
             provider_metadata=dict(data.get("provider_metadata", {})),
             trace_nodes=list(data.get("trace_nodes", [])),
             error=data.get("error"),

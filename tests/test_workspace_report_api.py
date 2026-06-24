@@ -51,6 +51,8 @@ def _client_with_fake_report_runner(tmp_path):
                     columns=["channel", "revenue"],
                     rows_preview=[{"channel": "paid_search", "revenue": 200.0}],
                     evidence_notes=["Result preview comes from workspace data."],
+                    provider_metadata={"sql_planning": {"provider_called": True}},
+                    trace_nodes=["sql_reviewer_agent", "sql_executor_node"],
                 )
             ],
         )
@@ -97,6 +99,14 @@ def test_create_report_returns_persisted_report(tmp_path):
     assert payload["report"]["report_id"] == "report_fake_1"
     assert payload["report"]["status"] == "completed"
     assert payload["report"]["sections"][0]["sql"].startswith("SELECT channel")
+    assert payload["report"]["sections"][0]["technical_details"]["sql"].startswith("SELECT channel")
+    assert payload["report"]["sections"][0]["technical_details"]["provider_metadata"]["sql_planning"][
+        "provider_called"
+    ] is True
+    assert payload["report"]["sections"][0]["technical_details"]["trace_nodes"] == [
+        "sql_reviewer_agent",
+        "sql_executor_node",
+    ]
     assert calls == [
         {
             "workspace_id": workspace_id,
@@ -135,6 +145,7 @@ def test_get_report_detail_returns_report(tmp_path):
     assert payload["report"]["executive_summary"] == [
         "Revenue is concentrated in paid search."
     ]
+    assert "technical_details" in payload["report"]["sections"][0]
 
 
 def test_download_report_markdown_returns_markdown_file(tmp_path):
@@ -150,6 +161,8 @@ def test_download_report_markdown_returns_markdown_file(tmp_path):
     assert response.headers["content-type"].startswith("text/markdown")
     assert f'filename="{created["report_id"]}.md"' in response.headers["content-disposition"]
     assert "# Fake Business Review" in response.text
+    assert "## Executive Summary" in response.text
+    assert "## Technical Appendix" in response.text
     assert "```sql\nSELECT channel" in response.text
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Callable
@@ -326,26 +327,49 @@ def _section_from_analysis_result(
 ) -> ReportSection:
     execution_result = dict(analysis_result.get("execution_result") or {})
     status = "completed" if _analysis_succeeded(analysis_result, execution_result) else "failed"
+    columns = [str(column) for column in execution_result.get("columns") or []]
+    rows_preview = _rows_preview(execution_result)
+    artifact_paths = _report_artifact_paths(
+        section_id=section_plan["section_id"],
+        analysis_result=analysis_result,
+        report_dir=report_dir,
+        artifact_dir=artifact_dir,
+    )
+    provider_metadata = _provider_metadata(analysis_result)
+    trace_nodes = _trace_nodes(analysis_result.get("trace") or [])
+    sql = str(analysis_result.get("generated_sql") or "")
+    error = _section_error(analysis_result, execution_result, status)
+    summary = _business_summary(analysis_result, sql)
     return ReportSection(
         section_id=section_plan["section_id"],
         title=section_plan["title"],
         purpose=section_plan["purpose"],
         status=status,
         question=question,
-        summary=str(analysis_result.get("final_answer") or ""),
-        sql=str(analysis_result.get("generated_sql") or ""),
-        columns=[str(column) for column in execution_result.get("columns") or []],
-        rows_preview=_rows_preview(execution_result),
-        artifact_paths=_report_artifact_paths(
-            section_id=section_plan["section_id"],
-            analysis_result=analysis_result,
-            report_dir=report_dir,
-            artifact_dir=artifact_dir,
-        ),
+        summary=summary,
+        sql=sql,
+        columns=columns,
+        rows_preview=rows_preview,
+        artifact_paths=artifact_paths,
         evidence_notes=_evidence_notes(analysis_result.get("evidence_result") or {}),
-        provider_metadata=_provider_metadata(analysis_result),
-        trace_nodes=_trace_nodes(analysis_result.get("trace") or []),
-        error=_section_error(analysis_result, execution_result, status),
+        business_artifacts=[
+            {"type": "chart", "path": path, "title": section_plan["title"]}
+            for path in artifact_paths
+        ],
+        technical_details={
+            "internal_question": question,
+            "purpose": section_plan["purpose"],
+            "sql": sql,
+            "columns": columns,
+            "rows_preview": rows_preview,
+            "provider_metadata": provider_metadata,
+            "trace_nodes": trace_nodes,
+            "trace_path": str(analysis_result.get("trace_path") or ""),
+            "workspace_run_dir": str(analysis_result.get("workspace_run_dir") or ""),
+        },
+        provider_metadata=provider_metadata,
+        trace_nodes=trace_nodes,
+        error=error,
     )
 
 
@@ -357,6 +381,16 @@ def _analysis_succeeded(
         analysis_result.get("status") == "completed"
         and execution_result.get("success") is True
     )
+
+
+def _business_summary(analysis_result: dict[str, Any], sql: str) -> str:
+    summary = str(analysis_result.get("final_answer") or "").strip()
+    summary = re.sub(r"```sql\s*.*?```", "", summary, flags=re.IGNORECASE | re.DOTALL).strip()
+    if sql:
+        summary = summary.replace(sql, "").strip()
+    if not summary:
+        return "本节分析已完成，业务证据与技术细节见下方章节和附录。"
+    return summary
 
 
 def _rows_preview(execution_result: dict[str, Any], limit: int = 20) -> list[dict[str, Any]]:

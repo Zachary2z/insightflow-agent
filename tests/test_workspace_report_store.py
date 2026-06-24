@@ -92,22 +92,30 @@ def test_report_store_renders_markdown_with_required_report_details(tmp_path):
     markdown = Path(saved.markdown_path).read_text(encoding="utf-8")
 
     assert markdown.startswith("# Leadership Business Review")
-    assert "## Report Metadata" in markdown
-    assert f"- Workspace ID: `{workspace['workspace_id']}`" in markdown
     assert "## Report Goal" in markdown
     assert "Summarize revenue and channel performance for leadership." in markdown
     assert "## Executive Summary" in markdown
     assert "- Revenue is concentrated in paid search and email." in markdown
-    assert "## Sections" in markdown
+    assert markdown.index("## Executive Summary") < markdown.index("## Technical Appendix")
+    assert "## Business Sections" in markdown
     assert "### Revenue by Channel" in markdown
-    assert "```sql\nSELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel\n```" in markdown
-    assert "| channel | revenue |" in markdown
-    assert "| paid_search | 200.0 |" in markdown
     assert "- `artifacts/section_revenue_by_channel.png`" in markdown
     assert "Preview is based on grouped rows" in markdown
-    assert "## Trace" in markdown
-    assert f"- Trace path: `{saved.trace_path}`" in markdown
-    assert "## Provider Metadata Summary" in markdown
+    business_body = markdown.split("## Technical Appendix", 1)[0]
+    appendix = markdown.split("## Technical Appendix", 1)[1]
+    assert "Compare revenue contribution across channels." not in business_body
+    assert "Which channels generated the most revenue?" not in business_body
+    assert "SELECT channel" not in business_body
+    assert "deepseek-chat" not in business_body
+    assert "trace://section_revenue_by_channel/sql" not in business_body
+    assert "## Technical Appendix" in markdown
+    assert "<details>" in appendix
+    assert "<summary>Revenue by Channel</summary>" in appendix
+    assert "```sql\nSELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel\n```" in appendix
+    assert "| channel | revenue |" in appendix
+    assert "| paid_search | 200.0 |" in appendix
+    assert "deepseek-chat" in appendix
+    assert "trace://section_revenue_by_channel/sql" in appendix
     assert "deepseek-chat" in markdown
 
 
