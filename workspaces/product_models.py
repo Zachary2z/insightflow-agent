@@ -14,6 +14,7 @@ def empty_question_thread() -> dict[str, Any]:
         "clarification_answer": "",
         "resolved_question": "",
         "pending_run_id": "",
+        "status": "",
     }
 
 

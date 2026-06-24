@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class WorkspaceCreateRequest(BaseModel):
@@ -46,8 +46,29 @@ class WorkspaceSemanticResponse(BaseModel):
 
 
 class WorkspaceRunCreateRequest(BaseModel):
-    user_question: str
+    user_question: str | None = None
     initial_sql: str | None = None
+    pending_run_id: str | None = None
+    clarification_answer: str | None = None
+
+    @model_validator(mode="after")
+    def validate_run_mode(self) -> "WorkspaceRunCreateRequest":
+        user_question = (self.user_question or "").strip()
+        pending_run_id = (self.pending_run_id or "").strip()
+        clarification_answer = (self.clarification_answer or "").strip()
+        has_question = bool(user_question)
+        has_continuation = bool(pending_run_id or clarification_answer)
+
+        if has_question and has_continuation:
+            raise ValueError("Provide either user_question or pending_run_id with clarification_answer, not both.")
+        if has_question:
+            self.user_question = user_question
+            return self
+        if pending_run_id and clarification_answer:
+            self.pending_run_id = pending_run_id
+            self.clarification_answer = clarification_answer
+            return self
+        raise ValueError("Provide user_question or pending_run_id with clarification_answer.")
 
 
 class WorkspaceRunResponse(BaseModel):

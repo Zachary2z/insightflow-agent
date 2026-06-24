@@ -143,6 +143,46 @@ describe("api client", () => {
     );
   });
 
+  it("posts clarification continuation requests without requiring the full question", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        run_id: "run_2",
+        result: { final_answer: "Products A and B lead revenue." },
+        product_result: {
+          version: "p13.v1",
+          status: "completed",
+          question_thread: {
+            original_question: "帮我看看销售情况",
+            clarification_answer: "按商品，最近 90 天，看 Top 5",
+            resolved_question: "分析最近 90 天商品销售额 Top 5。",
+            status: "completed",
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const run = await runAnalysis("ws_1", {
+      pendingRunId: "pending_1",
+      clarificationAnswer: "按商品，最近 90 天，看 Top 5",
+    });
+
+    expect(run.product_result?.question_thread?.resolved_question).toContain("最近 90 天");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/runs",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pending_run_id: "pending_1",
+          clarification_answer: "按商品，最近 90 天，看 Top 5",
+        }),
+      }),
+    );
+  });
+
   it("creates, lists, loads, and links workspace reports", async () => {
     const report = {
       report_id: "report_1",

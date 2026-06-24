@@ -44,8 +44,10 @@ export type SemanticLayer = {
 };
 
 export type RunAnalysisRequest = {
-  userQuestion: string;
+  userQuestion?: string;
   initialSql?: string;
+  pendingRunId?: string;
+  clarificationAnswer?: string;
 };
 
 export type QuestionThread = {
@@ -55,6 +57,7 @@ export type QuestionThread = {
   clarification_answer?: string;
   resolved_question?: string;
   pending_run_id?: string;
+  status?: string;
 };
 
 export type BusinessAnswer = {
@@ -251,8 +254,13 @@ export async function runAnalysis(
   const payload =
     typeof request === "string"
       ? { user_question: request }
+      : request.pendingRunId
+        ? {
+            pending_run_id: request.pendingRunId,
+            clarification_answer: request.clarificationAnswer ?? "",
+          }
       : {
-          user_question: request.userQuestion,
+          user_question: request.userQuestion ?? "",
           ...(request.initialSql?.trim() ? { initial_sql: request.initialSql.trim() } : {}),
         };
   const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/runs`, {

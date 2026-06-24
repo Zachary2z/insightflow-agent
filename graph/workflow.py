@@ -138,6 +138,12 @@ def run_workflow(
     run_id: str | None = None,
     session_id: str | None = None,
     initial_sql: str | None = None,
+    original_question: str | None = None,
+    clarification_question: str | None = None,
+    clarification_answer: str | None = None,
+    resolved_question: str | None = None,
+    pending_run_id: str | None = None,
+    stop_for_clarification: bool = False,
     workspace_id: str | None = None,
     workspace_root: str | Path | None = None,
     profile_path: str | Path | None = None,
@@ -153,6 +159,13 @@ def run_workflow(
     claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
+    state["original_question"] = original_question or user_question
+    state["clarification_question"] = clarification_question or ""
+    state["clarification_answer"] = clarification_answer or ""
+    state["resolved_question"] = resolved_question or ""
+    state["pending_run_id"] = pending_run_id or ""
+    state["question_thread_status"] = ""
+    state["stop_for_clarification"] = stop_for_clarification
     state["db_path"] = db_path
     state["trace_dir"] = trace_dir
     state["execution_result"] = {}

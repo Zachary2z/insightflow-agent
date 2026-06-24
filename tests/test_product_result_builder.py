@@ -81,6 +81,33 @@ def test_product_result_builder_handles_clarification_and_chart_paths():
         "clarification_answer": "最近 90 天",
         "resolved_question": "分析最近 90 天各渠道表现并给出预算建议。",
         "pending_run_id": "pending_1",
+        "status": "waiting_for_clarification",
     }
     assert product["chart_artifacts"][0]["path"].endswith("channel.png")
     assert product["chart_artifacts"][0]["rendering_status"] == "rendered"
+
+
+def test_product_result_builder_continuation_thread_preserves_resolved_business_intent():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_3",
+        "status": "completed",
+        "original_question": "帮我分析渠道表现，看看哪个渠道该加预算。",
+        "question_understanding": {"strategy": "clarify", "reason": "time range missing"},
+        "clarification_questions": ["你希望分析哪个时间范围？"],
+        "clarification_answer": "最近 90 天",
+        "resolved_question": "分析最近 90 天各渠道的收入、订单数、投放成本和 ROI，并给出预算调整建议。",
+        "pending_run_id": "pending_1",
+        "final_answer": "建议优先增加 paid_search 预算。",
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_1")
+    thread = product["question_thread"]
+
+    assert thread["status"] == "completed"
+    assert thread["original_question"] == "帮我分析渠道表现，看看哪个渠道该加预算。"
+    assert thread["clarification_answer"] == "最近 90 天"
+    assert "渠道" in thread["resolved_question"]
+    assert "预算" in thread["resolved_question"]
+    assert "最近 90 天" in thread["resolved_question"]

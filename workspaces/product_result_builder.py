@@ -35,7 +35,8 @@ def build_question_thread(raw: dict[str, Any]) -> dict[str, Any]:
     thread.update(
         {
             "original_question": str(original_question),
-            "system_understanding": _system_understanding(raw.get("question_understanding") or {}),
+            "system_understanding": str(raw.get("system_understanding") or "")
+            or _system_understanding(raw.get("pending_question_understanding") or raw.get("question_understanding") or {}),
             "clarification_question": _first_text(
                 raw.get("clarification_question"),
                 raw.get("clarification_questions"),
@@ -45,6 +46,7 @@ def build_question_thread(raw: dict[str, Any]) -> dict[str, Any]:
             "clarification_answer": str(raw.get("clarification_answer") or ""),
             "resolved_question": str(raw.get("resolved_question") or ""),
             "pending_run_id": str(raw.get("pending_run_id") or ""),
+            "status": str(raw.get("question_thread_status") or raw.get("status") or ""),
         }
     )
     return thread

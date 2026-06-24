@@ -5,7 +5,22 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from workspaces.profiler import profile_workspace_database
+from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
+
+
+def _seed_ecommerce_workspace(store: WorkspaceStore, workspace_id: str) -> None:
+    workspace = store.get_workspace(workspace_id)
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE orders (id INTEGER, status TEXT)")
+        conn.execute("CREATE TABLE order_items (order_id INTEGER, product_id INTEGER, quantity INTEGER, unit_price REAL)")
+        conn.execute("CREATE TABLE products (id INTEGER, product_name TEXT)")
+        conn.executemany("INSERT INTO orders VALUES (?, ?)", [(1, "paid"), (2, "paid")])
+        conn.executemany("INSERT INTO products VALUES (?, ?)", [(1, "A"), (2, "B")])
+        conn.executemany("INSERT INTO order_items VALUES (?, ?, ?, ?)", [(1, 1, 2, 100.0), (2, 2, 1, 50.0)])
+    profile = profile_workspace_database(store, workspace_id)
+    generate_semantic_layer_draft(store, workspace_id, profile)
 
 
 def test_workspace_api_create_profile_semantic_and_run(tmp_path):
@@ -40,6 +55,70 @@ def test_workspace_api_create_profile_semantic_and_run(tmp_path):
     assert run["result"]["final_answer"]
     assert run["product_result"]["business_answer"]["headline"]
     assert run["product_result"]["technical_details"]["sql"] == run["result"]["generated_sql"]
+
+
+def test_workspace_api_returns_pending_clarification_and_continues_with_answer(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+    created = client.post("/api/workspaces", json={"name": "Clarification API Workspace"}).json()
+    workspace_id = created["workspace_id"]
+    _seed_ecommerce_workspace(store, workspace_id)
+
+    pending_response = client.post(
+        f"/api/workspaces/{workspace_id}/runs",
+        json={"user_question": "帮我看看销售情况"},
+    )
+    assert pending_response.status_code == 200
+    pending = pending_response.json()
+    assert pending["success"] is True
+    assert pending["product_result"]["status"] == "waiting_for_clarification"
+    pending_run_id = pending["product_result"]["question_thread"]["pending_run_id"]
+    assert pending_run_id.startswith("pending_")
+    assert pending["product_result"]["question_thread"]["clarification_question"]
+
+    continuation_response = client.post(
+        f"/api/workspaces/{workspace_id}/runs",
+        json={
+            "pending_run_id": pending_run_id,
+            "clarification_answer": "按商品，最近 90 天，看 Top 5",
+        },
+    )
+    assert continuation_response.status_code == 200
+    continuation = continuation_response.json()
+    assert continuation["success"] is True
+    assert continuation["product_result"]["status"] == "completed"
+    thread = continuation["product_result"]["question_thread"]
+    assert thread["original_question"] == "帮我看看销售情况"
+    assert thread["clarification_answer"] == "按商品，最近 90 天，看 Top 5"
+    assert "最近 90 天" in thread["resolved_question"]
+    assert continuation["result"]["execution_result"]["success"] is True
+
+
+def test_workspace_api_returns_4xx_for_missing_pending_clarification_run(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+    created = client.post("/api/workspaces", json={"name": "Missing Pending API Workspace"}).json()
+
+    response = client.post(
+        f"/api/workspaces/{created['workspace_id']}/runs",
+        json={"pending_run_id": "pending_missing", "clarification_answer": "最近 90 天"},
+    )
+
+    assert response.status_code == 404
+    assert "pending_missing" in response.json()["detail"]
+
+
+def test_workspace_api_rejects_run_without_question_or_clarification_answer(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+    created = client.post("/api/workspaces", json={"name": "Invalid Run API Workspace"}).json()
+
+    response = client.post(f"/api/workspaces/{created['workspace_id']}/runs", json={"user_question": ""})
+
+    assert response.status_code in {400, 422}
 
 
 def test_workspace_api_allows_local_nextjs_origin(tmp_path):

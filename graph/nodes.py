@@ -98,6 +98,8 @@ def early_response_node(state: AgentState) -> AgentState:
     updated = {
         **state,
         "status": status,
+        "question_thread_status": status,
+        "clarification_question": (state.get("clarification_questions") or [""])[0],
         "final_answer": answer,
         "data_used": False,
     }
@@ -242,6 +244,14 @@ def save_trace_node(state: AgentState) -> AgentState:
         session_id=state.get("session_id"),
         user_question=state.get("user_question"),
         status=state.get("status", "unknown"),
+        question_thread={
+            "original_question": state.get("original_question") or state.get("user_question") or "",
+            "clarification_question": state.get("clarification_question") or "",
+            "clarification_answer": state.get("clarification_answer") or "",
+            "resolved_question": state.get("resolved_question") or "",
+            "pending_run_id": state.get("pending_run_id") or "",
+            "status": state.get("question_thread_status") or state.get("status", "unknown"),
+        },
     )
     updated = {
         **state,
@@ -277,6 +287,8 @@ def route_after_clarification(state: AgentState) -> str:
     if state.get("initial_sql"):
         return "schema"
     if state.get("routing_strategy") == "reject":
+        return "early_response"
+    if state.get("routing_strategy") == "clarify" and state.get("stop_for_clarification"):
         return "early_response"
     if (
         state.get("routing_strategy") == "clarify"

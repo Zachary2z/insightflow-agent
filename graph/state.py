@@ -9,6 +9,13 @@ class AgentState(TypedDict, total=False):
     run_id: str
     session_id: str
     user_question: str
+    original_question: str
+    clarification_question: str
+    clarification_answer: str
+    resolved_question: str
+    pending_run_id: str
+    question_thread_status: str
+    stop_for_clarification: bool
     task_type: str
     report_type: str
     report_plan: dict[str, Any]

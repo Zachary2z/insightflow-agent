@@ -25,8 +25,9 @@ from api.models import (
     WorkspaceSourcesResponse,
     WorkspaceSqliteSourceRequest,
 )
-from workspaces.analysis_runner import run_workspace_analysis
+from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_continuation
 from workspaces.importers import import_csv, import_excel, import_sqlite
+from workspaces.pending_clarification_store import PendingClarificationNotFoundError
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_runner import run_workspace_report
 from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
@@ -137,14 +138,26 @@ def create_app(
     @app.post("/api/workspaces/{workspace_id}/runs", response_model=WorkspaceRunResponse)
     def create_workspace_run(workspace_id: str, request: WorkspaceRunCreateRequest) -> dict:
         try:
-            result = run_workspace_analysis(
-                store=store,
-                workspace_id=workspace_id,
-                user_question=request.user_question,
-                initial_sql=request.initial_sql,
-            )
+            if request.pending_run_id:
+                result = run_workspace_analysis_continuation(
+                    store=store,
+                    workspace_id=workspace_id,
+                    pending_run_id=request.pending_run_id,
+                    clarification_answer=request.clarification_answer or "",
+                )
+            else:
+                result = run_workspace_analysis(
+                    store=store,
+                    workspace_id=workspace_id,
+                    user_question=request.user_question or "",
+                    initial_sql=request.initial_sql,
+                )
+        except PendingClarificationNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         except FileNotFoundError:
             raise _workspace_not_found(workspace_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
             "success": result.get("status") != "failed",
             "workspace_id": workspace_id,
