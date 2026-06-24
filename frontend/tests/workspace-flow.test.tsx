@@ -2,6 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
+import DataSettings from "../components/DataSettings";
 import DatasetManager from "../components/DatasetManager";
 import ProfileSummary from "../components/ProfileSummary";
 import ProfileWorkspace from "../components/ProfileWorkspace";
@@ -12,6 +13,7 @@ import RunResult from "../components/RunResult";
 import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
 import WorkspaceList from "../components/WorkspaceList";
 import WorkspaceNewForm from "../components/WorkspaceNewForm";
+import SettingsPage from "../app/workspaces/[workspaceId]/settings/page";
 
 const pushMock = vi.fn();
 
@@ -28,6 +30,7 @@ vi.mock("../lib/api", () => ({
   createWorkspace: vi.fn(),
   getWorkspaceReport: vi.fn(),
   getWorkspaceReportDownloadUrl: vi.fn(),
+  getWorkspaceSettings: vi.fn(),
   importSqliteSource: vi.fn(),
   listWorkspaceReports: vi.fn(),
   listSources: vi.fn(),
@@ -43,6 +46,7 @@ import {
   createWorkspace,
   getWorkspaceReport,
   getWorkspaceReportDownloadUrl,
+  getWorkspaceSettings,
   importSqliteSource,
   listWorkspaceReports,
   listSources,
@@ -146,6 +150,89 @@ describe("workspace product components", () => {
     expect(await screen.findByText("sum_revenue")).toBeTruthy();
     expect(screen.getByText(/orders.channel/)).toBeTruthy();
     expect(screen.getByText("customer")).toBeTruthy();
+  });
+
+  it("renders data settings sections with source profile semantic mode and safety details", async () => {
+    vi.mocked(getWorkspaceSettings).mockResolvedValue({
+      workspace_id: "ws_1",
+      data_sources: {
+        status: "ready",
+        sources: [{ name: "orders.csv", source_type: "csv", imported_tables: ["orders"] }],
+      },
+      profile: {
+        status: "ready",
+        tables: [
+          {
+            table_name: "orders",
+            row_count: 10,
+            columns: [
+              { name: "revenue", role_candidates: { measure: true } },
+              { name: "channel", role_candidates: { dimension: true } },
+            ],
+          },
+        ],
+      },
+      semantic_layer: {
+        status: "ready",
+        metrics: [{ name: "sum_revenue" }],
+        dimensions: [{ name: "channel" }],
+        entities: [],
+        time_fields: [],
+      },
+      model_mode: {
+        product_live_mode: true,
+        status_label: "Product/live mode is on",
+        provider_features: { insight_drafting: true, sql_planning: true },
+      },
+      safety: {
+        sql_review: "enabled",
+        sensitive_field_blocking: "enabled",
+        trace_available: "enabled",
+        technical_details_policy: "collapsed_by_default",
+      },
+    });
+
+    render(<DataSettings workspaceId="ws_1" />);
+
+    expect(await screen.findByText("Data sources")).toBeTruthy();
+    expect(screen.getByText("Field profile")).toBeTruthy();
+    expect(screen.getByText("Semantic layer")).toBeTruthy();
+    expect(screen.getByText("Product/live mode")).toBeTruthy();
+    expect(screen.getByText("Safety and audit")).toBeTruthy();
+    expect(screen.getByText("orders.csv")).toBeTruthy();
+    expect(screen.getByText("orders")).toBeTruthy();
+    expect(screen.getByText("10 rows")).toBeTruthy();
+    expect(screen.getByText("revenue")).toBeTruthy();
+    expect(screen.getByText("sum_revenue")).toBeTruthy();
+    expect(screen.getAllByText("channel").length).toBeGreaterThan(0);
+    expect(screen.getByText("Product/live mode is on")).toBeTruthy();
+    expect(screen.getByText("SQL review enabled")).toBeTruthy();
+    expect(screen.getByText("Trace available")).toBeTruthy();
+  });
+
+  it("renders the settings page route", async () => {
+    vi.mocked(getWorkspaceSettings).mockResolvedValue({
+      workspace_id: "ws_1",
+      data_sources: { status: "empty", sources: [] },
+      profile: { status: "missing", tables: [] },
+      semantic_layer: { status: "missing", metrics: [], dimensions: [], entities: [], time_fields: [] },
+      model_mode: {
+        product_live_mode: false,
+        status_label: "Product/live mode is off",
+        provider_features: {},
+      },
+      safety: {
+        sql_review: "enabled",
+        sensitive_field_blocking: "enabled",
+        trace_available: "enabled",
+        technical_details_policy: "collapsed_by_default",
+      },
+    });
+
+    render(await SettingsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByText("数据设置")).toBeTruthy();
+    expect(await screen.findByText("Data sources")).toBeTruthy();
   });
 
   it("submits analysis questions and stores the run result for the detail page", async () => {

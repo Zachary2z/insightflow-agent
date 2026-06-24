@@ -21,6 +21,7 @@ from api.models import (
     WorkspaceRunCreateRequest,
     WorkspaceRunResponse,
     WorkspaceSemanticResponse,
+    WorkspaceSettingsResponse,
     WorkspaceSourceImportResponse,
     WorkspaceSourcesResponse,
     WorkspaceSqliteSourceRequest,
@@ -32,6 +33,7 @@ from workspaces.profiler import profile_workspace_database
 from workspaces.report_runner import run_workspace_report
 from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
+from workspaces.settings_summary import build_workspace_settings
 from workspaces.store import WorkspaceStore
 
 
@@ -118,6 +120,14 @@ def create_app(
         except FileNotFoundError:
             raise _workspace_not_found(workspace_id)
         return {"sources": workspace.get("sources", [])}
+
+    @app.get("/api/workspaces/{workspace_id}/settings", response_model=WorkspaceSettingsResponse)
+    def get_workspace_settings(workspace_id: str) -> dict:
+        try:
+            workspace = store.get_workspace(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        return build_workspace_settings(store, workspace)
 
     @app.post("/api/workspaces/{workspace_id}/profile", response_model=WorkspaceProfileResponse)
     def create_profile(workspace_id: str) -> dict:

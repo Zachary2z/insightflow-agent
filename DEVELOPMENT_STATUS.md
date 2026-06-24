@@ -15,10 +15,10 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P13 design selected / implementation not started |
-| Current task | P13 implementation plan prepared; implementation not started |
-| Next planned task | P13-H1 product output model |
-| Last completed task | P12-H6 docs, artifact audit, final verification |
+| Current phase | P13 in progress through H6 |
+| Current task | P13-H6 Data Settings UI complete |
+| Next planned task | P13-H7 chart product quality |
+| Last completed task | P13-H6 Data Settings UI |
 | Main product target | P13 Analysis Workbench with business-facing answers, integrated clarification continuation, reports UI, data settings UI, and future-compatible Business Q&A Mode |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -46,7 +46,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
-| P13 | Business Answer And Product UX | `[~]` Design selected; implementation not started |
+| P13 | Business Answer And Product UX | `[~]` H1-H6 complete; H7 chart product quality remains next |
 
 ## P11 Product Hardening
 
@@ -84,7 +84,7 @@ No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
 
-Latest P12 result: passed on 2026-06-23.
+Latest P13-H6 result: passed on 2026-06-24.
 
 Required P12-H6 commands:
 
@@ -105,6 +105,10 @@ cd frontend && npm run build
 
 Final verification result summary:
 
+- P13-H6 backend settings API tests passed: `3 passed`.
+- P13-H6 frontend settings/client tests passed: `31 passed`.
+- P13-H6 frontend production build passed: Next.js compiled successfully and generated the `/workspaces/[workspaceId]/settings` route.
+- Suggested report/analysis regressions passed: `27 passed`.
 - Targeted P12 backend report tests passed: `28 passed`.
 - Non-live P12 DeepSeek acceptance command passed by opt-in skip when `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS` is unset: `1 skipped`.
 - Live DeepSeek P12 report acceptance passed with provider flags enabled: `1 passed`, with expected matplotlib CJK glyph warnings.
@@ -175,12 +179,12 @@ Suggested P13 task queue:
 
 | Task | Scope | Status |
 |---|---|---|
-| P13-H1 | Product output model: question thread, business answer, evidence, charts, report, technical details | `[ ]` Not started |
-| P13-H2 | Clarification continuation: pending run, clarification answer, resolved question, continue analysis | `[ ]` Not started |
-| P13-H3 | Business answer quality and product/live provider mode | `[ ]` Not started |
-| P13-H4 | Analysis Workbench UI with compact integrated question thread | `[ ]` Not started |
-| P13-H5 | Reports UI polish and collapsed technical appendix | `[ ]` Not started |
-| P13-H6 | Data Settings UI | `[ ]` Not started |
+| P13-H1 | Product output model: question thread, business answer, evidence, charts, report, technical details | `[x]` Complete |
+| P13-H2 | Clarification continuation: pending run, clarification answer, resolved question, continue analysis | `[x]` Complete |
+| P13-H3 | Business answer quality and product/live provider mode | `[x]` Complete |
+| P13-H4 | Analysis Workbench UI with compact integrated question thread | `[x]` Complete |
+| P13-H5 | Reports UI polish and collapsed technical appendix | `[x]` Complete |
+| P13-H6 | Data Settings UI | `[x]` Complete |
 | P13-H7 | Chart product quality and Chinese text support | `[ ]` Not started |
 | P13-H8 | Real DeepSeek product acceptance for answer quality and clarification continuation | `[ ]` Not started |
 | P13-H9 | Docs, artifact audit, regression, final verification | `[ ]` Not started |

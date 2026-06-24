@@ -17,6 +17,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
         <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
+        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
       </nav>
       <ProfileWorkspace workspaceId={workspaceId} />
     </main>

@@ -45,6 +45,16 @@ class WorkspaceSemanticResponse(BaseModel):
     semantic_layer: dict[str, Any]
 
 
+class WorkspaceSettingsResponse(BaseModel):
+    workspace_id: str
+    workspace_name: str = ""
+    data_sources: dict[str, Any]
+    profile: dict[str, Any]
+    semantic_layer: dict[str, Any]
+    model_mode: dict[str, Any]
+    safety: dict[str, Any]
+
+
 class WorkspaceRunCreateRequest(BaseModel):
     user_question: str | None = None
     initial_sql: str | None = None

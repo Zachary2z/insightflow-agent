@@ -17,6 +17,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
         <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
+        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
       </nav>
       <AnalysisRunner workspaceId={workspaceId} />
     </main>

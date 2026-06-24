@@ -18,6 +18,7 @@ export default async function ReportDetailPage({ params }: ReportDetailPageProps
         <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
         <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
+        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
       </nav>
       <ReportViewer workspaceId={workspaceId} reportId={reportId} />
     </main>

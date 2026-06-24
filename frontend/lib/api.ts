@@ -43,6 +43,46 @@ export type SemanticLayer = {
   time_fields?: Array<Record<string, unknown>>;
 };
 
+export type WorkspaceSettings = {
+  workspace_id: string;
+  workspace_name?: string;
+  data_sources: {
+    status?: string;
+    sources?: WorkspaceSource[];
+    source_count?: number;
+    imported_table_count?: number;
+  };
+  profile: WorkspaceProfile & {
+    status?: string;
+    table_count?: number;
+    column_count?: number;
+    row_count?: number;
+  };
+  semantic_layer: SemanticLayer & {
+    status?: string;
+  };
+  model_mode: {
+    product_live_mode?: boolean;
+    status_label?: string;
+    provider?: {
+      name?: string;
+      model?: string;
+      api_key_present?: boolean;
+    };
+    provider_features?: Record<string, boolean>;
+    coverage?: {
+      enabled?: number;
+      total?: number;
+    };
+  };
+  safety: {
+    sql_review: "enabled" | "disabled" | string;
+    sensitive_field_blocking: "enabled" | "disabled" | string;
+    trace_available: "enabled" | "disabled" | string;
+    technical_details_policy: "collapsed_by_default" | string;
+  };
+};
+
 export type RunAnalysisRequest = {
   userQuestion?: string;
   initialSql?: string;
@@ -258,6 +298,11 @@ export async function createSemanticDraft(
     method: "POST",
   });
   return parseJsonResponse(response, "Failed to create semantic draft");
+}
+
+export async function getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSettings> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/settings`);
+  return parseJsonResponse(response, "Failed to load workspace settings");
 }
 
 export async function runAnalysis(

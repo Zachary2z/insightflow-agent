@@ -44,7 +44,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
-| P13 | Business Answer And Product UX | Design selected / not implemented | Design selected for Analysis Workbench, clarification continuation, business-facing answers, reports UI, data settings UI, and future-compatible Business Q&A Mode |
+| P13 | Business Answer And Product UX | In progress through H6 | H1-H6 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, and Data Settings UI; H7 chart product quality remains next |
 
 ## P11 Product Hardening Plan
 
@@ -344,12 +344,12 @@ P13 should implement the Analysis Workbench and data/report UX improvements firs
 
 | Task | Scope | Status |
 |---|---|---|
-| P13-H1 | Product output model: split question thread, business answer, evidence, charts, report, and technical details instead of one raw result blob | Not started |
-| P13-H2 | Clarification continuation: pending run storage, clarification answer API, resolved question generation, and continuation into normal analysis | Not started |
-| P13-H3 | Business answer quality: provider insight drafting default in product mode, improved prompt/formatter, no parameter-dump answers | Not started |
-| P13-H4 | Analysis Workbench UI: compact integrated analysis thread, business answer first, evidence/chart section, collapsed technical details | Not started |
-| P13-H5 | Reports UI polish: business report reader, report progress, Markdown download, technical appendix collapsed | Not started |
-| P13-H6 | Data Settings UI: data source, profile, semantic layer, model mode, safety/audit pages | Not started |
+| P13-H1 | Product output model: split question thread, business answer, evidence, charts, report, and technical details instead of one raw result blob | Complete |
+| P13-H2 | Clarification continuation: pending run storage, clarification answer API, resolved question generation, and continuation into normal analysis | Complete |
+| P13-H3 | Business answer quality: provider insight drafting default in product mode, improved prompt/formatter, no parameter-dump answers | Complete |
+| P13-H4 | Analysis Workbench UI: compact integrated analysis thread, business answer first, evidence/chart section, collapsed technical details | Complete |
+| P13-H5 | Reports UI polish: business report reader, report progress, Markdown download, technical appendix collapsed | Complete |
+| P13-H6 | Data Settings UI: data source, profile, semantic layer, model mode, safety/audit pages | Complete |
 | P13-H7 | Chart product quality: Chinese font support, labels, units, annotations, and frontend display polish | Not started |
 | P13-H8 | Real DeepSeek product acceptance: answer quality and clarification continuation live tests | Not started |
 | P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | Not started |

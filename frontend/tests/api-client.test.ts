@@ -6,6 +6,7 @@ import {
   createWorkspace,
   getWorkspaceReport,
   getWorkspaceReportDownloadUrl,
+  getWorkspaceSettings,
   importSqliteSource,
   listWorkspaceReports,
   listSources,
@@ -181,6 +182,32 @@ describe("api client", () => {
         }),
       }),
     );
+  });
+
+  it("loads workspace settings from FastAPI", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workspace_id: "ws_1",
+        data_sources: { sources: [{ name: "orders.csv", imported_tables: ["orders"] }] },
+        profile: { status: "ready", tables: [] },
+        semantic_layer: { status: "ready", metrics: [], dimensions: [] },
+        model_mode: { product_live_mode: true, provider_features: { insight_drafting: true } },
+        safety: {
+          sql_review: "enabled",
+          sensitive_field_blocking: "enabled",
+          trace_available: "enabled",
+          technical_details_policy: "collapsed_by_default",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const settings = await getWorkspaceSettings("ws_1");
+
+    expect(settings.workspace_id).toBe("ws_1");
+    expect(settings.safety.sql_review).toBe("enabled");
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/api/workspaces/ws_1/settings");
   });
 
   it("creates, lists, loads, and links workspace reports", async () => {

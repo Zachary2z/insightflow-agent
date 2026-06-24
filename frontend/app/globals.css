@@ -309,6 +309,27 @@ th {
   overflow-wrap: anywhere;
 }
 
+.settings-section {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.settings-grid h3,
+.settings-list h3 {
+  margin: 0 0 6px;
+}
+
+.settings-list {
+  display: grid;
+  gap: 14px;
+}
+
 .technical-block {
   display: grid;
   gap: 6px;

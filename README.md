@@ -1,6 +1,6 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis with P12 workspace reports:
+InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, and P13 business-facing product UX:
 
 ```text
 workspace
@@ -9,6 +9,7 @@ workspace
 -> semantic-layer draft
 -> P11 natural-language ad hoc analysis
 -> P12 structured workspace reports
+-> P13 data settings and business-facing workbench surfaces
 -> validated SQL, evidence, visualization, artifacts, and trace output
 ```
 
@@ -16,12 +17,13 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H6 Data Settings UI.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
+| P13 data settings | Complete through H6 | `/workspaces/{workspaceId}/settings` |
 
 ## Quickstart
 
@@ -60,6 +62,7 @@ Workspace APIs:
 POST /api/workspaces
 GET  /api/workspaces
 GET  /api/workspaces/{workspace_id}
+GET  /api/workspaces/{workspace_id}/settings
 ```
 
 Data source APIs:
