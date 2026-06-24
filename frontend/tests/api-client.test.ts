@@ -107,7 +107,15 @@ describe("api client", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ success: true, run_id: "run_1", result: { final_answer: "Done" } }),
+        json: async () => ({
+          success: true,
+          run_id: "run_1",
+          result: { final_answer: "Paid search leads revenue." },
+          product_result: {
+            version: "p13.v1",
+            business_answer: { headline: "Paid search leads revenue." },
+          },
+        }),
       });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -119,6 +127,8 @@ describe("api client", () => {
     });
 
     expect(run.run_id).toBe("run_1");
+    expect(run.product_result?.business_answer?.headline).toBe("Paid search leads revenue.");
+    expect(run.result.final_answer).toBe("Paid search leads revenue.");
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       "http://localhost:8000/api/workspaces/ws_1/runs",

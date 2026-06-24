@@ -55,6 +55,7 @@ class WorkspaceRunResponse(BaseModel):
     workspace_id: str
     run_id: str | None = None
     result: dict[str, Any]
+    product_result: dict[str, Any] | None = None
 
 
 class WorkspaceReportCreateRequest(BaseModel):

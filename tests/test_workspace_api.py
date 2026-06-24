@@ -37,6 +37,9 @@ def test_workspace_api_create_profile_semantic_and_run(tmp_path):
     ).json()
     assert run["success"] is True
     assert run["workspace_id"] == workspace_id
+    assert run["result"]["final_answer"]
+    assert run["product_result"]["business_answer"]["headline"]
+    assert run["product_result"]["technical_details"]["sql"] == run["result"]["generated_sql"]
 
 
 def test_workspace_api_allows_local_nextjs_origin(tmp_path):

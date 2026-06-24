@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from graph.workflow import run_workflow
+from workspaces.product_result_builder import build_product_analysis_result
 from workspaces.store import WorkspaceStore
 
 
@@ -41,4 +42,11 @@ def run_workspace_analysis(
     )
     result["workspace_id"] = workspace_id
     result["workspace_run_dir"] = str(run_dir)
+    product_result = build_product_analysis_result(result, workspace_id=workspace_id)
+    result["product_result"] = product_result
+    result["question_thread"] = product_result["question_thread"]
+    result["business_answer"] = product_result["business_answer"]
+    result["evidence"] = product_result["evidence"]
+    result["chart_artifacts"] = product_result["chart_artifacts"]
+    result["technical_details"] = product_result["technical_details"]
     return result

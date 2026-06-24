@@ -45,3 +45,8 @@ def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_p
     assert result["workspace_id"] == workspace["workspace_id"]
     assert result["execution_result"]["success"] is True
     assert result["trace_path"].startswith(str(tmp_path / "workspaces" / workspace["workspace_id"] / "runs"))
+    assert result["final_answer"]
+    assert result["product_result"]["workspace_id"] == workspace["workspace_id"]
+    assert result["product_result"]["business_answer"]["headline"]
+    assert result["product_result"]["technical_details"]["sql"] == result["generated_sql"]
+    assert result["business_answer"] == result["product_result"]["business_answer"]

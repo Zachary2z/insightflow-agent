@@ -48,11 +48,72 @@ export type RunAnalysisRequest = {
   initialSql?: string;
 };
 
+export type QuestionThread = {
+  original_question?: string;
+  system_understanding?: string;
+  clarification_question?: string;
+  clarification_answer?: string;
+  resolved_question?: string;
+  pending_run_id?: string;
+};
+
+export type BusinessAnswer = {
+  headline?: string;
+  summary?: string;
+  recommendations?: string[];
+  next_actions?: string[];
+  caveats?: string[];
+  confidence?: string;
+  source?: string;
+  quality_flags?: string[];
+};
+
+export type EvidenceSummary = {
+  table_preview?: {
+    columns?: string[];
+    rows?: unknown[][];
+  };
+  evidence_notes?: string[];
+  validation_status?: string;
+};
+
+export type ChartArtifact = {
+  title?: string;
+  path?: string;
+  url?: string;
+  rendering_status?: string;
+  unit?: string;
+  business_annotation?: string;
+};
+
+export type TechnicalDetails = {
+  sql?: string;
+  raw_rows?: unknown[][];
+  trace_path?: string;
+  provider_metadata?: Record<string, unknown>;
+  validation_logs?: Array<Record<string, unknown>>;
+  debug?: Record<string, unknown>;
+};
+
+export type ProductAnalysisResult = {
+  version: "p13.v1" | string;
+  workspace_id?: string;
+  run_id?: string | null;
+  status?: string;
+  question_thread?: QuestionThread;
+  business_answer?: BusinessAnswer;
+  evidence?: EvidenceSummary;
+  chart_artifacts?: ChartArtifact[];
+  report?: Record<string, unknown> | null;
+  technical_details?: TechnicalDetails;
+};
+
 export type WorkspaceRunResponse = {
   success: boolean;
   workspace_id?: string;
   run_id?: string | null;
   result: Record<string, unknown>;
+  product_result?: ProductAnalysisResult | null;
 };
 
 export type ReportType = "business_review" | "channel_performance" | "revenue_trend";

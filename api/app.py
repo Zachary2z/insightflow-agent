@@ -150,6 +150,7 @@ def create_app(
             "workspace_id": workspace_id,
             "run_id": result.get("run_id"),
             "result": result,
+            "product_result": result.get("product_result"),
         }
 
     @app.post("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportCreateResponse)
