@@ -56,17 +56,38 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
     existing = raw.get("business_answer") if isinstance(raw.get("business_answer"), dict) else {}
     insight = raw.get("insight") if isinstance(raw.get("insight"), dict) else {}
     final_answer = str(existing.get("summary") or raw.get("final_answer") or "")
+    quality_flags = _list_of_text(existing.get("quality_flags"))
+    raw_dump_detected = _looks_like_raw_parameter_dump(final_answer)
+    if raw_dump_detected and "raw_parameter_dump_detected" not in quality_flags:
+        quality_flags.append("raw_parameter_dump_detected")
+    summary = (
+        "已完成查询，但当前回答需要进一步业务化表达；请查看证据表和技术细节。"
+        if raw_dump_detected
+        else final_answer
+    )
+    headline = str(existing.get("headline") or _headline_from(summary))
+    if raw_dump_detected:
+        headline = "查询已完成，需进一步业务化表达"
+    recommendations = _list_of_text(existing.get("recommendations"))
+    next_actions = _list_of_text(existing.get("next_actions"))
+    if not raw_dump_detected and not recommendations and _looks_recommendation_like(summary):
+        recommendations = [summary]
+    if raw_dump_detected and not next_actions:
+        next_actions = ["查看证据表和技术细节后补充业务建议。"]
+    caveats = _list_of_text(existing.get("caveats"))
+    if raw_dump_detected and not caveats:
+        caveats = ["原始回答包含参数格式内容，已从产品摘要中降级。"]
     answer = empty_business_answer()
     answer.update(
         {
-            "headline": str(existing.get("headline") or _headline_from(final_answer)),
-            "summary": final_answer,
-            "recommendations": _list_of_text(existing.get("recommendations")),
-            "next_actions": _list_of_text(existing.get("next_actions")),
-            "caveats": _list_of_text(existing.get("caveats")),
-            "confidence": str(existing.get("confidence") or "medium"),
+            "headline": headline,
+            "summary": summary,
+            "recommendations": recommendations,
+            "next_actions": next_actions,
+            "caveats": caveats,
+            "confidence": str(existing.get("confidence") or ("low" if raw_dump_detected else "medium")),
             "source": str(existing.get("source") or insight.get("source") or ""),
-            "quality_flags": _list_of_text(existing.get("quality_flags")),
+            "quality_flags": quality_flags,
         }
     )
     return answer
@@ -175,6 +196,24 @@ def _headline_from(text: str) -> str:
         return ""
     match = re.split(r"(?<=[。.!?？])\s*", normalized, maxsplit=1)
     return match[0][:120]
+
+
+def _looks_recommendation_like(text: str) -> bool:
+    normalized = str(text or "").strip().lower()
+    return normalized.startswith(("建议", "recommend", "prioritize", "优先"))
+
+
+def _looks_like_raw_parameter_dump(text: str) -> bool:
+    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    if not lines:
+        return False
+    dump_lines = 0
+    for line in lines:
+        stripped = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line)
+        assignments = re.findall(r"\b[A-Za-z_][\w. -]*\s*=", stripped)
+        if len(assignments) >= 2 or (assignments and "," in stripped):
+            dump_lines += 1
+    return dump_lines >= max(1, len(lines) // 2)
 
 
 def _list_of_text(value: Any) -> list[str]:

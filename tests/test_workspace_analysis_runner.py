@@ -116,3 +116,58 @@ def test_workspace_analysis_continuation_resolves_question_and_calls_workflow(tm
     assert thread["clarification_answer"] == "按商品，最近 90 天，看 Top 5"
     assert "最近 90 天" in thread["resolved_question"]
     assert "商品" in thread["resolved_question"]
+
+
+def test_resolved_question_uses_generic_context_merge_without_channel_budget_template():
+    from question_understanding.resolved_question import build_resolved_question
+
+    resolved = build_resolved_question(
+        original_question="帮我分析渠道表现，看看哪个渠道该加预算。",
+        clarification_answer="最近 90 天。",
+        clarification_context={
+            "clarification_question": "你希望分析哪个时间范围？",
+            "question_understanding": {"intent": {"dimension": "channel"}},
+        },
+    )
+
+    assert "帮我分析渠道表现" in resolved
+    assert "最近 90 天" in resolved
+    assert "投放成本" not in resolved
+    assert "ROI" not in resolved
+
+
+def test_workspace_analysis_continuation_marks_pending_failed_when_workflow_errors(tmp_path, monkeypatch):
+    from workspaces.analysis_runner import run_workspace_analysis_continuation
+    from workspaces.pending_clarification_store import PendingClarificationStore
+
+    store, workspace = _create_ecommerce_workspace(tmp_path)
+    pending_store = PendingClarificationStore(store)
+    pending = pending_store.create_pending_run(
+        workspace_id=workspace["workspace_id"],
+        run_id="run_pending",
+        original_question="帮我看看销售情况",
+        question_understanding={"missing_slots": ["time_range"]},
+        clarification_question="你希望分析哪个时间范围？",
+        raw_result={"status": "waiting_for_clarification"},
+    )
+
+    def fail_workflow(*args, **kwargs):
+        raise RuntimeError("workflow exploded")
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", fail_workflow)
+
+    try:
+        run_workspace_analysis_continuation(
+            store=store,
+            workspace_id=workspace["workspace_id"],
+            pending_run_id=pending["pending_run_id"],
+            clarification_answer="最近 90 天",
+        )
+    except RuntimeError:
+        pass
+
+    stored = pending_store.load_pending_run(workspace["workspace_id"], pending["pending_run_id"])
+    assert stored["status"] == "failed"
+    assert stored["clarification_answer"] == "最近 90 天"
+    assert stored["resolved_question"]
+    assert "workflow exploded" in stored["error"]

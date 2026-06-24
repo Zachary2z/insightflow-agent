@@ -40,6 +40,9 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert product["business_answer"]["summary"] == raw["final_answer"]
     assert product["business_answer"]["source"] == "deterministic"
     assert product["business_answer"]["quality_flags"] == []
+    assert "raw_rows" not in product["business_answer"]
+    assert "SELECT channel" not in product["business_answer"]["summary"]
+    assert "provider_called" not in product["business_answer"]["summary"]
     assert product["evidence"]["table_preview"]["columns"] == ["channel", "revenue"]
     assert product["evidence"]["table_preview"]["rows"] == [["paid_search", 200.0]]
     assert product["evidence"]["evidence_notes"] == ["paid_search revenue is 200.0"]
@@ -50,7 +53,6 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert product["technical_details"]["raw_rows"] == [["paid_search", 200.0]]
     assert product["technical_details"]["trace_path"].endswith("trace.json")
     assert product["technical_details"]["provider_metadata"]["insight"]["source"] == "deterministic"
-    assert "raw_rows" not in product["business_answer"]
     assert "sql" not in product["business_answer"]
     assert "trace_path" not in product["business_answer"]
     assert "provider_metadata" not in product["business_answer"]

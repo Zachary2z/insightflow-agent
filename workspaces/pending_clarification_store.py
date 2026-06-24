@@ -47,6 +47,7 @@ class PendingClarificationStore:
             "updated_at": now,
             "clarification_answer": "",
             "resolved_question": "",
+            "error": "",
         }
         self._write(workspace_id, pending_run_id, record)
         return record
@@ -71,6 +72,45 @@ class PendingClarificationStore:
                 "status": "completed",
                 "clarification_answer": clarification_answer,
                 "resolved_question": resolved_question,
+                "updated_at": utc_now_iso(),
+            }
+        )
+        self._write(workspace_id, pending_run_id, record)
+        return record
+
+    def mark_running(
+        self,
+        *,
+        workspace_id: str,
+        pending_run_id: str,
+        clarification_answer: str,
+        resolved_question: str,
+    ) -> dict[str, Any]:
+        record = self.load_pending_run(workspace_id, pending_run_id)
+        record.update(
+            {
+                "status": "running",
+                "clarification_answer": clarification_answer,
+                "resolved_question": resolved_question,
+                "error": "",
+                "updated_at": utc_now_iso(),
+            }
+        )
+        self._write(workspace_id, pending_run_id, record)
+        return record
+
+    def mark_failed(
+        self,
+        *,
+        workspace_id: str,
+        pending_run_id: str,
+        error: str,
+    ) -> dict[str, Any]:
+        record = self.load_pending_run(workspace_id, pending_run_id)
+        record.update(
+            {
+                "status": "failed",
+                "error": error,
                 "updated_at": utc_now_iso(),
             }
         )

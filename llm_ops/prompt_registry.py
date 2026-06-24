@@ -401,7 +401,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
         ),
         PromptTemplate(
             prompt_id="insight_drafter",
-            version="v1",
+            version="v2",
             description="Draft candidate insight claims and concise prose from real execution rows before evidence validation.",
             required_variables=[
                 "user_question",
@@ -425,7 +425,11 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Metric context: {metric_context}\n"
                 "Return JSON only with candidate_claims and draft_summary.\n"
                 "candidate_claims must be factual candidate claims that can be checked by Evidence Validator. "
-                "draft_summary is concise prose and must not present unsupported causes as final truth.\n"
+                "draft_summary must be recommendation-first business prose: start with the most useful conclusion "
+                "or recommendation, cite the evidence in natural language, mention practical next actions when "
+                "the data supports them, and note caveats when the evidence is limited. "
+                "Do not output raw field=value parameter lists, SQL, provider metadata, trace ids, or raw rows. "
+                "Do not present unsupported causes as final truth.\n"
                 "Safety: use only execution_result rows and provided context; do not generate SQL, final claims, "
                 "final answers, action payloads, approval fields, credentials, or secrets. Evidence Validator "
                 "decides which candidate claims survive."

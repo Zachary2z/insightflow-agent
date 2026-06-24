@@ -95,7 +95,7 @@ def run_workspace_analysis_continuation(
         clarification_answer=clarification_answer,
         clarification_context=pending,
     )
-    pending_store.complete_pending_run(
+    pending_store.mark_running(
         workspace_id=workspace_id,
         pending_run_id=pending_run_id,
         clarification_answer=clarification_answer,
@@ -106,31 +106,52 @@ def run_workspace_analysis_continuation(
     run_dir = Path(workspace["root_path"]) / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     provider_map = providers or {}
-    result = run_workflow(
-        user_question=resolved_question,
-        db_path=workspace["analysis_db_path"],
-        trace_dir=run_dir,
-        run_id=run_id,
-        workspace_id=workspace_id,
-        workspace_root=workspace["root_path"],
-        profile_path=workspace["profile_path"],
-        semantic_layer_path=workspace["semantic_layer_path"],
-        run_artifact_dir=run_dir,
-        original_question=pending.get("original_question", ""),
-        clarification_question=pending.get("clarification_question", ""),
-        clarification_answer=clarification_answer,
-        resolved_question=resolved_question,
-        pending_run_id=pending_run_id,
-        stop_for_clarification=False,
-        question_understanding_provider=provider_map.get("question_understanding"),
-        clarification_provider=provider_map.get("clarification"),
-        sql_planning_provider=provider_map.get("sql_planning"),
-        analysis_planner_provider=provider_map.get("analysis_planner"),
-        visualization_agent_provider=provider_map.get("visualization_agent"),
-        sql_candidate_provider=provider_map.get("sql_candidate"),
-        insight_drafting_provider=provider_map.get("insight_drafting"),
-        claim_typing_provider=provider_map.get("claim_typing"),
-    )
+    try:
+        result = run_workflow(
+            user_question=resolved_question,
+            db_path=workspace["analysis_db_path"],
+            trace_dir=run_dir,
+            run_id=run_id,
+            workspace_id=workspace_id,
+            workspace_root=workspace["root_path"],
+            profile_path=workspace["profile_path"],
+            semantic_layer_path=workspace["semantic_layer_path"],
+            run_artifact_dir=run_dir,
+            original_question=pending.get("original_question", ""),
+            clarification_question=pending.get("clarification_question", ""),
+            clarification_answer=clarification_answer,
+            resolved_question=resolved_question,
+            pending_run_id=pending_run_id,
+            stop_for_clarification=False,
+            question_understanding_provider=provider_map.get("question_understanding"),
+            clarification_provider=provider_map.get("clarification"),
+            sql_planning_provider=provider_map.get("sql_planning"),
+            analysis_planner_provider=provider_map.get("analysis_planner"),
+            visualization_agent_provider=provider_map.get("visualization_agent"),
+            sql_candidate_provider=provider_map.get("sql_candidate"),
+            insight_drafting_provider=provider_map.get("insight_drafting"),
+            claim_typing_provider=provider_map.get("claim_typing"),
+        )
+    except Exception as exc:
+        pending_store.mark_failed(
+            workspace_id=workspace_id,
+            pending_run_id=pending_run_id,
+            error=str(exc),
+        )
+        raise
+    if result.get("status") == "completed":
+        pending_store.complete_pending_run(
+            workspace_id=workspace_id,
+            pending_run_id=pending_run_id,
+            clarification_answer=clarification_answer,
+            resolved_question=resolved_question,
+        )
+    else:
+        pending_store.mark_failed(
+            workspace_id=workspace_id,
+            pending_run_id=pending_run_id,
+            error=str(result.get("error_message") or result.get("status") or "workflow did not complete"),
+        )
     result["workspace_id"] = workspace_id
     result["workspace_run_dir"] = str(run_dir)
     result["original_question"] = pending.get("original_question", "")

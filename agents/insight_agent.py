@@ -6,6 +6,7 @@ from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
 from tools.trace_logger import append_trace
+from workspaces.product_result_builder import build_business_answer
 
 
 def _format_row(columns: list[str], row: list[Any]) -> str:
@@ -24,9 +25,11 @@ def _answer_from_result(question: str, execution_result: dict[str, Any]) -> str:
     if not rows:
         return "查询已执行成功，但 execution_result 没有返回数据行。"
 
-    lines = [f"基于 execution_result，问题「{question}」的结果如下："]
-    for index, claim in enumerate(_row_claims(execution_result), start=1):
-        lines.append(f"{index}. {claim}")
+    columns = execution_result.get("columns", [])
+    lines = [f"已完成问题「{question}」的查询，共返回 {len(rows)} 行结果。"]
+    for index, row in enumerate(rows[:5], start=1):
+        parts = [f"{column} 为 {value}" for column, value in zip(columns, row, strict=False)]
+        lines.append(f"{index}. " + "，".join(parts) + "。")
     if execution_result.get("truncated"):
         lines.append("结果已按 max_rows 截断。")
     return "\n".join(lines)
@@ -169,6 +172,7 @@ def run_insight_agent(state: dict[str, Any], provider: LLMProvider | None = None
     updated = {
         **state,
         "insight": output,
+        "business_answer": build_business_answer({"final_answer": output["final_answer"], "insight": output}),
         "final_answer": output["final_answer"],
         "claims_to_validate": output.get("candidate_claims", []),
     }
