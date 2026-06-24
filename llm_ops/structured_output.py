@@ -712,6 +712,10 @@ def _validate_visualization_chart_spec(content: Any, schema_context: dict[str, A
     if missing:
         return _error(prompt_id, f"chart_spec referenced missing execution columns: {', '.join(missing)}")
 
+    unit = str(content.get("unit", "") or "").strip()
+    value_label = bool(content.get("value_label", False))
+    business_annotation = str(content.get("business_annotation", "") or "").strip()
+
     return _ok(
         prompt_id,
         {
@@ -723,6 +727,9 @@ def _validate_visualization_chart_spec(content: Any, schema_context: dict[str, A
             "series": series,
             "required_columns": all_referenced,
             "explanation_basis": explanation_basis,
+            "unit": unit,
+            "value_label": value_label,
+            "business_annotation": business_annotation,
         },
     )
 

@@ -46,6 +46,7 @@ def empty_chart_artifact() -> dict[str, Any]:
         "url": "",
         "rendering_status": "not_rendered",
         "unit": "",
+        "value_label": False,
         "business_annotation": "",
     }
 

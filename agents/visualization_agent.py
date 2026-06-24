@@ -248,6 +248,7 @@ def decide_visualization(
 
 
 def _trace_from(decision: dict[str, Any], delivery_result: dict[str, Any]) -> dict[str, Any]:
+    chart_spec = decision.get("chart_spec") if isinstance(decision.get("chart_spec"), dict) else {}
     return {
         "provider_called": bool(decision.get("provider_called", False)),
         "fallback_used": bool(decision.get("fallback_used", False)),
@@ -260,6 +261,11 @@ def _trace_from(decision: dict[str, Any], delivery_result: dict[str, Any]) -> di
         "artifact_url": delivery_result.get("artifact_url", ""),
         "data_row_count": delivery_result.get("data_row_count", decision.get("data_row_count", 0)),
         "fabricated_data": False,
+        "chart_spec": chart_spec,
+        "title": chart_spec.get("title", ""),
+        "unit": chart_spec.get("unit", ""),
+        "value_label": bool(chart_spec.get("value_label", False)),
+        "business_annotation": chart_spec.get("business_annotation", ""),
     }
 
 

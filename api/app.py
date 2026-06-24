@@ -176,6 +176,20 @@ def create_app(
             "product_result": result.get("product_result"),
         }
 
+    @app.get("/api/workspaces/{workspace_id}/artifacts/{relative_path:path}")
+    def read_workspace_artifact(workspace_id: str, relative_path: str) -> FileResponse:
+        try:
+            store.get_workspace(workspace_id)
+            artifact_path = store.resolve_workspace_path(workspace_id, relative_path)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Artifact not found") from exc
+
+        if not artifact_path.exists() or not artifact_path.is_file():
+            raise HTTPException(status_code=404, detail="Artifact not found")
+        return FileResponse(artifact_path)
+
     @app.post("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportCreateResponse)
     def create_workspace_report(workspace_id: str, request: WorkspaceReportCreateRequest) -> dict:
         try:

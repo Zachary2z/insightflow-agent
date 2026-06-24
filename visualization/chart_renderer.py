@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import warnings
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -18,6 +19,18 @@ import matplotlib
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
+from matplotlib import font_manager
+
+
+CJK_FONT_FALLBACKS = [
+    "Noto Sans CJK SC",
+    "Noto Sans CJK JP",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "SimHei",
+    "Arial Unicode MS",
+    "DejaVu Sans",
+]
 
 
 def _safe_filename(value: str) -> str:
@@ -40,6 +53,54 @@ def _numeric_values(columns: list[str], rows: list[list[Any]], column: str) -> l
     return [float(value) for value in _values(columns, rows, column)]
 
 
+def _configure_fonts() -> None:
+    available = {font.name for font in font_manager.fontManager.ttflist}
+    selected = [font for font in CJK_FONT_FALLBACKS if font in available]
+    if "DejaVu Sans" not in selected:
+        selected.append("DejaVu Sans")
+    plt.rcParams["font.sans-serif"] = selected
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+def _y_label(spec: dict[str, Any]) -> str:
+    unit = str(spec.get("unit") or "").strip()
+    return f"{spec['y']} ({unit})" if unit else spec["y"]
+
+
+def _format_value(value: float, unit: str) -> str:
+    label = f"{value:,.0f}" if float(value).is_integer() else f"{value:,.2f}"
+    return f"{label}{unit}" if unit else label
+
+
+def _add_bar_value_labels(bars: Any, values: list[float], unit: str) -> None:
+    axis = plt.gca()
+    max_value = max(values) if values else 0
+    offset = max_value * 0.015 if max_value else 0.05
+    for bar, value in zip(bars, values, strict=False):
+        axis.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + offset,
+            _format_value(value, unit),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+
+def _add_point_value_labels(x_values: list[Any], y_values: list[float], unit: str) -> None:
+    axis = plt.gca()
+    for x_value, y_value in zip(x_values, y_values, strict=False):
+        axis.annotate(
+            _format_value(y_value, unit),
+            (x_value, y_value),
+            textcoords="offset points",
+            xytext=(0, 6),
+            ha="center",
+            fontsize=8,
+        )
+
+
 def _trace_event(chart_type: str, output: str, status: str, latency_ms: int, error: str = "") -> dict[str, Any]:
     event = {
         "tool_name": "render_visualization_chart",
@@ -58,23 +119,33 @@ def _draw_supported_chart(spec: dict[str, Any], columns: list[str], rows: list[l
     chart_type = spec["chart_type"]
     x_values = [str(value) for value in _values(columns, rows, spec["x"])]
     y_values = _numeric_values(columns, rows, spec["y"])
+    unit = str(spec.get("unit") or "")
+    show_value_labels = bool(spec.get("value_label", False))
 
     if chart_type in {"ranked_bar", "funnel"}:
-        plt.bar(x_values, y_values, color="#2563eb")
+        bars = plt.bar(x_values, y_values, color="#2563eb")
+        if show_value_labels:
+            _add_bar_value_labels(bars, y_values, unit)
         plt.xticks(rotation=30, ha="right")
     elif chart_type == "line":
         plt.plot(x_values, y_values, marker="o", color="#2563eb")
+        if show_value_labels:
+            _add_point_value_labels(x_values, y_values, unit)
         plt.xticks(rotation=30, ha="right")
     elif chart_type == "grouped_bar":
         series_values = [str(value) for value in _values(columns, rows, spec["series"])]
         labels = [f"{x}\n{series}" for x, series in zip(x_values, series_values, strict=False)]
-        plt.bar(labels, y_values, color="#2563eb")
+        bars = plt.bar(labels, y_values, color="#2563eb")
+        if show_value_labels:
+            _add_bar_value_labels(bars, y_values, unit)
         plt.xticks(rotation=30, ha="right")
     elif chart_type == "dual_axis_line":
         secondary_values = _numeric_values(columns, rows, spec["y_secondary"])
         axis = plt.gca()
         axis.plot(x_values, y_values, marker="o", color="#2563eb", label=spec["y"])
-        axis.set_ylabel(spec["y"])
+        if show_value_labels:
+            _add_point_value_labels(x_values, y_values, unit)
+        axis.set_ylabel(_y_label(spec))
         secondary_axis = axis.twinx()
         secondary_axis.plot(x_values, secondary_values, marker="s", color="#dc2626", label=spec["y_secondary"])
         secondary_axis.set_ylabel(spec["y_secondary"])
@@ -102,7 +173,7 @@ def _draw_supported_chart(spec: dict[str, Any], columns: list[str], rows: list[l
     plt.title(spec.get("title") or f"{chart_type.title()} Chart")
     if chart_type != "dual_axis_line":
         plt.xlabel(spec["x"])
-        plt.ylabel(spec["y"])
+        plt.ylabel(_y_label(spec))
 
 
 def _table_fallback(execution_result: dict[str, Any], reason: str, started_at: float) -> dict[str, Any]:
@@ -132,6 +203,7 @@ def render_chart(
     columns = [str(column) for column in execution_result.get("columns") or []]
     rows = list(execution_result.get("rows") or [])
     raw_chart_type = str(chart_spec.get("chart_type", "")).strip().lower()
+    _configure_fonts()
 
     if not is_supported_chart_type(raw_chart_type):
         fallback_type = fallback_chart_type(columns, rows)
@@ -164,10 +236,16 @@ def render_chart(
         run_id = str(validated.get("run_id", "run_unknown"))
         filename = _safe_filename(f"{run_id}_{validated['chart_type']}_{validated['x']}_{validated['y']}") + ".png"
         chart_path = output_path / filename
-        plt.figure(figsize=(8, 4.8))
+        plt.figure(figsize=(8, 5.2))
         _draw_supported_chart(validated, columns, rows)
-        plt.tight_layout()
-        plt.savefig(chart_path, dpi=160)
+        annotation = str(validated.get("business_annotation") or "").strip()
+        if annotation:
+            plt.figtext(0.08, 0.03, annotation, ha="left", va="bottom", fontsize=9, wrap=True)
+        plt.tight_layout(rect=(0, 0.1, 1, 1) if annotation else None)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=r".*Glyph .* missing from font.*")
+            warnings.filterwarnings("ignore", message=r".*missing from current font.*")
+            plt.savefig(chart_path, dpi=160)
         plt.close()
     except Exception as exc:
         plt.close()

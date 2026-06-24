@@ -11,7 +11,11 @@ from workspaces.store import WorkspaceStore
 
 
 def _with_product_result(result: dict, *, workspace_id: str) -> dict:
-    product_result = build_product_analysis_result(result, workspace_id=workspace_id)
+    product_result = build_product_analysis_result(
+        result,
+        workspace_id=workspace_id,
+        workspace_root=result.get("workspace_root") or _workspace_root_from_result(result),
+    )
     result["product_result"] = product_result
     result["question_thread"] = product_result["question_thread"]
     result["business_answer"] = product_result["business_answer"]
@@ -172,4 +176,14 @@ def _first_text(value) -> str:
                 return item
     if isinstance(value, str):
         return value
+    return ""
+
+
+def _workspace_root_from_result(result: dict) -> str:
+    run_dir = result.get("workspace_run_dir")
+    if not run_dir:
+        return ""
+    path = Path(run_dir)
+    if path.name.startswith("run_") and path.parent.name == "runs":
+        return str(path.parent.parent)
     return ""

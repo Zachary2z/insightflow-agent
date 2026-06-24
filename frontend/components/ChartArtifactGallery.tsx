@@ -23,14 +23,14 @@ export default function ChartArtifactGallery({ artifacts = [] }: ChartArtifactGa
               {artifact.url ? <img src={artifact.url} alt={artifact.title || "分析图表"} /> : null}
               <figcaption>
                 <strong>{artifact.title || "分析图表"}</strong>
+                {!artifact.url ? <span>图表已生成，可在技术细节查看文件路径。</span> : null}
                 {artifact.business_annotation ? <span>{artifact.business_annotation}</span> : null}
-                {artifact.path ? <code>{artifact.path}</code> : null}
               </figcaption>
             </figure>
           ))}
         </div>
       ) : (
-        <p>暂无图表。</p>
+        <p>暂无图表</p>
       )}
     </article>
   );

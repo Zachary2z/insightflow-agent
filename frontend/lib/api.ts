@@ -173,7 +173,14 @@ export type WorkspaceReportSection = {
   rows_preview?: Array<Record<string, unknown>>;
   artifact_paths?: string[];
   evidence_notes?: string[];
-  business_artifacts?: Array<Record<string, unknown>>;
+  business_artifacts?: Array<{
+    type?: string;
+    title?: string;
+    url?: string;
+    path?: string;
+    unit?: string;
+    business_annotation?: string;
+  }>;
   technical_details?: {
     internal_question?: string;
     purpose?: string;

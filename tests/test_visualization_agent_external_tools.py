@@ -54,6 +54,9 @@ def _provider_output(delivery_tool_id: str = "local_renderer", **overrides) -> d
             "series": "",
             "required_columns": ["category_name", "gmv"],
             "explanation_basis": ["supported_findings"],
+            "unit": "元",
+            "value_label": True,
+            "business_annotation": "Cameras leads category GMV.",
         },
         "delivery_tool_id": delivery_tool_id,
         "tool_reason": "Use the selected delivery tool for the stakeholder workflow.",
@@ -129,6 +132,9 @@ def test_provider_valid_output_selects_local_renderer_and_calls_real_renderer(tm
     assert delivery["success"] is True
     assert delivery["chart_type"] == "ranked_bar"
     assert Path(delivery["artifact_path"]).exists()
+    assert result["visualization_decision"]["chart_spec"]["unit"] == "元"
+    assert result["visualization_decision"]["chart_spec"]["value_label"] is True
+    assert result["visualization_trace"]["business_annotation"] == "Cameras leads category GMV."
     assert delivery["external_tool_called"] is True
     assert delivery["rendered_rows"] == _execution_result()["rows"]
     assert delivery["fabricated_data"] is False

@@ -17,13 +17,13 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H6 Data Settings UI.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H7 chart product quality and frontend display.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
-| P13 data settings | Complete through H6 | `/workspaces/{workspaceId}/settings` |
+| P13 data settings and chart display | Complete through H7 | `/workspaces/{workspaceId}/settings` |
 
 ## Quickstart
 

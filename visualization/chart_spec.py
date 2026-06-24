@@ -17,6 +17,9 @@ SPEC_FIELDS = (
     "prompt_id",
     "validation_error",
     "provider_error",
+    "unit",
+    "value_label",
+    "business_annotation",
 )
 
 
@@ -41,6 +44,9 @@ def normalize_chart_spec(spec: dict[str, Any]) -> dict[str, Any]:
         "prompt_id": str(spec.get("prompt_id", "") or "").strip(),
         "validation_error": str(spec.get("validation_error", "") or ""),
         "provider_error": str(spec.get("provider_error", "") or ""),
+        "unit": str(spec.get("unit", "") or "").strip(),
+        "value_label": bool(spec.get("value_label", False)),
+        "business_annotation": str(spec.get("business_annotation", "") or "").strip(),
     }
     for field in ("run_id", "prompt_version", "model", "usage", "latency_ms"):
         if field in spec:

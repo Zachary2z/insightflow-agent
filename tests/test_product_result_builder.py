@@ -1,9 +1,11 @@
 def test_product_result_builder_splits_business_and_technical_fields():
     from workspaces.product_result_builder import build_product_analysis_result
 
+    workspace_root = "/tmp/ws"
     raw = {
         "run_id": "run_1",
         "status": "completed",
+        "workspace_root": workspace_root,
         "user_question": "哪个渠道该加预算？",
         "question_understanding": {
             "strategy": "llm_candidate",
@@ -23,12 +25,17 @@ def test_product_result_builder_splits_business_and_technical_fields():
         "visualization_trace": {
             "artifact_path": "/tmp/ws/runs/run_1/charts/channel.png",
             "provider_called": True,
+            "chart_spec": {
+                "title": "渠道收入",
+                "unit": "元",
+                "business_annotation": "paid_search 收入领先。",
+            },
         },
         "trace_path": "/tmp/ws/runs/run_1/trace.json",
         "insight": {"source": "deterministic", "provider_called": False},
     }
 
-    product = build_product_analysis_result(raw, workspace_id="ws_1")
+    product = build_product_analysis_result(raw, workspace_id="ws_1", workspace_root=workspace_root)
 
     assert product["version"] == "p13.v1"
     assert product["workspace_id"] == "ws_1"
@@ -48,7 +55,10 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert product["evidence"]["evidence_notes"] == ["paid_search revenue is 200.0"]
     assert product["evidence"]["validation_status"] == "validated"
     assert product["chart_artifacts"][0]["path"].endswith("channel.png")
-    assert product["chart_artifacts"][0]["url"] == ""
+    assert product["chart_artifacts"][0]["path"] == "runs/run_1/charts/channel.png"
+    assert product["chart_artifacts"][0]["url"] == "/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png"
+    assert product["chart_artifacts"][0]["unit"] == "元"
+    assert product["chart_artifacts"][0]["business_annotation"] == "paid_search 收入领先。"
     assert product["technical_details"]["sql"].startswith("SELECT channel")
     assert product["technical_details"]["raw_rows"] == [["paid_search", 200.0]]
     assert product["technical_details"]["trace_path"].endswith("trace.json")
@@ -61,9 +71,11 @@ def test_product_result_builder_splits_business_and_technical_fields():
 def test_product_result_builder_handles_clarification_and_chart_paths():
     from workspaces.product_result_builder import build_product_analysis_result
 
+    workspace_root = "/tmp/ws"
     raw = {
         "run_id": "run_2",
         "status": "waiting_for_clarification",
+        "workspace_root": workspace_root,
         "user_question": "帮我分析渠道表现",
         "question_understanding": {"strategy": "clarify", "reason": "time range missing"},
         "clarification_questions": ["你希望分析哪个时间范围？"],
@@ -74,7 +86,7 @@ def test_product_result_builder_handles_clarification_and_chart_paths():
         "chart_paths": ["/tmp/ws/runs/run_2/charts/channel.png"],
     }
 
-    product = build_product_analysis_result(raw, workspace_id="ws_1")
+    product = build_product_analysis_result(raw, workspace_id="ws_1", workspace_root=workspace_root)
 
     assert product["question_thread"] == {
         "original_question": "帮我分析渠道表现",
@@ -86,6 +98,7 @@ def test_product_result_builder_handles_clarification_and_chart_paths():
         "status": "waiting_for_clarification",
     }
     assert product["chart_artifacts"][0]["path"].endswith("channel.png")
+    assert product["chart_artifacts"][0]["url"] == "/api/workspaces/ws_1/artifacts/runs/run_2/charts/channel.png"
     assert product["chart_artifacts"][0]["rendering_status"] == "rendered"
 
 

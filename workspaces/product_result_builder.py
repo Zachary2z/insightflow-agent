@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from workspaces.product_models import (
     PRODUCT_RESULT_VERSION,
@@ -14,16 +16,27 @@ from workspaces.product_models import (
 )
 
 
-def build_product_analysis_result(raw: dict[str, Any], *, workspace_id: str | None = None) -> dict[str, Any]:
+def build_product_analysis_result(
+    raw: dict[str, Any],
+    *,
+    workspace_id: str | None = None,
+    workspace_root: str | Path | None = None,
+) -> dict[str, Any]:
+    resolved_workspace_id = workspace_id or raw.get("workspace_id") or ""
+    resolved_workspace_root = workspace_root or raw.get("workspace_root") or _workspace_root_from_raw(raw)
     return {
         "version": PRODUCT_RESULT_VERSION,
-        "workspace_id": workspace_id or raw.get("workspace_id") or "",
+        "workspace_id": resolved_workspace_id,
         "run_id": raw.get("run_id") or "",
         "status": raw.get("status", "unknown"),
         "question_thread": build_question_thread(raw),
         "business_answer": build_business_answer(raw),
         "evidence": build_evidence(raw.get("execution_result") or {}, raw.get("evidence_result") or {}),
-        "chart_artifacts": build_chart_artifacts(raw),
+        "chart_artifacts": build_chart_artifacts(
+            raw,
+            workspace_id=str(resolved_workspace_id),
+            workspace_root=resolved_workspace_root,
+        ),
         "report": raw.get("report_result") or None,
         "technical_details": build_technical_details(raw),
     }
@@ -108,16 +121,23 @@ def build_evidence(execution_result: dict[str, Any], evidence_result: dict[str, 
     return evidence
 
 
-def build_chart_artifacts(raw: dict[str, Any]) -> list[dict[str, Any]]:
+def build_chart_artifacts(
+    raw: dict[str, Any],
+    *,
+    workspace_id: str = "",
+    workspace_root: str | Path | None = None,
+) -> list[dict[str, Any]]:
     visualization_trace = raw.get("visualization_trace") if isinstance(raw.get("visualization_trace"), dict) else {}
     delivery = (
         raw.get("visualization_delivery_result")
         if isinstance(raw.get("visualization_delivery_result"), dict)
         else {}
     )
-    chart_spec = _chart_spec(raw, visualization_trace, delivery)
+    decision = raw.get("visualization_decision") if isinstance(raw.get("visualization_decision"), dict) else {}
+    chart_spec = _chart_spec(raw, visualization_trace, delivery, decision)
     title = str(chart_spec.get("title") or visualization_trace.get("title") or "Chart")
     unit = str(chart_spec.get("unit") or visualization_trace.get("unit") or "")
+    value_label = bool(chart_spec.get("value_label") or visualization_trace.get("value_label") or False)
     annotation = str(
         chart_spec.get("business_annotation") or visualization_trace.get("business_annotation") or ""
     )
@@ -134,14 +154,21 @@ def build_chart_artifacts(raw: dict[str, Any]) -> list[dict[str, Any]]:
     )
     artifacts: list[dict[str, Any]] = []
     for path in paths:
+        display_path, url = _artifact_path_and_url(
+            path,
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+            artifact_url=str(visualization_trace.get("artifact_url") or delivery.get("artifact_url") or ""),
+        )
         artifact = empty_chart_artifact()
         artifact.update(
             {
                 "title": title,
-                "path": path,
-                "url": "",
+                "path": display_path,
+                "url": url,
                 "rendering_status": str(visualization_trace.get("rendering_status") or "rendered"),
                 "unit": unit,
+                "value_label": value_label,
                 "business_annotation": annotation,
             }
         )
@@ -244,6 +271,57 @@ def _chart_spec(*values: dict[str, Any]) -> dict[str, Any]:
         if isinstance(chart_spec, dict):
             return chart_spec
     return {}
+
+
+def _workspace_root_from_raw(raw: dict[str, Any]) -> str:
+    run_dir = raw.get("workspace_run_dir")
+    if isinstance(run_dir, str) and run_dir:
+        path = Path(run_dir)
+        if path.name.startswith("run_") and path.parent.name == "runs":
+            return str(path.parent.parent)
+    return ""
+
+
+def _artifact_path_and_url(
+    path: str,
+    *,
+    workspace_id: str,
+    workspace_root: str | Path | None,
+    artifact_url: str = "",
+) -> tuple[str, str]:
+    relative_path = _workspace_relative_path(path, workspace_id=workspace_id, workspace_root=workspace_root)
+    if relative_path and workspace_id:
+        encoded = "/".join(quote(part) for part in relative_path.split("/"))
+        return relative_path, f"/api/workspaces/{quote(workspace_id)}/artifacts/{encoded}"
+    return path, artifact_url
+
+
+def _workspace_relative_path(path: str, *, workspace_id: str, workspace_root: str | Path | None) -> str:
+    path_text = str(path or "").strip()
+    if not path_text:
+        return ""
+    candidate = Path(path_text)
+    if candidate.is_absolute() and workspace_root:
+        try:
+            workspace_root_path = Path(workspace_root).resolve()
+            resolved = candidate.resolve()
+            if resolved == workspace_root_path:
+                return ""
+            if resolved.is_relative_to(workspace_root_path):
+                return resolved.relative_to(workspace_root_path).as_posix()
+        except (OSError, ValueError):
+            return ""
+    if not candidate.is_absolute():
+        normalized = candidate.as_posix().lstrip("/")
+        parts = [part for part in normalized.split("/") if part]
+        if ".." in parts:
+            return ""
+        if workspace_id and len(parts) >= 2 and parts[0] == "workspaces" and parts[1] == workspace_id:
+            parts = parts[2:]
+        if parts and parts[0] in {"runs", "reports"}:
+            return "/".join(parts)
+        return ""
+    return ""
 
 
 def _unique_text(values: list[Any]) -> list[str]:

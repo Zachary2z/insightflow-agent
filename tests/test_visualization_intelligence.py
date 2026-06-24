@@ -34,6 +34,33 @@ def test_chart_validator_rejects_columns_missing_from_execution_result():
     assert "net_gmv" in result["validation_error"]
 
 
+def test_chart_validator_preserves_product_metadata_fields():
+    from visualization.chart_validator import validate_chart_spec
+
+    execution_result = _execution_result(["渠道", "收入"], [["付费搜索", 1200.0]])
+    result = validate_chart_spec(
+        {
+            "chart_type": "ranked_bar",
+            "title": "渠道收入",
+            "x": "渠道",
+            "y": "收入",
+            "y_secondary": "",
+            "series": "",
+            "required_columns": ["渠道", "收入"],
+            "explanation_basis": ["supported_findings"],
+            "unit": "元",
+            "value_label": True,
+            "business_annotation": "付费搜索贡献最高。",
+        },
+        execution_result,
+    )
+
+    assert result["success"] is True
+    assert result["unit"] == "元"
+    assert result["value_label"] is True
+    assert result["business_annotation"] == "付费搜索贡献最高。"
+
+
 def test_chart_renderer_uses_only_real_execution_rows(tmp_path):
     from visualization.chart_renderer import render_chart
 

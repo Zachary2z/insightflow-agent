@@ -2,6 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
+import ChartArtifactGallery from "../components/ChartArtifactGallery";
 import DataSettings from "../components/DataSettings";
 import DatasetManager from "../components/DatasetManager";
 import ProfileSummary from "../components/ProfileSummary";
@@ -463,6 +464,33 @@ describe("workspace product components", () => {
     expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术细节"));
   });
 
+  it("renders chart artifact images with title alt text and hides local paths from the main UI", () => {
+    render(
+      <ChartArtifactGallery
+        artifacts={[
+          {
+            title: "渠道收入",
+            path: "runs/run_1/charts/channel.png",
+            url: "/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png",
+            unit: "元",
+            business_annotation: "付费搜索贡献最高。",
+          },
+        ]}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "渠道收入" }) as HTMLImageElement;
+    expect(image.getAttribute("src")).toBe("/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png");
+    expect(screen.getByText("付费搜索贡献最高。")).toBeTruthy();
+    expect(screen.queryByText("runs/run_1/charts/channel.png")).toBeNull();
+  });
+
+  it("shows an empty chart gallery state when no artifacts exist", () => {
+    render(<ChartArtifactGallery artifacts={[]} />);
+
+    expect(screen.getByText("暂无图表")).toBeTruthy();
+  });
+
   it("shows a business-friendly quality warning for raw parameter dump flags", () => {
     render(
       <RunResult
@@ -592,6 +620,13 @@ describe("workspace product components", () => {
             columns: ["channel", "revenue"],
             rows_preview: [{ channel: "paid_search", revenue: 200 }],
             artifact_paths: ["artifacts/revenue_by_channel_1.png"],
+            business_artifacts: [
+              {
+                type: "chart",
+                path: "artifacts/revenue_by_channel_1.png",
+                title: "Revenue by Channel",
+              },
+            ],
             evidence_notes: ["Rows preview came from workspace data."],
             provider_metadata: { sql_planning: { provider_called: true } },
             trace_nodes: ["sql_reviewer"],
@@ -621,7 +656,8 @@ describe("workspace product components", () => {
     expect(screen.getByText("Revenue grew.")).toBeTruthy();
     expect(screen.getByText("Paid search led revenue.")).toBeTruthy();
     expect(screen.getByText("Rows preview came from workspace data.")).toBeTruthy();
-    expect(screen.getByText("artifacts/revenue_by_channel_1.png")).toBeTruthy();
+    expect(screen.getByText("Revenue by Channel 图表已生成")).toBeTruthy();
+    expect(screen.queryByText("artifacts/revenue_by_channel_1.png")).toBeNull();
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
     expect(screen.queryByText("paid_search")).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
