@@ -298,6 +298,8 @@ P13 is the next selected product phase. It turns the current technically working
 
 Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
 
+Implementation plan: `docs/superpowers/plans/2026-06-24-p13-business-answer-product-ux-implementation-plan.md`.
+
 ### P13 Product Direction
 
 Primary product shape:
