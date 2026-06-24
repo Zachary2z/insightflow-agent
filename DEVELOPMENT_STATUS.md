@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
 This file is the living status tracker for InsightFlow Agent.
 
@@ -15,15 +15,15 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P12 complete / ready for next planning |
-| Current task | None / next phase planning |
-| Next planned task | Define P13 only after a separate design is written and selected |
+| Current phase | P13 design selected / implementation not started |
+| Current task | Prepare P13 implementation plan |
+| Next planned task | P13-H1 product output model and clarification continuation planning |
 | Last completed task | P12-H6 docs, artifact audit, final verification |
-| Main product target | P11 ad hoc workspace analysis remains available; P12 synchronous workspace reports support page display and Markdown download |
+| Main product target | P13 Analysis Workbench with business-facing answers, integrated clarification continuation, reports UI, data settings UI, and future-compatible Business Q&A Mode |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
-| Out of scope for P12 MVP | PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, old demo restoration, and unguarded LLM execution |
+| Out of scope for P13 | Full chat product implementation, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
 
@@ -46,7 +46,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
-| P13 | Next phase | `[ ]` Not started; no selected design yet |
+| P13 | Business Answer And Product UX | `[~]` Design selected; implementation not started |
 
 ## P11 Product Hardening
 
@@ -130,8 +130,58 @@ The following terms are intentionally retained only in historical notes or fixtu
 
 After future verification:
 
-1. Keep P13 marked `[ ] Not started` until a design is written and implementation begins.
+1. Keep P13 marked design-selected until implementation begins.
 2. Record exact verification results in this file or in the final task response.
+
+## P13 Planning Snapshot
+
+Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
+
+P13 selected product direction:
+
+```text
+Analysis Workbench
+-> compact integrated question thread
+-> clarification continuation
+-> resolved question
+-> guarded SQL/evidence/chart execution
+-> business answer
+-> report generation
+-> collapsed technical details
+```
+
+Future-compatible direction:
+
+```text
+Business Q&A Mode
+-> chat-style surface that reuses the same question/evidence/answer/report/progress objects
+```
+
+Key P13 decisions:
+
+- Analysis Workbench is the implementation target.
+- Business Q&A Mode is designed for future compatibility but is not a full P13 implementation target.
+- Clarification is a normal product state, not an error.
+- Users should answer only the missing detail; they should not rewrite the full question.
+- The system must combine the original question, system understanding, clarification answer, and workspace context into a visible `resolved_question`.
+- Business answers must be recommendation-first, readable, evidence-backed, and not raw parameter dumps.
+- SQL, raw rows, trace, provider metadata, and validation logs stay available but collapsed under technical details.
+- Reports must read like business reports; internal prompts and provider metadata do not belong in the main report body.
+- Data Settings should cover data sources, profile, semantic layer, product/live model mode, and safety/audit boundaries.
+
+Suggested P13 task queue:
+
+| Task | Scope | Status |
+|---|---|---|
+| P13-H1 | Product output model: question thread, business answer, evidence, charts, report, technical details | `[ ]` Not started |
+| P13-H2 | Clarification continuation: pending run, clarification answer, resolved question, continue analysis | `[ ]` Not started |
+| P13-H3 | Business answer quality and product/live provider mode | `[ ]` Not started |
+| P13-H4 | Analysis Workbench UI with compact integrated question thread | `[ ]` Not started |
+| P13-H5 | Reports UI polish and collapsed technical appendix | `[ ]` Not started |
+| P13-H6 | Data Settings UI | `[ ]` Not started |
+| P13-H7 | Chart product quality and Chinese text support | `[ ]` Not started |
+| P13-H8 | Real DeepSeek product acceptance for answer quality and clarification continuation | `[ ]` Not started |
+| P13-H9 | Docs, artifact audit, regression, final verification | `[ ]` Not started |
 
 ## P12 Planning Snapshot
 

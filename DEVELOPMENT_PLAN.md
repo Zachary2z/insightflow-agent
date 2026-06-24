@@ -44,7 +44,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
-| P13 | Next phase | Not started | No P13 design has been selected or started |
+| P13 | Business Answer And Product UX | Design selected / not implemented | Design selected for Analysis Workbench, clarification continuation, business-facing answers, reports UI, data settings UI, and future-compatible Business Q&A Mode |
 
 ## P11 Product Hardening Plan
 
@@ -230,7 +230,7 @@ Likely components:
 - Replacing P11 ad hoc analysis.
 - Restoring historical Streamlit/ecommerce/eval product paths.
 
-P13 has not started. Do not infer or add a P13 scope until a separate design is written and selected.
+P13 design has been selected but implementation has not started. Use the P13 design section below as the next development scope.
 
 ### P12 Acceptance
 
@@ -291,3 +291,87 @@ Expected result: no generated artifacts from this list are committed. Existing `
 ## P12 Guardrail
 
 P12 implementation is limited to the scoped report MVP. Do not add PDF/PPT, scheduled reports, async queues, auth/RBAC, deployment, or real SaaS integrations unless explicitly selected later.
+
+## P13 Business Answer And Product UX Plan
+
+P13 is the next selected product phase. It turns the current technically working P11/P12 flows into a business-facing product experience.
+
+Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
+
+### P13 Product Direction
+
+Primary product shape:
+
+```text
+Analysis Workbench
+-> business question
+-> integrated question thread
+-> optional clarification
+-> resolved question
+-> guarded SQL/evidence/chart execution
+-> business answer
+-> evidence and chart
+-> report generation
+-> collapsed technical details
+```
+
+Future-compatible product shape:
+
+```text
+Business Q&A Mode
+-> chat-style business question
+-> same question/evidence/answer/report objects
+-> open in workbench for full evidence and technical detail
+```
+
+P13 should implement the Analysis Workbench and data/report UX improvements first. Business Q&A Mode should be represented in the design and data model, but a full chat product is out of scope for P13.
+
+### P13 Core Requirements
+
+- Add a compact integrated analysis thread that shows original question, model understanding, clarification prompt, user clarification answer, resolved question, and continue/edit controls together.
+- Add clarification continuation so users can answer only the missing detail instead of rewriting the full original question.
+- Persist and expose the original question, clarification question, clarification answer, and resolved question.
+- Make business answers recommendation-first, readable, evidence-backed, and free of raw key-value parameter dumps.
+- Collapse SQL, raw execution rows, traces, provider metadata, and validation logs under technical details.
+- Redesign report pages so the main report reads like a business report; internal prompts and provider metadata must not appear in the main report body.
+- Add Data Settings UI for data sources, profile, semantic layer, product/live model mode, and safety/audit boundaries.
+- Fix chart product quality, including Chinese text support, value labels, units, and business annotations.
+- Move toward a single product/live mode instead of requiring users to manually enable many provider flags.
+
+### P13 Suggested Task Queue
+
+| Task | Scope | Status |
+|---|---|---|
+| P13-H1 | Product output model: split question thread, business answer, evidence, charts, report, and technical details instead of one raw result blob | Not started |
+| P13-H2 | Clarification continuation: pending run storage, clarification answer API, resolved question generation, and continuation into normal analysis | Not started |
+| P13-H3 | Business answer quality: provider insight drafting default in product mode, improved prompt/formatter, no parameter-dump answers | Not started |
+| P13-H4 | Analysis Workbench UI: compact integrated analysis thread, business answer first, evidence/chart section, collapsed technical details | Not started |
+| P13-H5 | Reports UI polish: business report reader, report progress, Markdown download, technical appendix collapsed | Not started |
+| P13-H6 | Data Settings UI: data source, profile, semantic layer, model mode, safety/audit pages | Not started |
+| P13-H7 | Chart product quality: Chinese font support, labels, units, annotations, and frontend display polish | Not started |
+| P13-H8 | Real DeepSeek product acceptance: answer quality and clarification continuation live tests | Not started |
+| P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | Not started |
+
+### P13 Out Of Scope
+
+- Full Business Q&A chat product implementation.
+- Real SaaS integrations such as Slack, Jira, Power BI, Notion, email, CRM, or ticketing systems.
+- Auth/RBAC.
+- Deployment.
+- PDF/PPT export.
+- Scheduled reports.
+- Large async job infrastructure beyond lightweight report progress if chosen during implementation.
+- Restoring Streamlit, old ecommerce-only demo flows, historical eval product paths, or mock SaaS demos as current product paths.
+
+### P13 Acceptance
+
+- Users can answer a clarification prompt without rewriting the full question.
+- The system shows and uses a resolved question before continuing analysis.
+- Analysis Workbench shows the compact integrated question thread and keeps the rest of the page readable.
+- Business answer appears before SQL/raw rows and contains a recommendation, evidence, next actions, and caveats when relevant.
+- Product-facing answers do not pass if they are raw `field=value` or key-value row dumps.
+- Reports hide internal section prompts, SQL, trace nodes, provider metadata, and raw rows from the main report body.
+- Data Settings clearly exposes data source, profile, semantic layer, model mode, and safety/audit status.
+- Charts render Chinese labels correctly and include useful units/value labels.
+- Live DeepSeek tests cover question understanding, clarification continuation, SQL planning/candidate, insight drafting, visualization, and readable final answer quality.
+- Full backend tests, frontend tests, frontend build, tracked artifact audit, and docs audit pass.
