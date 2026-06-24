@@ -10,8 +10,8 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
 
   return (
     <main>
-      <h1>Ask InsightFlow</h1>
-      <p>Workspace: {workspaceId}</p>
+      <h1>Analysis Workbench</h1>
+      <p>工作区：{workspaceId}</p>
       <nav>
         <Link href={`/workspaces/${workspaceId}/datasets`}>Datasets</Link>
         <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>

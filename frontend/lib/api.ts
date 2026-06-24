@@ -74,7 +74,7 @@ export type BusinessAnswer = {
 export type EvidenceSummary = {
   table_preview?: {
     columns?: string[];
-    rows?: unknown[][];
+    rows?: Array<unknown[] | Record<string, unknown>>;
   };
   evidence_notes?: string[];
   validation_status?: string;
@@ -91,7 +91,7 @@ export type ChartArtifact = {
 
 export type TechnicalDetails = {
   sql?: string;
-  raw_rows?: unknown[][];
+  raw_rows?: Array<unknown[] | Record<string, unknown>>;
   trace_path?: string;
   provider_metadata?: Record<string, unknown>;
   validation_logs?: Array<Record<string, unknown>>;

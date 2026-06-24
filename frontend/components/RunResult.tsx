@@ -1,13 +1,45 @@
 import React from "react";
+import type { ProductAnalysisResult } from "../lib/api";
+import AnalysisThreadCard from "./AnalysisThreadCard";
+import BusinessAnswerCard from "./BusinessAnswerCard";
+import ChartArtifactGallery from "./ChartArtifactGallery";
+import EvidencePanel from "./EvidencePanel";
+import TechnicalDetailsDisclosure from "./TechnicalDetailsDisclosure";
+
+type ContinuePayload = {
+  pendingRunId: string;
+  clarificationAnswer: string;
+};
 
 type RunResultProps = {
-  result: Record<string, unknown>;
+  result: Record<string, unknown> | ProductAnalysisResult;
+  onContinueClarification?: (payload: ContinuePayload) => Promise<void> | void;
+  isContinuing?: boolean;
+  continuationError?: string;
 };
 
 type ExecutionResult = {
   columns: string[];
   rows: Array<unknown[] | Record<string, unknown>>;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function productResult(result: Record<string, unknown> | ProductAnalysisResult): ProductAnalysisResult | null {
+  if (!isRecord(result)) {
+    return null;
+  }
+  const record = result as Record<string, unknown>;
+  if (isRecord(record.product_result)) {
+    return record.product_result as ProductAnalysisResult;
+  }
+  if (record.question_thread || record.business_answer || record.technical_details) {
+    return record as ProductAnalysisResult;
+  }
+  return null;
+}
 
 function stringField(result: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
@@ -34,110 +66,94 @@ function listField(result: Record<string, unknown>, keys: string[]) {
 
 function executionResult(result: Record<string, unknown>): ExecutionResult | null {
   const candidate = result.execution_result;
-  if (!candidate || typeof candidate !== "object") {
+  if (!isRecord(candidate)) {
     return null;
   }
-  const record = candidate as Record<string, unknown>;
-  const rows = Array.isArray(record.rows) ? (record.rows as Array<unknown[] | Record<string, unknown>>) : [];
-  const columns = Array.isArray(record.columns)
-    ? record.columns.map((column) => String(column))
-    : rows.length > 0 && !Array.isArray(rows[0]) && typeof rows[0] === "object"
-      ? Object.keys(rows[0] as Record<string, unknown>)
+  const rows = Array.isArray(candidate.rows) ? (candidate.rows as Array<unknown[] | Record<string, unknown>>) : [];
+  const columns = Array.isArray(candidate.columns)
+    ? candidate.columns.map((column) => String(column))
+    : rows.length > 0 && isRecord(rows[0])
+      ? Object.keys(rows[0])
       : [];
   return { columns, rows };
 }
 
-function rowValue(row: unknown[] | Record<string, unknown>, column: string, index: number) {
-  if (Array.isArray(row)) {
-    return row[index];
-  }
-  return row[column];
-}
-
-export default function RunResult({ result }: RunResultProps) {
+function fallbackProduct(result: Record<string, unknown>): ProductAnalysisResult {
   const execution = executionResult(result);
   const finalAnswer = stringField(result, ["final_answer", "answer", "summary", "error"]);
   const sql = stringField(result, ["generated_sql", "final_sql", "sql"]);
-  const chartPaths = listField(result, ["chart_path", "chart_paths"]);
   const tracePath = stringField(result, ["trace_path"]);
-  const providerMetadata = [
-    ["Question understanding", result.question_understanding],
-    ["SQL planning", result.sql_planning],
-    ["Visualization", result.visualization_trace],
-  ].filter(([, value]) => value && typeof value === "object");
+  const chartPaths = listField(result, ["chart_path", "chart_paths"]);
+
+  return {
+    version: "legacy",
+    status: String(result.status || ""),
+    run_id: typeof result.run_id === "string" ? result.run_id : null,
+    question_thread: {
+      original_question: stringField(result, ["original_question", "user_question", "question"]),
+      system_understanding: "",
+      status: typeof result.status === "string" ? result.status : "",
+    },
+    business_answer: finalAnswer
+      ? {
+          headline: finalAnswer.split(/[。.!?？]/)[0] || finalAnswer,
+          summary: finalAnswer,
+          confidence: "medium",
+        }
+      : undefined,
+    evidence: execution
+      ? {
+          table_preview: {
+            columns: execution.columns,
+            rows: execution.rows,
+          },
+        }
+      : undefined,
+    chart_artifacts: chartPaths.map((path) => ({ title: "分析图表", path })),
+    technical_details: {
+      sql,
+      raw_rows: execution?.rows ?? [],
+      trace_path: tracePath,
+      provider_metadata: {
+        ...(isRecord(result.question_understanding) ? { question_understanding: result.question_understanding } : {}),
+        ...(isRecord(result.sql_planning) ? { sql_planning: result.sql_planning } : {}),
+        ...(isRecord(result.visualization_trace) ? { visualization: result.visualization_trace } : {}),
+      },
+    },
+  };
+}
+
+export default function RunResult({
+  result,
+  onContinueClarification,
+  isContinuing = false,
+  continuationError = "",
+}: RunResultProps) {
+  const product = productResult(result) ?? fallbackProduct(result as Record<string, unknown>);
+  const hasProductContent =
+    product.question_thread ||
+    product.business_answer ||
+    product.evidence ||
+    product.chart_artifacts?.length ||
+    product.technical_details;
+
+  if (!hasProductContent) {
+    return <p>本次分析暂未返回可展示结果。</p>;
+  }
 
   return (
-    <section className="stack">
-      <h2>Analysis Result</h2>
-      {finalAnswer ? (
-        <article className="panel">
-          <h3>Final Answer</h3>
-          <p>{finalAnswer}</p>
-        </article>
-      ) : null}
-      {sql ? (
-        <article className="panel">
-          <h3>SQL</h3>
-          <pre>{sql}</pre>
-        </article>
-      ) : null}
-      {execution ? (
-        <article className="panel">
-          <h3>Execution Rows</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  {execution.columns.map((column) => (
-                    <th key={column}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {execution.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {execution.columns.map((column, index) => (
-                      <td key={column}>{String(rowValue(row, column, index) ?? "")}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      ) : null}
-      {chartPaths.length ? (
-        <article className="panel">
-          <h3>Chart Artifacts</h3>
-          <ul>
-            {chartPaths.map((path) => (
-              <li key={path}>{path}</li>
-            ))}
-          </ul>
-        </article>
-      ) : null}
-      {tracePath ? (
-        <article className="panel">
-          <h3>Trace</h3>
-          <p>{tracePath}</p>
-        </article>
-      ) : null}
-      {providerMetadata.length ? (
-        <article className="panel">
-          <h3>Provider Metadata</h3>
-          <ul>
-            {providerMetadata.map(([label, value]) => (
-              <li key={label as string}>
-                <strong>{label as string}</strong>
-                <pre>{JSON.stringify(value, null, 2)}</pre>
-              </li>
-            ))}
-          </ul>
-        </article>
-      ) : null}
-      {!finalAnswer && !sql && !execution && !chartPaths.length && !tracePath ? (
-        <p>No result fields returned for this run.</p>
-      ) : null}
+    <section className="workbench-result">
+      <AnalysisThreadCard
+        thread={product.question_thread}
+        status={product.status}
+        onContinue={onContinueClarification}
+        isContinuing={isContinuing}
+        continuationError={continuationError}
+      />
+      <BusinessAnswerCard answer={product.business_answer} />
+      <EvidencePanel evidence={product.evidence} />
+      <ChartArtifactGallery artifacts={product.chart_artifacts} />
+      <TechnicalDetailsDisclosure details={product.technical_details} />
     </section>
   );
 }

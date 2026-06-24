@@ -153,23 +153,44 @@ describe("workspace product components", () => {
       success: true,
       workspace_id: "ws_1",
       run_id: "run_1",
-      result: { final_answer: "Email produced the most revenue.", generated_sql: "SELECT 1" },
+      result: {
+        product_result: {
+          version: "p13.v1",
+          status: "completed",
+          question_thread: {
+            original_question: "哪个渠道收入最高？",
+            system_understanding: "按渠道比较收入",
+            resolved_question: "比较各渠道收入并给出建议。",
+          },
+          business_answer: {
+            headline: "Email produced the most revenue.",
+            summary: "Email 贡献最高收入。",
+            next_actions: ["复核 email 投放预算"],
+            caveats: [],
+            confidence: "medium",
+          },
+          evidence: { table_preview: { columns: ["channel", "revenue"], rows: [["email", 100]] } },
+          chart_artifacts: [],
+          technical_details: { sql: "SELECT 1", raw_rows: [[1]] },
+        },
+      },
     });
 
     render(<AnalysisRunner workspaceId="ws_1" />);
-    fireEvent.change(screen.getByLabelText("Question"), {
-      target: { value: "Which channel has the most revenue?" },
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "哪个渠道收入最高？" },
     });
-    fireEvent.change(screen.getByLabelText("Initial SQL"), { target: { value: "SELECT 1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Run analysis" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
 
     expect(await screen.findByText("Email produced the most revenue.")).toBeTruthy();
+    expect(screen.getByText("比较各渠道收入并给出建议。")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open run result" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/runs/run_1",
     );
-    expect(JSON.parse(window.sessionStorage.getItem("insightflow.run.ws_1.run_1") ?? "{}").result.final_answer).toBe(
-      "Email produced the most revenue.",
-    );
+    expect(
+      JSON.parse(window.sessionStorage.getItem("insightflow.run.ws_1.run_1") ?? "{}").result.product_result
+        .business_answer.headline,
+    ).toBe("Email produced the most revenue.");
   });
 
   it("renders profile tables and candidate roles", () => {
@@ -194,23 +215,190 @@ describe("workspace product components", () => {
     expect(screen.getByText("measure")).toBeTruthy();
   });
 
-  it("renders SQL and execution rows for a run result", () => {
+  it("renders the integrated analysis thread in one compact card", () => {
     render(
       <RunResult
         result={{
-          final_answer: "Email leads revenue.",
-          generated_sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
-          execution_result: { columns: ["channel", "revenue"], rows: [["email", 100]] },
-          chart_path: "workspaces/ws_1/runs/run_1/charts/revenue.png",
-          trace_path: "workspaces/ws_1/runs/run_1/trace.json",
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: {
+              original_question: "帮我分析渠道表现",
+              system_understanding: "按渠道比较收入表现",
+              clarification_question: "你希望分析哪个时间范围？",
+              clarification_answer: "最近 90 天",
+              resolved_question: "分析最近 90 天各渠道收入和 ROI，并给出预算建议。",
+            },
+            business_answer: {
+              headline: "建议优先加码 paid_search",
+              summary: "paid_search 收入最高。",
+              next_actions: ["提高预算"],
+              caveats: [],
+              confidence: "medium",
+            },
+            evidence: { table_preview: { columns: ["channel", "revenue"], rows: [["paid_search", 200]] } },
+            chart_artifacts: [],
+            technical_details: { sql: "SELECT 1", raw_rows: [[1]], provider_metadata: { model: "deepseek" } },
+          },
         }}
       />,
     );
-    expect(screen.getByText("Email leads revenue.")).toBeTruthy();
+
+    const thread = screen.getByLabelText("分析线程");
+    expect(thread.textContent).toContain("帮我分析渠道表现");
+    expect(thread.textContent).toContain("按渠道比较收入表现");
+    expect(thread.textContent).toContain("你希望分析哪个时间范围？");
+    expect(thread.textContent).toContain("最近 90 天");
+    expect(thread.textContent).toContain("分析最近 90 天各渠道收入和 ROI");
+    expect(screen.getByText("建议优先加码 paid_search")).toBeTruthy();
+  });
+
+  it("keeps SQL raw rows and provider metadata collapsed by default", () => {
+    render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: { original_question: "看收入" },
+            business_answer: { headline: "收入稳定", summary: "收入保持稳定。", confidence: "medium" },
+            evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+            chart_artifacts: [],
+            technical_details: {
+              sql: "SELECT channel FROM orders",
+              raw_rows: [["email"]],
+              trace_path: "workspaces/ws_1/runs/run_1/trace.json",
+              provider_metadata: { model: "deepseek" },
+              validation_logs: [{ name: "review_result", value: { approved: true } }],
+            },
+          },
+        }}
+      />,
+    );
+
+    const disclosure = screen.getByText("技术细节").closest("details");
+    expect(disclosure?.hasAttribute("open")).toBe(false);
+    expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText(/deepseek/)).toBeNull();
+
+    fireEvent.click(screen.getByText("技术细节"));
+
     expect(screen.getByText(/SELECT channel/)).toBeTruthy();
-    expect(screen.getByText("email")).toBeTruthy();
-    expect(screen.getByText(/revenue.png/)).toBeTruthy();
-    expect(screen.getByText(/trace.json/)).toBeTruthy();
+    expect(screen.getByText(/deepseek/)).toBeTruthy();
+  });
+
+  it("submits only the clarification answer for a pending run", async () => {
+    vi.mocked(runAnalysis)
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_pending",
+        result: {
+          product_result: {
+            version: "p13.v1",
+            status: "waiting_for_clarification",
+            question_thread: {
+              pending_run_id: "pending_1",
+              original_question: "帮我分析渠道表现",
+              system_understanding: "需要按渠道比较表现",
+              clarification_question: "你希望分析哪个时间范围？",
+              status: "waiting_for_clarification",
+            },
+            business_answer: {},
+            evidence: { table_preview: { columns: [], rows: [] } },
+            chart_artifacts: [],
+            technical_details: {},
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_done",
+        result: {
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: {
+              original_question: "帮我分析渠道表现",
+              clarification_question: "你希望分析哪个时间范围？",
+              clarification_answer: "最近 90 天",
+              resolved_question: "分析最近 90 天各渠道表现。",
+            },
+            business_answer: {
+              headline: "paid_search 表现最好",
+              summary: "收入最高。",
+              next_actions: [],
+              caveats: [],
+              confidence: "medium",
+            },
+            evidence: { table_preview: { columns: [], rows: [] } },
+            chart_artifacts: [],
+            technical_details: {},
+          },
+        },
+      });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), { target: { value: "帮我分析渠道表现" } });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+    fireEvent.change(await screen.findByLabelText("补充回答"), { target: { value: "最近 90 天" } });
+    fireEvent.click(screen.getByRole("button", { name: "继续分析" }));
+
+    await waitFor(() =>
+      expect(runAnalysis).toHaveBeenLastCalledWith("ws_1", {
+        pendingRunId: "pending_1",
+        clarificationAnswer: "最近 90 天",
+      }),
+    );
+    expect(await screen.findByText("paid_search 表现最好")).toBeTruthy();
+  });
+
+  it("renders the business answer before evidence and technical details", () => {
+    const { container } = render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: { original_question: "分析渠道" },
+            business_answer: { headline: "先看业务结论", summary: "这是业务摘要。", confidence: "medium" },
+            evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+            chart_artifacts: [],
+            technical_details: { sql: "SELECT 1", raw_rows: [[1]] },
+          },
+        }}
+      />,
+    );
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("先看业务结论")).toBeLessThan(text.indexOf("证据表"));
+    expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术细节"));
+  });
+
+  it("shows a business-friendly quality warning for raw parameter dump flags", () => {
+    render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: { original_question: "分析渠道" },
+            business_answer: {
+              headline: "查询已完成",
+              summary: "已完成查询。",
+              confidence: "low",
+              quality_flags: ["raw_parameter_dump_detected"],
+            },
+            evidence: { table_preview: { columns: [], rows: [] } },
+            chart_artifacts: [],
+            technical_details: { raw_rows: [["channel=paid_search, revenue=200"]] },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("回答已自动过滤技术参数，建议结合证据表补充业务解读。")).toBeTruthy();
   });
 
   it("renders an empty report list state", async () => {
