@@ -17,13 +17,13 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H8 real DeepSeek product acceptance. The active closeout stage is P13-H9 documentation, artifact audit, regression, live verification, and final commit.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. There is no unfinished P13 H-task; the next planned phase is P14 product direction planning.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
-| P13 Analysis Workbench, Data Settings, and chart display | H1-H8 complete; H9 final verification active | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
+| P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
 
 ## Quickstart
 

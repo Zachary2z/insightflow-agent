@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H8 real DeepSeek product acceptance, with H9 final documentation, artifact audit, regression, and closeout verification active. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. No P13 H-task remains open; the next phase is P14 product direction planning. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -45,7 +45,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
-| P13 | Business Answer And Product UX | H9 final verification active | H1-H8 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, and real DeepSeek product acceptance; H9 documentation/audit/regression/closeout is active |
+| P13 | Business Answer And Product UX | Complete | H1-H9 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, real DeepSeek product acceptance, documentation, artifact audit, regression, live verification, and closeout |
 
 ## P11 Product Hardening Plan
 
@@ -231,7 +231,7 @@ Likely components:
 - Replacing P11 ad hoc analysis.
 - Restoring historical Streamlit/ecommerce/eval product paths.
 
-P13 implementation is active and complete through H8. Use the P13 section below for the final H9 closeout scope.
+P13 implementation is complete through H9. There is no remaining P13 H-task; use the P13 section below as the completed scope and verification record before planning P14.
 
 ### P12 Acceptance
 
@@ -295,7 +295,7 @@ P12 implementation is limited to the scoped report MVP. Do not add PDF/PPT, sche
 
 ## P13 Business Answer And Product UX Plan
 
-P13 turns the current technically working P11/P12 flows into a business-facing product experience. H1-H8 are complete, including real DeepSeek product acceptance for business answer quality and clarification continuation. H9 is the active closeout task for documentation, artifact hygiene, regression, live verification, and final commit.
+P13 turns the current technically working P11/P12 flows into a business-facing product experience. H1-H9 are complete, including real DeepSeek product acceptance for business answer quality, clarification continuation, documentation, artifact hygiene, regression, live verification, and final closeout.
 
 Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
 
@@ -353,11 +353,11 @@ P13 implements the Analysis Workbench, clarification continuation, business-faci
 | P13-H6 | Data Settings UI: data source, profile, semantic layer, model mode, safety/audit pages | Complete |
 | P13-H7 | Chart product quality: Chinese font support, labels, units, annotations, and frontend display polish | Complete |
 | P13-H8 | Real DeepSeek product acceptance: answer quality and clarification continuation live tests | Complete |
-| P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | In progress |
+| P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | Complete |
 
 ### P13-H9 Closeout Checklist
 
-Run and record these before closing P13-H9:
+Recorded verification for closing P13-H9:
 
 ```bash
 python3 -m pytest -q
