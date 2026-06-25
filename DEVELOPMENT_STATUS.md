@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
 This file is the living status tracker for InsightFlow Agent.
 
@@ -15,11 +15,11 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P13 in progress through H7 |
-| Current task | P13-H7 chart product quality complete |
-| Next planned task | P13-H8 live DeepSeek product acceptance |
-| Last completed task | P13-H7 chart product quality and frontend display |
-| Main product target | P13 Analysis Workbench with business-facing answers, integrated clarification continuation, reports UI, data settings UI, and future-compatible Business Q&A Mode |
+| Current phase | P13-H9 final verification and closeout |
+| Current task | P13-H9 documentation, artifact audit, regression, live verification, and final commit |
+| Next planned task | Close P13 after H9 closeout commit |
+| Last completed task | P13-H8 real DeepSeek product acceptance for business answer quality and clarification continuation |
+| Main product target | P13 Analysis Workbench with business-facing answers, integrated clarification continuation, reports UI, Data Settings, chart image display, real DeepSeek product acceptance, and future-compatible Business Q&A Mode |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
@@ -46,7 +46,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
-| P13 | Business Answer And Product UX | `[~]` H1-H7 complete; H8 live DeepSeek product acceptance remains next |
+| P13 | Business Answer And Product UX | `[~]` H1-H8 complete; H9 documentation, artifact audit, regression, live verification, and closeout is active |
 
 ## P11 Product Hardening
 
@@ -83,6 +83,28 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P13-H9 result: passed on 2026-06-25.
+
+P13-H9 verification result summary:
+
+- Full backend suite passed: `279 passed, 12 skipped`.
+- Frontend tests passed: `33 passed`.
+- Frontend production build passed: Next.js compiled successfully and generated all workspace app routes, including analysis, reports, run detail, and settings.
+- Live DeepSeek P13 product acceptance passed: `3 passed`, covering readable business answer quality, chart artifact URL output, clarification continuation, resolved question, and deterministic product/live no-key fallback.
+- Live DeepSeek P11 workspace analysis regression passed: `1 passed`.
+- Live DeepSeek P12 workspace report regression passed: `1 passed`.
+- H9 live verification exposed a continuation routing regression where provider-backed clarification or SQL planning could ask for more context after a resolved question; fixed by routing continuation contexts into the guarded SQL path and added `tests/test_clarification_routing.py`.
+- Legacy path audit command completed. Hits were historical/audit documentation, mock boundary tests for `powerbi_publisher_mock`, and cleanup-boundary assertions that `chart_tool.py` remains absent; no active Streamlit, old eval, `chart_agent`, `visualization_planner`, or `chart_tool` product path was restored.
+- Artifact hygiene audit completed. The required broad tracked-file regex produced only false positives for `.env.example` and frontend route source paths containing `/reports/`; a stricter tracked generated-artifact check produced no output. `.env`, API keys, workspace runs/reports, report chart images, traces, `frontend/.next`, `.pytest_cache`, `__pycache__`, and untracked `sample_data/` are not tracked.
+
+Latest P13-H8 result: passed on 2026-06-24.
+
+P13-H8 verification result summary:
+
+- Real DeepSeek P13 product acceptance passed for a business analysis question with provider-backed understanding, SQL planning, guarded SQL candidate generation, insight drafting, visualization, readable business answer, evidence preview, chart artifact URL, and technical SQL details.
+- Real DeepSeek P13 clarification continuation passed: the first run stopped for clarification, persisted a pending run, accepted a short user clarification answer, generated a visible resolved question, and completed the guarded product flow.
+- Product/live mode fallback without an API key continued to support the deterministic SQL path.
 
 Latest P13-H7 result: passed on 2026-06-24.
 
@@ -129,7 +151,7 @@ Required audits completed:
 
 - Documentation audit: every remaining old-term hit must be in an explicit Historical, Superseded, legacy, or retained low-level fixture context.
 - Tracked artifact audit: no tracked old UI/API/eval files, generated frontend build output, generated report/chart artifacts, or generated trace JSON.
-- Artifact hygiene audit: `.env`, `.venv/`, `frontend/node_modules/`, `frontend/.next/`, `.pytest_cache/`, `__pycache__/`, `reports/charts/*`, `logs/traces/*`, `workspaces/*/reports/*`, `eval/report.md`, `data/action_ops.db`, `docs/superpowers/plans/*`, and `.superpowers/*` are ignored or untracked. Only intentional `.gitkeep` placeholders remain tracked for empty artifact directories.
+- Artifact hygiene audit: `.env`, `.venv/`, `frontend/node_modules/`, `frontend/.next/`, `.pytest_cache/`, `__pycache__/`, `reports/charts/*`, `logs/traces/*`, `workspaces/*/reports/*`, `eval/report.md`, `data/action_ops.db`, and `.superpowers/*` are ignored or untracked. Only intentional `.gitkeep` placeholders remain tracked for empty artifact directories.
 - Legacy path audit command run: `rg -n "chart_agent|visualization_planner|chart_tool|old|legacy|TODO|deprecated|fixed template|deterministic action template|keyword inference"`. Hits were Historical/Superseded docs, cleanup-boundary tests, or false positives such as `old_price`, `threshold`, `stakeholder`, and `placeholder`; no active legacy chart/Streamlit/eval path was restored.
 
 ## Historical / Superseded Notes
@@ -143,7 +165,7 @@ The following terms are intentionally retained only in historical notes or fixtu
 
 After future verification:
 
-1. Keep P13 marked design-selected until implementation begins.
+1. Keep P13 marked H9 active until final verification, audits, cleanup, and commit are complete.
 2. Record exact verification results in this file or in the final task response.
 
 ## P13 Planning Snapshot
@@ -195,8 +217,8 @@ Suggested P13 task queue:
 | P13-H5 | Reports UI polish and collapsed technical appendix | `[x]` Complete |
 | P13-H6 | Data Settings UI | `[x]` Complete |
 | P13-H7 | Chart product quality and Chinese text support | `[x]` Complete |
-| P13-H8 | Real DeepSeek product acceptance for answer quality and clarification continuation | `[ ]` Not started |
-| P13-H9 | Docs, artifact audit, regression, final verification | `[ ]` Not started |
+| P13-H8 | Real DeepSeek product acceptance for answer quality and clarification continuation | `[x]` Complete |
+| P13-H9 | Docs, artifact audit, regression, final verification | `[~]` In progress |
 
 ## P12 Planning Snapshot
 

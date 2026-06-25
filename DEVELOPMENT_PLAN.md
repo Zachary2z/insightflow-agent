@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H8 real DeepSeek product acceptance, with H9 final documentation, artifact audit, regression, and closeout verification active. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -15,10 +15,11 @@ FastAPI backend
 + semantic-layer draft
 + natural business question for P11 ad hoc analysis
 + structured P12 workspace reports
-+ live DeepSeek/provider-backed understanding and planning
++ P13 Analysis Workbench, clarification continuation, Data Settings, and chart display
++ live DeepSeek/provider-backed product mode
 + guarded SQL candidate
 + validated SQL execution
-+ visualization/artifact/report/trace output
++ business answer, visualization/artifact/report/trace output
 ```
 
 The current product is not the historical Streamlit demo, not the old ecommerce-only demo, not the old eval benchmark, and not mock SaaS integration work.
@@ -44,7 +45,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P10 | MCP Contract & Lightweight Engineering Hardening | Complete | Historical contract and generated-artifact hygiene baseline |
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
-| P13 | Business Answer And Product UX | In progress through H7 | H1-H7 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, and chart product quality; H8 live acceptance remains next |
+| P13 | Business Answer And Product UX | H9 final verification active | H1-H8 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, and real DeepSeek product acceptance; H9 documentation/audit/regression/closeout is active |
 
 ## P11 Product Hardening Plan
 
@@ -230,7 +231,7 @@ Likely components:
 - Replacing P11 ad hoc analysis.
 - Restoring historical Streamlit/ecommerce/eval product paths.
 
-P13 design has been selected but implementation has not started. Use the P13 design section below as the next development scope.
+P13 implementation is active and complete through H8. Use the P13 section below for the final H9 closeout scope.
 
 ### P12 Acceptance
 
@@ -294,7 +295,7 @@ P12 implementation is limited to the scoped report MVP. Do not add PDF/PPT, sche
 
 ## P13 Business Answer And Product UX Plan
 
-P13 is the next selected product phase. It turns the current technically working P11/P12 flows into a business-facing product experience.
+P13 turns the current technically working P11/P12 flows into a business-facing product experience. H1-H8 are complete, including real DeepSeek product acceptance for business answer quality and clarification continuation. H9 is the active closeout task for documentation, artifact hygiene, regression, live verification, and final commit.
 
 Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
 
@@ -326,7 +327,7 @@ Business Q&A Mode
 -> open in workbench for full evidence and technical detail
 ```
 
-P13 should implement the Analysis Workbench and data/report UX improvements first. Business Q&A Mode should be represented in the design and data model, but a full chat product is out of scope for P13.
+P13 implements the Analysis Workbench, clarification continuation, business-facing answer model, business report reader, Data Settings, and chart image display. Business Q&A Mode is represented in the design and data model for future compatibility, but a full chat product is out of scope for P13.
 
 ### P13 Core Requirements
 
@@ -351,8 +352,32 @@ P13 should implement the Analysis Workbench and data/report UX improvements firs
 | P13-H5 | Reports UI polish: business report reader, report progress, Markdown download, technical appendix collapsed | Complete |
 | P13-H6 | Data Settings UI: data source, profile, semantic layer, model mode, safety/audit pages | Complete |
 | P13-H7 | Chart product quality: Chinese font support, labels, units, annotations, and frontend display polish | Complete |
-| P13-H8 | Real DeepSeek product acceptance: answer quality and clarification continuation live tests | Not started |
-| P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | Not started |
+| P13-H8 | Real DeepSeek product acceptance: answer quality and clarification continuation live tests | Complete |
+| P13-H9 | Documentation, artifact audit, frontend/backend regression, final verification | In progress |
+
+### P13-H9 Closeout Checklist
+
+Run and record these before closing P13-H9:
+
+```bash
+python3 -m pytest -q
+cd frontend && npm test
+cd frontend && npm run build
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
+python3 -m pytest tests/test_p13_live_deepseek_product_acceptance.py -q
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
+python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
+python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
+```
+
+H9 artifact hygiene must prove that `.env`, API keys, workspace runs/reports, report chart images, traces, frontend build output, pytest caches, Python caches, and untracked `sample_data/` are not committed. The legacy audit must prove no active Streamlit, old eval, `chart_agent`, `visualization_planner`, or `chart_tool` product path has been restored.
 
 ### P13 Out Of Scope
 

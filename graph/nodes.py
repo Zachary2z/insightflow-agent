@@ -288,6 +288,8 @@ def route_after_clarification(state: AgentState) -> str:
         return "schema"
     if state.get("routing_strategy") == "reject":
         return "early_response"
+    if state.get("routing_strategy") == "clarify" and _has_continuation_context(state):
+        return "schema"
     if state.get("routing_strategy") == "clarify" and state.get("stop_for_clarification"):
         return "early_response"
     if (
@@ -304,6 +306,21 @@ def route_after_sql_planning(state: AgentState) -> str:
     if state.get("initial_sql"):
         return "schema"
     planning = state.get("sql_planning", {})
+    if (
+        planning.get("source") == "provider"
+        and planning.get("strategy") == "clarify"
+        and _has_continuation_context(state)
+    ):
+        return "schema"
     if planning.get("source") in {"provider", "provider_unavailable"} and planning.get("strategy") in {"clarify", "reject"}:
         return "early_response"
     return "schema"
+
+
+def _has_continuation_context(state: AgentState) -> bool:
+    return bool(
+        state.get("pending_run_id")
+        and state.get("clarification_answer")
+        and state.get("resolved_question")
+        and not state.get("stop_for_clarification")
+    )
