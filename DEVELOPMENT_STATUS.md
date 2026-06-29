@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P15 Analysis Reliability And History |
-| Current task | P15-H3 Run detail uses backend source of truth complete |
-| Next planned task | P15-H4 One-pass schema-mismatch SQL repair |
-| Last completed task | P15-H3 Run Detail Backend Source Of Truth |
+| Current task | P15-H4 One-pass schema-mismatch SQL repair complete |
+| Next planned task | P15-H5 Business-friendly failure UX |
+| Last completed task | P15-H4 One-Pass Schema-Mismatch SQL Repair |
 | Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -48,7 +48,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
-| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 Analysis Workbench history panel complete; H3 run detail backend source of truth complete; H4 one-pass schema-mismatch SQL repair next |
+| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 Analysis Workbench history panel complete; H3 run detail backend source of truth complete; H4 one-pass schema-mismatch SQL repair complete; H5 business-friendly failure UX next |
 
 ## P11 Product Hardening
 
@@ -85,6 +85,16 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P15-H4 result: passed on 2026-06-29.
+
+P15-H4 verification result summary:
+
+- TDD red confirmed before implementation: three focused workspace-analysis tests failed because schema repair metadata and the one-pass review/repair/review loop did not exist.
+- Workspace analysis now allows schema-mismatch provider SQL candidates to reach SQL Reviewer for the first rejection, attempts one provider-backed schema repair with original question, rejected SQL, reviewer issues, workspace schema, and semantic hints, and sends the repaired SQL back through SQL Reviewer before execution.
+- Repair success records `schema_repair_attempted`, `schema_repair_succeeded`, `schema_repair_reason`, rejected/repaired SQL summaries, and technical metadata; repair failure does not execute SQL and does not retry a third time.
+- Focused workspace analysis tests passed: `python3 -m pytest tests/test_workspace_analysis_runner.py -q` with `8 passed`.
+- SQL validator, run history API, product result builder, and provider-backed clarification router regressions passed with focused pytest commands.
 
 Latest P15-H3 result: passed on 2026-06-29.
 
@@ -406,8 +416,8 @@ Suggested P15 task queue:
 | P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[x]` Complete |
 | P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[x]` Complete |
 | P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[x]` Complete |
-| P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[ ]` Not started |
-| P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[ ]` Not started |
+| P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[x]` Complete |
+| P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[ ]` Not started, next |
 | P15-H6 | Real DeepSeek regression for channel data + `都看`, plus history persistence | `[ ]` Not started |
 
 P15 out of scope: full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, vector databases, fixed SQL templates, keyword-heavy business rules, and any restoration of old Streamlit/eval/chart-agent paths.

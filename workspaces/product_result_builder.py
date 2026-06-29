@@ -352,6 +352,7 @@ def _provider_metadata(raw: dict[str, Any]) -> dict[str, Any]:
         "clarification_result",
         "sql_planning",
         "llm_sql_enhancement",
+        "schema_repair",
         "analysis_plan",
         "insight",
         "claim_typing_result",
@@ -362,7 +363,7 @@ def _provider_metadata(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _validation_logs(raw: dict[str, Any]) -> list[dict[str, Any]]:
     logs: list[dict[str, Any]] = []
-    for key in ("review_result", "evidence_result", "trace_save_result"):
+    for key in ("review_result", "schema_repair", "evidence_result", "trace_save_result"):
         value = raw.get(key)
         if isinstance(value, dict):
             logs.append({"name": key, "value": value})

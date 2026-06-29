@@ -11,6 +11,7 @@ from agents.insight_agent import run_insight_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
+from agents.schema_repair import is_schema_mismatch_review, run_schema_repair_agent
 from agents.sql_planning_router import run_sql_planning_router_agent
 from agents.sql_generator import run_sql_generator
 from agents.sql_reviewer import run_sql_reviewer
@@ -155,7 +156,29 @@ def guarded_sql_candidate_node(state: AgentState, provider=None) -> AgentState:
 
 
 def sql_reviewer_node(state: AgentState) -> AgentState:
-    return run_sql_reviewer(dict(state))
+    updated = run_sql_reviewer(dict(state))
+    if updated.get("schema_repair_pending_review"):
+        review_result = updated.get("review_result", {})
+        repair = dict(updated.get("schema_repair") or {})
+        approved = bool(review_result.get("approved"))
+        repair.update(
+            {
+                "reviewed": True,
+                "succeeded": approved,
+                "review_status": "approved" if approved else "rejected",
+                "repair_rejection_reasons": list(review_result.get("issues") or []),
+            }
+        )
+        updated["schema_repair"] = repair
+        updated["schema_repair_succeeded"] = approved
+        updated["schema_repair_pending_review"] = False
+        if not approved:
+            updated["schema_repair_reason"] = "; ".join(str(issue) for issue in review_result.get("issues") or [])
+    return updated
+
+
+def schema_repair_node(state: AgentState, provider=None) -> AgentState:
+    return run_schema_repair_agent(dict(state), provider=provider)
 
 
 def sql_executor_node(state: AgentState) -> AgentState:
@@ -266,6 +289,17 @@ def save_trace_node(state: AgentState) -> AgentState:
 def route_after_review(state: AgentState) -> str:
     if state.get("review_result", {}).get("approved"):
         return "execute"
+    if (
+        is_schema_mismatch_review(state.get("review_result"))
+        and not state.get("schema_repair_attempted")
+    ):
+        return "schema_repair"
+    return "fail"
+
+
+def route_after_schema_repair(state: AgentState) -> str:
+    if state.get("schema_repair_pending_review") and state.get("generated_sql"):
+        return "review"
     return "fail"
 
 

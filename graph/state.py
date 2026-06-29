@@ -83,6 +83,11 @@ class AgentState(TypedDict, total=False):
     sql_reason: str
     review_result: dict[str, Any]
     review_retry_count: int
+    schema_repair_attempted: bool
+    schema_repair_succeeded: bool
+    schema_repair_reason: str
+    schema_repair: dict[str, Any]
+    schema_repair_pending_review: bool
 
     execution_result: dict[str, Any]
     error_message: str

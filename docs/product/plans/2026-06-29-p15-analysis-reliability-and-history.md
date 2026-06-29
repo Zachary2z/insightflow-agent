@@ -181,6 +181,8 @@ LLM SQL candidate
 
 ## Task P15-H4: One-Pass SQL Schema Repair
 
+**Status:** Complete.
+
 **Goal:** Recover from LLM SQL candidates that reference nonexistent tables or columns.
 
 **Implementation steps:**

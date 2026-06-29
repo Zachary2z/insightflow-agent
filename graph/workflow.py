@@ -23,8 +23,10 @@ from graph.nodes import (
     route_after_clarification,
     route_after_sql_planning,
     route_after_review,
+    route_after_schema_repair,
     save_trace_node,
     schema_node,
+    schema_repair_node,
     sql_planning_node,
     sql_executor_node,
     sql_generator_node,
@@ -80,6 +82,10 @@ def build_workflow(
         lambda state: guarded_sql_candidate_node(dict(state), provider=sql_candidate_provider),
     )
     workflow.add_node("review", sql_reviewer_node)
+    workflow.add_node(
+        "schema_repair",
+        lambda state: schema_repair_node(dict(state), provider=sql_candidate_provider),
+    )
     workflow.add_node("execute", sql_executor_node)
     workflow.add_node("fix", error_fix_node)
     workflow.add_node(
@@ -119,7 +125,12 @@ def build_workflow(
     )
     workflow.add_edge("generate", "guarded_candidate")
     workflow.add_edge("guarded_candidate", "review")
-    workflow.add_conditional_edges("review", route_after_review, {"execute": "execute", "fail": "fail"})
+    workflow.add_conditional_edges(
+        "review",
+        route_after_review,
+        {"execute": "execute", "schema_repair": "schema_repair", "fail": "fail"},
+    )
+    workflow.add_conditional_edges("schema_repair", route_after_schema_repair, {"review": "review", "fail": "fail"})
     workflow.add_conditional_edges("execute", route_after_execute, {"insight": "insight", "fix": "fix", "fail": "fail"})
     workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
     workflow.add_edge("insight", "claim_typing")
@@ -170,6 +181,11 @@ def run_workflow(
     state["trace_dir"] = trace_dir
     state["execution_result"] = {}
     state["review_retry_count"] = 0
+    state["schema_repair_attempted"] = False
+    state["schema_repair_succeeded"] = False
+    state["schema_repair_reason"] = ""
+    state["schema_repair"] = {}
+    state["schema_repair_pending_review"] = False
     state["workspace_id"] = workspace_id
     state["workspace_root"] = str(workspace_root) if workspace_root else None
     state["profile_path"] = str(profile_path) if profile_path else None

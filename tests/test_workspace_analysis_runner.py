@@ -7,6 +7,50 @@ from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
 
 
+class _SequenceProvider:
+    model = "mock-sequence"
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        if not self.responses:
+            raise AssertionError("provider called more times than expected")
+        return self.responses.pop(0)
+
+
+def _provider_intent():
+    return {
+        "strategy": "llm_candidate",
+        "intent": {
+            "metric": "revenue",
+            "dimension": "channel",
+            "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
+            "filters": [],
+            "operation": "comparison",
+            "limit": 20,
+        },
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": [],
+        "reason": "Clear workspace analysis question.",
+    }
+
+
+def _provider_sql_plan():
+    return {
+        "strategy": "llm_candidate",
+        "matched_template": "",
+        "confidence": 0.9,
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": [],
+        "reason": "Use a provider SQL candidate for this workspace schema.",
+    }
+
+
 def _create_ecommerce_workspace(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Clarification Analysis Workspace")
@@ -17,6 +61,39 @@ def _create_ecommerce_workspace(tmp_path):
         conn.executemany("INSERT INTO orders VALUES (?, ?)", [(1, "paid"), (2, "paid")])
         conn.executemany("INSERT INTO products VALUES (?, ?)", [(1, "A"), (2, "B")])
         conn.executemany("INSERT INTO order_items VALUES (?, ?, ?, ?)", [(1, 1, 2, 100.0), (2, 2, 1, 50.0)])
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    return store, workspace
+
+
+def _create_channel_workspace(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Schema Repair Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE orders (order_id TEXT, customer_id TEXT, channel TEXT, order_date TEXT, revenue REAL)"
+        )
+        conn.execute("CREATE TABLE customers (customer_id TEXT, segment TEXT, city TEXT)")
+        conn.execute("CREATE TABLE marketing_spend (spend_id TEXT, channel TEXT, spend_date TEXT, spend REAL)")
+        conn.executemany(
+            "INSERT INTO orders VALUES (?, ?, ?, ?, ?)",
+            [
+                ("o_1", "c_1", "email", "2026-06-01", 100.0),
+                ("o_2", "c_2", "paid_search", "2026-06-02", 260.0),
+                ("o_3", "c_1", "email", "2026-06-03", 140.0),
+            ],
+        )
+        conn.executemany(
+            "INSERT INTO customers VALUES (?, ?, ?)",
+            [("c_1", "enterprise", "Shanghai"), ("c_2", "consumer", "Beijing")],
+        )
+        conn.executemany(
+            "INSERT INTO marketing_spend VALUES (?, ?, ?, ?)",
+            [
+                ("s_1", "email", "2026-06-01", 30.0),
+                ("s_2", "paid_search", "2026-06-02", 80.0),
+            ],
+        )
     profile = profile_workspace_database(store, workspace["workspace_id"])
     generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
     return store, workspace
@@ -173,3 +250,149 @@ def test_workspace_analysis_continuation_marks_pending_failed_when_workflow_erro
     assert stored["clarification_answer"] == "最近 90 天"
     assert stored["resolved_question"]
     assert "workflow exploded" in stored["error"]
+
+
+def test_workspace_analysis_repairs_schema_mismatch_once(tmp_path):
+    store, workspace = _create_channel_workspace(tmp_path)
+    bad_sql = (
+        "SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS revenue "
+        "FROM orders o "
+        "JOIN order_items oi ON o.id = oi.order_id "
+        "JOIN products p ON oi.product_id = p.id "
+        "GROUP BY p.product_name LIMIT 20"
+    )
+    repaired_sql = (
+        "SELECT o.channel, SUM(o.revenue) AS revenue, COALESCE(SUM(ms.spend), 0) AS spend "
+        "FROM orders o "
+        "LEFT JOIN marketing_spend ms ON o.channel = ms.channel "
+        "GROUP BY o.channel "
+        "ORDER BY revenue DESC LIMIT 20"
+    )
+    sql_provider = _SequenceProvider(
+        [
+            {"sql_candidates": [{"sql": bad_sql, "rationale": "Mistaken adjacent ecommerce schema."}]},
+            {"sql_candidates": [{"sql": repaired_sql, "rationale": "Use only workspace tables and channel fields."}]},
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近 30 天各渠道收入和投放情况怎么样？",
+        providers={
+            "question_understanding": MockLLMProvider(_provider_intent()),
+            "sql_planning": MockLLMProvider(_provider_sql_plan()),
+            "sql_candidate": sql_provider,
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["execution_result"]["success"] is True
+    assert result["execution_result"]["rows"]
+    assert result["schema_repair_attempted"] is True
+    assert result["schema_repair_succeeded"] is True
+    assert "Unknown table" in result["schema_repair_reason"]
+    assert "order_items" in result["schema_repair"]["rejected_sql_summary"]
+    assert "marketing_spend" in result["schema_repair"]["repaired_sql_summary"]
+    assert result["generated_sql"] == result["review_result"]["normalized_sql"]
+    assert "order_items" not in result["generated_sql"]
+    assert "marketing_spend" in result["generated_sql"]
+    assert result["product_result"]["evidence"]["table_preview"]["rows"]
+    technical = result["product_result"]["technical_details"]
+    assert any(log["name"] == "schema_repair" for log in technical["validation_logs"])
+    assert technical["provider_metadata"]["schema_repair"]["attempted"] is True
+
+    review_events = [event for event in result["trace"] if event.get("node") == "sql_reviewer_agent"]
+    assert len(review_events) == 2
+    assert review_events[0]["status"] == "error"
+    assert review_events[1]["status"] == "success"
+    repair_prompt = sql_provider.requests[1].prompt
+    assert "最近 30 天各渠道收入和投放情况怎么样？" in repair_prompt
+    assert bad_sql in repair_prompt
+    assert "Unknown table: order_items" in repair_prompt
+    assert "Table orders:" in repair_prompt
+    assert "Table marketing_spend:" in repair_prompt
+    assert "semantic_layer" in repair_prompt or "workspace_semantic_layer" in repair_prompt
+
+
+def test_workspace_analysis_does_not_retry_schema_repair_more_than_once(tmp_path):
+    store, workspace = _create_channel_workspace(tmp_path)
+    bad_sql = (
+        "SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS revenue "
+        "FROM orders o "
+        "JOIN order_items oi ON o.id = oi.order_id "
+        "JOIN products p ON oi.product_id = p.id "
+        "GROUP BY p.product_name LIMIT 20"
+    )
+    still_bad_sql = "SELECT p.product_name FROM products p LIMIT 20"
+    sql_provider = _SequenceProvider(
+        [
+            {"sql_candidates": [{"sql": bad_sql, "rationale": "Mistaken adjacent ecommerce schema."}]},
+            {"sql_candidates": [{"sql": still_bad_sql, "rationale": "Still references a missing table."}]},
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近 30 天各渠道收入和投放情况怎么样？",
+        providers={
+            "question_understanding": MockLLMProvider(_provider_intent()),
+            "sql_planning": MockLLMProvider(_provider_sql_plan()),
+            "sql_candidate": sql_provider,
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert result["execution_result"] == {}
+    assert result["schema_repair_attempted"] is True
+    assert result["schema_repair_succeeded"] is False
+    assert len(sql_provider.requests) == 2
+    review_events = [event for event in result["trace"] if event.get("node") == "sql_reviewer_agent"]
+    assert len(review_events) == 2
+    assert all(event["status"] == "error" for event in review_events)
+    assert not any(event.get("node") == "sql_executor_node" for event in result["trace"])
+    assert "Unknown table" in result["schema_repair_reason"]
+    technical = result["product_result"]["technical_details"]
+    assert any(log["name"] == "schema_repair" for log in technical["validation_logs"])
+    assert technical["provider_metadata"]["schema_repair"]["succeeded"] is False
+
+
+def test_schema_repair_still_requires_sql_reviewer_approval(tmp_path):
+    store, workspace = _create_channel_workspace(tmp_path)
+    bad_sql = (
+        "SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS revenue "
+        "FROM orders o "
+        "JOIN order_items oi ON o.id = oi.order_id "
+        "JOIN products p ON oi.product_id = p.id "
+        "GROUP BY p.product_name LIMIT 20"
+    )
+    unsafe_repair = "DELETE FROM orders WHERE revenue < 0"
+    sql_provider = _SequenceProvider(
+        [
+            {"sql_candidates": [{"sql": bad_sql, "rationale": "Mistaken adjacent ecommerce schema."}]},
+            {"sql_candidates": [{"sql": unsafe_repair, "rationale": "Unsafe repair must still be reviewed."}]},
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近 30 天各渠道收入和投放情况怎么样？",
+        providers={
+            "question_understanding": MockLLMProvider(_provider_intent()),
+            "sql_planning": MockLLMProvider(_provider_sql_plan()),
+            "sql_candidate": sql_provider,
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert result["execution_result"] == {}
+    assert result["schema_repair_attempted"] is True
+    assert result["schema_repair_succeeded"] is False
+    assert result["review_result"]["approved"] is False
+    assert "SQL contains a dangerous keyword" in result["review_result"]["issues"]
+    review_events = [event for event in result["trace"] if event.get("node") == "sql_reviewer_agent"]
+    assert len(review_events) == 2
+    assert review_events[-1]["status"] == "error"
+    assert not any(event.get("node") == "sql_executor_node" for event in result["trace"])
