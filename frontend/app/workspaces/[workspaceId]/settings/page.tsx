@@ -13,7 +13,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   return (
     <ProductShell workspaceId={workspaceId} active="settings">
       <ProductPageHeader
-        eyebrow="Data Settings"
+        eyebrow="数据准备"
         title="数据设置"
         description="管理数据源、字段画像、语义层、真实模型模式和安全边界。"
       />

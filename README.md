@@ -18,14 +18,16 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning, H2 shared Next.js product shell, H3 data source management redesign, H4 Analysis Workbench redesign, and H5 Report Center redesign are complete, and H6 Data Settings redesign is next.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning, H2 shared Next.js product shell, H3 data source management redesign, H4 Analysis Workbench redesign, H5 Report Center redesign, and H6 Data Settings redesign are complete, and H7 Business Q&A preview route is next.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
-| P14 unified product UI shell | Active; H1-H5 complete, H6 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
+| P14 unified product UI shell | Active; H1-H6 complete, H7 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
+
+P14-H6 Data Settings redesign is complete. P14-H7 Business Q&A preview route is the next planned task.
 
 ## Quickstart
 
@@ -55,7 +57,7 @@ Open the frontend at `http://localhost:3000`, create a workspace, import CSV/Exc
 
 - P11 analysis: `/workspaces/{workspaceId}/analysis`
 - P12 reports: `/workspaces/{workspaceId}/reports`
-- P13 data settings: `/workspaces/{workspaceId}/settings`
+- P14 data settings: `/workspaces/{workspaceId}/settings`
 
 ## P13 Product Capabilities
 

@@ -206,15 +206,20 @@ describe("workspace product components", () => {
     expect(screen.getByText("customer")).toBeTruthy();
   });
 
-  it("renders data settings sections with source profile semantic mode and safety details", async () => {
+  it("renders data settings as a Chinese readiness product page with collapsed technical details", async () => {
     vi.mocked(getWorkspaceSettings).mockResolvedValue({
       workspace_id: "ws_1",
       data_sources: {
         status: "ready",
+        source_count: 1,
+        imported_table_count: 1,
         sources: [{ name: "orders.csv", source_type: "csv", imported_tables: ["orders"] }],
       },
       profile: {
         status: "ready",
+        table_count: 1,
+        column_count: 2,
+        row_count: 10,
         tables: [
           {
             table_name: "orders",
@@ -235,8 +240,14 @@ describe("workspace product components", () => {
       },
       model_mode: {
         product_live_mode: true,
-        status_label: "Product/live mode is on",
-        provider_features: { insight_drafting: true, sql_planning: true },
+        status_label: "真实模型模式已开启",
+        provider: { name: "DeepSeek", model: "deepseek-chat", api_key_present: true },
+        provider_features: {
+          question_understanding: true,
+          clarification: true,
+          sql_planning: true,
+          report_writer: true,
+        },
       },
       safety: {
         sql_review: "enabled",
@@ -248,20 +259,72 @@ describe("workspace product components", () => {
 
     render(<DataSettings workspaceId="ws_1" />);
 
-    expect(await screen.findByText("Data sources")).toBeTruthy();
-    expect(screen.getByText("Field profile")).toBeTruthy();
-    expect(screen.getByText("Semantic layer")).toBeTruthy();
-    expect(screen.getByText("Product/live mode")).toBeTruthy();
-    expect(screen.getByText("Safety and audit")).toBeTruthy();
+    expect(await screen.findByText("数据准备总览")).toBeTruthy();
+    expect(screen.getByText("数据源")).toBeTruthy();
+    expect(screen.getByText("字段画像")).toBeTruthy();
+    expect(screen.getByText("语义层")).toBeTruthy();
+    expect(screen.getByText("真实模型模式")).toBeTruthy();
+    expect(screen.getByText("安全与审计")).toBeTruthy();
+    expect(screen.getAllByText("已准备").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("orders.csv")).toBeTruthy();
     expect(screen.getByText("orders")).toBeTruthy();
-    expect(screen.getByText("10 rows")).toBeTruthy();
-    expect(screen.getByText("revenue")).toBeTruthy();
+    expect(screen.getAllByText("10 行").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("1 张表")).toBeTruthy();
+    expect(screen.getByText("2 个字段")).toBeTruthy();
+    expect(screen.getAllByText(/revenue/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("指标")).toBeTruthy();
+    expect(screen.getByText("维度")).toBeTruthy();
     expect(screen.getByText("sum_revenue")).toBeTruthy();
     expect(screen.getAllByText("channel").length).toBeGreaterThan(0);
-    expect(screen.getByText("Product/live mode is on")).toBeTruthy();
-    expect(screen.getByText("SQL review enabled")).toBeTruthy();
-    expect(screen.getByText("Trace available")).toBeTruthy();
+    expect(screen.getAllByText("真实模型已参与").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("DeepSeek / deepseek-chat")).toBeTruthy();
+    expect(screen.getByText("问题理解")).toBeTruthy();
+    expect(screen.getByText("追问判断")).toBeTruthy();
+    expect(screen.getByText("SQL 规划")).toBeTruthy();
+    expect(screen.getByText("报告写作")).toBeTruthy();
+    expect(screen.getByText("SQL 审核不可绕过")).toBeTruthy();
+    expect(screen.getByText("敏感字段拦截已开启")).toBeTruthy();
+    expect(screen.getByText("Trace 可审计")).toBeTruthy();
+    expect(screen.getByText("技术详情默认折叠")).toBeTruthy();
+
+    const disclosure = screen.getByText("技术详情").closest("details");
+    expect(disclosure?.hasAttribute("open")).toBe(false);
+    expect(screen.queryByText(/provider metadata/)).toBeNull();
+    expect(screen.queryByText(/raw config/)).toBeNull();
+
+    fireEvent.click(screen.getByText("技术详情"));
+
+    expect(screen.getByText(/provider metadata/)).toBeTruthy();
+    expect(screen.getByText(/raw config/)).toBeTruthy();
+  });
+
+  it("shows Chinese empty states for settings that are not ready yet", async () => {
+    vi.mocked(getWorkspaceSettings).mockResolvedValue({
+      workspace_id: "ws_1",
+      data_sources: { status: "empty", sources: [], source_count: 0, imported_table_count: 0 },
+      profile: { status: "missing", tables: [], table_count: 0, column_count: 0, row_count: 0 },
+      semantic_layer: { status: "missing", metrics: [], dimensions: [], entities: [], time_fields: [] },
+      model_mode: {
+        product_live_mode: false,
+        status_label: "真实模型模式未开启",
+        provider_features: {},
+      },
+      safety: {
+        sql_review: "enabled",
+        sensitive_field_blocking: "enabled",
+        trace_available: "enabled",
+        technical_details_policy: "collapsed_by_default",
+      },
+    });
+
+    render(<DataSettings workspaceId="ws_1" />);
+
+    expect(await screen.findByText("暂无数据源")).toBeTruthy();
+    expect(screen.getByText("先回到数据源管理导入 CSV、Excel 或 SQLite。")).toBeTruthy();
+    expect(screen.getAllByText("未生成").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("暂无数据").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("真实模型未开启").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/暂无真实模型能力参与/)).toBeTruthy();
   });
 
   it("renders the settings page route", async () => {
@@ -272,7 +335,7 @@ describe("workspace product components", () => {
       semantic_layer: { status: "missing", metrics: [], dimensions: [], entities: [], time_fields: [] },
       model_mode: {
         product_live_mode: false,
-        status_label: "Product/live mode is off",
+        status_label: "真实模型模式未开启",
         provider_features: {},
       },
       safety: {
@@ -287,7 +350,8 @@ describe("workspace product components", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "数据设置" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /数据设置/ }).getAttribute("aria-current")).toBe("page");
-    expect(await screen.findByText("Data sources")).toBeTruthy();
+    expect(await screen.findByText("数据准备总览")).toBeTruthy();
+    expect(screen.getByText("暂无数据源")).toBeTruthy();
   });
 
   it("submits analysis questions and stores the run result for the detail page", async () => {
