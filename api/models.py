@@ -89,6 +89,23 @@ class WorkspaceRunResponse(BaseModel):
     product_result: dict[str, Any] | None = None
 
 
+class WorkspaceRunSummary(BaseModel):
+    run_id: str
+    status: str
+    question: str = ""
+    headline: str = ""
+    created_at: str | None = None
+    saved_at: str | None = None
+    has_chart: bool = False
+    requires_clarification: bool = False
+    failure_reason: str = ""
+
+
+class WorkspaceRunsResponse(BaseModel):
+    workspace_id: str
+    runs: list[WorkspaceRunSummary] = Field(default_factory=list)
+
+
 class WorkspaceReportCreateRequest(BaseModel):
     report_type: str = Field(..., min_length=1)
     report_goal: str = Field(..., min_length=1)

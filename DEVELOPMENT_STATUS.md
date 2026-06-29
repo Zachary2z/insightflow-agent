@@ -15,10 +15,10 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P15 Analysis Reliability And History planning |
-| Current task | P15 plan documented; implementation not started |
-| Next planned task | P15-H1 backend run history APIs |
-| Last completed task | P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, artifact audit |
+| Current phase | P15 Analysis Reliability And History |
+| Current task | P15-H1 backend run history APIs complete |
+| Next planned task | P15-H2 Analysis Workbench history panel |
+| Last completed task | P15-H1 Backend Run History APIs |
 | Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -48,7 +48,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
-| P15 | Analysis Reliability And History | `[~]` Plan documented; implementation not started |
+| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 history panel next |
 
 ## P11 Product Hardening
 
@@ -379,7 +379,7 @@ Suggested P15 task queue:
 
 | Task | Scope | Status |
 |---|---|---|
-| P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[ ]` Not started |
+| P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[x]` Complete |
 | P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[ ]` Not started |
 | P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[ ]` Not started |
 | P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[ ]` Not started |

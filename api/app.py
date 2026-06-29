@@ -20,6 +20,7 @@ from api.models import (
     WorkspaceResponse,
     WorkspaceRunCreateRequest,
     WorkspaceRunResponse,
+    WorkspaceRunsResponse,
     WorkspaceSemanticResponse,
     WorkspaceSettingsResponse,
     WorkspaceSourceImportResponse,
@@ -32,6 +33,7 @@ from workspaces.pending_clarification_store import PendingClarificationNotFoundE
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_runner import run_workspace_report
 from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
+from workspaces.run_store import RunNotFoundError, WorkspaceRunStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.settings_summary import build_workspace_settings
 from workspaces.store import WorkspaceStore
@@ -51,6 +53,7 @@ def create_app(
     store = workspace_store or WorkspaceStore()
     selected_report_runner = report_runner or run_workspace_report
     report_store = WorkspaceReportStore(store)
+    run_store = WorkspaceRunStore(store)
     app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
@@ -175,6 +178,26 @@ def create_app(
             "result": result,
             "product_result": result.get("product_result"),
         }
+
+    @app.get("/api/workspaces/{workspace_id}/runs", response_model=WorkspaceRunsResponse)
+    def list_workspace_runs(workspace_id: str) -> dict:
+        try:
+            runs = run_store.list_runs(workspace_id)
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        return {
+            "workspace_id": workspace_id,
+            "runs": runs,
+        }
+
+    @app.get("/api/workspaces/{workspace_id}/runs/{run_id}", response_model=WorkspaceRunResponse)
+    def get_workspace_run(workspace_id: str, run_id: str) -> dict:
+        try:
+            return run_store.load_run_response(workspace_id, run_id)
+        except RunNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
 
     @app.get("/api/workspaces/{workspace_id}/artifacts/{relative_path:path}")
     def read_workspace_artifact(workspace_id: str, relative_path: str) -> FileResponse:
