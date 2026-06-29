@@ -162,6 +162,8 @@ LLM SQL candidate
 
 ## Task P15-H3: Run Detail Uses Backend Source Of Truth
 
+**Status:** Complete.
+
 **Goal:** Remove the product dependency on `sessionStorage` for run detail restoration.
 
 **Implementation steps:**

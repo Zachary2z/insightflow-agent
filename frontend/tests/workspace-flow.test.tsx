@@ -602,7 +602,42 @@ describe("workspace product components", () => {
     ).toBe("Email produced the most revenue.");
   });
 
-  it("renders the run detail route inside the product shell with Chinese copy", async () => {
+  it("loads the run detail route from the backend without sessionStorage", async () => {
+    vi.mocked(getWorkspaceRun).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_1",
+      result: {
+        generated_sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+      },
+      product_result: {
+        version: "p13.v1",
+        workspace_id: "ws_1",
+        run_id: "run_1",
+        status: "completed",
+        question_thread: {
+          original_question: "哪个渠道收入最高？",
+          system_understanding: "按渠道比较收入",
+          resolved_question: "比较各渠道收入并给出建议。",
+          status: "completed",
+        },
+        business_answer: {
+          headline: "Email produced the most revenue.",
+          summary: "Email 贡献最高收入。",
+          next_actions: ["复核 email 投放预算"],
+          caveats: [],
+          confidence: "medium",
+        },
+        evidence: { table_preview: { columns: ["channel", "revenue"], rows: [["email", 100]] } },
+        chart_artifacts: [],
+        technical_details: {
+          sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+          raw_rows: [["email", 100]],
+          provider_metadata: { model: "deepseek" },
+        },
+      },
+    });
+
     render(
       await RunDetailPage({
         params: Promise.resolve({ workspaceId: "ws_1", runId: "run_1" }),
@@ -611,8 +646,33 @@ describe("workspace product components", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "分析详情" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /分析工作台/ }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText("分析结果")).toBeTruthy();
-    expect(screen.getByText(/当前浏览器会话没有缓存这次分析结果/)).toBeTruthy();
+    expect(screen.getByText("正在加载分析详情")).toBeTruthy();
+
+    await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_1"));
+    expect(await screen.findByText("Email produced the most revenue.", { selector: ".answer-headline" })).toBeTruthy();
+    expect(screen.getByText("Email 贡献最高收入。")).toBeTruthy();
+    expect(screen.getByText("email")).toBeTruthy();
+    expect(screen.getByText("100")).toBeTruthy();
+    expect(screen.getByText("技术详情")).toBeTruthy();
+    expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText(/deepseek/)).toBeNull();
+    expect(screen.queryByText(/当前浏览器会话没有缓存这次分析结果/)).toBeNull();
+    expect(window.sessionStorage.getItem("insightflow.run.ws_1.run_1")).toBeNull();
+  });
+
+  it("shows a Chinese error state when backend run detail cannot be loaded", async () => {
+    vi.mocked(getWorkspaceRun).mockRejectedValue(new Error("not found"));
+
+    render(
+      await RunDetailPage({
+        params: Promise.resolve({ workspaceId: "ws_1", runId: "run_missing" }),
+      }),
+    );
+
+    await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_missing"));
+    expect(await screen.findByText("无法加载分析详情")).toBeTruthy();
+    expect(screen.getByText("请回到分析工作台，从历史分析中重新打开这条记录。")).toBeTruthy();
+    expect(screen.queryByText(/当前浏览器会话没有缓存这次分析结果/)).toBeNull();
   });
 
   it("renders the business Q&A preview route with active navigation and honest preview copy", async () => {
