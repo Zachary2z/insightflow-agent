@@ -14,6 +14,7 @@ import RunResult from "../components/RunResult";
 import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
 import WorkspaceList from "../components/WorkspaceList";
 import WorkspaceNewForm from "../components/WorkspaceNewForm";
+import DatasetsPage from "../app/workspaces/[workspaceId]/datasets/page";
 import SettingsPage from "../app/workspaces/[workspaceId]/settings/page";
 
 const pushMock = vi.fn();
@@ -91,31 +92,81 @@ describe("workspace product components", () => {
     expect(await screen.findByText(/Workspace created/)).toBeTruthy();
   });
 
-  it("uploads files, imports SQLite, and renders source metadata", async () => {
+  it("renders the data source management page route with active product navigation", async () => {
+    vi.mocked(listSources).mockResolvedValue({ sources: [] });
+
+    render(await DatasetsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "数据源管理" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(await screen.findByText("还没有导入数据源")).toBeTruthy();
+  });
+
+  it("uploads files, imports SQLite, and renders Chinese source management metadata", async () => {
     vi.mocked(listSources)
-      .mockResolvedValueOnce({ sources: [] })
       .mockResolvedValueOnce({
-        sources: [{ source_id: "src_1", source_type: "csv", name: "orders.csv", imported_tables: ["orders"] }],
+        sources: [
+          { source_id: "src_1", source_type: "csv", name: "orders.csv", imported_tables: ["orders"] },
+          { source_id: "src_2", source_type: "csv", name: "customers.csv", imported_tables: ["customers"] },
+          {
+            source_id: "src_3",
+            source_type: "csv",
+            name: "marketing_spend.csv",
+            imported_tables: ["marketing_spend"],
+          },
+        ],
       })
       .mockResolvedValueOnce({
         sources: [
           { source_id: "src_1", source_type: "csv", name: "orders.csv", imported_tables: ["orders"] },
-          { source_id: "src_2", source_type: "sqlite", name: "ops.db", imported_tables: ["invoices"] },
+          { source_id: "src_2", source_type: "csv", name: "customers.csv", imported_tables: ["customers"] },
+          {
+            source_id: "src_3",
+            source_type: "csv",
+            name: "marketing_spend.csv",
+            imported_tables: ["marketing_spend"],
+          },
+          { source_id: "src_4", source_type: "csv", name: "returns.csv", imported_tables: ["returns"] },
+        ],
+      })
+      .mockResolvedValueOnce({
+        sources: [
+          { source_id: "src_1", source_type: "csv", name: "orders.csv", imported_tables: ["orders"] },
+          { source_id: "src_2", source_type: "csv", name: "customers.csv", imported_tables: ["customers"] },
+          {
+            source_id: "src_3",
+            source_type: "csv",
+            name: "marketing_spend.csv",
+            imported_tables: ["marketing_spend"],
+          },
+          { source_id: "src_4", source_type: "csv", name: "returns.csv", imported_tables: ["returns"] },
+          { source_id: "src_5", source_type: "sqlite", name: "ops.db", imported_tables: ["invoices"] },
         ],
       });
-    vi.mocked(uploadSource).mockResolvedValue({ success: true, imported_tables: ["orders"] });
+    vi.mocked(uploadSource).mockResolvedValue({ success: true, imported_tables: ["returns"] });
     vi.mocked(importSqliteSource).mockResolvedValue({ success: true, imported_tables: ["invoices"] });
 
     render(<DatasetManager workspaceId="ws_1" />);
 
-    const file = new File(["order_id,revenue\n1,100"], "orders.csv", { type: "text/csv" });
-    fireEvent.change(screen.getByLabelText("CSV or Excel file"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Upload source" }));
+    expect(await screen.findByText("已导入数据源")).toBeTruthy();
+    expect(screen.getByText("上传 CSV / Excel")).toBeTruthy();
+    expect(screen.getByText("导入 SQLite")).toBeTruthy();
+    expect(screen.getByText("数据准备状态")).toBeTruthy();
+    expect(screen.getByText("orders.csv")).toBeTruthy();
+    expect(screen.getByText("customers.csv")).toBeTruthy();
+    expect(screen.getByText("marketing_spend.csv")).toBeTruthy();
+    expect(screen.getAllByText("已导入").length).toBeGreaterThanOrEqual(3);
 
-    expect(await screen.findByText("orders.csv")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("SQLite file path"), { target: { value: "/tmp/ops.db" } });
-    fireEvent.click(screen.getByRole("button", { name: "Import SQLite" }));
+    const file = new File(["return_id,amount\n1,20"], "returns.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByLabelText("选择 CSV 或 Excel 文件"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "上传 CSV / Excel" }));
 
+    expect(await screen.findByText("returns.csv")).toBeTruthy();
+    expect(uploadSource).toHaveBeenCalledWith("ws_1", file);
+    fireEvent.change(screen.getByLabelText("SQLite 文件路径"), { target: { value: "/tmp/ops.db" } });
+    fireEvent.click(screen.getByRole("button", { name: "导入 SQLite" }));
+
+    expect(importSqliteSource).toHaveBeenCalledWith("ws_1", "/tmp/ops.db");
     expect(await screen.findByText("ops.db")).toBeTruthy();
     expect(screen.getByText("invoices")).toBeTruthy();
   });
