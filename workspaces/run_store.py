@@ -25,7 +25,7 @@ _SCHEMA_MISMATCH_MARKERS = (
     "不存在的表",
     "不存在的字段",
 )
-_SCHEMA_MISMATCH_FAILURE = "SQL 引用了当前工作区不存在的表或字段，本轮未执行查询。"
+_SCHEMA_MISMATCH_FAILURE = "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。"
 
 
 class WorkspaceRunStore:
@@ -190,11 +190,7 @@ def _failure_reason(result: dict[str, Any], product_result: dict[str, Any]) -> s
 
 
 def _failure_texts(result: dict[str, Any], product_result: dict[str, Any]) -> list[str]:
-    texts = [
-        result.get("error_message"),
-        result.get("final_answer"),
-        result.get("failure_reason"),
-    ]
+    texts = []
     product_answer = product_result.get("business_answer") if isinstance(product_result.get("business_answer"), dict) else {}
     raw_answer = result.get("business_answer") if isinstance(result.get("business_answer"), dict) else {}
     texts.extend(
@@ -203,6 +199,13 @@ def _failure_texts(result: dict[str, Any], product_result: dict[str, Any]) -> li
             product_answer.get("headline"),
             raw_answer.get("summary"),
             raw_answer.get("headline"),
+        ]
+    )
+    texts.extend(
+        [
+            result.get("error_message"),
+            result.get("final_answer"),
+            result.get("failure_reason"),
         ]
     )
     review = result.get("review_result") if isinstance(result.get("review_result"), dict) else {}

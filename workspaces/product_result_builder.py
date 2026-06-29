@@ -66,6 +66,9 @@ def build_question_thread(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
+    if _is_sql_review_failure(raw):
+        return _business_failure_answer(raw)
+
     existing = raw.get("business_answer") if isinstance(raw.get("business_answer"), dict) else {}
     insight = raw.get("insight") if isinstance(raw.get("insight"), dict) else {}
     final_answer = str(existing.get("summary") or raw.get("final_answer") or "")
@@ -104,6 +107,80 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
         }
     )
     return answer
+
+
+def _business_failure_answer(raw: dict[str, Any]) -> dict[str, Any]:
+    answer = empty_business_answer()
+    schema_mismatch = _is_schema_review_failure(raw)
+    if schema_mismatch:
+        answer.update(
+            {
+                "headline": "当前数据无法支持这次查询",
+                "summary": "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
+                "next_actions": [
+                    "可以改问当前数据已包含的渠道、收入、订单、投放花费和 ROI。",
+                    "如果要分析商品、订单明细或产品维度，请先上传对应数据表。",
+                ],
+                "caveats": ["本轮没有执行未通过审核的 SQL。"],
+                "confidence": "low",
+                "source": "sql_review",
+                "quality_flags": ["sql_review_failed", "schema_mismatch"],
+            }
+        )
+        return answer
+
+    answer.update(
+        {
+            "headline": "本次查询未能安全执行",
+            "summary": "系统在执行前发现查询不符合当前数据或安全校验要求，因此已停止本轮分析。",
+            "next_actions": ["可以换一种更贴近当前数据表和字段的问题重新分析。"],
+            "caveats": ["本轮没有执行未通过审核的 SQL。"],
+            "confidence": "low",
+            "source": "sql_review",
+            "quality_flags": ["sql_review_failed"],
+        }
+    )
+    return answer
+
+
+def _is_sql_review_failure(raw: dict[str, Any]) -> bool:
+    if str(raw.get("status") or "").lower() != "failed":
+        return False
+    review = raw.get("review_result") if isinstance(raw.get("review_result"), dict) else {}
+    if review and review.get("approved") is False:
+        return True
+    failure_text = "\n".join(
+        str(raw.get(key) or "") for key in ("final_answer", "error_message", "failure_reason")
+    ).lower()
+    return "sql 审核未通过" in failure_text or "sql review" in failure_text
+
+
+def _is_schema_review_failure(raw: dict[str, Any]) -> bool:
+    markers = (
+        "unknown table",
+        "unknown column",
+        "no such table",
+        "no such column",
+        "missing table",
+        "missing column",
+        "不存在的表",
+        "不存在的字段",
+    )
+    combined = "\n".join(_review_failure_texts(raw)).lower()
+    return any(marker in combined for marker in markers)
+
+
+def _review_failure_texts(raw: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for key in ("final_answer", "error_message", "schema_repair_reason"):
+        value = raw.get(key)
+        if value:
+            texts.append(str(value))
+    for key in ("review_result", "schema_repair"):
+        value = raw.get(key)
+        if isinstance(value, dict):
+            texts.append(json.dumps(value, ensure_ascii=False, sort_keys=True))
+    return texts
 
 
 def build_evidence(execution_result: dict[str, Any], evidence_result: dict[str, Any]) -> dict[str, Any]:

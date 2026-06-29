@@ -217,6 +217,8 @@ LLM SQL candidate
 
 ## Task P15-H5: Business-Friendly Failure UX
 
+**Status:** Complete.
+
 **Goal:** Replace raw SQL reviewer output in the main UI with a clear explanation.
 
 **Implementation steps:**

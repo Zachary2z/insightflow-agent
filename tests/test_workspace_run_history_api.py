@@ -92,8 +92,8 @@ def test_list_workspace_runs_includes_all_statuses_and_sorts_latest_first(tmp_pa
     assert [run["status"] for run in summaries] == ["failed", "waiting_for_clarification", "completed"]
     failed, waiting, completed = summaries
     assert failed["question"] == "分析不存在字段"
-    assert failed["headline"] == "SQL 引用了当前工作区不存在的表或字段，本轮未执行查询。"
-    assert failed["failure_reason"] == "SQL 引用了当前工作区不存在的表或字段，本轮未执行查询。"
+    assert failed["headline"] == "当前数据无法支持这次查询"
+    assert failed["failure_reason"] == "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。"
     assert waiting["requires_clarification"] is True
     assert waiting["question"] == "帮我看看销售情况"
     assert completed["headline"] == "邮件渠道收入最高"
@@ -206,12 +206,12 @@ def test_failed_runs_without_business_answer_or_evidence_are_not_filtered(tmp_pa
             "run_id": "run_failed1",
             "status": "failed",
             "question": "分析不存在的商品明细",
-            "headline": "SQL review rejected",
+            "headline": "本次查询未能安全执行",
             "created_at": None,
             "saved_at": "2026-06-29T13:00:00Z",
             "has_chart": False,
             "requires_clarification": False,
-            "failure_reason": "SQL review rejected",
+            "failure_reason": "系统在执行前发现查询不符合当前数据或安全校验要求，因此已停止本轮分析。",
         }
     ]
 

@@ -358,6 +358,48 @@ def test_workspace_analysis_does_not_retry_schema_repair_more_than_once(tmp_path
     assert technical["provider_metadata"]["schema_repair"]["succeeded"] is False
 
 
+def test_workspace_analysis_schema_repair_failure_has_business_friendly_product_answer(tmp_path):
+    store, workspace = _create_channel_workspace(tmp_path)
+    bad_sql = (
+        "SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS revenue "
+        "FROM orders o "
+        "JOIN order_items oi ON o.id = oi.order_id "
+        "JOIN products p ON oi.product_id = p.id "
+        "GROUP BY p.product_name LIMIT 20"
+    )
+    still_bad_sql = "SELECT p.product_name FROM products p LIMIT 20"
+    sql_provider = _SequenceProvider(
+        [
+            {"sql_candidates": [{"sql": bad_sql, "rationale": "Mistaken adjacent ecommerce schema."}]},
+            {"sql_candidates": [{"sql": still_bad_sql, "rationale": "Still references a missing table."}]},
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近 30 天各渠道收入和投放情况怎么样？",
+        providers={
+            "question_understanding": MockLLMProvider(_provider_intent()),
+            "sql_planning": MockLLMProvider(_provider_sql_plan()),
+            "sql_candidate": sql_provider,
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert result["execution_result"] == {}
+    answer = result["product_result"]["business_answer"]
+    assert answer["headline"] == "当前数据无法支持这次查询"
+    assert "不存在的表或字段" in answer["summary"]
+    assert "Unknown table" not in answer["summary"]
+    assert "Unknown column" not in answer["summary"]
+    assert "Unknown table" not in answer["headline"]
+    technical = result["product_result"]["technical_details"]
+    assert {log["name"] for log in technical["validation_logs"]} >= {"review_result", "schema_repair"}
+    assert "Unknown table" in str(technical["validation_logs"])
+    assert not any(event.get("node") == "sql_executor_node" for event in result["trace"])
+
+
 def test_schema_repair_still_requires_sql_reviewer_approval(tmp_path):
     store, workspace = _create_channel_workspace(tmp_path)
     bad_sql = (

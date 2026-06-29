@@ -126,3 +126,39 @@ def test_product_result_builder_continuation_thread_preserves_resolved_business_
     assert "渠道" in thread["resolved_question"]
     assert "预算" in thread["resolved_question"]
     assert "最近 90 天" in thread["resolved_question"]
+
+
+def test_product_result_builder_turns_schema_review_failure_into_business_answer():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_failed",
+        "status": "failed",
+        "user_question": "按商品看看最近 30 天收入",
+        "final_answer": (
+            "Review rejected before execution: Unknown table: products; "
+            "Unknown column: order_items.quantity"
+        ),
+        "generated_sql": "SELECT p.product_name FROM products p LIMIT 20",
+        "review_result": {
+            "approved": False,
+            "issues": ["Unknown table: products", "Unknown column: order_items.quantity"],
+        },
+        "schema_repair": {
+            "attempted": True,
+            "succeeded": False,
+            "repair_rejection_reasons": ["Unknown table: products"],
+        },
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_1")
+    answer = product["business_answer"]
+
+    assert answer["headline"] == "当前数据无法支持这次查询"
+    assert "不存在的表或字段" in answer["summary"]
+    assert "Unknown table" not in answer["summary"]
+    assert "Unknown column" not in answer["summary"]
+    assert any("渠道、收入、订单、投放花费和 ROI" in action for action in answer["next_actions"])
+    assert any(log["name"] == "review_result" for log in product["technical_details"]["validation_logs"])
+    assert any(log["name"] == "schema_repair" for log in product["technical_details"]["validation_logs"])
+    assert "Unknown table: products" in str(product["technical_details"]["validation_logs"])

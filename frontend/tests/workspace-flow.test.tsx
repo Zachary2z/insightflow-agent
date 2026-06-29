@@ -441,7 +441,7 @@ describe("workspace product components", () => {
           saved_at: "2026-06-29T11:00:00Z",
           has_chart: false,
           requires_clarification: false,
-          failure_reason: "SQL 引用了当前工作区不存在的表或字段，本轮未执行查询。",
+          failure_reason: "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
         },
         {
           run_id: "run_waiting",
@@ -463,7 +463,7 @@ describe("workspace product components", () => {
     expect(screen.getByText("哪个渠道收入最高？")).toBeTruthy();
     expect(screen.getByText(/Email produced the most revenue/)).toBeTruthy();
     expect(screen.getByText("分析不存在字段")).toBeTruthy();
-    expect(screen.getByText(/SQL 引用了当前工作区不存在的表或字段/)).toBeTruthy();
+    expect(screen.getByText(/系统尝试使用当前工作区中不存在的表或字段/)).toBeTruthy();
     expect(screen.getByText("帮我看看销售情况")).toBeTruthy();
     expect(screen.getByText(/需要补充时间范围/)).toBeTruthy();
     expect(screen.getByText("有图表")).toBeTruthy();
@@ -853,6 +853,78 @@ describe("workspace product components", () => {
 
     expect(screen.getByText(/SELECT channel/)).toBeTruthy();
     expect(screen.getByText(/deepseek/)).toBeTruthy();
+  });
+
+  it("shows business-friendly failed SQL review copy and keeps reviewer details collapsed", () => {
+    render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p13.v1",
+            status: "failed",
+            question_thread: { original_question: "按商品看看最近 30 天收入", status: "failed" },
+            business_answer: {
+              headline: "当前数据无法支持这次查询",
+              summary: "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
+              next_actions: [
+                "可以改问当前数据已包含的渠道、收入、订单、投放花费和 ROI。",
+                "如果要分析商品、订单明细或产品维度，请先上传对应数据表。",
+              ],
+              confidence: "low",
+            },
+            evidence: { table_preview: { columns: [], rows: [] } },
+            chart_artifacts: [],
+            technical_details: {
+              validation_logs: [
+                {
+                  name: "review_result",
+                  value: {
+                    approved: false,
+                    issues: ["Unknown table: products", "Unknown column: order_items.quantity"],
+                  },
+                },
+              ],
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("当前数据无法支持这次查询")).toBeTruthy();
+    expect(screen.getByText("系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。")).toBeTruthy();
+    expect(screen.getByText("可以改问当前数据已包含的渠道、收入、订单、投放花费和 ROI。")).toBeTruthy();
+    expect(screen.queryByText(/Unknown table/)).toBeNull();
+    expect(screen.queryByText(/Unknown column/)).toBeNull();
+
+    fireEvent.click(screen.getByText("技术详情"));
+
+    expect(screen.getByText(/Unknown table: products/)).toBeTruthy();
+    expect(screen.getByText(/Unknown column: order_items.quantity/)).toBeTruthy();
+  });
+
+  it("replaces raw SQL reviewer wall in failed history summaries", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({
+      workspace_id: "ws_1",
+      runs: [
+        {
+          run_id: "run_failed_raw",
+          status: "failed",
+          question: "分析商品表现",
+          headline: "",
+          saved_at: "2026-06-29T12:00:00Z",
+          has_chart: false,
+          requires_clarification: false,
+          failure_reason: "Review rejected before execution: Unknown table: products; Unknown column: product_name",
+        },
+      ],
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+
+    expect(await screen.findByText("分析商品表现")).toBeTruthy();
+    expect(screen.getByText("原因：本轮分析未能执行，请打开详情查看技术信息。")).toBeTruthy();
+    expect(screen.queryByText(/Unknown table/)).toBeNull();
+    expect(screen.queryByText(/Unknown column/)).toBeNull();
   });
 
   it("submits only the clarification answer for a pending run", async () => {
