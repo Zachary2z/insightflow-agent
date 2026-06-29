@@ -2,6 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
+import BusinessQAPreview from "../components/BusinessQAPreview";
 import ChartArtifactGallery from "../components/ChartArtifactGallery";
 import DataSettings from "../components/DataSettings";
 import DatasetManager from "../components/DatasetManager";
@@ -14,6 +15,7 @@ import RunResult from "../components/RunResult";
 import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
 import WorkspaceList from "../components/WorkspaceList";
 import WorkspaceNewForm from "../components/WorkspaceNewForm";
+import BusinessQAPage from "../app/workspaces/[workspaceId]/business-qa/page";
 import DatasetsPage from "../app/workspaces/[workspaceId]/datasets/page";
 import ReportDetailPage from "../app/workspaces/[workspaceId]/reports/[reportId]/page";
 import ReportsPage from "../app/workspaces/[workspaceId]/reports/page";
@@ -404,6 +406,82 @@ describe("workspace product components", () => {
       JSON.parse(window.sessionStorage.getItem("insightflow.run.ws_1.run_1") ?? "{}").result.product_result
         .business_answer.headline,
     ).toBe("Email produced the most revenue.");
+  });
+
+  it("renders the business Q&A preview route with active navigation and honest preview copy", async () => {
+    render(await BusinessQAPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "业务问答" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /业务问答/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: /业务问答/ }).getAttribute("href")).toBe(
+      "/workspaces/ws_1/business-qa",
+    );
+    expect(screen.getByText("未来模式预览")).toBeTruthy();
+    expect(screen.getByText("当前上下文")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "业务问题" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "业务结论" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "进入分析工作台" }).getAttribute("href")).toBe(
+      "/workspaces/ws_1/analysis",
+    );
+    expect(screen.getByRole("link", { name: "进入报告中心" }).getAttribute("href")).toBe(
+      "/workspaces/ws_1/reports",
+    );
+    expect(screen.queryByText("完整聊天产品已上线")).toBeNull();
+  });
+
+  it("submits a business Q&A preview question through the existing analysis API", async () => {
+    vi.mocked(runAnalysis).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_qa_1",
+      result: {
+        product_result: {
+          version: "p13.v1",
+          status: "completed",
+          question_thread: {
+            original_question: "下个月预算应该优先投哪个渠道？",
+            system_understanding: "比较渠道表现并给出预算建议",
+            resolved_question: "比较各渠道表现，给出下个月预算优先级建议。",
+          },
+          business_answer: {
+            headline: "优先加码 paid_search，同时观察转化成本。",
+            summary: "paid_search 贡献更高收入，但需要结合成本观察。",
+            recommendations: ["先提高 paid_search 预算"],
+            next_actions: ["进入分析工作台做深度拆解"],
+            caveats: [],
+            confidence: "medium",
+          },
+          evidence: { table_preview: { columns: ["channel", "revenue"], rows: [["paid_search", 200]] } },
+          chart_artifacts: [],
+          technical_details: {
+            sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+            raw_rows: [["paid_search", 200]],
+            provider_metadata: { model: "deepseek" },
+          },
+        },
+      },
+    });
+
+    render(<BusinessQAPreview workspaceId="ws_1" />);
+
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "下个月预算应该优先投哪个渠道？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成预览回答" }));
+
+    await waitFor(() =>
+      expect(runAnalysis).toHaveBeenCalledWith("ws_1", {
+        userQuestion: "下个月预算应该优先投哪个渠道？",
+      }),
+    );
+    expect(await screen.findByText("优先加码 paid_search，同时观察转化成本。")).toBeTruthy();
+    expect(screen.getByText("分析线程")).toBeTruthy();
+    expect(screen.getByText("证据表")).toBeTruthy();
+
+    const disclosure = screen.getByText("技术详情").closest("details");
+    expect(disclosure?.hasAttribute("open")).toBe(false);
+    expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText(/deepseek/)).toBeNull();
   });
 
   it("renders profile tables and candidate roles", () => {

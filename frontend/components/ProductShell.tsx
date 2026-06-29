@@ -14,13 +14,13 @@ const NAV_ITEMS: Array<{
   key: ProductShellActive;
   label: string;
   index: string;
-  path: "datasets" | "analysis" | "reports" | "settings";
+  path: "datasets" | "analysis" | "reports" | "settings" | "business-qa";
 }> = [
   { key: "sources", label: "数据源管理", index: "01", path: "datasets" },
   { key: "analysis", label: "分析工作台", index: "02", path: "analysis" },
   { key: "reports", label: "报告中心", index: "03", path: "reports" },
   { key: "settings", label: "数据设置", index: "04", path: "settings" },
-  { key: "business-qa", label: "业务问答", index: "05", path: "analysis" },
+  { key: "business-qa", label: "业务问答", index: "05", path: "business-qa" },
 ];
 
 export default function ProductShell({ workspaceId, active, children }: ProductShellProps) {

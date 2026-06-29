@@ -960,6 +960,65 @@ th {
   gap: 10px;
 }
 
+.business-qa,
+.business-qa-intro,
+.business-qa-answer,
+.business-qa-next {
+  display: grid;
+  gap: 18px;
+}
+
+.business-qa-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.qa-preview-note,
+.qa-answer-placeholder {
+  color: #334155;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.qa-preview-note,
+.qa-answer-placeholder,
+.qa-context-list li {
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.qa-context-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.qa-context-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.qa-context-list strong {
+  color: var(--product-ink);
+}
+
+.qa-context-list span {
+  color: var(--product-muted);
+  line-height: 1.5;
+}
+
+.qa-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 @media (max-width: 980px) {
   .product-topbar-inner,
   .product-page {
@@ -978,6 +1037,10 @@ th {
 
   .product-page-header {
     display: grid;
+  }
+
+  .business-qa-grid {
+    grid-template-columns: 1fr;
   }
 
   .dataset-manager {

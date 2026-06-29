@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P14 Product UI Shell And Business Workflow |
-| Current task | P14-H6 Data Settings redesign complete |
-| Next planned task | P14-H7 Business Q&A preview route |
-| Last completed task | P14-H6 Data Settings redesign |
+| Current task | P14-H7 Business Q&A preview route complete |
+| Next planned task | P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, artifact audit |
+| Last completed task | P14-H7 Business Q&A preview route |
 | Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -47,7 +47,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | `[~]` H1-H6 complete; H7 Business Q&A preview route is next |
+| P14 | Product UI Shell And Business Workflow | `[~]` H1-H7 complete; H8 full regression/live acceptance/docs closeout is next |
 
 ## P11 Product Hardening
 
@@ -84,6 +84,20 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P14-H7 result: passed on 2026-06-29.
+
+P14-H7 verification result summary:
+
+- Focused Business Q&A preview frontend tests passed: `frontend/tests/product-shell.test.tsx` and `frontend/tests/workspace-flow.test.tsx` with `33 passed`.
+- Full frontend test suite passed: `41 passed`.
+- Frontend production build passed and included `/workspaces/[workspaceId]/business-qa`.
+- Backend analysis/clarification regressions plus P14 Business Q&A endpoint boundary test passed: `8 passed`.
+- Business Q&A navigation now points to `/workspaces/{workspaceId}/business-qa` and marks `业务问答` active on the preview route.
+- Business Q&A preview page is clearly labeled `未来模式预览`, reuses the existing `runAnalysis` / `/api/workspaces/{workspace_id}/runs` concept for one-round preview answers, and does not add a backend chat endpoint.
+- The preview answer area reuses existing product result objects through `RunResult`; SQL, raw rows, and provider metadata remain inside collapsed `技术详情`.
+- Legacy path audit hits remained historical documentation or existing mock-boundary tests; no Streamlit, old eval UI, old `chart_agent`, `visualization_planner`, or `chart_tool` product path was restored.
+- Tracked generated-artifact audit produced no output for `.env`, `frontend/.next`, `frontend/node_modules`, workspace run/report directories, report chart/markdown outputs, trace JSON, or `sample_data/`.
 
 Latest P14-H6 result: passed on 2026-06-29.
 
@@ -227,7 +241,7 @@ Suggested P14 task queue:
 | P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | `[x]` Complete |
 | P14-H5 | Report Center redesign with collapsed technical appendix | `[x]` Complete |
 | P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[x]` Complete |
-| P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[ ]` Not started |
+| P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[x]` Complete |
 | P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[ ]` Not started |
 
 ## P13 Planning Snapshot
