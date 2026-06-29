@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P14 Product UI Shell And Business Workflow |
-| Current task | P14-H2 shared Next.js product shell complete |
-| Next planned task | P14-H3 Data source management redesign |
-| Last completed task | P14-H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers |
+| Current task | P14-H3 data source management redesign complete |
+| Next planned task | P14-H4 Analysis Workbench redesign |
+| Last completed task | P14-H3 data source management redesign |
 | Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -47,7 +47,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | `[~]` H1 and H2 complete; H3 data source management redesign is next |
+| P14 | Product UI Shell And Business Workflow | `[~]` H1-H3 complete; H4 Analysis Workbench redesign is next |
 
 ## P11 Product Hardening
 
@@ -202,7 +202,7 @@ Suggested P14 task queue:
 |---|---|---|
 | P14-H1 | Clickable product UI prototype and full implementation plan | `[x]` Complete |
 | P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | `[x]` Complete |
-| P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | `[ ]` Not started |
+| P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | `[x]` Complete |
 | P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | `[ ]` Not started |
 | P14-H5 | Report Center redesign with collapsed technical appendix | `[ ]` Not started |
 | P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[ ]` Not started |
