@@ -216,6 +216,72 @@ def test_failed_runs_without_business_answer_or_evidence_are_not_filtered(tmp_pa
     ]
 
 
+def test_old_failed_run_with_raw_product_result_is_sanitized_in_history_and_detail(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    raw_summary = "SQL 审核未通过，已停止执行。原因：Unknown table: products; Unknown column: product_name"
+    _write_run(
+        workspace,
+        "run_rawwall1",
+        {
+            "status": "failed",
+            "saved_at": "2026-06-29T16:00:00Z",
+            "original_question": "分析最近 30 天商品表现",
+            "final_answer": raw_summary,
+            "review_result": {
+                "approved": False,
+                "issues": ["Unknown table: products", "Unknown column: product_name"],
+            },
+            "product_result": {
+                "version": "p13.v1",
+                "status": "failed",
+                "question_thread": {
+                    "original_question": "分析最近 30 天商品表现",
+                    "status": "failed",
+                },
+                "business_answer": {
+                    "headline": "SQL 审核未通过",
+                    "summary": raw_summary,
+                    "confidence": "low",
+                },
+                "evidence": {"table_preview": {"columns": [], "rows": []}},
+                "chart_artifacts": [],
+                "technical_details": {
+                    "validation_logs": [
+                        {
+                            "name": "review_result",
+                            "value": {
+                                "approved": False,
+                                "issues": ["Unknown table: products", "Unknown column: product_name"],
+                            },
+                        }
+                    ]
+                },
+            },
+        },
+    )
+
+    history = client.get(f"/api/workspaces/{workspace_id}/runs")
+    detail = client.get(f"/api/workspaces/{workspace_id}/runs/run_rawwall1")
+
+    assert history.status_code == 200
+    summary = history.json()["runs"][0]
+    assert summary["headline"] == "当前数据无法支持这次查询"
+    assert summary["failure_reason"] == "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。"
+    assert "Unknown table" not in summary["headline"]
+    assert "Unknown column" not in summary["failure_reason"]
+
+    assert detail.status_code == 200
+    product_result = detail.json()["product_result"]
+    answer = product_result["business_answer"]
+    assert answer["headline"] == "当前数据无法支持这次查询"
+    assert "不存在的表或字段" in answer["summary"]
+    assert "Unknown table" not in answer["headline"]
+    assert "Unknown column" not in answer["summary"]
+    assert "Unknown table: products" in str(product_result["technical_details"]["validation_logs"])
+    assert detail.json()["result"]["product_result"]["business_answer"] == answer
+
+
 def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp_path):
     client, _store, workspace = _client_and_workspace(tmp_path)
     workspace_id = workspace["workspace_id"]

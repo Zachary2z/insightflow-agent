@@ -3,6 +3,7 @@ import sqlite3
 from llm_ops.provider import MockLLMProvider
 from workspaces.analysis_runner import run_workspace_analysis
 from workspaces.profiler import profile_workspace_database
+from workspaces.run_store import WorkspaceRunStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
 
@@ -142,6 +143,33 @@ def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_p
     assert result["product_result"]["business_answer"]["headline"]
     assert result["product_result"]["technical_details"]["sql"] == result["generated_sql"]
     assert result["business_answer"] == result["product_result"]["business_answer"]
+
+
+def test_workspace_analysis_persists_full_product_result_for_history_detail(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Persisted Analysis Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE orders (channel TEXT, revenue REAL)")
+        conn.executemany("INSERT INTO orders VALUES (?, ?)", [("email", 100.0), ("paid_search", 200.0)])
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="按渠道汇总收入",
+        initial_sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel LIMIT 20",
+    )
+
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], result["run_id"])
+
+    assert stored["run_id"] == result["run_id"]
+    assert stored["product_result"]["business_answer"] == result["product_result"]["business_answer"]
+    assert stored["product_result"]["evidence"]["table_preview"]["rows"] == result["product_result"]["evidence"][
+        "table_preview"
+    ]["rows"]
+    assert stored["product_result"]["technical_details"]["sql"] == result["generated_sql"]
+    assert stored["result"]["product_result"]["question_thread"]["original_question"] == "按渠道汇总收入"
 
 
 def test_workspace_analysis_persists_pending_clarification_run(tmp_path):

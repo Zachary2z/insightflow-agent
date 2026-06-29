@@ -15,10 +15,10 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P15 Analysis Reliability And History |
-| Current task | P15-H5 Business-friendly failure UX complete |
-| Next planned task | P15-H6 Real DeepSeek product regression |
-| Last completed task | P15-H5 Business-Friendly Failure UX |
+| Current phase | P15 Analysis Reliability And History complete |
+| Current task | P15-H6 Real DeepSeek product regression complete |
+| Next planned task | None; P15 is closed |
+| Last completed task | P15-H6 Real DeepSeek Product Regression And P15 Closeout |
 | Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -48,7 +48,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
-| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 Analysis Workbench history panel complete; H3 run detail backend source of truth complete; H4 one-pass schema-mismatch SQL repair complete; H5 business-friendly failure UX complete; H6 live DeepSeek regression next |
+| P15 | Analysis Reliability And History | `[x]` Complete; H1 backend run history APIs, H2 Analysis Workbench history panel, H3 run detail backend source of truth, H4 one-pass schema-mismatch SQL repair, H5 business-friendly failure UX, and H6 real DeepSeek product regression are closed |
 
 ## P11 Product Hardening
 
@@ -85,6 +85,21 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P15-H6 result: passed on 2026-06-29.
+
+P15-H6 verification result summary:
+
+- Added a real opt-in DeepSeek regression in `tests/test_p15_live_deepseek_analysis_reliability.py` for `给我一下最近30天几个渠道的数据`; when the model asks for metrics, the test answers only `都看` and verifies the continuation combines the answer with the original question instead of requiring a full rewrite.
+- The live regression uses a temporary workspace with realistic `orders`, `marketing_spend`, and `customers` data, generated profile, and semantic-layer draft. It does not commit generated data or keys.
+- The verified live run triggered the intended metric clarification, continued with `都看`, completed through real provider-backed product mode, returned a readable Chinese business answer with evidence rows, and restored the final run from persisted history detail.
+- Workspace analysis now writes the full product result back to the workspace run file after product-result building, so history detail can restore business answer, evidence, question thread, SQL technical detail, and provider metadata after navigation.
+- Added a non-live run-history regression proving old persisted failed runs with raw `product_result.business_answer` are sanitized in history/detail while raw reviewer logs stay in technical details.
+- Focused backend tests passed: `python3 -m pytest tests/test_workspace_run_history_api.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` with `22 passed`.
+- Focused frontend workspace flow tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `43 passed`.
+- Frontend production build passed: `cd frontend && npm run build`.
+- Full backend suite passed: `python3 -m pytest` with `303 passed, 13 skipped`.
+- Real DeepSeek P15 regression passed with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1`, `INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1`, `INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1`, and `INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1`: `1 passed`.
 
 Latest P15-H5 result: passed on 2026-06-29.
 
@@ -433,6 +448,6 @@ Suggested P15 task queue:
 | P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[x]` Complete |
 | P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[x]` Complete |
 | P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[x]` Complete |
-| P15-H6 | Real DeepSeek regression for channel data + `都看`, plus history persistence | `[ ]` Not started |
+| P15-H6 | Real DeepSeek regression for channel data + `都看`, plus history persistence | `[x]` Complete |
 
 P15 out of scope: full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, vector databases, fixed SQL templates, keyword-heavy business rules, and any restoration of old Streamlit/eval/chart-agent paths.

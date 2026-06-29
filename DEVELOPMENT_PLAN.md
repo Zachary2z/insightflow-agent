@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. P14 Product UI Shell And Business Workflow is complete through H8 full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 Analysis Reliability And History is in progress with H1-H5 complete and H6 next. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. P14 Product UI Shell And Business Workflow is complete through H8 full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 Analysis Reliability And History is complete with H1-H6 closed, including persisted history, run restoration, schema repair, business-friendly failures, and real DeepSeek regression coverage. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -49,7 +49,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
 | P13 | Business Answer And Product UX | Complete | H1-H9 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, real DeepSeek product acceptance, documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | Complete | H1 clickable product UI prototype and full implementation plan complete; H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers complete; H3 data source management redesign complete; H4 Analysis Workbench redesign complete; H5 Report Center redesign complete; H6 Data Settings redesign complete; H7 Business Q&A preview route complete; H8 full regression/live acceptance/docs closeout complete |
-| P15 | Analysis Reliability And History | In progress | H1-H5 complete: persisted analysis history APIs, Analysis Workbench history panel, backend-backed run detail, one-pass schema-mismatch SQL repair, and business-friendly failure UX; H6 live DeepSeek regression next |
+| P15 | Analysis Reliability And History | Complete | H1-H6 complete: persisted analysis history APIs, Analysis Workbench history panel, backend-backed run detail, one-pass schema-mismatch SQL repair, business-friendly failure UX, full run-result persistence, and real DeepSeek regression for clarification continuation |
 
 ## P11 Product Hardening Plan
 
@@ -502,7 +502,7 @@ Latest result: passed on 2026-06-29.
 
 ## P15 Analysis Reliability And History Plan
 
-P15 is in progress. H1 backend run history APIs, H2 Analysis Workbench history panel, H3 run detail backend source of truth, H4 one-pass schema-mismatch SQL repair, and H5 business-friendly failure UX are complete; H6 live DeepSeek regression is next. The phase addresses two real product gaps found during live usage after P14:
+P15 is complete. H1 backend run history APIs, H2 Analysis Workbench history panel, H3 run detail backend source of truth, H4 one-pass schema-mismatch SQL repair, H5 business-friendly failure UX, and H6 real DeepSeek regression are complete. The phase addressed two real product gaps found during live usage after P14:
 
 1. Analysis Workbench history is not product-grade. A run is persisted under the workspace, but the UI cannot list previous questions or restore previous results after navigation.
 2. Real DeepSeek can occasionally generate SQL for a stale or adjacent schema. The SQL reviewer correctly blocks those queries, but the product should attempt one schema-aware repair and then show a business-friendly failure if repair is not possible.
@@ -556,7 +556,16 @@ LLM SQL candidate
 | P15-H3 | Run detail source-of-truth cleanup: load run detail from backend instead of relying on `sessionStorage` | Complete |
 | P15-H4 | One-pass schema-mismatch SQL repair after reviewer detects unknown tables or columns | Complete |
 | P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | Complete |
-| P15-H6 | Real DeepSeek regression for the `最近30天几个渠道的数据` + `都看` scenario and history persistence | Not started |
+| P15-H6 | Real DeepSeek regression for the `最近30天几个渠道的数据` + `都看` scenario and history persistence | Complete |
+
+### P15-H6 Closeout Verification
+
+Latest result: passed on 2026-06-29.
+
+- Added `tests/test_p15_live_deepseek_analysis_reliability.py` as a real DeepSeek opt-in regression. It creates a temporary workspace with realistic `orders`, `marketing_spend`, and `customers` CSV data, profiles it, drafts the semantic layer, asks `给我一下最近30天几个渠道的数据`, continues with `都看` when the model asks for metrics, and accepts either a completed product answer or a business-friendly failed answer.
+- The live regression passed with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, and provider flags for question understanding, SQL planning, SQL candidate, and insight drafting. In the verified run, DeepSeek asked a metric clarification first and the `都看` continuation completed through the product path.
+- Workspace runs now persist the full product result after analysis so backend run detail can restore business answer, evidence rows, question thread, SQL technical details, and history state after navigation.
+- Added a non-live history regression proving old failed persisted runs with raw `product_result.business_answer` are sanitized in list/detail responses while reviewer logs remain in technical details.
 
 ### P15 Acceptance
 

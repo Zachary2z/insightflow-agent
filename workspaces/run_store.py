@@ -112,10 +112,13 @@ class WorkspaceRunStore:
         workspace_id: str,
         workspace_root: Path,
     ) -> dict[str, Any]:
+        existing: dict[str, Any] | None = None
         if isinstance(raw.get("product_result"), dict):
-            return raw["product_result"]
-        if isinstance(result.get("product_result"), dict):
-            return result["product_result"]
+            existing = raw["product_result"]
+        elif isinstance(result.get("product_result"), dict):
+            existing = result["product_result"]
+        if existing is not None and not _needs_product_result_rebuild(result, existing):
+            return existing
         return build_product_analysis_result(result, workspace_id=workspace_id, workspace_root=workspace_root)
 
     def _run_path(self, workspace_id: str, run_id: str) -> Path:
@@ -225,6 +228,13 @@ def _failure_texts(result: dict[str, Any], product_result: dict[str, Any]) -> li
 def _has_schema_mismatch(texts: list[str]) -> bool:
     combined = "\n".join(texts).lower()
     return any(marker in combined for marker in _SCHEMA_MISMATCH_MARKERS)
+
+
+def _needs_product_result_rebuild(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
+    status = str(result.get("status") or product_result.get("status") or "")
+    if status != "failed":
+        return False
+    return _has_schema_mismatch(_failure_texts(result, product_result))
 
 
 def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:

@@ -1,6 +1,6 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, and the completed P14 product UI shell work:
+InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, the completed P14 product UI shell work, and completed P15 analysis reliability/history hardening:
 
 ```text
 workspace
@@ -11,6 +11,7 @@ workspace
 -> P12 structured workspace reports
 -> P13 Analysis Workbench, Data Settings, chart display, and product/live acceptance
 -> P14 unified Chinese product shell, shared design tokens, and clickable UI reference
+-> P15 persisted analysis history, run restoration, schema repair, and business-friendly failures
 -> validated SQL, evidence, visualization, artifacts, and trace output
 ```
 
@@ -18,7 +19,7 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is complete through H1-H8, including the clickable prototype/planning, shared Next.js product shell, data source management redesign, Analysis Workbench redesign, Report Center redesign, Data Settings redesign, Business Q&A preview route, full regression, real DeepSeek live acceptance, docs closeout, and artifact audit.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is complete through H1-H8, including the clickable prototype/planning, shared Next.js product shell, data source management redesign, Analysis Workbench redesign, Report Center redesign, Data Settings redesign, Business Q&A preview route, full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 Analysis Reliability And History is complete through H1-H6, including analysis history APIs, backend-backed run detail, one-pass schema-mismatch SQL repair, business-friendly failure UX, full product-result persistence, and a real DeepSeek `都看` clarification continuation regression.
 
 | Product area | Status | Entry |
 |---|---|---|
@@ -26,8 +27,9 @@ P11 General Data Analysis Product is complete. P12 Report Productization is comp
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
 | P14 unified product UI shell | Complete; H1-H8 closed | `docs/product/prototypes/p14-clickable-product-ui.html` |
+| P15 analysis reliability and history | Complete; H1-H6 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/runs/{runId}` |
 
-P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, and artifact audit is complete. A post-H8 audit also aligned the home/workspace entry pages, profile page, semantic-layer page, and run-detail page with the Chinese product shell. P15 planning is pending.
+P15-H6 Real DeepSeek product regression and P15 closeout are complete. The live regression covers the observed `给我一下最近30天几个渠道的数据` plus `都看` continuation path and verifies persisted run history/detail restoration.
 
 ## Quickstart
 
@@ -59,6 +61,7 @@ Open the frontend at `http://localhost:3000`, create a workspace, import CSV/Exc
 - P12 reports: `/workspaces/{workspaceId}/reports`
 - P14 data settings: `/workspaces/{workspaceId}/settings`
 - P14 Business Q&A preview: `/workspaces/{workspaceId}/business-qa`
+- Previous analysis runs are restored from backend history at `/workspaces/{workspaceId}/runs/{runId}`.
 
 ## P14 Product State
 
@@ -76,6 +79,17 @@ Business Q&A remains a preview, not a complete multi-turn chat product. P14 does
 Real SaaS integrations, auth/RBAC, deployment, scheduled reports, PDF/PPT export, vector databases, and full Business Q&A chat remain outside the P14 scope.
 
 P14-H1, P14-H2, P14-H3, P14-H4, P14-H5, P14-H6, P14-H7, and P14-H8 are complete.
+
+## P15 Reliability And History
+
+P15 closes the analysis reliability phase:
+
+- Analysis Workbench history lists persisted completed, failed, and waiting-for-clarification runs.
+- Run detail pages load from the backend source of truth rather than browser `sessionStorage`.
+- Workspace analysis persists the full product result so history detail can restore question thread, business answer, evidence rows, charts, SQL technical detail, provider metadata, and validation logs.
+- Schema-mismatch SQL review failures get one schema-aware repair attempt before any execution.
+- If repair cannot safely complete, users see Chinese business-friendly failure copy while raw reviewer details remain in collapsed technical details.
+- Real DeepSeek regression covers `给我一下最近30天几个渠道的数据`; when the model asks for metrics, the user can answer only `都看` and the system continues with the original context.
 
 ## P13 Product Capabilities
 
@@ -196,6 +210,19 @@ set -a; [ -f .env ] && source .env; set +a; \
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
 python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
+```
+
+The P15 reliability live regression is:
+
+```bash
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1 \
+python3 -m pytest tests/test_p15_live_deepseek_analysis_reliability.py -q
 ```
 
 ## Verification

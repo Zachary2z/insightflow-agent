@@ -243,6 +243,8 @@ LLM SQL candidate
 
 ## Task P15-H6: Real DeepSeek Product Regression
 
+**Status:** Complete.
+
 **Goal:** Prove the real product path handles the scenario that exposed the bug.
 
 **Implementation steps:**
@@ -275,6 +277,12 @@ LLM SQL candidate
 - If the provider still produces bad SQL initially, the schema-repair path either fixes it or returns a business-friendly failure.
 - History persists after page navigation.
 
+**Closeout notes:**
+
+- Added `tests/test_p15_live_deepseek_analysis_reliability.py` as a real opt-in DeepSeek regression. It creates a temporary workspace with realistic `orders`, `marketing_spend`, and `customers` data, generates profile and semantic-layer context, asks the original channel question, continues with `都看` when clarification is requested, and verifies completed or business-friendly failed product output.
+- The verified live run asked a metric clarification, accepted `都看` as the only user continuation, completed analysis, returned Chinese business output with evidence rows, and restored the result from workspace run history detail.
+- Added non-live persistence/history regressions so full product results are saved to workspace run files and old raw `product_result.business_answer` values are sanitized when loaded through history/detail APIs.
+
 ## Verification Commands
 
 Run focused tests during implementation:
@@ -299,10 +307,14 @@ Run opt-in live verification before P15 closeout:
 set -a; [ -f .env ] && source .env; set +a; \
 INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-python3 -m pytest tests/test_p13_live_deepseek_product_acceptance.py tests/test_p11_live_deepseek_workspace_analysis.py -q
+INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
+INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
+INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1 \
+python3 -m pytest tests/test_p15_live_deepseek_analysis_reliability.py -q
 ```
 
-Add the new P15 live test file to this command once implemented.
+P11/P12/P13 live tests remain available for cross-phase regression when needed.
 
 ## Artifact Hygiene
 

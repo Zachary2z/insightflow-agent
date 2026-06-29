@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,6 +24,32 @@ def _with_product_result(result: dict, *, workspace_id: str) -> dict:
     result["chart_artifacts"] = product_result["chart_artifacts"]
     result["technical_details"] = product_result["technical_details"]
     return result
+
+
+def _persist_workspace_run_result(result: dict) -> None:
+    trace_path = result.get("trace_path")
+    run_id = result.get("run_id")
+    if trace_path:
+        path = Path(trace_path)
+    elif result.get("workspace_run_dir") and run_id:
+        path = Path(result["workspace_run_dir"]) / f"{run_id}.json"
+    else:
+        return
+
+    saved_at = result.get("saved_at") or ""
+    if not saved_at and path.exists():
+        try:
+            previous = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(previous, dict):
+                saved_at = str(previous.get("saved_at") or "")
+        except (OSError, json.JSONDecodeError):
+            saved_at = ""
+
+    payload = dict(result)
+    if saved_at:
+        payload["saved_at"] = saved_at
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
 
 def run_workspace_analysis(
@@ -78,7 +105,9 @@ def run_workspace_analysis(
         result["clarification_question"] = clarification_question
         result["system_understanding"] = pending["system_understanding"]
         result["question_thread_status"] = "waiting_for_clarification"
-    return _with_product_result(result, workspace_id=workspace_id)
+    result = _with_product_result(result, workspace_id=workspace_id)
+    _persist_workspace_run_result(result)
+    return result
 
 
 def run_workspace_analysis_continuation(
@@ -166,7 +195,9 @@ def run_workspace_analysis_continuation(
     result["resolved_question"] = resolved_question
     result["pending_run_id"] = pending_run_id
     result["question_thread_status"] = result.get("status", "unknown")
-    return _with_product_result(result, workspace_id=workspace_id)
+    result = _with_product_result(result, workspace_id=workspace_id)
+    _persist_workspace_run_result(result)
+    return result
 
 
 def _first_text(value) -> str:
