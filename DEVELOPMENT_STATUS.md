@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-25
+Last updated: 2026-06-29
 
 This file is the living status tracker for InsightFlow Agent.
 
@@ -15,15 +15,15 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P13 Business Answer And Product UX complete; prepare P14 product direction planning |
-| Current task | No unfinished P13 H-task remains |
-| Next planned task | Enter P14 product direction planning |
-| Last completed task | P13-H9 documentation, artifact audit, regression, live verification, and closeout |
-| Main product target | P13 Analysis Workbench with business-facing answers, integrated clarification continuation, reports UI, Data Settings, chart image display, real DeepSeek product acceptance, and future-compatible Business Q&A Mode |
+| Current phase | P14 Product UI Shell And Business Workflow |
+| Current task | P14-H2 shared Next.js product shell complete |
+| Next planned task | P14-H3 Data source management redesign |
+| Last completed task | P14-H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers |
+| Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
-| Out of scope for P13 | Full chat product implementation, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, old demo restoration, and unguarded LLM execution |
+| Out of scope for P14 | Real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, backend-agent rewrite, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
 
@@ -47,6 +47,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
+| P14 | Product UI Shell And Business Workflow | `[~]` H1 and H2 complete; H3 data source management redesign is next |
 
 ## P11 Product Hardening
 
@@ -167,6 +168,46 @@ After future verification:
 
 1. Keep P13 marked complete unless a new scoped P13 follow-up is explicitly opened.
 2. Record exact verification results in this file or in the final task response.
+
+## P14 Planning Snapshot
+
+Clickable UI reference: `docs/product/prototypes/p14-clickable-product-ui.html`.
+
+Implementation plan: `docs/product/plans/2026-06-29-p14-product-ui-shell-and-business-workflow.md`.
+
+P14 selected product direction:
+
+```text
+workspace
+-> 数据源管理
+-> 分析工作台
+-> 报告中心
+-> 数据设置
+-> 业务问答 preview
+```
+
+Key P14 decisions:
+
+- P14 is a product UI and workflow hardening phase, not a backend-agent rewrite.
+- The tracked clickable HTML prototype is the visual reference for Next.js implementation.
+- Navigation should be a shared horizontal product shell, not per-page link strips.
+- The primary UI should be Chinese and business-facing.
+- Data source management should replace the old English `Datasets` page feel.
+- Business Q&A is a preview route for future compatibility, not a completed chat product.
+- Guarded SQL, evidence validation, report generation, artifact handling, trace boundaries, and live DeepSeek acceptance must remain intact.
+
+Suggested P14 task queue:
+
+| Task | Scope | Status |
+|---|---|---|
+| P14-H1 | Clickable product UI prototype and full implementation plan | `[x]` Complete |
+| P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | `[x]` Complete |
+| P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | `[ ]` Not started |
+| P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | `[ ]` Not started |
+| P14-H5 | Report Center redesign with collapsed technical appendix | `[ ]` Not started |
+| P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[ ]` Not started |
+| P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[ ]` Not started |
+| P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[ ]` Not started |
 
 ## P13 Planning Snapshot
 

@@ -1,6 +1,6 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, and P13 business-facing product UX:
+InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, and the active P14 product UI shell work:
 
 ```text
 workspace
@@ -10,6 +10,7 @@ workspace
 -> P11 natural-language ad hoc analysis
 -> P12 structured workspace reports
 -> P13 Analysis Workbench, Data Settings, chart display, and product/live acceptance
+-> P14 unified Chinese product shell, shared design tokens, and clickable UI reference
 -> validated SQL, evidence, visualization, artifacts, and trace output
 ```
 
@@ -17,13 +18,14 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. There is no unfinished P13 H-task; the next planned phase is P14 product direction planning.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning and H2 shared Next.js product shell are complete, and H3 data source management redesign is next.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
+| P14 unified product UI shell | Active; H1-H2 complete, H3 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
 
 ## Quickstart
 

@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. No P13 H-task remains open; the next phase is P14 product direction planning. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. P14 Product UI Shell And Business Workflow is active and starts from a tracked clickable product UI prototype. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -16,6 +16,7 @@ FastAPI backend
 + natural business question for P11 ad hoc analysis
 + structured P12 workspace reports
 + P13 Analysis Workbench, clarification continuation, Data Settings, and chart display
++ P14 unified Chinese product shell and clickable UI reference
 + live DeepSeek/provider-backed product mode
 + guarded SQL candidate
 + validated SQL execution
@@ -46,6 +47,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
 | P13 | Business Answer And Product UX | Complete | H1-H9 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, real DeepSeek product acceptance, documentation, artifact audit, regression, live verification, and closeout |
+| P14 | Product UI Shell And Business Workflow | Active | H1 clickable product UI prototype and full implementation plan complete; H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers complete; H3 data source management redesign is next |
 
 ## P11 Product Hardening Plan
 
@@ -402,3 +404,81 @@ H9 artifact hygiene must prove that `.env`, API keys, workspace runs/reports, re
 - Charts render Chinese labels correctly and include useful units/value labels.
 - Live DeepSeek tests cover question understanding, clarification continuation, SQL planning/candidate, insight drafting, visualization, and readable final answer quality.
 - Full backend tests, frontend tests, frontend build, tracked artifact audit, and docs audit pass.
+
+## P14 Product UI Shell And Business Workflow Plan
+
+P14 is the active phase. It turns the P11/P12/P13 working product into a coherent Chinese business data-analysis web application. The main risk being addressed is product fragmentation: P13 made core pages more useful, but old pages and route-level navigation still feel like separate demos instead of one product.
+
+Implementation plan: `docs/product/plans/2026-06-29-p14-product-ui-shell-and-business-workflow.md`.
+
+Clickable UI reference: `docs/product/prototypes/p14-clickable-product-ui.html`.
+
+### P14 Product Direction
+
+Primary product shape:
+
+```text
+workspace
+-> 数据源管理
+-> 数据画像 / 语义层 / 模型模式 readiness
+-> 分析工作台
+-> business question and clarification continuation
+-> business answer, evidence, chart, and collapsed technical details
+-> 报告中心
+-> 数据设置
+-> 业务问答 preview route for future chat mode
+```
+
+P14 does not rewrite the guarded analysis runtime. It keeps the existing FastAPI workspace APIs, report APIs, provider-backed product mode, SQL validation, SQL execution, evidence validation, artifact handling, and trace boundaries. The main implementation work is shared Next.js product shell, UI tokens, page redesign, Chinese product copy, and frontend tests.
+
+### P14 Core Requirements
+
+- Track the clickable product UI prototype under `docs/product/prototypes/` so future implementation does not depend on ignored `.superpowers/` files.
+- Add one reusable Next.js product shell with brand, workspace label, model status, and horizontal navigation.
+- Use the same shell for 数据源管理, 分析工作台, 报告中心, 数据设置, run detail, report detail, and 业务问答 preview.
+- Replace old English/demo page copy such as `Datasets`, `Upload File`, `Reports`, and `Workspace Details` with Chinese product copy.
+- Keep the UI business-first: answers, recommendations, evidence, reports, and data readiness appear before SQL, raw rows, trace, and provider metadata.
+- Keep Business Q&A as a clearly labeled preview route, not a fake completed chat product.
+- Preserve P11/P12/P13 backend behavior and live DeepSeek acceptance.
+- Add frontend tests that assert product shell navigation and core Chinese business copy.
+
+### P14 Suggested Task Queue
+
+| Task | Scope | Status |
+|---|---|---|
+| P14-H1 | Clickable product UI prototype and full implementation plan | Complete |
+| P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | Complete |
+| P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | Not started |
+| P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | Not started |
+| P14-H5 | Report Center redesign: list, generator, reader, Markdown download, collapsed appendix | Not started |
+| P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | Not started |
+| P14-H7 | Business Q&A preview route using existing product objects conceptually, no new backend chat endpoint | Not started |
+| P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | Not started |
+
+### P14 Out Of Scope
+
+- Real SaaS integrations such as Slack, Jira, Power BI, Notion, email, CRM, or ticketing systems.
+- Auth/RBAC.
+- Deployment.
+- PDF/PPT export.
+- Scheduled reports.
+- Replacing the guarded SQL, evidence, visualization, report, or trace boundaries.
+- Restoring Streamlit, old ecommerce-only UI, old eval UI, old `chart_agent`, old `visualization_planner`, or old `chart_tool`.
+
+### P14 Acceptance
+
+- The tracked prototype exists at `docs/product/prototypes/p14-clickable-product-ui.html`.
+- Next.js workspace pages share one horizontal product shell.
+- The primary user-facing UI is Chinese and business-facing.
+- `/workspaces/{workspaceId}/datasets` reads as 数据源管理, not an English developer form.
+- `/workspaces/{workspaceId}/analysis` reads as 分析工作台 and preserves integrated clarification continuation.
+- `/workspaces/{workspaceId}/reports` reads as 报告中心 and keeps technical details secondary.
+- `/workspaces/{workspaceId}/settings` reads as 数据设置 and exposes data/profile/semantic/model/safety sections.
+- `/workspaces/{workspaceId}/business-qa` exists as a clearly labeled preview route.
+- Frontend tests cover product shell navigation and core Chinese product copy.
+- Full backend tests pass.
+- Full frontend tests and production build pass.
+- Real DeepSeek product acceptance passes.
+- P11 and P12 live regressions pass.
+- No generated artifacts are committed.
+- No old Streamlit/eval/chart-agent product path is restored.
