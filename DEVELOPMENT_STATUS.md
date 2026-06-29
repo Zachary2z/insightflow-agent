@@ -16,14 +16,14 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P14 Product UI Shell And Business Workflow |
-| Current task | P14-H7 Business Q&A preview route complete |
-| Next planned task | P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, artifact audit |
-| Last completed task | P14-H7 Business Q&A preview route |
+| Current task | P14-H8 full regression/live acceptance/docs closeout complete |
+| Next planned task | P15 planning pending |
+| Last completed task | P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, artifact audit |
 | Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
-| Out of scope for P14 | Real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, backend-agent rewrite, old demo restoration, and unguarded LLM execution |
+| Out of scope for P14 | Real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, full Business Q&A chat, backend-agent rewrite, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
 
@@ -47,7 +47,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | `[~]` H1-H7 complete; H8 full regression/live acceptance/docs closeout is next |
+| P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
 
 ## P11 Product Hardening
 
@@ -84,6 +84,19 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P14-H8 result: passed on 2026-06-29.
+
+P14-H8 verification result summary:
+
+- Full frontend test suite passed: `cd frontend && npm test` with `41 passed`.
+- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces/[workspaceId]/business-qa`, `/analysis`, `/reports`, and `/settings`.
+- Full backend suite passed: `python3 -m pytest` with `280 passed, 12 skipped`.
+- Real DeepSeek live acceptance passed with `.env`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`: `5 passed` across P11 workspace analysis, P12 workspace report, and P13 product acceptance.
+- P14 final product state is 数据源管理, 分析工作台, 报告中心, 数据设置, and 业务问答 preview.
+- Business Q&A remains a preview route that reuses the existing workspace analysis API and product result objects; it is not a complete chat product and no backend chat endpoint was added.
+- Real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, and full Business Q&A chat remain outside P14 scope.
+- Artifact hygiene and legacy path audit were run as H8 closeout checks; generated outputs must remain untracked and old Streamlit/eval/chart-agent product paths must remain absent.
 
 Latest P14-H7 result: passed on 2026-06-29.
 
@@ -242,7 +255,7 @@ Suggested P14 task queue:
 | P14-H5 | Report Center redesign with collapsed technical appendix | `[x]` Complete |
 | P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[x]` Complete |
 | P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[x]` Complete |
-| P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[ ]` Not started |
+| P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[x]` Complete |
 
 ## P13 Planning Snapshot
 

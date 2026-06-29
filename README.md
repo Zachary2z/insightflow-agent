@@ -1,6 +1,6 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, and the active P14 product UI shell work:
+InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, and the completed P14 product UI shell work:
 
 ```text
 workspace
@@ -18,16 +18,16 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning, H2 shared Next.js product shell, H3 data source management redesign, H4 Analysis Workbench redesign, H5 Report Center redesign, H6 Data Settings redesign, and H7 Business Q&A preview route are complete, and H8 full regression/live acceptance/docs closeout is next.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is complete through H1-H8, including the clickable prototype/planning, shared Next.js product shell, data source management redesign, Analysis Workbench redesign, Report Center redesign, Data Settings redesign, Business Q&A preview route, full regression, real DeepSeek live acceptance, docs closeout, and artifact audit.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
-| P14 unified product UI shell | Active; H1-H7 complete, H8 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
+| P14 unified product UI shell | Complete; H1-H8 closed | `docs/product/prototypes/p14-clickable-product-ui.html` |
 
-P14-H7 Business Q&A preview route is complete. P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, and artifact audit is the next planned task.
+P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, and artifact audit is complete. P15 planning is pending.
 
 ## Quickstart
 
@@ -59,6 +59,22 @@ Open the frontend at `http://localhost:3000`, create a workspace, import CSV/Exc
 - P12 reports: `/workspaces/{workspaceId}/reports`
 - P14 data settings: `/workspaces/{workspaceId}/settings`
 - P14 Business Q&A preview: `/workspaces/{workspaceId}/business-qa`
+
+## P14 Product State
+
+P14 closes the current product UI phase with these product surfaces:
+
+- 数据源管理: CSV/Excel upload, SQLite import, source list, and data-readiness copy.
+- 分析工作台: business question input, clarification continuation, business answer, evidence, chart artifacts, and collapsed technical details.
+- 报告中心: report generation, report list, business report reader, Markdown download, and collapsed technical appendix.
+- 数据设置: data sources, field profile, semantic layer, product/live model mode, and safety/audit status.
+- 业务问答预览: a clearly labeled future-mode preview that reuses the existing workspace analysis API and product result objects.
+
+Business Q&A remains a preview, not a complete multi-turn chat product. P14 does not add a backend chat endpoint.
+
+Real SaaS integrations, auth/RBAC, deployment, scheduled reports, PDF/PPT export, vector databases, and full Business Q&A chat remain outside the P14 scope.
+
+P14-H1, P14-H2, P14-H3, P14-H4, P14-H5, P14-H6, P14-H7, and P14-H8 are complete.
 
 ## P13 Product Capabilities
 
@@ -187,6 +203,10 @@ Backend:
 
 ```bash
 python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
+set -a; [ -f .env ] && source .env; set +a; \
+INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
+INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
+python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p13_live_deepseek_product_acceptance.py -q
 python3 -m pytest tests/test_p13_live_deepseek_product_acceptance.py -q
 python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
 python3 -m pytest -q
@@ -244,7 +264,7 @@ The LLM may understand, plan, draft SQL candidates, draft wording, and choose vi
 
 P0-P10 are retained as historical engineering context and low-level safety coverage. They should not be treated as current product entry points.
 
-- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, mock jira demos, `powerbi_publisher_mock`, fixed template behavior, deterministic action template behavior, and chart keyword inference are old demo/eval or cleanup-history terms, not current P11/P12/P13 product guidance.
+- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, mock jira demos, `powerbi_publisher_mock`, fixed template behavior, deterministic action template behavior, and chart keyword inference are old demo/eval or cleanup-history terms, not current P11/P12/P13/P14 product guidance.
 - Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level schema, SQL validator, SQL executor, workflow, report, MCP, and provider regression tests still use it directly. It is not the default product database, not the API default, and not the current quickstart data source.
 - Historical generated-output locations such as eval reports, trace JSON, chart PNG/XLSX files, action DBs, frontend build output, and dependency directories must not be committed.
 
