@@ -213,6 +213,120 @@ th {
   gap: 16px;
 }
 
+.analysis-main-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.analysis-primary-column,
+.analysis-history-panel,
+.history-list {
+  display: grid;
+  gap: 14px;
+}
+
+.analysis-history-panel .product-lead {
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.history-empty {
+  background: var(--product-surface-soft);
+  border: 1px dashed var(--product-line);
+  border-radius: 8px;
+  color: var(--product-muted);
+  line-height: 1.6;
+  margin: 0;
+  padding: 14px;
+}
+
+.history-card {
+  align-items: stretch;
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 8px;
+  color: var(--product-ink);
+  display: grid;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: stretch;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.history-card:hover {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  text-decoration: none;
+}
+
+.history-card.selected {
+  background: var(--product-blue-soft);
+  border-color: var(--product-blue);
+  box-shadow: inset 3px 0 0 var(--product-blue);
+}
+
+.history-card-topline,
+.history-meta-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.history-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 5px 8px;
+}
+
+.history-status-completed {
+  background: var(--product-green-soft);
+  color: #166534;
+}
+
+.history-status-failed {
+  background: #fef2f2;
+  color: #b42318;
+}
+
+.history-status-waiting {
+  background: var(--product-orange-soft);
+  color: #9a3412;
+}
+
+.history-status-running {
+  background: var(--product-blue-soft);
+  color: var(--product-blue);
+}
+
+.history-time,
+.history-meta-row,
+.history-summary {
+  color: var(--product-muted);
+  font-size: 13px;
+}
+
+.history-question {
+  color: var(--product-ink);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.history-summary {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .run-shell {
   margin-top: 2px;
 }
@@ -1111,6 +1225,10 @@ th {
 
   .product-page-header {
     display: grid;
+  }
+
+  .analysis-main-grid {
+    grid-template-columns: 1fr;
   }
 
   .chat-shell {

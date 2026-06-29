@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P15 Analysis Reliability And History |
-| Current task | P15-H1 backend run history APIs complete |
-| Next planned task | P15-H2 Analysis Workbench history panel |
-| Last completed task | P15-H1 Backend Run History APIs |
+| Current task | P15-H2 Analysis Workbench history panel complete |
+| Next planned task | P15-H3 Run detail uses backend source of truth |
+| Last completed task | P15-H2 Analysis Workbench History Panel |
 | Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -48,7 +48,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
-| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 history panel next |
+| P15 | Analysis Reliability And History | `[~]` H1 backend run history APIs complete; H2 Analysis Workbench history panel complete; H3 run detail backend source of truth next |
 
 ## P11 Product Hardening
 
@@ -85,6 +85,17 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P15-H2 result: passed on 2026-06-29.
+
+P15-H2 verification result summary:
+
+- Focused Analysis Workbench history tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `40 passed`.
+- Full frontend test suite passed: `cd frontend && npm test` with `50 passed`.
+- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces/[workspaceId]/analysis`.
+- P15-H1 backend run history API regression passed: `python3 -m pytest tests/test_workspace_run_history_api.py -q` with `7 passed`.
+- Analysis Workbench now loads persisted run history from the backend run history API, shows completed, failed, waiting-for-clarification, and running status labels in Chinese, keeps failed runs visible, and restores a selected run through `getWorkspaceRun()`.
+- History refreshes after new analysis, clarification continuation, and follow-up analysis. `sessionStorage` remains only as the existing optional run-detail cache, not as the history source.
 
 Latest P14-H8 result: passed on 2026-06-29.
 

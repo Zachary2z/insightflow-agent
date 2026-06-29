@@ -43,9 +43,11 @@ vi.mock("../lib/api", () => ({
   getWorkspaceArtifactUrl: (workspaceId: string, relativePath: string) =>
     `http://localhost:8000/api/workspaces/${workspaceId}/artifacts/${relativePath}`,
   getWorkspaceReportDownloadUrl: vi.fn(),
+  getWorkspaceRun: vi.fn(),
   getWorkspaceSettings: vi.fn(),
   importSqliteSource: vi.fn(),
   listWorkspaceReports: vi.fn(),
+  listWorkspaceRuns: vi.fn(),
   listSources: vi.fn(),
   listWorkspaces: vi.fn(),
   resolveApiUrl: (url: string) => (url.startsWith("/api/") ? `http://localhost:8000${url}` : url),
@@ -60,9 +62,11 @@ import {
   createWorkspace,
   getWorkspaceReport,
   getWorkspaceReportDownloadUrl,
+  getWorkspaceRun,
   getWorkspaceSettings,
   importSqliteSource,
   listWorkspaceReports,
+  listWorkspaceRuns,
   listSources,
   listWorkspaces,
   runAnalysis,
@@ -415,7 +419,137 @@ describe("workspace product components", () => {
     expect(screen.getByText("暂无数据源")).toBeTruthy();
   });
 
+  it("loads analysis history on mount and renders completed failed and clarification runs", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({
+      workspace_id: "ws_1",
+      runs: [
+        {
+          run_id: "run_done",
+          status: "completed",
+          question: "哪个渠道收入最高？",
+          headline: "Email produced the most revenue.",
+          saved_at: "2026-06-29T12:00:00Z",
+          has_chart: true,
+          requires_clarification: false,
+          failure_reason: "",
+        },
+        {
+          run_id: "run_failed",
+          status: "failed",
+          question: "分析不存在字段",
+          headline: "",
+          saved_at: "2026-06-29T11:00:00Z",
+          has_chart: false,
+          requires_clarification: false,
+          failure_reason: "SQL 引用了当前工作区不存在的表或字段，本轮未执行查询。",
+        },
+        {
+          run_id: "run_waiting",
+          status: "waiting_for_clarification",
+          question: "帮我看看销售情况",
+          headline: "需要补充时间范围",
+          saved_at: "2026-06-29T10:00:00Z",
+          has_chart: false,
+          requires_clarification: true,
+          failure_reason: "",
+        },
+      ],
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledWith("ws_1"));
+    expect(await screen.findByText("历史分析")).toBeTruthy();
+    expect(screen.getByText("哪个渠道收入最高？")).toBeTruthy();
+    expect(screen.getByText(/Email produced the most revenue/)).toBeTruthy();
+    expect(screen.getByText("分析不存在字段")).toBeTruthy();
+    expect(screen.getByText(/SQL 引用了当前工作区不存在的表或字段/)).toBeTruthy();
+    expect(screen.getByText("帮我看看销售情况")).toBeTruthy();
+    expect(screen.getByText(/需要补充时间范围/)).toBeTruthy();
+    expect(screen.getByText("有图表")).toBeTruthy();
+    expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("失败").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("等待补充").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("restores a selected history run into the analysis result", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({
+      workspace_id: "ws_1",
+      runs: [
+        {
+          run_id: "run_history",
+          status: "completed",
+          question: "恢复历史问题",
+          headline: "历史业务结论",
+          saved_at: "2026-06-29T12:00:00Z",
+          has_chart: false,
+          requires_clarification: false,
+          failure_reason: "",
+        },
+      ],
+    });
+    vi.mocked(getWorkspaceRun).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_history",
+      result: {
+        product_result: {
+          version: "p13.v1",
+          status: "completed",
+          question_thread: { original_question: "恢复历史问题", status: "completed" },
+          business_answer: {
+            headline: "历史业务结论",
+            summary: "这是从后端历史详情恢复的完整结果。",
+            confidence: "medium",
+          },
+          evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+          chart_artifacts: [],
+          technical_details: {},
+        },
+      },
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.click(await screen.findByRole("button", { name: /恢复历史问题/ }));
+
+    await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_history"));
+    expect(await screen.findByText("历史业务结论", { selector: ".answer-headline" })).toBeTruthy();
+    expect(screen.getByText("这是从后端历史详情恢复的完整结果。")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /恢复历史问题/ }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("shows Chinese history empty and error states", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] });
+
+    const { unmount } = render(<AnalysisRunner workspaceId="ws_1" />);
+
+    expect(await screen.findByText("还没有历史分析。开始提问后会保存在这里。")).toBeTruthy();
+    unmount();
+
+    vi.mocked(listWorkspaceRuns).mockRejectedValueOnce(new Error("backend unavailable"));
+    render(<AnalysisRunner workspaceId="ws_1" />);
+
+    expect(await screen.findByText("历史分析加载失败：backend unavailable")).toBeTruthy();
+  });
+
   it("submits analysis questions and stores the run result for the detail page", async () => {
+    vi.mocked(listWorkspaceRuns)
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
+      .mockResolvedValueOnce({
+        workspace_id: "ws_1",
+        runs: [
+          {
+            run_id: "run_1",
+            status: "completed",
+            question: "哪个渠道收入最高？",
+            headline: "Email produced the most revenue.",
+            saved_at: "2026-06-29T12:00:00Z",
+            has_chart: false,
+            requires_clarification: false,
+            failure_reason: "",
+          },
+        ],
+      });
     vi.mocked(runAnalysis).mockResolvedValue({
       success: true,
       workspace_id: "ws_1",
@@ -451,6 +585,7 @@ describe("workspace product components", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
 
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("分析线程")).toBeTruthy();
     expect(screen.getByText("用户问题")).toBeTruthy();
     expect(screen.getByText("系统理解")).toBeTruthy();
@@ -661,6 +796,10 @@ describe("workspace product components", () => {
   });
 
   it("submits only the clarification answer for a pending run", async () => {
+    vi.mocked(listWorkspaceRuns)
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_pending", status: "waiting_for_clarification", question: "帮我分析渠道表现", headline: "需要补充时间范围", saved_at: "2026-06-29T12:00:00Z", has_chart: false, requires_clarification: true, failure_reason: "" }] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_done", status: "completed", question: "帮我分析渠道表现", headline: "paid_search 表现最好", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
     vi.mocked(runAnalysis)
       .mockResolvedValueOnce({
         success: true,
@@ -725,12 +864,17 @@ describe("workspace product components", () => {
         clarificationAnswer: "最近 90 天",
       }),
     );
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(3));
     expect(await screen.findByText("用户补充")).toBeTruthy();
     expect(screen.getByText("整理后")).toBeTruthy();
     expect(await screen.findByText("paid_search 表现最好")).toBeTruthy();
   });
 
   it("starts a contextual follow-up analysis after a completed run", async () => {
+    vi.mocked(listWorkspaceRuns)
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_done", status: "completed", question: "帮我分析最近90天哪些渠道收益比较好", headline: "email 渠道收益最好", saved_at: "2026-06-29T12:00:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_followup", status: "completed", question: "为什么 email 渠道收益最好？", headline: "email 的客单价更高", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
     vi.mocked(runAnalysis)
       .mockResolvedValueOnce({
         success: true,
@@ -802,6 +946,7 @@ describe("workspace product components", () => {
     expect(String((followUpRequest as { userQuestion?: string }).userQuestion)).toContain(
       "帮我分析最近90天哪些渠道收益比较好",
     );
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(3));
     expect(await screen.findByText("email 的客单价更高")).toBeTruthy();
   });
 

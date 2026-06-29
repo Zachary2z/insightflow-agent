@@ -159,6 +159,23 @@ export type WorkspaceRunResponse = {
   product_result?: ProductAnalysisResult | null;
 };
 
+export type WorkspaceRunSummary = {
+  run_id: string;
+  status: string;
+  question: string;
+  headline?: string;
+  created_at?: string | null;
+  saved_at?: string | null;
+  has_chart?: boolean;
+  requires_clarification?: boolean;
+  failure_reason?: string;
+};
+
+export type WorkspaceRunsResponse = {
+  workspace_id: string;
+  runs: WorkspaceRunSummary[];
+};
+
 export type ReportType = "business_review" | "channel_performance" | "revenue_trend";
 
 export type WorkspaceReportSection = {
@@ -334,6 +351,16 @@ export async function runAnalysis(
     body: JSON.stringify(payload),
   });
   return parseJsonResponse(response, "Failed to run analysis");
+}
+
+export async function listWorkspaceRuns(workspaceId: string): Promise<WorkspaceRunsResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/runs`);
+  return parseJsonResponse(response, "Failed to list analysis history");
+}
+
+export async function getWorkspaceRun(workspaceId: string, runId: string): Promise<WorkspaceRunResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/runs/${runId}`);
+  return parseJsonResponse(response, "Failed to load analysis run");
 }
 
 export async function createWorkspaceReport(
