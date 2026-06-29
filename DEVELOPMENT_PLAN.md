@@ -47,7 +47,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P11 | General Data Analysis Product | Complete | H1-H5 hardening complete; backend, frontend, artifact, and live DeepSeek verification passed |
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
 | P13 | Business Answer And Product UX | Complete | H1-H9 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, real DeepSeek product acceptance, documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | Active | H1 clickable product UI prototype and full implementation plan complete; H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers complete; H3 data source management redesign complete; H4 Analysis Workbench redesign complete; H5 Report Center redesign is next |
+| P14 | Product UI Shell And Business Workflow | Active | H1 clickable product UI prototype and full implementation plan complete; H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers complete; H3 data source management redesign complete; H4 Analysis Workbench redesign complete; H5 Report Center redesign complete; H6 Data Settings redesign is next |
 
 ## P11 Product Hardening Plan
 
@@ -450,7 +450,7 @@ P14 does not rewrite the guarded analysis runtime. It keeps the existing FastAPI
 | P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | Complete |
 | P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | Complete |
 | P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | Complete |
-| P14-H5 | Report Center redesign: list, generator, reader, Markdown download, collapsed appendix | Not started |
+| P14-H5 | Report Center redesign: list, generator, reader, Markdown download, collapsed appendix | Complete |
 | P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | Not started |
 | P14-H7 | Business Q&A preview route using existing product objects conceptually, no new backend chat endpoint | Not started |
 | P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | Not started |

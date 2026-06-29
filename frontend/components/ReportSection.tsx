@@ -1,5 +1,7 @@
 import React from "react";
 import type { WorkspaceReportSection } from "../lib/api";
+import ProductCard from "./ProductCard";
+import { StatusPill } from "./ProductStatus";
 
 type ReportSectionProps = {
   section: WorkspaceReportSection;
@@ -33,10 +35,14 @@ export default function ReportSection({ section }: ReportSectionProps) {
   const artifacts = businessArtifacts(section);
 
   return (
-    <article className="panel stack">
+    <ProductCard className="report-section-card">
       <header>
         <h3>{section.title}</h3>
-        <p>章节状态：{statusLabel(section.status)}</p>
+        <StatusPill
+          tone={section.status === "completed" ? "green" : section.status === "running" ? "blue" : "orange"}
+        >
+          章节状态：{statusLabel(section.status)}
+        </StatusPill>
       </header>
       {section.summary ? (
         <section>
@@ -62,7 +68,7 @@ export default function ReportSection({ section }: ReportSectionProps) {
       ) : null}
       {artifacts.length ? (
         <section>
-          <h4>图表</h4>
+          <h4>图表或附件</h4>
           <div className="chart-list">
             {artifacts.map((artifact, index) => (
               <figure key={`${artifact.url || artifact.path || artifact.title}-${index}`} className="chart-artifact">
@@ -77,6 +83,6 @@ export default function ReportSection({ section }: ReportSectionProps) {
           </div>
         </section>
       ) : null}
-    </article>
+    </ProductCard>
   );
 }

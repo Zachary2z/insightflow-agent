@@ -804,6 +804,84 @@ th {
   width: 100%;
 }
 
+.report-center,
+.report-viewer,
+.report-sections,
+.report-list,
+.report-form {
+  display: grid;
+  gap: 18px;
+}
+
+.report-reader-head,
+.report-list-item {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.report-reader-head h2,
+.report-list-item h3,
+.report-section-card h3,
+.report-summary h3 {
+  margin: 0;
+}
+
+.report-meta-row {
+  align-items: center;
+  color: var(--product-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-weight: 800;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.report-goal-copy,
+.report-summary,
+.report-section-card section,
+.report-goal-examples {
+  margin-top: 16px;
+}
+
+.report-goal-copy {
+  color: #26364d;
+  line-height: 1.6;
+}
+
+.report-goal-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-goal-examples .secondary-button {
+  min-height: 36px;
+}
+
+.report-list-item {
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.report-list-item .button,
+.report-reader-head .button {
+  flex: 0 0 auto;
+}
+
+.report-summary ul,
+.report-section-card ul {
+  margin: 10px 0 0;
+}
+
+.report-section-card header {
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 980px) {
   .product-topbar-inner,
   .product-page {
@@ -856,6 +934,11 @@ th {
   }
 
   .product-section-title {
+    display: grid;
+  }
+
+  .report-reader-head,
+  .report-list-item {
     display: grid;
   }
 

@@ -2,6 +2,7 @@ import ProductPageHeader from "@/components/ProductPageHeader";
 import ProductShell from "@/components/ProductShell";
 import ReportGenerator from "@/components/ReportGenerator";
 import ReportList from "@/components/ReportList";
+import React from "react";
 
 type ReportsPageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -15,11 +16,11 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
       <ProductPageHeader
         eyebrow="Report Center"
         title="报告中心"
-        description="用于生成、阅读、下载管理层报告。正文业务化，技术信息默认收起。"
+        description="集中管理业务复盘、渠道表现和收入趋势报告。报告正文面向管理层阅读，技术信息默认收起。"
       />
-      <section className="stack">
-        <ReportGenerator workspaceId={workspaceId} />
+      <section className="report-center">
         <ReportList workspaceId={workspaceId} />
+        <ReportGenerator workspaceId={workspaceId} />
       </section>
     </ProductShell>
   );

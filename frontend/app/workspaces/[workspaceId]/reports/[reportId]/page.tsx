@@ -1,5 +1,7 @@
-import Link from "next/link";
+import ProductPageHeader from "@/components/ProductPageHeader";
+import ProductShell from "@/components/ProductShell";
 import ReportViewer from "@/components/ReportViewer";
+import React from "react";
 
 type ReportDetailPageProps = {
   params: Promise<{ workspaceId: string; reportId: string }>;
@@ -9,18 +11,13 @@ export default async function ReportDetailPage({ params }: ReportDetailPageProps
   const { workspaceId, reportId } = await params;
 
   return (
-    <main>
-      <h1>Report Detail</h1>
-      <p>Workspace: {workspaceId}</p>
-      <p>Report: {reportId}</p>
-      <nav>
-        <Link href={`/workspaces/${workspaceId}/reports`}>Back to reports</Link>
-        <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
-        <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
-        <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
-        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
-      </nav>
+    <ProductShell workspaceId={workspaceId} active="reports">
+      <ProductPageHeader
+        eyebrow="Report Reader"
+        title="报告中心"
+        description="阅读报告正文、查看章节和图表，并在需要时展开技术附录。"
+      />
       <ReportViewer workspaceId={workspaceId} reportId={reportId} />
-    </main>
+    </ProductShell>
   );
 }

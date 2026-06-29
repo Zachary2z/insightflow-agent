@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { getWorkspaceReport, type WorkspaceReport } from "../lib/api";
+import ProductCard from "./ProductCard";
+import { StatusPill } from "./ProductStatus";
 import ReportDownloadLink from "./ReportDownloadLink";
 import ReportSection from "./ReportSection";
 import ReportTechnicalAppendix from "./ReportTechnicalAppendix";
@@ -70,7 +72,7 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
   }, [workspaceId, reportId]);
 
   if (isLoading) {
-    return <p role="status">Loading report</p>;
+    return <p role="status">正在加载报告</p>;
   }
 
   if (error) {
@@ -79,29 +81,32 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
 
   if (!report) {
     return (
-      <section className="panel">
-        <h2>Report</h2>
-        <p>Report was not found.</p>
-      </section>
+      <ProductCard>
+        <h2>报告不存在</h2>
+        <p>没有找到这份报告。</p>
+      </ProductCard>
     );
   }
 
   return (
-    <section className="stack">
-      <article className="panel stack">
-        <div className="item-row">
+    <section className="report-viewer">
+      <ProductCard className="report-reader-hero">
+        <div className="report-reader-head">
           <div>
+            <p className="product-eyebrow">Report</p>
             <h2>{report.title}</h2>
-            <p>状态：{statusLabel(report.status)}</p>
-            <p>{progressSummary(report)}</p>
-            <p>类型：{report.report_type}</p>
-            <p>目标：{report.report_goal}</p>
+            <div className="report-meta-row">
+              <StatusPill tone={statusTone(report.status)}>生成状态：{statusLabel(report.status)}</StatusPill>
+              <span>{progressSummary(report)}</span>
+              <span>报告类型：{reportTypeLabel(report.report_type)}</span>
+            </div>
+            {report.report_goal ? <p className="report-goal-copy">报告目标：{report.report_goal}</p> : null}
           </div>
           <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} />
         </div>
         {report.executive_summary?.length ? (
-          <section>
-            <h3>Executive Summary</h3>
+          <section className="report-summary">
+            <h3>管理层摘要 / Executive Summary</h3>
             <ul>
               {report.executive_summary.map((item) => (
                 <li key={item}>{item}</li>
@@ -109,16 +114,45 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
             </ul>
           </section>
         ) : null}
-      </article>
-      <section className="stack">
-        <h2>业务章节</h2>
+      </ProductCard>
+      <section className="report-sections">
+        <div className="product-section-title">
+          <div>
+            <p className="product-eyebrow">Sections</p>
+            <h2>报告章节</h2>
+          </div>
+        </div>
         {report.sections?.length ? (
           report.sections.map((section) => <ReportSection key={section.section_id} section={section} />)
         ) : (
-          <p>No report sections returned.</p>
+          <ProductCard>
+            <p>暂无报告章节。</p>
+          </ProductCard>
         )}
       </section>
       <ReportTechnicalAppendix report={report} />
     </section>
   );
+}
+
+function statusTone(status: string): "green" | "orange" | "blue" | "neutral" {
+  if (status === "completed") {
+    return "green";
+  }
+  if (status === "failed" || status === "partial") {
+    return "orange";
+  }
+  if (status === "running") {
+    return "blue";
+  }
+  return "neutral";
+}
+
+function reportTypeLabel(reportType: string) {
+  const labels: Record<string, string> = {
+    business_review: "经营复盘",
+    channel_performance: "渠道表现",
+    revenue_trend: "收入趋势",
+  };
+  return labels[reportType] ?? reportType;
 }

@@ -15,6 +15,8 @@ import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
 import WorkspaceList from "../components/WorkspaceList";
 import WorkspaceNewForm from "../components/WorkspaceNewForm";
 import DatasetsPage from "../app/workspaces/[workspaceId]/datasets/page";
+import ReportDetailPage from "../app/workspaces/[workspaceId]/reports/[reportId]/page";
+import ReportsPage from "../app/workspaces/[workspaceId]/reports/page";
 import SettingsPage from "../app/workspaces/[workspaceId]/settings/page";
 
 const pushMock = vi.fn();
@@ -590,8 +592,9 @@ describe("workspace product components", () => {
 
     render(<ReportList workspaceId="ws_1" />);
 
-    expect(screen.getByText("Loading reports")).toBeTruthy();
-    expect(await screen.findByText("No reports generated yet.")).toBeTruthy();
+    expect(screen.getByText("正在加载报告")).toBeTruthy();
+    expect(await screen.findByText("还没有生成报告")).toBeTruthy();
+    expect(screen.getByText("生成第一份管理层复盘，之后会在这里按创建时间展示。")).toBeTruthy();
   });
 
   it("submits a report generation form and opens the created report", async () => {
@@ -616,16 +619,20 @@ describe("workspace product components", () => {
     });
 
     render(<ReportGenerator workspaceId="ws_1" />);
-    fireEvent.change(screen.getByLabelText("Report type"), { target: { value: "channel_performance" } });
-    fireEvent.change(screen.getByLabelText("Report goal"), {
-      target: { value: "Compare acquisition channel revenue." },
+    expect(screen.getByText("新建报告")).toBeTruthy();
+    expect(screen.getByText("生成最近 90 天渠道表现复盘")).toBeTruthy();
+    expect(screen.getByText("生成管理层收入复盘报告")).toBeTruthy();
+    expect(screen.getByText("生成客户增长与留存报告")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("报告类型"), { target: { value: "channel_performance" } });
+    fireEvent.change(screen.getByLabelText("报告目标"), {
+      target: { value: "生成最近 90 天渠道表现复盘" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成报告" }));
 
     await waitFor(() =>
       expect(createWorkspaceReport).toHaveBeenCalledWith("ws_1", {
         reportType: "channel_performance",
-        reportGoal: "Compare acquisition channel revenue.",
+        reportGoal: "生成最近 90 天渠道表现复盘",
       }),
     );
     expect(pushMock).toHaveBeenCalledWith("/workspaces/ws_1/reports/report_1");
@@ -656,10 +663,24 @@ describe("workspace product components", () => {
     render(<ReportList workspaceId="ws_1" />);
 
     expect(await screen.findByText("Business Review")).toBeTruthy();
-    expect(screen.getByText("Status: completed")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open report" }).getAttribute("href")).toBe(
+    expect(screen.getByText("报告列表")).toBeTruthy();
+    expect(screen.getByText("生成状态：已完成")).toBeTruthy();
+    expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
+    expect(screen.getByText(/创建时间：2026-06-23/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开报告" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/reports/report_1",
     );
+  });
+
+  it("renders the report center route with active product navigation", async () => {
+    vi.mocked(listWorkspaceReports).mockResolvedValue({ workspace_id: "ws_1", reports: [] });
+
+    render(await ReportsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "报告中心" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
+    expect(await screen.findByText("还没有生成报告")).toBeTruthy();
+    expect(screen.getByText("新建报告")).toBeTruthy();
   });
 
   it("renders business report detail with a collapsed technical appendix and Markdown download link", async () => {
@@ -720,13 +741,19 @@ describe("workspace product components", () => {
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
     expect(await screen.findByText("Business Review")).toBeTruthy();
-    expect(screen.getByText("状态：已完成")).toBeTruthy();
+    expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
+    expect(screen.getByText("管理层摘要 / Executive Summary")).toBeTruthy();
+    expect(screen.getByText("报告章节")).toBeTruthy();
     expect(screen.getByText("Revenue grew.")).toBeTruthy();
     expect(screen.getByText("Paid search led revenue.")).toBeTruthy();
     expect(screen.getByText("Rows preview came from workspace data.")).toBeTruthy();
+    expect(screen.getByText("图表或附件")).toBeTruthy();
     expect(screen.getByText("Revenue by Channel 图表已生成")).toBeTruthy();
     expect(screen.queryByText("artifacts/revenue_by_channel_1.png")).toBeNull();
+    expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.md")).toBeNull();
+    expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.json")).toBeNull();
+    expect(screen.queryByText("workspaces/ws_1/reports/report_1/artifacts")).toBeNull();
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
     expect(screen.queryByText("paid_search")).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
@@ -740,9 +767,40 @@ describe("workspace product components", () => {
     expect(screen.getByText(/provider_called/)).toBeTruthy();
     expect(screen.getByText(/sql_reviewer/)).toBeTruthy();
     expect(screen.getByText(/这是自动报告内部 section/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Download Markdown" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "下载 Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
+  });
+
+  it("renders the report detail route inside the product shell", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        executive_summary: ["收入增长稳定。"],
+        sections: [{ section_id: "summary", title: "收入概览", status: "completed", summary: "收入保持增长。" }],
+      },
+    });
+
+    render(
+      await ReportDetailPage({
+        params: Promise.resolve({ workspaceId: "ws_1", reportId: "report_1" }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "报告中心" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
+    expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
+    expect(screen.getByText("收入增长稳定。")).toBeTruthy();
   });
 
   it.each([
@@ -785,7 +843,7 @@ describe("workspace product components", () => {
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
-    expect(await screen.findByText(`状态：${label}`)).toBeTruthy();
+    expect(await screen.findByText(`生成状态：${label}`)).toBeTruthy();
     expect(screen.getByText(progress)).toBeTruthy();
   });
 

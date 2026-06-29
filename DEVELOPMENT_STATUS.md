@@ -16,9 +16,9 @@ This file is the living status tracker for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P14 Product UI Shell And Business Workflow |
-| Current task | P14-H4 Analysis Workbench redesign complete |
-| Next planned task | P14-H5 Report Center redesign |
-| Last completed task | P14-H4 Analysis Workbench redesign |
+| Current task | P14-H5 Report Center redesign complete |
+| Next planned task | P14-H6 Data Settings redesign |
+| Last completed task | P14-H5 Report Center redesign |
 | Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -47,7 +47,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | `[~]` H1-H4 complete; H5 Report Center redesign is next |
+| P14 | Product UI Shell And Business Workflow | `[~]` H1-H5 complete; H6 Data Settings redesign is next |
 
 ## P11 Product Hardening
 
@@ -84,6 +84,17 @@ workspace
 No H1-H5 implementation or verification work remains.
 
 ## Final Verification Summary
+
+Latest P14-H5 result: passed on 2026-06-29.
+
+P14-H5 verification result summary:
+
+- Focused report-center frontend tests passed: `frontend/tests/workspace-flow.test.tsx` with `28 passed`.
+- Product shell plus workspace flow frontend regression passed: `29 passed`.
+- Full frontend test suite passed: `37 passed`.
+- Frontend production build passed and included `/workspaces/[workspaceId]/reports` plus `/workspaces/[workspaceId]/reports/[reportId]`.
+- Report backend regressions passed: `28 passed` across `tests/test_workspace_report_api.py`, `tests/test_workspace_report_runner.py`, and `tests/test_workspace_report_store.py`.
+- Report UI now uses the shared P14 ProductShell, Chinese report-center copy, Chinese empty/status/type labels, business-facing generation examples, visible Markdown download, and collapsed technical appendix for paths, trace, SQL, provider metadata, and raw JSON details.
 
 Latest P13-H9 result: passed on 2026-06-25.
 
@@ -204,7 +215,7 @@ Suggested P14 task queue:
 | P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | `[x]` Complete |
 | P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | `[x]` Complete |
 | P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | `[x]` Complete |
-| P14-H5 | Report Center redesign with collapsed technical appendix | `[ ]` Not started |
+| P14-H5 | Report Center redesign with collapsed technical appendix | `[x]` Complete |
 | P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[ ]` Not started |
 | P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[ ]` Not started |
 | P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[ ]` Not started |

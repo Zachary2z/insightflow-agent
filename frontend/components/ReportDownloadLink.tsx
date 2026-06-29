@@ -9,7 +9,7 @@ type ReportDownloadLinkProps = {
 export default function ReportDownloadLink({ workspaceId, reportId }: ReportDownloadLinkProps) {
   return (
     <a className="button" href={getWorkspaceReportDownloadUrl(workspaceId, reportId)}>
-      Download Markdown
+      下载 Markdown
     </a>
   );
 }
