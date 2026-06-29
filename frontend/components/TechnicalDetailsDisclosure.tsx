@@ -32,9 +32,10 @@ export default function TechnicalDetailsDisclosure({ details }: TechnicalDetails
 
   return (
     <details className="technical-details">
-      <summary onClick={() => setIsOpen((current) => !current)}>技术细节</summary>
+      <summary onClick={() => setIsOpen((current) => !current)}>技术详情</summary>
       {isOpen ? (
         <div className="technical-content">
+          <p>默认折叠；仅在需要排查 SQL、Trace、Provider Metadata 或校验日志时展开。</p>
           <JsonBlock title="SQL" value={details?.sql} />
           <JsonBlock title="Raw rows" value={details?.raw_rows} />
           <JsonBlock title="Trace" value={details?.trace_path} />

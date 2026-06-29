@@ -140,7 +140,18 @@ th {
 }
 
 .analysis-workbench {
-  gap: 16px;
+  display: grid;
+  gap: 18px;
+}
+
+.workbench-local-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.workbench-local-heading h2 {
+  font-size: 22px;
+  margin: 0;
 }
 
 .workbench-header,
@@ -202,6 +213,10 @@ th {
   gap: 16px;
 }
 
+.run-shell {
+  margin-top: 2px;
+}
+
 .advanced-options,
 .technical-details {
   border: 1px solid #d9e1ee;
@@ -232,6 +247,53 @@ th {
   padding: 16px;
 }
 
+.workbench-readiness-card {
+  display: grid;
+  gap: 18px;
+}
+
+.workbench-readiness-card h2 {
+  margin: 0;
+}
+
+.workbench-metric-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workbench-metric {
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  min-height: 82px;
+  padding: 14px;
+}
+
+.workbench-metric strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.workbench-metric span {
+  color: var(--product-muted);
+  font-weight: 800;
+}
+
+.workbench-metric.blue strong {
+  color: var(--product-blue);
+}
+
+.workbench-metric.green strong {
+  color: var(--product-green);
+}
+
+.workbench-metric.orange strong {
+  color: var(--product-orange);
+}
+
 .thread-list {
   display: grid;
   gap: 8px;
@@ -239,10 +301,13 @@ th {
 }
 
 .thread-item {
-  border-left: 3px solid #d6e4ff;
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-left: 4px solid #d6e4ff;
+  border-radius: 12px;
   display: grid;
-  gap: 2px;
-  padding-left: 10px;
+  gap: 4px;
+  padding: 10px 12px;
 }
 
 .thread-item dt {
@@ -263,6 +328,14 @@ th {
   padding-top: 14px;
 }
 
+.clarification-form p,
+.thread-help,
+.panel-help {
+  color: var(--product-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
 .inline-form-row input {
   min-width: 0;
 }
@@ -275,6 +348,15 @@ th {
 
 .business-answer {
   border-color: #b7d7c2;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fff9 100%);
+}
+
+.answer-headline {
+  color: #14532d;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.35;
+  margin: 8px 0 0;
 }
 
 .answer-summary {
@@ -778,7 +860,8 @@ th {
   }
 
   .dataset-action-grid,
-  .dataset-side-column {
+  .dataset-side-column,
+  .workbench-metric-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -12,8 +12,9 @@ export default function ChartArtifactGallery({ artifacts = [] }: ChartArtifactGa
     <article className="panel chart-gallery">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Charts</p>
+          <p className="product-eyebrow">Charts</p>
           <h3>图表</h3>
+          <p className="panel-help">图表在业务结论和证据之后展示，便于快速复核趋势和对比。</p>
         </div>
       </div>
       {displayable.length ? (

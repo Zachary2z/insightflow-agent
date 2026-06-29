@@ -26,6 +26,19 @@ function ThreadItem({ label, value }: { label: string; value?: string }) {
   );
 }
 
+function statusLabel(status?: string) {
+  if (status === "waiting_for_clarification") {
+    return "等待用户补充";
+  }
+  if (status === "completed") {
+    return "已完成";
+  }
+  if (status === "running") {
+    return "分析中";
+  }
+  return status || "";
+}
+
 export default function AnalysisThreadCard({
   thread,
   status,
@@ -53,21 +66,23 @@ export default function AnalysisThreadCard({
     <article className="panel analysis-thread" aria-label="分析线程">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Question thread</p>
+          <p className="product-eyebrow">Question Thread</p>
           <h3>分析线程</h3>
+          <p className="thread-help">追问是正常分析流程；补充缺失信息后，无需重写完整问题。</p>
         </div>
-        {thread.status || status ? <span className="status-chip">{thread.status || status}</span> : null}
+        {thread.status || status ? <span className="status-chip">{statusLabel(thread.status || status)}</span> : null}
       </div>
       <dl className="thread-list">
-        <ThreadItem label="用户提问" value={thread.original_question} />
+        <ThreadItem label="用户问题" value={thread.original_question} />
         <ThreadItem label="系统理解" value={thread.system_understanding} />
         <ThreadItem label="追问" value={thread.clarification_question} />
         <ThreadItem label="用户补充" value={thread.clarification_answer} />
-        <ThreadItem label="整理后问题" value={thread.resolved_question} />
+        <ThreadItem label="整理后" value={thread.resolved_question} />
       </dl>
       {waitingForClarification && onContinue ? (
         <form className="clarification-form" onSubmit={handleSubmit}>
-          <label htmlFor="clarification-answer">补充回答</label>
+          <label htmlFor="clarification-answer">用户补充</label>
+          <p>只回答上面的追问即可，系统会自动合并原问题和补充信息。</p>
           <div className="inline-form-row">
             <input
               id="clarification-answer"

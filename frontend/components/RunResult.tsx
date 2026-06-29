@@ -142,7 +142,7 @@ export default function RunResult({
   }
 
   return (
-    <section className="workbench-result">
+    <section className="workbench-result" aria-label="业务分析结果">
       <AnalysisThreadCard
         thread={product.question_thread}
         status={product.status}

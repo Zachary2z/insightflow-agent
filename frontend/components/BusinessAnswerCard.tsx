@@ -34,8 +34,9 @@ export default function BusinessAnswerCard({ answer }: BusinessAnswerCardProps) 
     <article className="panel business-answer">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Business answer</p>
-          <h3>{answer.headline || "业务结论"}</h3>
+          <p className="product-eyebrow">Business Answer</p>
+          <h3>业务结论</h3>
+          {answer.headline ? <p className="answer-headline">{answer.headline}</p> : null}
         </div>
         {answer.confidence ? <span className="status-chip">置信度 {answer.confidence}</span> : null}
       </div>

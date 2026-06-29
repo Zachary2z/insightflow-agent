@@ -317,14 +317,21 @@ describe("workspace product components", () => {
     });
 
     render(<AnalysisRunner workspaceId="ws_1" />);
+    expect(screen.getByText("分析工作台")).toBeTruthy();
+    expect(screen.getByText("问一个业务问题")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("业务问题"), {
       target: { value: "哪个渠道收入最高？" },
     });
     fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
 
+    expect(await screen.findByText("分析线程")).toBeTruthy();
+    expect(screen.getByText("用户问题")).toBeTruthy();
+    expect(screen.getByText("系统理解")).toBeTruthy();
+    expect(screen.getByText("整理后")).toBeTruthy();
+    expect(screen.getByText("业务结论")).toBeTruthy();
     expect(await screen.findByText("Email produced the most revenue.")).toBeTruthy();
     expect(screen.getByText("比较各渠道收入并给出建议。")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open run result" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "查看本次分析详情" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/runs/run_1",
     );
     expect(
@@ -385,6 +392,12 @@ describe("workspace product components", () => {
     );
 
     const thread = screen.getByLabelText("分析线程");
+    expect(screen.getByText("用户问题")).toBeTruthy();
+    expect(screen.getByText("系统理解")).toBeTruthy();
+    expect(screen.getByText("追问")).toBeTruthy();
+    expect(screen.getByText("用户补充")).toBeTruthy();
+    expect(screen.getByText("整理后")).toBeTruthy();
+    expect(screen.getByText("业务结论")).toBeTruthy();
     expect(thread.textContent).toContain("帮我分析渠道表现");
     expect(thread.textContent).toContain("按渠道比较收入表现");
     expect(thread.textContent).toContain("你希望分析哪个时间范围？");
@@ -416,12 +429,12 @@ describe("workspace product components", () => {
       />,
     );
 
-    const disclosure = screen.getByText("技术细节").closest("details");
+    const disclosure = screen.getByText("技术详情").closest("details");
     expect(disclosure?.hasAttribute("open")).toBe(false);
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
     expect(screen.queryByText(/deepseek/)).toBeNull();
 
-    fireEvent.click(screen.getByText("技术细节"));
+    fireEvent.click(screen.getByText("技术详情"));
 
     expect(screen.getByText(/SELECT channel/)).toBeTruthy();
     expect(screen.getByText(/deepseek/)).toBeTruthy();
@@ -482,7 +495,8 @@ describe("workspace product components", () => {
     render(<AnalysisRunner workspaceId="ws_1" />);
     fireEvent.change(screen.getByLabelText("业务问题"), { target: { value: "帮我分析渠道表现" } });
     fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
-    fireEvent.change(await screen.findByLabelText("补充回答"), { target: { value: "最近 90 天" } });
+    expect(await screen.findByText("追问")).toBeTruthy();
+    fireEvent.change(await screen.findByLabelText("用户补充"), { target: { value: "最近 90 天" } });
     fireEvent.click(screen.getByRole("button", { name: "继续分析" }));
 
     await waitFor(() =>
@@ -491,6 +505,8 @@ describe("workspace product components", () => {
         clarificationAnswer: "最近 90 天",
       }),
     );
+    expect(await screen.findByText("用户补充")).toBeTruthy();
+    expect(screen.getByText("整理后")).toBeTruthy();
     expect(await screen.findByText("paid_search 表现最好")).toBeTruthy();
   });
 
@@ -512,8 +528,9 @@ describe("workspace product components", () => {
     );
 
     const text = container.textContent ?? "";
+    expect(text).toContain("业务结论");
     expect(text.indexOf("先看业务结论")).toBeLessThan(text.indexOf("证据表"));
-    expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术细节"));
+    expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术详情"));
   });
 
   it("renders chart artifact images with title alt text and hides local paths from the main UI", () => {

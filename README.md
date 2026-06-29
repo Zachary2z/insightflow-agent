@@ -18,14 +18,14 @@ Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning, H2 shared Next.js product shell, and H3 data source management redesign are complete, and H4 Analysis Workbench redesign is next.
+P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is active; H1 clickable prototype/planning, H2 shared Next.js product shell, H3 data source management redesign, and H4 Analysis Workbench redesign are complete, and H5 Report Center redesign is next.
 
 | Product area | Status | Entry |
 |---|---|---|
 | P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
 | P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
-| P14 unified product UI shell | Active; H1-H3 complete, H4 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
+| P14 unified product UI shell | Active; H1-H4 complete, H5 next | `docs/product/prototypes/p14-clickable-product-ui.html` |
 
 ## Quickstart
 

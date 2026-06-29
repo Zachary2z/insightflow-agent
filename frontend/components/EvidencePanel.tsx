@@ -22,8 +22,9 @@ export default function EvidencePanel({ evidence }: EvidencePanelProps) {
     <article className="panel evidence-panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Evidence</p>
+          <p className="product-eyebrow">Evidence</p>
           <h3>证据表</h3>
+          <p className="panel-help">用于支撑业务结论的结果预览。</p>
         </div>
         {evidence?.validation_status ? <span className="status-chip">{evidence.validation_status}</span> : null}
       </div>

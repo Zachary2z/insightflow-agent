@@ -78,13 +78,18 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
   }
 
   return (
-    <section className="stack analysis-workbench">
+    <section className="analysis-workbench">
+      <div className="workbench-local-heading">
+        <p className="product-eyebrow">Analysis Workbench</p>
+        <h2>分析工作台</h2>
+      </div>
       <WorkspaceReadinessHeader workspaceId={workspaceId} />
-      <article className="panel question-panel">
+      <article className="product-card question-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Ask</p>
-            <h2>提出业务问题</h2>
+            <p className="product-eyebrow">Ask</p>
+            <h2>问一个业务问题</h2>
+            <p className="product-lead">输入自然语言问题；如果缺少时间范围或口径，系统会在同一条分析线程里追问。</p>
           </div>
         </div>
         <form className="form-grid" onSubmit={handleSubmit}>
@@ -97,7 +102,7 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
             placeholder="例如：帮我分析最近 90 天哪个渠道应该加预算"
           />
           <details className="advanced-options">
-            <summary>高级选项</summary>
+            <summary>高级选项：SQL 起点</summary>
             <div className="advanced-options-body">
               <label htmlFor="initial-sql">初始 SQL</label>
               <textarea
@@ -116,11 +121,11 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
       </article>
       {error ? <p role="alert">{error}</p> : null}
       {run ? (
-        <article className="panel run-shell">
+        <article className="run-shell">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Run</p>
-              <h2>分析结果</h2>
+              <p className="product-eyebrow">Analysis Flow</p>
+              <h2>分析线程与结果</h2>
             </div>
             {run.run_id ? <span className="status-chip">{run.run_id}</span> : null}
           </div>
@@ -132,7 +137,7 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
           />
           {run.run_id ? (
             <Link className="button secondary-button" href={`/workspaces/${workspaceId}/runs/${run.run_id}`}>
-              Open run result
+              查看本次分析详情
             </Link>
           ) : null}
         </article>
