@@ -38,3 +38,21 @@ def test_continuation_does_not_stop_for_provider_sql_planning_clarification() ->
     )
 
     assert route == "schema"
+
+
+def test_provider_clarification_router_can_clear_initial_clarify_route() -> None:
+    route = route_after_clarification(
+        {
+            "routing_strategy": "clarify",
+            "stop_for_clarification": True,
+            "question_understanding": {"source": "provider_unavailable", "strategy": "clarify"},
+            "clarification_result": {
+                "provider_called": True,
+                "requires_clarification": False,
+                "missing_slots": [],
+                "clarification_questions": [],
+            },
+        }
+    )
+
+    assert route == "schema"

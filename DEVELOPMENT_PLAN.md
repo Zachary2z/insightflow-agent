@@ -429,7 +429,7 @@ workspace
 -> 业务问答 preview route for future chat mode
 ```
 
-P14 did not rewrite the guarded analysis runtime. It kept the existing FastAPI workspace APIs, report APIs, provider-backed product mode, SQL validation, SQL execution, evidence validation, artifact handling, and trace boundaries. The completed product surfaces are 数据源管理, 分析工作台, 报告中心, 数据设置, and a clearly labeled 业务问答 preview route.
+P14 did not rewrite the guarded analysis runtime. It kept the existing FastAPI workspace APIs, report APIs, provider-backed product mode, SQL validation, SQL execution, evidence validation, artifact handling, and trace boundaries. The completed product surfaces are 数据源管理, 分析工作台, 报告中心, 数据设置, and a clearly labeled 业务问答 preview route. A post-H8 audit also aligned the home/workspace entry pages, field profile, semantic-layer draft, and run-detail pages with the same Chinese product shell.
 
 ### P14 Core Requirements
 
@@ -477,6 +477,7 @@ P14 did not rewrite the guarded analysis runtime. It kept the existing FastAPI w
 - `/workspaces/{workspaceId}/reports` reads as 报告中心 and keeps technical details secondary.
 - `/workspaces/{workspaceId}/settings` reads as 数据设置 and exposes data/profile/semantic/model/safety sections.
 - `/workspaces/{workspaceId}/business-qa` exists as a clearly labeled preview route.
+- Home, workspace list/create, field profile, semantic-layer draft, and run-detail pages no longer look like separate English demo pages.
 - Frontend tests cover product shell navigation and core Chinese product copy.
 - Full backend tests pass.
 - Full frontend tests and production build pass.
@@ -489,9 +490,10 @@ P14 did not rewrite the guarded analysis runtime. It kept the existing FastAPI w
 
 Latest result: passed on 2026-06-29.
 
-- Frontend tests passed: `cd frontend && npm test` -> `41 passed`.
+- Frontend tests passed: `cd frontend && npm test` -> `46 passed`.
 - Frontend production build passed: `cd frontend && npm run build`.
-- Full backend suite passed: `python3 -m pytest` -> `280 passed, 12 skipped`.
+- Full backend suite passed: `python3 -m pytest` -> `289 passed, 12 skipped`.
 - Real DeepSeek live acceptance passed with `.env`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`: `5 passed`, covering P11 workspace analysis, P12 workspace report, and P13 product acceptance.
+- Post-H8 live-provider hardening fixed real DeepSeek structured-output variance, no-clarification routing, evidence anchoring for readable business answers, and clean resolved-question generation after user clarification.
 - P14 Business Q&A boundary test passed and confirms no backend chat or business-qa endpoint was added.
 - Artifact hygiene and legacy path audits passed as final closeout checks; generated workspaces, reports, charts, traces, frontend build output, node_modules, caches, `.env`, and `sample_data/` must remain untracked.

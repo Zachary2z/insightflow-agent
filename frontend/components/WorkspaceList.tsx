@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { listWorkspaces, type Workspace } from "../lib/api";
+import ProductCard from "./ProductCard";
 
 export default function WorkspaceList() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -21,7 +22,7 @@ export default function WorkspaceList() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load workspaces");
+          setError(err instanceof Error ? err.message : "工作区加载失败");
         }
       } finally {
         if (!cancelled) {
@@ -36,40 +37,40 @@ export default function WorkspaceList() {
   }, []);
 
   if (isLoading) {
-    return <p role="status">Loading workspaces</p>;
+    return <p role="status">正在加载工作区</p>;
   }
 
   if (error) {
     return (
-      <section className="panel" role="alert">
-        <h2>Workspace Load Failed</h2>
+      <ProductCard role="alert">
+        <h2>工作区加载失败</h2>
         <p>{error}</p>
-      </section>
+      </ProductCard>
     );
   }
 
   if (workspaces.length === 0) {
     return (
-      <section className="panel">
-        <h2>No Workspaces</h2>
-        <p>Create a workspace to import CSV, Excel, or SQLite data.</p>
-      </section>
+      <ProductCard>
+        <h2>还没有工作区</h2>
+        <p>先创建一个工作区，用来导入 CSV、Excel 或 SQLite 数据。</p>
+      </ProductCard>
     );
   }
 
   return (
     <section className="stack">
       {workspaces.map((workspace) => (
-        <article className="panel item-row" key={workspace.workspace_id}>
+        <ProductCard className="item-row" key={workspace.workspace_id}>
           <div>
             <h2>{workspace.name}</h2>
             <p>{workspace.workspace_id}</p>
-            {workspace.updated_at ? <p>Updated {workspace.updated_at}</p> : null}
+            {workspace.updated_at ? <p>更新时间：{workspace.updated_at}</p> : null}
           </div>
           <Link className="button" href={`/workspaces/${workspace.workspace_id}/datasets`}>
-            Open datasets
+            打开数据源管理
           </Link>
-        </article>
+        </ProductCard>
       ))}
     </section>
   );

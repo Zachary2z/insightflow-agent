@@ -27,7 +27,7 @@ P11 General Data Analysis Product is complete. P12 Report Productization is comp
 | P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
 | P14 unified product UI shell | Complete; H1-H8 closed | `docs/product/prototypes/p14-clickable-product-ui.html` |
 
-P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, and artifact audit is complete. P15 planning is pending.
+P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, and artifact audit is complete. A post-H8 audit also aligned the home/workspace entry pages, profile page, semantic-layer page, and run-detail page with the Chinese product shell. P15 planning is pending.
 
 ## Quickstart
 
@@ -69,6 +69,7 @@ P14 closes the current product UI phase with these product surfaces:
 - 报告中心: report generation, report list, business report reader, Markdown download, and collapsed technical appendix.
 - 数据设置: data sources, field profile, semantic layer, product/live model mode, and safety/audit status.
 - 业务问答预览: a clearly labeled future-mode preview that reuses the existing workspace analysis API and product result objects.
+- Entry and support pages: home, workspace list/create, field profile, semantic-layer draft, and run detail now use the same Chinese product chrome instead of separate English demo-style pages.
 
 Business Q&A remains a preview, not a complete multi-turn chat product. P14 does not add a backend chat endpoint.
 

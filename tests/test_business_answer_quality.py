@@ -84,6 +84,23 @@ def test_provider_insight_output_becomes_recommendation_first_business_answer():
     assert "channel=" not in result["business_answer"]["summary"]
 
 
+def test_business_answer_extracts_recommendation_from_plain_english_guidance():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "final_answer": (
+                "Based on the past 90 days data, email has the highest ROI. "
+                "A balanced approach might be to increase email budget while optimizing paid search spend."
+            ),
+            "insight": {"source": "provider"},
+        }
+    )
+
+    assert answer["recommendations"]
+    assert "increase email budget" in answer["recommendations"][0]
+
+
 def test_insight_drafter_validation_rejects_raw_parameter_dump():
     from llm_ops.structured_output import validate_prompt_output
 

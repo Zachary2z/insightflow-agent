@@ -200,6 +200,35 @@ def test_provider_backed_question_understanding_treats_missing_intent_risk_flags
     assert result["intent"]["risk_flags"] == []
 
 
+def test_provider_backed_question_understanding_accepts_live_multi_metric_shape():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": ["收入", "投放成本", "ROI"],
+        "dimension": "渠道",
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+        "operation": "比较",
+        "limit": None,
+    }
+
+    result = understand_question_with_provider(
+        "分析最近 90 天各渠道收入、投放成本和 ROI，告诉我哪个渠道应该加预算，并生成图表。",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["fallback_used"] is False
+    assert result["strategy"] == "llm_candidate"
+    assert result["intent"]["metric"] == "收入, 投放成本, ROI"
+    assert result["intent"]["dimension"] == "channel"
+    assert result["intent"]["operation"] == "comparison"
+    assert result["missing_slots"] == []
+
+
 def test_provider_backed_question_understanding_includes_workspace_context_in_prompt():
     from question_understanding.provider_backed import understand_question_with_provider
 

@@ -260,6 +260,113 @@ def test_question_understanding_normalizes_string_list_fields():
     assert result["content"]["risk_flags"] == []
 
 
+def test_question_understanding_accepts_multi_metric_array_from_provider():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "question_understanding",
+        {
+            "strategy": "llm_candidate",
+            "intent": {
+                "metric": ["收入", "投放成本", "ROI"],
+                "dimension": "渠道",
+                "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+                "filters": [],
+                "operation": "对比",
+                "limit": None,
+                "risk_flags": [],
+            },
+            "missing_slots": [],
+            "clarification_questions": [],
+            "risk_flags": [],
+            "reason": "Multiple requested metrics are complete enough for guarded SQL candidate planning.",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["intent"]["metric"] == "收入, 投放成本, ROI"
+    assert result["content"]["missing_slots"] == []
+
+
+def test_question_understanding_normalizes_null_list_fields_to_empty_lists():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "question_understanding",
+        {
+            "strategy": "llm_candidate",
+            "intent": {
+                "metric": ["收入", "投放成本", "ROI"],
+                "dimension": "渠道",
+                "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+                "filters": None,
+                "operation": "对比",
+                "limit": None,
+                "risk_flags": None,
+            },
+            "missing_slots": None,
+            "clarification_questions": None,
+            "risk_flags": None,
+            "reason": "DeepSeek sometimes returns null instead of an empty array.",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["intent"]["filters"] == []
+    assert result["content"]["missing_slots"] == []
+    assert result["content"]["clarification_questions"] == []
+    assert result["content"]["risk_flags"] == []
+
+
+def test_question_understanding_normalizes_object_list_fields_from_provider():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "question_understanding",
+        {
+            "strategy": "llm_candidate",
+            "intent": {
+                "metric": "收入",
+                "dimension": "渠道",
+                "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+                "filters": {"paid_orders": True, "ignore_me": False},
+                "operation": "对比",
+                "limit": 5,
+                "risk_flags": {},
+            },
+            "missing_slots": {"metric": False, "time_range": False},
+            "clarification_questions": {},
+            "risk_flags": {},
+            "reason": "DeepSeek sometimes returns keyed objects instead of empty arrays.",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["intent"]["filters"] == ["paid_orders"]
+    assert result["content"]["missing_slots"] == []
+    assert result["content"]["clarification_questions"] == []
+    assert result["content"]["risk_flags"] == []
+
+
+def test_clarification_router_accepts_no_clarification_decision():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "clarification_router",
+        {
+            "requires_clarification": False,
+            "missing_slots": [],
+            "clarification_questions": [],
+            "risk_flags": [],
+            "reason": "The user already supplied metric, dimension, time range, and decision objective.",
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["requires_clarification"] is False
+    assert result["content"]["clarification_questions"] == []
+
+
 def test_visualization_agent_normalizes_explanation_basis_string():
     from llm_ops.structured_output import validate_prompt_output
 

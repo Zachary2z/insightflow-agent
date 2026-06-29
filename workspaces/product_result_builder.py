@@ -227,7 +227,21 @@ def _headline_from(text: str) -> str:
 
 def _looks_recommendation_like(text: str) -> bool:
     normalized = str(text or "").strip().lower()
-    return normalized.startswith(("建议", "recommend", "prioritize", "优先"))
+    recommendation_markers = (
+        "建议",
+        "推荐",
+        "优先",
+        "加大",
+        "增加",
+        "recommend",
+        "prioritize",
+        "should",
+        "increase",
+        "optimize",
+        "balanced approach",
+        "might be to",
+    )
+    return normalized.startswith(recommendation_markers) or any(marker in normalized for marker in recommendation_markers)
 
 
 def _looks_like_raw_parameter_dump(text: str) -> bool:

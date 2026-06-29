@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { createProfile, type WorkspaceProfile } from "../lib/api";
+import ProductCard from "./ProductCard";
 import ProfileSummary from "./ProfileSummary";
 
 type ProfileWorkspaceProps = {
@@ -20,7 +21,7 @@ export default function ProfileWorkspace({ workspaceId }: ProfileWorkspaceProps)
       const response = await createProfile(workspaceId);
       setProfile(response.profile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to generate profile");
+      setError(err instanceof Error ? err.message : "字段画像生成失败");
     } finally {
       setIsLoading(false);
     }
@@ -28,15 +29,16 @@ export default function ProfileWorkspace({ workspaceId }: ProfileWorkspaceProps)
 
   return (
     <section className="stack">
-      <article className="panel action-panel">
+      <ProductCard className="action-panel">
         <div>
-          <h2>Profile Data</h2>
-          <p>Generate table, column, and role metadata from the workspace database.</p>
+          <p className="product-eyebrow">字段准备</p>
+          <h2>生成字段画像</h2>
+          <p className="panel-help">读取当前工作区数据库，生成表、字段、行数和候选角色信息。</p>
         </div>
         <button type="button" onClick={handleCreateProfile} disabled={isLoading}>
-          {isLoading ? "Generating..." : "Generate profile"}
+          {isLoading ? "生成中..." : "生成字段画像"}
         </button>
-      </article>
+      </ProductCard>
       {error ? <p role="alert">{error}</p> : null}
       {profile ? <ProfileSummary profile={profile} /> : null}
     </section>

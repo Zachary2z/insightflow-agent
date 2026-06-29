@@ -86,7 +86,7 @@ function fallbackProduct(result: Record<string, unknown>): ProductAnalysisResult
   const chartPaths = listField(result, ["chart_path", "chart_paths"]);
 
   return {
-    version: "legacy",
+    version: "compat",
     status: String(result.status || ""),
     run_id: typeof result.run_id === "string" ? result.run_id : null,
     question_thread: {

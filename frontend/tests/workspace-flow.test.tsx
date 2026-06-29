@@ -17,9 +17,14 @@ import WorkspaceList from "../components/WorkspaceList";
 import WorkspaceNewForm from "../components/WorkspaceNewForm";
 import BusinessQAPage from "../app/workspaces/[workspaceId]/business-qa/page";
 import DatasetsPage from "../app/workspaces/[workspaceId]/datasets/page";
+import NewWorkspacePage from "../app/workspaces/new/page";
+import ProfilePage from "../app/workspaces/[workspaceId]/profile/page";
 import ReportDetailPage from "../app/workspaces/[workspaceId]/reports/[reportId]/page";
 import ReportsPage from "../app/workspaces/[workspaceId]/reports/page";
+import RunDetailPage from "../app/workspaces/[workspaceId]/runs/[runId]/page";
+import SemanticLayerPage from "../app/workspaces/[workspaceId]/semantic-layer/page";
 import SettingsPage from "../app/workspaces/[workspaceId]/settings/page";
+import WorkspacesPage from "../app/workspaces/page";
 
 const pushMock = vi.fn();
 
@@ -76,11 +81,23 @@ describe("workspace product components", () => {
 
     render(<WorkspaceList />);
 
-    expect(screen.getByText("Loading workspaces")).toBeTruthy();
+    expect(screen.getByText("正在加载工作区")).toBeTruthy();
     expect(await screen.findByText("Finance Workspace")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Open datasets" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "打开数据源管理" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/datasets",
     );
+  });
+
+  it("renders the workspace list route as a Chinese product entry page", async () => {
+    vi.mocked(listWorkspaces).mockResolvedValue({
+      workspaces: [{ workspace_id: "ws_1", name: "Finance Workspace", updated_at: "2026-06-23T00:00:00Z" }],
+    });
+
+    render(<WorkspacesPage />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "选择工作区" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "新建工作区" }).getAttribute("href")).toBe("/workspaces/new");
+    expect(await screen.findByText("Finance Workspace")).toBeTruthy();
   });
 
   it("creates a workspace and reports the datasets destination", async () => {
@@ -88,12 +105,20 @@ describe("workspace product components", () => {
     vi.mocked(createWorkspace).mockResolvedValue({ workspace_id: "ws_2", name: "Ops" });
 
     render(<WorkspaceNewForm onCreated={onCreated} />);
-    fireEvent.change(screen.getByLabelText("Workspace name"), { target: { value: "Ops" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+    fireEvent.change(screen.getByLabelText("工作区名称"), { target: { value: "Ops" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建工作区" }));
 
     await waitFor(() => expect(createWorkspace).toHaveBeenCalledWith("Ops"));
     expect(onCreated).toHaveBeenCalledWith({ workspace_id: "ws_2", name: "Ops" });
-    expect(await screen.findByText(/Workspace created/)).toBeTruthy();
+    expect(await screen.findByText(/已创建工作区/)).toBeTruthy();
+  });
+
+  it("renders the new workspace route as a Chinese product entry page", () => {
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "新建工作区" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "返回工作区" }).getAttribute("href")).toBe("/workspaces");
+    expect(screen.getByText("工作区信息")).toBeTruthy();
   });
 
   it("renders the data source management page route with active product navigation", async () => {
@@ -184,10 +209,21 @@ describe("workspace product components", () => {
     });
 
     render(<ProfileWorkspace workspaceId="ws_1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Generate profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成字段画像" }));
 
     expect(await screen.findByText("orders")).toBeTruthy();
+    expect(screen.getByText("字段画像结果")).toBeTruthy();
+    expect(screen.getByText("2 行")).toBeTruthy();
+    expect(screen.getByText(/指标/)).toBeTruthy();
     expect(createProfile).toHaveBeenCalledWith("ws_1");
+  });
+
+  it("renders the profile route inside the product shell with Chinese copy", async () => {
+    render(await ProfilePage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "字段画像" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "生成字段画像" })).toBeTruthy();
   });
 
   it("generates and renders semantic layer drafts", async () => {
@@ -201,11 +237,22 @@ describe("workspace product components", () => {
     });
 
     render(<SemanticLayerWorkspace workspaceId="ws_1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Draft semantic layer" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成语义层草稿" }));
 
     expect(await screen.findByText("sum_revenue")).toBeTruthy();
+    expect(screen.getByText("语义层草稿结果")).toBeTruthy();
+    expect(screen.getByText("指标")).toBeTruthy();
+    expect(screen.getByText("维度")).toBeTruthy();
     expect(screen.getByText(/orders.channel/)).toBeTruthy();
     expect(screen.getByText("customer")).toBeTruthy();
+  });
+
+  it("renders the semantic-layer route inside the product shell with Chinese copy", async () => {
+    render(await SemanticLayerPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+
+    expect(screen.getByRole("heading", { level: 1, name: "语义层草稿" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "生成语义层草稿" })).toBeTruthy();
   });
 
   it("renders data settings as a Chinese readiness product page with collapsed technical details", async () => {
@@ -408,6 +455,19 @@ describe("workspace product components", () => {
     ).toBe("Email produced the most revenue.");
   });
 
+  it("renders the run detail route inside the product shell with Chinese copy", async () => {
+    render(
+      await RunDetailPage({
+        params: Promise.resolve({ workspaceId: "ws_1", runId: "run_1" }),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "分析详情" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /分析工作台/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("分析结果")).toBeTruthy();
+    expect(screen.getByText(/当前浏览器会话没有缓存这次分析结果/)).toBeTruthy();
+  });
+
   it("renders the business Q&A preview route with active navigation and honest preview copy", async () => {
     render(await BusinessQAPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
@@ -507,7 +567,7 @@ describe("workspace product components", () => {
     );
     expect(screen.getByText("orders")).toBeTruthy();
     expect(screen.getByText("revenue")).toBeTruthy();
-    expect(screen.getByText("measure")).toBeTruthy();
+    expect(screen.getByText("指标")).toBeTruthy();
   });
 
   it("renders the integrated analysis thread in one compact card", () => {

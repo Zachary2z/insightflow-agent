@@ -27,14 +27,14 @@ class ReportSection:
 
     def __post_init__(self) -> None:
         if not self.technical_details:
-            self.technical_details = self._legacy_technical_details()
+            self.technical_details = self._compat_technical_details()
         if not self.business_artifacts and self.artifact_paths:
             self.business_artifacts = [
                 {"type": "chart", "path": path, "title": self.title}
                 for path in self.artifact_paths
             ]
 
-    def _legacy_technical_details(self) -> dict[str, Any]:
+    def _compat_technical_details(self) -> dict[str, Any]:
         details: dict[str, Any] = {}
         if self.question:
             details["internal_question"] = self.question

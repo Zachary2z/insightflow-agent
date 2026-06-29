@@ -75,6 +75,21 @@ def test_question_understanding_routes_complete_non_template_question_to_llm_can
     assert result["risk_flags"] == []
 
 
+def test_question_understanding_routes_channel_roi_budget_question_without_clarification():
+    from question_understanding.router import understand_question
+
+    result = understand_question("分析最近 90 天各渠道收入、投放成本和 ROI，告诉我哪个渠道应该加预算，并生成图表。")
+
+    assert result["success"] is True
+    assert result["strategy"] == "llm_candidate"
+    assert result["intent"]["metric"] == "gmv"
+    assert result["intent"]["dimension"] == "channel"
+    assert result["intent"]["time_range"] == {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"}
+    assert result["intent"]["operation"] == "comparison"
+    assert result["missing_slots"] == []
+    assert result["clarification_questions"] == []
+
+
 def test_question_understanding_agent_writes_state_and_trace_without_sql():
     from agents.question_understanding import run_question_understanding_agent
     from agents.supervisor import initialize_run

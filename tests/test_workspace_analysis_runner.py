@@ -132,6 +132,8 @@ def test_resolved_question_uses_generic_context_merge_without_channel_budget_tem
 
     assert "帮我分析渠道表现" in resolved
     assert "最近 90 天" in resolved
+    assert "追问" not in resolved
+    assert "你希望分析哪个时间范围" not in resolved
     assert "投放成本" not in resolved
     assert "ROI" not in resolved
 

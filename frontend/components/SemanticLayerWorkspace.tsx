@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { createSemanticDraft, type SemanticLayer } from "../lib/api";
+import ProductCard from "./ProductCard";
 import SemanticLayerEditor from "./SemanticLayerEditor";
 
 type SemanticLayerWorkspaceProps = {
@@ -20,7 +21,7 @@ export default function SemanticLayerWorkspace({ workspaceId }: SemanticLayerWor
       const response = await createSemanticDraft(workspaceId);
       setSemanticLayer(response.semantic_layer);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to draft semantic layer");
+      setError(err instanceof Error ? err.message : "语义层草稿生成失败");
     } finally {
       setIsLoading(false);
     }
@@ -28,15 +29,16 @@ export default function SemanticLayerWorkspace({ workspaceId }: SemanticLayerWor
 
   return (
     <section className="stack">
-      <article className="panel action-panel">
+      <ProductCard className="action-panel">
         <div>
-          <h2>Draft Semantic Layer</h2>
-          <p>Create metric, dimension, entity, and time-field suggestions from the profile.</p>
+          <p className="product-eyebrow">业务语义</p>
+          <h2>生成语义层草稿</h2>
+          <p className="panel-help">根据字段画像生成指标、维度、实体和时间字段建议。</p>
         </div>
         <button type="button" onClick={handleDraft} disabled={isLoading}>
-          {isLoading ? "Drafting..." : "Draft semantic layer"}
+          {isLoading ? "生成中..." : "生成语义层草稿"}
         </button>
-      </article>
+      </ProductCard>
       {error ? <p role="alert">{error}</p> : null}
       {semanticLayer ? <SemanticLayerEditor semanticLayer={semanticLayer} /> : null}
     </section>

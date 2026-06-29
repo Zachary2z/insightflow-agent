@@ -89,10 +89,13 @@ Latest P14-H8 result: passed on 2026-06-29.
 
 P14-H8 verification result summary:
 
-- Full frontend test suite passed: `cd frontend && npm test` with `41 passed`.
-- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces/[workspaceId]/business-qa`, `/analysis`, `/reports`, and `/settings`.
-- Full backend suite passed: `python3 -m pytest` with `280 passed, 12 skipped`.
+- Full frontend test suite passed: `cd frontend && npm test` with `46 passed`.
+- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces`, `/workspaces/new`, `/workspaces/[workspaceId]/profile`, `/semantic-layer`, `/runs/[runId]`, `/business-qa`, `/analysis`, `/reports`, and `/settings`.
+- Full backend suite passed: `python3 -m pytest` with `289 passed, 12 skipped`.
 - Real DeepSeek live acceptance passed with `.env`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`: `5 passed` across P11 workspace analysis, P12 workspace report, and P13 product acceptance.
+- Post-H8 audit fixed remaining route-level product drift: home/workspace entry pages, field profile, semantic-layer draft, and run detail now use Chinese product chrome and tests.
+- Post-H8 live/provider hardening fixed real DeepSeek output normalization for multi-metric intent fields, null/object list fields, clarification-router no-clarification decisions, and evidence anchoring for business answers.
+- Clarification continuation now merges original question and user clarification answer without injecting the clarification prompt options into the resolved analysis question.
 - P14 final product state is 数据源管理, 分析工作台, 报告中心, 数据设置, and 业务问答 preview.
 - Business Q&A remains a preview route that reuses the existing workspace analysis API and product result objects; it is not a complete chat product and no backend chat endpoint was added.
 - Real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, and full Business Q&A chat remain outside P14 scope.

@@ -35,6 +35,47 @@ def _answer_from_result(question: str, execution_result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _flatten_execution_values(execution_result: dict[str, Any], limit: int = 5) -> list[Any]:
+    values = []
+    for row in execution_result.get("rows", [])[:limit]:
+        if isinstance(row, dict):
+            values.extend(row.values())
+        elif isinstance(row, (list, tuple)):
+            values.extend(row)
+    return [value for value in values if value is not None and str(value).strip()]
+
+
+def _answer_mentions_exact_value(answer: str, execution_result: dict[str, Any]) -> bool:
+    return any(str(value) in answer for value in _flatten_execution_values(execution_result))
+
+
+def _evidence_anchor(execution_result: dict[str, Any]) -> str:
+    rows = execution_result.get("rows", [])
+    if not rows:
+        return ""
+    columns = execution_result.get("columns", [])
+    first_row = rows[0]
+    if isinstance(first_row, dict):
+        pairs = [(str(key), value) for key, value in first_row.items()]
+    elif isinstance(first_row, (list, tuple)):
+        pairs = [(str(column), value) for column, value in zip(columns, first_row, strict=False)]
+    else:
+        return ""
+    parts = [f"{column} 为 {value}" for column, value in pairs[:3] if value is not None and str(value).strip()]
+    if not parts:
+        return ""
+    return "证据表第一行显示：" + "，".join(parts) + "。"
+
+
+def _ensure_evidence_anchor(answer: str, execution_result: dict[str, Any]) -> str:
+    if _answer_mentions_exact_value(answer, execution_result):
+        return answer
+    anchor = _evidence_anchor(execution_result)
+    if not anchor:
+        return answer
+    return f"{answer}\n{anchor}" if answer else anchor
+
+
 def _fallback_output(
     state: dict[str, Any],
     execution_result: dict[str, Any] | None,
@@ -137,12 +178,13 @@ def _provider_output(state: dict[str, Any], provider: LLMProvider, execution_res
         )
 
     content = response.get("content", {})
+    final_answer = _ensure_evidence_anchor(content.get("draft_summary", ""), execution_result)
     output = {
         "success": True,
         "source": "provider",
         "provider_called": True,
         "fallback_used": False,
-        "final_answer": content.get("draft_summary", ""),
+        "final_answer": final_answer,
         "candidate_claims": content.get("candidate_claims", []),
         "data_used": True,
         "error": "",

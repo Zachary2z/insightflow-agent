@@ -1,5 +1,7 @@
-import Link from "next/link";
+import ProductPageHeader from "@/components/ProductPageHeader";
+import ProductShell from "@/components/ProductShell";
 import RunResultLoader from "@/components/RunResultLoader";
+import React from "react";
 
 type RunDetailPageProps = {
   params: Promise<{ workspaceId: string; runId: string }>;
@@ -9,18 +11,13 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
   const { workspaceId, runId } = await params;
 
   return (
-    <main>
-      <h1>Run Detail</h1>
-      <p>Workspace: {workspaceId}</p>
-      <p>Run: {runId}</p>
-      <nav>
-        <Link href={`/workspaces/${workspaceId}/analysis`}>Back to analysis</Link>
-        <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
-        <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
-        <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
-        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
-      </nav>
+    <ProductShell workspaceId={workspaceId} active="analysis">
+      <ProductPageHeader
+        eyebrow="分析记录"
+        title="分析详情"
+        description={`查看本次分析结果、证据和默认折叠的技术详情。Run: ${runId}`}
+      />
       <RunResultLoader workspaceId={workspaceId} runId={runId} />
-    </main>
+    </ProductShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { FormEvent, useState } from "react";
 import { createWorkspace, type Workspace } from "../lib/api";
+import ProductCard from "./ProductCard";
 
 type WorkspaceNewFormProps = {
   onCreated?: (workspace: Workspace) => void;
@@ -16,7 +17,7 @@ export default function WorkspaceNewForm({ onCreated }: WorkspaceNewFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) {
-      setError("Workspace name is required.");
+      setError("请填写工作区名称。");
       return;
     }
     try {
@@ -29,34 +30,34 @@ export default function WorkspaceNewForm({ onCreated }: WorkspaceNewFormProps) {
         window.location.assign(`/workspaces/${workspace.workspace_id}/datasets`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create workspace");
+      setError(err instanceof Error ? err.message : "工作区创建失败");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <section className="panel">
-      <h2>Workspace Details</h2>
+    <ProductCard>
+      <h2>工作区信息</h2>
       <form className="form-grid" onSubmit={handleSubmit}>
-        <label htmlFor="workspace-name">Workspace name</label>
+        <label htmlFor="workspace-name">工作区名称</label>
         <input
           id="workspace-name"
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Finance analysis"
+          placeholder="收入复盘工作区"
         />
         <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating..." : "Create workspace"}
+          {isSubmitting ? "创建中..." : "创建工作区"}
         </button>
       </form>
       {error ? <p role="alert">{error}</p> : null}
       {created ? (
         <p role="status">
-          Workspace created: <strong>{created.name}</strong>
+          已创建工作区：<strong>{created.name}</strong>
         </p>
       ) : null}
-    </section>
+    </ProductCard>
   );
 }

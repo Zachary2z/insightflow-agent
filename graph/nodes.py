@@ -290,6 +290,12 @@ def route_after_clarification(state: AgentState) -> str:
         return "early_response"
     if state.get("routing_strategy") == "clarify" and _has_continuation_context(state):
         return "schema"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("clarification_result", {}).get("provider_called")
+        and state.get("clarification_result", {}).get("requires_clarification") is False
+    ):
+        return "schema"
     if state.get("routing_strategy") == "clarify" and state.get("stop_for_clarification"):
         return "early_response"
     if (

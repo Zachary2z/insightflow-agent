@@ -1,4 +1,5 @@
 import React from "react";
+import ProductCard from "./ProductCard";
 
 type SemanticLayerEditorProps = {
   semanticLayer: {
@@ -21,7 +22,7 @@ function displayValue(item: Record<string, unknown>, keys: string[]) {
 
 function renderItems(items: Array<Record<string, unknown>>, detailKeys: string[]) {
   if (items.length === 0) {
-    return <p>No items returned.</p>;
+    return <p>暂无建议项。</p>;
   }
   return (
     <ul>
@@ -42,23 +43,23 @@ function renderItems(items: Array<Record<string, unknown>>, detailKeys: string[]
 export default function SemanticLayerEditor({ semanticLayer }: SemanticLayerEditorProps) {
   return (
     <section className="stack">
-      <h2>Semantic Layer</h2>
-      <article className="panel">
-        <h3>Metrics</h3>
+      <h2>语义层草稿结果</h2>
+      <ProductCard>
+        <h3>指标</h3>
         {renderItems(semanticLayer.metrics ?? [], ["formula", "expression", "field", "table"])}
-      </article>
-      <article className="panel">
-        <h3>Dimensions</h3>
+      </ProductCard>
+      <ProductCard>
+        <h3>维度</h3>
         {renderItems(semanticLayer.dimensions ?? [], ["field", "column", "table"])}
-      </article>
-      <article className="panel">
-        <h3>Entities</h3>
+      </ProductCard>
+      <ProductCard>
+        <h3>实体</h3>
         {renderItems(semanticLayer.entities ?? [], ["key", "field", "table"])}
-      </article>
-      <article className="panel">
-        <h3>Time Fields</h3>
+      </ProductCard>
+      <ProductCard>
+        <h3>时间字段</h3>
         {renderItems(semanticLayer.time_fields ?? [], ["field", "table"])}
-      </article>
+      </ProductCard>
     </section>
   );
 }

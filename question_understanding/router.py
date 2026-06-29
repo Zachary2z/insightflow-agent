@@ -79,6 +79,8 @@ def _extract_operation(question: str) -> str:
         return "trend"
     if _contains(question, "下降", "下滑", "降低", "跌"):
         return "decline"
+    if _contains(question, "roi", "roas", "投放成本", "加预算", "预算建议", "预算", "推荐", "建议"):
+        return "comparison"
     if _contains(question, "对比", "比较", "环比", "同比"):
         return "comparison"
     if _contains(question, "最高", "最多", "top", "前"):

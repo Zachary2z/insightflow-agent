@@ -366,6 +366,22 @@ def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
     return False, "", f"{field_name} must be a string or null"
 
 
+def _nullable_string_or_joined_list(value: Any, field_name: str) -> tuple[bool, str, str]:
+    if isinstance(value, list):
+        items = []
+        for index, item in enumerate(value):
+            if not isinstance(item, str):
+                return False, "", f"{field_name}[{index}] must be a string"
+            item = item.strip()
+            if item:
+                items.append(item)
+        return True, ", ".join(items), ""
+    ok, text, message = _nullable_string(value, field_name)
+    if not ok:
+        return False, "", f"{field_name} must be a string, string array, or null"
+    return True, text, ""
+
+
 def _string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
     if not isinstance(value, list):
         return False, [], f"{field_name} must be a list"
@@ -380,9 +396,19 @@ def _string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
 
 
 def _string_or_string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
+    if value is None:
+        return True, [], ""
     if isinstance(value, str):
         item = value.strip()
         return True, [item] if item else [], ""
+    if isinstance(value, dict):
+        normalized = []
+        for key, enabled in value.items():
+            if enabled:
+                item = str(key).strip()
+                if item:
+                    normalized.append(item)
+        return True, normalized, ""
     return _string_list(value, field_name)
 
 
@@ -399,13 +425,13 @@ def _validate_question_understanding(content: Any) -> dict[str, Any]:
     if not isinstance(intent, dict):
         return _error(prompt_id, "intent must be an object")
 
-    ok, metric, message = _nullable_string(intent.get("metric"), "intent.metric")
+    ok, metric, message = _nullable_string_or_joined_list(intent.get("metric"), "intent.metric")
     if not ok:
         return _error(prompt_id, message)
-    ok, dimension, message = _nullable_string(intent.get("dimension"), "intent.dimension")
+    ok, dimension, message = _nullable_string_or_joined_list(intent.get("dimension"), "intent.dimension")
     if not ok:
         return _error(prompt_id, message)
-    ok, operation, message = _nullable_string(intent.get("operation"), "intent.operation")
+    ok, operation, message = _nullable_string_or_joined_list(intent.get("operation"), "intent.operation")
     if not ok:
         return _error(prompt_id, message)
 
@@ -466,6 +492,7 @@ def _validate_clarification_router(content: Any) -> dict[str, Any]:
     if not isinstance(content, dict):
         return _error(prompt_id, "clarification_router output must be an object")
 
+    requires_clarification = bool(content.get("requires_clarification", True))
     missing_ok, missing_slots, message = _string_list(content.get("missing_slots"), "missing_slots")
     if not missing_ok:
         return _error(prompt_id, message)
@@ -475,16 +502,20 @@ def _validate_clarification_router(content: Any) -> dict[str, Any]:
     )
     if not questions_ok:
         return _error(prompt_id, message)
-    if not clarification_questions:
+    if requires_clarification and not clarification_questions:
         return _error(prompt_id, "clarification_questions must contain at least one question")
     risk_ok, risk_flags, message = _string_list(content.get("risk_flags"), "risk_flags")
     if not risk_ok:
         return _error(prompt_id, message)
 
+    if not requires_clarification:
+        missing_slots = []
+        clarification_questions = []
+
     return _ok(
         prompt_id,
         {
-            "requires_clarification": bool(content.get("requires_clarification", True)),
+            "requires_clarification": requires_clarification,
             "missing_slots": missing_slots,
             "clarification_questions": clarification_questions,
             "risk_flags": risk_flags,

@@ -28,8 +28,8 @@ export default function RunResultLoader({ workspaceId, runId }: RunResultLoaderP
   if (!result) {
     return (
       <section className="panel">
-        <h2>Run Result</h2>
-        <p>This browser session does not have a cached result for this run.</p>
+        <h2>分析结果</h2>
+        <p>当前浏览器会话没有缓存这次分析结果。请回到分析工作台重新打开最近一次分析。</p>
       </section>
     );
   }

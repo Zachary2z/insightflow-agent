@@ -1,5 +1,7 @@
-import Link from "next/link";
+import ProductPageHeader from "@/components/ProductPageHeader";
+import ProductShell from "@/components/ProductShell";
 import ProfileWorkspace from "@/components/ProfileWorkspace";
+import React from "react";
 
 type ProfilePageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -9,17 +11,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const { workspaceId } = await params;
 
   return (
-    <main>
-      <h1>Data Profile</h1>
-      <p>Workspace: {workspaceId}</p>
-      <nav>
-        <Link href={`/workspaces/${workspaceId}/datasets`}>Datasets</Link>
-        <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
-        <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
-        <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
-        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
-      </nav>
+    <ProductShell workspaceId={workspaceId} active="sources">
+      <ProductPageHeader
+        eyebrow="字段准备"
+        title="字段画像"
+        description="从已导入数据生成表、字段和候选角色画像，为语义层和分析工作台提供上下文。"
+      />
       <ProfileWorkspace workspaceId={workspaceId} />
-    </main>
+    </ProductShell>
   );
 }
