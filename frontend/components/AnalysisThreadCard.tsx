@@ -6,12 +6,18 @@ type ContinuePayload = {
   clarificationAnswer: string;
 };
 
+type FollowUpPayload = {
+  followUpQuestion: string;
+  thread: QuestionThread;
+};
+
 type AnalysisThreadCardProps = {
   thread?: QuestionThread;
   status?: string;
   isContinuing?: boolean;
   continuationError?: string;
   onContinue?: (payload: ContinuePayload) => Promise<void> | void;
+  onAskFollowUp?: (payload: FollowUpPayload) => Promise<void> | void;
 };
 
 function ThreadItem({ label, value }: { label: string; value?: string }) {
@@ -45,10 +51,14 @@ export default function AnalysisThreadCard({
   isContinuing = false,
   continuationError = "",
   onContinue,
+  onAskFollowUp,
 }: AnalysisThreadCardProps) {
   const [answer, setAnswer] = useState("");
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
   const pendingRunId = thread?.pending_run_id || "";
-  const waitingForClarification = (status || thread?.status) === "waiting_for_clarification" && pendingRunId;
+  const currentStatus = status || thread?.status;
+  const waitingForClarification = currentStatus === "waiting_for_clarification" && pendingRunId;
+  const canAskFollowUp = currentStatus === "completed" && Boolean(onAskFollowUp);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +66,15 @@ export default function AnalysisThreadCard({
       return;
     }
     onContinue({ pendingRunId, clarificationAnswer: answer.trim() });
+  }
+
+  function handleFollowUpSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!followUpQuestion.trim() || !thread || !onAskFollowUp) {
+      return;
+    }
+    onAskFollowUp({ followUpQuestion: followUpQuestion.trim(), thread });
+    setFollowUpQuestion("");
   }
 
   if (!thread) {
@@ -92,6 +111,24 @@ export default function AnalysisThreadCard({
             />
             <button type="submit" disabled={isContinuing || !answer.trim()}>
               {isContinuing ? "继续中..." : "继续分析"}
+            </button>
+          </div>
+          {continuationError ? <p role="alert">{continuationError}</p> : null}
+        </form>
+      ) : null}
+      {canAskFollowUp ? (
+        <form className="clarification-form follow-up-form" onSubmit={handleFollowUpSubmit}>
+          <label htmlFor="analysis-follow-up">继续追问</label>
+          <p>围绕这次分析继续问，系统会带上上一轮问题作为上下文，并重新走安全分析流程。</p>
+          <div className="inline-form-row">
+            <input
+              id="analysis-follow-up"
+              value={followUpQuestion}
+              onChange={(event) => setFollowUpQuestion(event.target.value)}
+              placeholder="例如：为什么 email 渠道收益最好？"
+            />
+            <button type="submit" disabled={isContinuing || !followUpQuestion.trim()}>
+              {isContinuing ? "追问中..." : "发送追问"}
             </button>
           </div>
           {continuationError ? <p role="alert">{continuationError}</p> : null}

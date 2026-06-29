@@ -123,7 +123,14 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
           </div>
         </div>
         {report.sections?.length ? (
-          report.sections.map((section) => <ReportSection key={section.section_id} section={section} />)
+          report.sections.map((section) => (
+            <ReportSection
+              key={section.section_id}
+              section={section}
+              workspaceId={workspaceId}
+              reportId={report.report_id}
+            />
+          ))
         ) : (
           <ProductCard>
             <p>暂无报告章节。</p>

@@ -11,9 +11,15 @@ type ContinuePayload = {
   clarificationAnswer: string;
 };
 
+type FollowUpPayload = {
+  followUpQuestion: string;
+  thread: NonNullable<ProductAnalysisResult["question_thread"]>;
+};
+
 type RunResultProps = {
   result: Record<string, unknown> | ProductAnalysisResult;
   onContinueClarification?: (payload: ContinuePayload) => Promise<void> | void;
+  onAskFollowUp?: (payload: FollowUpPayload) => Promise<void> | void;
   isContinuing?: boolean;
   continuationError?: string;
 };
@@ -126,6 +132,7 @@ function fallbackProduct(result: Record<string, unknown>): ProductAnalysisResult
 export default function RunResult({
   result,
   onContinueClarification,
+  onAskFollowUp,
   isContinuing = false,
   continuationError = "",
 }: RunResultProps) {
@@ -147,6 +154,7 @@ export default function RunResult({
         thread={product.question_thread}
         status={product.status}
         onContinue={onContinueClarification}
+        onAskFollowUp={onAskFollowUp}
         isContinuing={isContinuing}
         continuationError={continuationError}
       />

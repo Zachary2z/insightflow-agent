@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { FormEvent, useState } from "react";
-import { runAnalysis, type WorkspaceRunResponse } from "../lib/api";
+import { runAnalysis, type QuestionThread, type WorkspaceRunResponse } from "../lib/api";
 import RunResult from "./RunResult";
 import WorkspaceReadinessHeader from "./WorkspaceReadinessHeader";
 
@@ -15,11 +15,30 @@ type ContinuePayload = {
   clarificationAnswer: string;
 };
 
+type FollowUpPayload = {
+  followUpQuestion: string;
+  thread: QuestionThread;
+};
+
 function resultForDisplay(run: WorkspaceRunResponse): Record<string, unknown> {
   if (run.product_result) {
     return { ...run.result, product_result: run.product_result };
   }
   return run.result;
+}
+
+function buildFollowUpQuestion(thread: QuestionThread, followUpQuestion: string) {
+  const previousQuestion = thread.resolved_question || thread.original_question || "";
+  const originalQuestion = thread.original_question && thread.original_question !== previousQuestion ? thread.original_question : "";
+  return [
+    "基于上一轮分析继续追问。",
+    originalQuestion ? `上一轮用户问题：${originalQuestion}` : "",
+    previousQuestion ? `上一轮整理后问题：${previousQuestion}` : "",
+    `本轮追问：${followUpQuestion}`,
+    "请结合同一工作区数据继续分析，并给出业务结论、证据和必要图表。",
+  ]
+    .filter(Boolean)
+    .join("。");
 }
 
 export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
@@ -72,6 +91,24 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
       cacheRun(response);
     } catch (err) {
       setContinuationError(err instanceof Error ? err.message : "无法继续分析");
+    } finally {
+      setIsContinuing(false);
+    }
+  }
+
+  async function handleFollowUp({ followUpQuestion, thread }: FollowUpPayload) {
+    try {
+      setIsContinuing(true);
+      setContinuationError("");
+      const contextualQuestion = buildFollowUpQuestion(thread, followUpQuestion);
+      const response = await runAnalysis(workspaceId, {
+        userQuestion: contextualQuestion,
+      });
+      setRun(response);
+      setQuestion(followUpQuestion);
+      cacheRun(response);
+    } catch (err) {
+      setContinuationError(err instanceof Error ? err.message : "无法继续追问");
     } finally {
       setIsContinuing(false);
     }
@@ -132,6 +169,7 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
           <RunResult
             result={resultForDisplay(run)}
             onContinueClarification={handleContinue}
+            onAskFollowUp={handleFollowUp}
             isContinuing={isContinuing}
             continuationError={continuationError}
           />

@@ -367,3 +367,26 @@ export async function getWorkspaceReport(
 export function getWorkspaceReportDownloadUrl(workspaceId: string, reportId: string): string {
   return `${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}/download`;
 }
+
+export function resolveApiUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/^https?:\/\//.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/api/")) {
+    return `${API_BASE}${trimmed}`;
+  }
+  return trimmed;
+}
+
+export function getWorkspaceArtifactUrl(workspaceId: string, relativePath: string): string {
+  const encodedPath = relativePath
+    .split("/")
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `${API_BASE}/api/workspaces/${workspaceId}/artifacts/${encodedPath}`;
+}

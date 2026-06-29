@@ -12,7 +12,7 @@ type DatasetManagerProps = {
 
 export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
   const [sources, setSources] = useState<WorkspaceSource[]>([]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [sqlitePath, setSqlitePath] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -31,16 +31,20 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedFile) {
-      setError("请先选择 CSV 或 Excel 文件。");
+    if (selectedFiles.length === 0) {
+      setError("请先选择一个或多个 CSV / Excel 文件。");
       return;
     }
     try {
       setIsBusy(true);
       setError("");
-      const response = await uploadSource(workspaceId, selectedFile);
-      setStatus(formatImportStatus(response.imported_tables));
-      setSelectedFile(null);
+      const importedTables: string[] = [];
+      for (const file of selectedFiles) {
+        const response = await uploadSource(workspaceId, file);
+        importedTables.push(...(response.imported_tables ?? []));
+      }
+      setStatus(formatUploadStatus(selectedFiles.length, importedTables));
+      setSelectedFiles([]);
       await refreshSources();
     } catch (err) {
       setError(`文件上传失败：${err instanceof Error ? err.message : "请检查文件后重试。"}`);
@@ -121,12 +125,12 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
           )}
         </ProductCard>
 
-        <div className="dataset-action-grid">
+        <div className="dataset-action-grid" role="region" aria-label="数据源操作区">
           <ProductCard>
             <div className="dataset-card-heading">
               <p className="product-eyebrow">上传文件</p>
               <h2>上传业务文件</h2>
-              <p>支持 CSV、Excel 工作簿，导入后会写入当前工作区的分析数据库。</p>
+              <p>支持一次选择多个 CSV / Excel 文件，导入后会写入当前工作区的分析数据库。</p>
             </div>
             <form className="form-grid" onSubmit={handleUpload}>
               <label htmlFor="source-file">选择 CSV 或 Excel 文件</label>
@@ -134,7 +138,8 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
                 id="source-file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
-                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                multiple
+                onChange={(event) => setSelectedFiles(Array.from(event.target.files ?? []))}
               />
               <button type="submit" disabled={isBusy}>
                 上传 CSV / Excel
@@ -162,50 +167,55 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
               </button>
             </form>
           </ProductCard>
+
+          <ProductCard>
+            <p className="product-eyebrow">准备状态</p>
+            <h2>数据准备状态</h2>
+            <div className="dataset-readiness-list">
+              <div>
+                <span aria-hidden="true">✓</span>
+                {sourceCount > 0 ? `${sourceCount} 个文件已导入` : "等待导入第一个文件"}
+              </div>
+              <div>
+                <span aria-hidden="true">✓</span>
+                {importedTableCount > 0 ? `${importedTableCount} 个表已识别` : "导入后自动识别表结构"}
+              </div>
+              <div>
+                <span aria-hidden="true">✓</span>
+                {sourceCount > 0 ? "可进入分析工作台" : "完成导入后继续分析"}
+              </div>
+            </div>
+          </ProductCard>
+
+          <ProductCard className="dataset-next-card">
+            <p className="product-eyebrow">下一步</p>
+            <h2>下一步</h2>
+            <div className="dataset-next-links">
+              <Link className="button secondary-button" href={`/workspaces/${workspaceId}/profile`}>
+                生成数据画像
+              </Link>
+              <Link className="button secondary-button" href={`/workspaces/${workspaceId}/settings`}>
+                进入数据设置
+              </Link>
+              <Link className="button" href={`/workspaces/${workspaceId}/analysis`}>
+                前往分析工作台
+              </Link>
+            </div>
+          </ProductCard>
         </div>
 
         {status ? <p role="status">{status}</p> : null}
         {error ? <p role="alert">{error}</p> : null}
       </div>
-
-      <aside className="dataset-side-column">
-        <ProductCard>
-          <p className="product-eyebrow">准备状态</p>
-          <h2>数据准备状态</h2>
-          <div className="dataset-readiness-list">
-            <div>
-              <span aria-hidden="true">✓</span>
-              {sourceCount > 0 ? `${sourceCount} 个文件已导入` : "等待导入第一个文件"}
-            </div>
-            <div>
-              <span aria-hidden="true">✓</span>
-              {importedTableCount > 0 ? `${importedTableCount} 个表已识别` : "导入后自动识别表结构"}
-            </div>
-            <div>
-              <span aria-hidden="true">✓</span>
-              {sourceCount > 0 ? "可进入分析工作台" : "完成导入后继续分析"}
-            </div>
-          </div>
-        </ProductCard>
-
-        <ProductCard className="dataset-next-card">
-          <p className="product-eyebrow">下一步</p>
-          <h2>下一步</h2>
-          <div className="dataset-next-links">
-            <Link className="button secondary-button" href={`/workspaces/${workspaceId}/profile`}>
-              生成数据画像
-            </Link>
-            <Link className="button secondary-button" href={`/workspaces/${workspaceId}/settings`}>
-              进入数据设置
-            </Link>
-            <Link className="button" href={`/workspaces/${workspaceId}/analysis`}>
-              前往分析工作台
-            </Link>
-          </div>
-        </ProductCard>
-      </aside>
     </section>
   );
+}
+
+function formatUploadStatus(fileCount: number, importedTables?: string[]) {
+  if (!importedTables || importedTables.length === 0) {
+    return `已上传 ${fileCount} 个文件，正在刷新数据源列表。`;
+  }
+  return `已上传 ${fileCount} 个文件，导入表：${importedTables.join(", ")}`;
 }
 
 function formatImportStatus(importedTables?: string[]) {

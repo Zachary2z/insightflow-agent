@@ -792,28 +792,24 @@ th {
 
 .product-section-title h2,
 .dataset-card-heading h2,
-.dataset-side-column h2,
 .dataset-empty-state h3 {
   margin: 0;
 }
 
 .dataset-manager {
-  align-items: start;
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
 }
 
-.dataset-main-column,
-.dataset-side-column {
+.dataset-main-column {
   display: grid;
   gap: 20px;
 }
 
 .dataset-action-grid {
   display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .dataset-card-heading p:not(.product-eyebrow),
@@ -1121,13 +1117,6 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .dataset-manager {
-    grid-template-columns: 1fr;
-  }
-
-  .dataset-side-column {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 700px) {
@@ -1162,7 +1151,6 @@ th {
   }
 
   .dataset-action-grid,
-  .dataset-side-column,
   .workbench-metric-grid {
     grid-template-columns: 1fr;
   }

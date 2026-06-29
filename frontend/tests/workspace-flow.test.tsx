@@ -40,12 +40,15 @@ vi.mock("../lib/api", () => ({
   createSemanticDraft: vi.fn(),
   createWorkspace: vi.fn(),
   getWorkspaceReport: vi.fn(),
+  getWorkspaceArtifactUrl: (workspaceId: string, relativePath: string) =>
+    `http://localhost:8000/api/workspaces/${workspaceId}/artifacts/${relativePath}`,
   getWorkspaceReportDownloadUrl: vi.fn(),
   getWorkspaceSettings: vi.fn(),
   importSqliteSource: vi.fn(),
   listWorkspaceReports: vi.fn(),
   listSources: vi.fn(),
   listWorkspaces: vi.fn(),
+  resolveApiUrl: (url: string) => (url.startsWith("/api/") ? `http://localhost:8000${url}` : url),
   runAnalysis: vi.fn(),
   uploadSource: vi.fn(),
 }));
@@ -131,7 +134,7 @@ describe("workspace product components", () => {
     expect(await screen.findByText("还没有导入数据源")).toBeTruthy();
   });
 
-  it("uploads files, imports SQLite, and renders Chinese source management metadata", async () => {
+  it("uploads multiple files, imports SQLite, and renders source management actions in one responsive grid", async () => {
     vi.mocked(listSources)
       .mockResolvedValueOnce({
         sources: [
@@ -172,7 +175,9 @@ describe("workspace product components", () => {
           { source_id: "src_5", source_type: "sqlite", name: "ops.db", imported_tables: ["invoices"] },
         ],
       });
-    vi.mocked(uploadSource).mockResolvedValue({ success: true, imported_tables: ["returns"] });
+    vi.mocked(uploadSource)
+      .mockResolvedValueOnce({ success: true, imported_tables: ["returns"] })
+      .mockResolvedValueOnce({ success: true, imported_tables: ["refunds"] });
     vi.mocked(importSqliteSource).mockResolvedValue({ success: true, imported_tables: ["invoices"] });
 
     render(<DatasetManager workspaceId="ws_1" />);
@@ -181,17 +186,24 @@ describe("workspace product components", () => {
     expect(screen.getByText("上传 CSV / Excel")).toBeTruthy();
     expect(screen.getByText("导入 SQLite")).toBeTruthy();
     expect(screen.getByText("数据准备状态")).toBeTruthy();
+    const actionRegion = screen.getByRole("region", { name: "数据源操作区" });
+    expect(actionRegion.querySelector(".dataset-side-column")).toBeNull();
+    expect(actionRegion.contains(screen.getByText("数据准备状态"))).toBe(true);
+    expect(actionRegion.contains(screen.getByRole("heading", { name: "下一步" }))).toBe(true);
     expect(screen.getByText("orders.csv")).toBeTruthy();
     expect(screen.getByText("customers.csv")).toBeTruthy();
     expect(screen.getByText("marketing_spend.csv")).toBeTruthy();
     expect(screen.getAllByText("已导入").length).toBeGreaterThanOrEqual(3);
 
     const file = new File(["return_id,amount\n1,20"], "returns.csv", { type: "text/csv" });
-    fireEvent.change(screen.getByLabelText("选择 CSV 或 Excel 文件"), { target: { files: [file] } });
+    const secondFile = new File(["refund_id,amount\n1,8"], "refunds.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByLabelText("选择 CSV 或 Excel 文件"), { target: { files: [file, secondFile] } });
     fireEvent.click(screen.getByRole("button", { name: "上传 CSV / Excel" }));
 
     expect(await screen.findByText("returns.csv")).toBeTruthy();
     expect(uploadSource).toHaveBeenCalledWith("ws_1", file);
+    expect(uploadSource).toHaveBeenCalledWith("ws_1", secondFile);
+    expect(uploadSource).toHaveBeenCalledTimes(2);
     fireEvent.change(screen.getByLabelText("SQLite 文件路径"), { target: { value: "/tmp/ops.db" } });
     fireEvent.click(screen.getByRole("button", { name: "导入 SQLite" }));
 
@@ -718,6 +730,81 @@ describe("workspace product components", () => {
     expect(await screen.findByText("paid_search 表现最好")).toBeTruthy();
   });
 
+  it("starts a contextual follow-up analysis after a completed run", async () => {
+    vi.mocked(runAnalysis)
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_done",
+        result: {
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: {
+              original_question: "帮我分析最近90天哪些渠道收益比较好",
+              system_understanding: "按最近 90 天比较渠道收益。",
+              resolved_question: "分析最近 90 天各渠道收益表现。",
+              status: "completed",
+            },
+            business_answer: {
+              headline: "email 渠道收益最好",
+              summary: "email 收益最高。",
+              confidence: "medium",
+            },
+            evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+            chart_artifacts: [],
+            technical_details: {},
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_followup",
+        result: {
+          product_result: {
+            version: "p13.v1",
+            status: "completed",
+            question_thread: {
+              original_question: "基于上一轮分析继续追问",
+              resolved_question: "继续分析 email 渠道为什么收益最好。",
+              status: "completed",
+            },
+            business_answer: {
+              headline: "email 的客单价更高",
+              summary: "email 渠道收益高主要来自客单价。",
+              confidence: "medium",
+            },
+            evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+            chart_artifacts: [],
+            technical_details: {},
+          },
+        },
+      });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "帮我分析最近90天哪些渠道收益比较好" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+
+    expect(await screen.findByText("email 渠道收益最好")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("继续追问"), {
+      target: { value: "为什么 email 渠道收益最好？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发送追问" }));
+
+    await waitFor(() => expect(runAnalysis).toHaveBeenCalledTimes(2));
+    const followUpRequest = vi.mocked(runAnalysis).mock.calls[1][1];
+    expect(followUpRequest).toMatchObject({
+      userQuestion: expect.stringContaining("为什么 email 渠道收益最好？"),
+    });
+    expect(String((followUpRequest as { userQuestion?: string }).userQuestion)).toContain(
+      "帮我分析最近90天哪些渠道收益比较好",
+    );
+    expect(await screen.findByText("email 的客单价更高")).toBeTruthy();
+  });
+
   it("renders the business answer before evidence and technical details", () => {
     const { container } = render(
       <RunResult
@@ -757,7 +844,9 @@ describe("workspace product components", () => {
     );
 
     const image = screen.getByRole("img", { name: "渠道收入" }) as HTMLImageElement;
-    expect(image.getAttribute("src")).toBe("/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png");
+    expect(image.getAttribute("src")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png",
+    );
     expect(screen.getByText("付费搜索贡献最高。")).toBeTruthy();
     expect(screen.queryByText("runs/run_1/charts/channel.png")).toBeNull();
   });
@@ -955,7 +1044,13 @@ describe("workspace product components", () => {
     expect(screen.getByText("Paid search led revenue.")).toBeTruthy();
     expect(screen.getByText("Rows preview came from workspace data.")).toBeTruthy();
     expect(screen.getByText("图表或附件")).toBeTruthy();
-    expect(screen.getByText("Revenue by Channel 图表已生成")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Revenue by Channel" }).getAttribute("src")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
+    );
+    expect(screen.getByRole("link", { name: "下载图表" }).getAttribute("href")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
+    );
+    expect(screen.queryByText("Revenue by Channel 图表已生成")).toBeNull();
     expect(screen.queryByText("artifacts/revenue_by_channel_1.png")).toBeNull();
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.md")).toBeNull();
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.json")).toBeNull();
