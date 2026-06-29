@@ -1,4 +1,5 @@
-import Link from "next/link";
+import ProductPageHeader from "@/components/ProductPageHeader";
+import ProductShell from "@/components/ProductShell";
 import ReportGenerator from "@/components/ReportGenerator";
 import ReportList from "@/components/ReportList";
 
@@ -10,20 +11,16 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
   const { workspaceId } = await params;
 
   return (
-    <main>
-      <h1>Reports</h1>
-      <p>Workspace: {workspaceId}</p>
-      <nav>
-        <Link href={`/workspaces/${workspaceId}/datasets`}>Datasets</Link>
-        <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
-        <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
-        <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
-        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
-      </nav>
+    <ProductShell workspaceId={workspaceId} active="reports">
+      <ProductPageHeader
+        eyebrow="Report Center"
+        title="报告中心"
+        description="用于生成、阅读、下载管理层报告。正文业务化，技术信息默认收起。"
+      />
       <section className="stack">
         <ReportGenerator workspaceId={workspaceId} />
         <ReportList workspaceId={workspaceId} />
       </section>
-    </main>
+    </ProductShell>
   );
 }

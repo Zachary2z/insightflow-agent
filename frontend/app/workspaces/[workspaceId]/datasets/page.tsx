@@ -1,5 +1,6 @@
-import Link from "next/link";
 import DatasetManager from "@/components/DatasetManager";
+import ProductPageHeader from "@/components/ProductPageHeader";
+import ProductShell from "@/components/ProductShell";
 
 type DatasetsPageProps = {
   params: Promise<{ workspaceId: string }>;
@@ -9,17 +10,13 @@ export default async function DatasetsPage({ params }: DatasetsPageProps) {
   const { workspaceId } = await params;
 
   return (
-    <main>
-      <h1>Datasets</h1>
-      <p>Workspace: {workspaceId}</p>
-      <nav>
-        <Link href={`/workspaces/${workspaceId}/profile`}>Profile</Link>
-        <Link href={`/workspaces/${workspaceId}/semantic-layer`}>Semantic layer</Link>
-        <Link href={`/workspaces/${workspaceId}/analysis`}>Analysis</Link>
-        <Link href={`/workspaces/${workspaceId}/reports`}>Reports</Link>
-        <Link href={`/workspaces/${workspaceId}/settings`}>Settings</Link>
-      </nav>
+    <ProductShell workspaceId={workspaceId} active="sources">
+      <ProductPageHeader
+        eyebrow="Data Sources"
+        title="数据源管理"
+        description="先把真实业务文件导入工作区，再生成数据画像、语义层和可分析问题。"
+      />
       <DatasetManager workspaceId={workspaceId} />
-    </main>
+    </ProductShell>
   );
 }

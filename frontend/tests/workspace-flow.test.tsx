@@ -232,7 +232,8 @@ describe("workspace product components", () => {
 
     render(await SettingsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByText("数据设置")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "数据设置" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /数据设置/ }).getAttribute("aria-current")).toBe("page");
     expect(await screen.findByText("Data sources")).toBeTruthy();
   });
 
