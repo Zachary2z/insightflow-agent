@@ -247,14 +247,18 @@ def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
 def _requires_clarification(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
     product_thread = product_result.get("question_thread") if isinstance(product_result.get("question_thread"), dict) else {}
     raw_thread = result.get("question_thread") if isinstance(result.get("question_thread"), dict) else {}
-    status = _first_text(product_result.get("status"), result.get("status"), product_thread.get("status"), raw_thread.get("status"))
+    status = _first_text(
+        product_result.get("status"),
+        result.get("status"),
+        product_thread.get("status"),
+        raw_thread.get("status"),
+    ).lower()
+    if status == "waiting_for_clarification":
+        return True
+    if status in {"completed", "failed"}:
+        return False
     clarification = result.get("clarification_result") if isinstance(result.get("clarification_result"), dict) else {}
-    return (
-        status == "waiting_for_clarification"
-        or bool(product_thread.get("pending_run_id"))
-        or bool(raw_thread.get("pending_run_id"))
-        or clarification.get("requires_clarification") is True
-    )
+    return clarification.get("requires_clarification") is True
 
 
 def _first_text(*values: Any) -> str:

@@ -214,3 +214,56 @@ def test_failed_runs_without_business_answer_or_evidence_are_not_filtered(tmp_pa
             "failure_reason": "SQL review rejected",
         }
     ]
+
+
+def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_donepending",
+        {
+            "status": "completed",
+            "saved_at": "2026-06-29T15:00:00Z",
+            "question_thread": {
+                "original_question": "继续分析后的完成 run",
+                "pending_run_id": "pending_123",
+                "status": "completed",
+            },
+        },
+    )
+    _write_run(
+        workspace,
+        "run_failpending",
+        {
+            "status": "failed",
+            "saved_at": "2026-06-29T14:00:00Z",
+            "question_thread": {
+                "original_question": "继续分析后的失败 run",
+                "pending_run_id": "pending_123",
+                "status": "failed",
+            },
+            "error_message": "SQL review rejected",
+        },
+    )
+    _write_run(
+        workspace,
+        "run_waitpending",
+        {
+            "status": "waiting_for_clarification",
+            "saved_at": "2026-06-29T13:00:00Z",
+            "question_thread": {
+                "original_question": "真正等待澄清的 run",
+                "pending_run_id": "pending_123",
+                "status": "waiting_for_clarification",
+            },
+        },
+    )
+
+    response = client.get(f"/api/workspaces/{workspace_id}/runs")
+
+    assert response.status_code == 200
+    summaries = {run["run_id"]: run for run in response.json()["runs"]}
+    assert summaries["run_donepending"]["requires_clarification"] is False
+    assert summaries["run_failpending"]["requires_clarification"] is False
+    assert summaries["run_waitpending"]["requires_clarification"] is True
