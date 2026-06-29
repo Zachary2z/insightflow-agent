@@ -15,15 +15,15 @@ This file is the living status tracker for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P14 Product UI Shell And Business Workflow |
-| Current task | P14-H8 full regression/live acceptance/docs closeout complete |
-| Next planned task | P15 planning pending |
+| Current phase | P15 Analysis Reliability And History planning |
+| Current task | P15 plan documented; implementation not started |
+| Next planned task | P15-H1 backend run history APIs |
 | Last completed task | P14-H8 Full regression, real DeepSeek live acceptance, docs closeout, artifact audit |
-| Main product target | Coherent Chinese business data-analysis product with 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
+| Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
-| Out of scope for P14 | Real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, full Business Q&A chat, backend-agent rewrite, old demo restoration, and unguarded LLM execution |
+| Out of scope for P15 | Full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, fixed SQL templates, keyword-heavy business rules, old demo restoration, and unguarded LLM execution |
 
 ## Phase Overview
 
@@ -48,6 +48,7 @@ This file is the living status tracker for InsightFlow Agent.
 | P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
 | P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
+| P15 | Analysis Reliability And History | `[~]` Plan documented; implementation not started |
 
 ## P11 Product Hardening
 
@@ -346,3 +347,43 @@ Completed task queue:
 | P12-H6 | Docs, artifact audit, final verification | `[x]` Complete |
 
 P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, hardcoded SQL templates, keyword-heavy report rule trees, silent semantic-layer overwrites, and any restoration of historical Streamlit/ecommerce/eval product paths.
+
+## P15 Planning Snapshot
+
+Implementation plan: `docs/product/plans/2026-06-29-p15-analysis-reliability-and-history.md`.
+
+P15 selected product direction:
+
+```text
+Analysis Workbench
+-> ask a business question
+-> persist each workspace run
+-> show analysis history after navigation or refresh
+-> restore previous question thread, answer, evidence, charts, and technical details
+-> repair schema-mismatch SQL once when reviewer detects unknown tables or columns
+-> show business-friendly failure when repair cannot safely complete
+```
+
+Key P15 decisions:
+
+- Workspace run files are the source of truth for analysis history.
+- `sessionStorage` must not be the product source of truth for run restoration.
+- Backend should expose run list/detail APIs instead of making the frontend infer history from local state.
+- Analysis history must include completed, failed, and waiting-for-clarification runs.
+- SQL schema repair is allowed exactly once and must still pass SQL Reviewer before execution.
+- Do not add fixed SQL templates, keyword-heavy rule trees, or ecommerce-specific fallback logic.
+- Main UI must explain failures in Chinese business language; raw reviewer details stay collapsed under technical details.
+- Real DeepSeek regression should cover the observed `给我一下最近30天几个渠道的数据` plus `都看` scenario.
+
+Suggested P15 task queue:
+
+| Task | Scope | Status |
+|---|---|---|
+| P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[ ]` Not started |
+| P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[ ]` Not started |
+| P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[ ]` Not started |
+| P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[ ]` Not started |
+| P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[ ]` Not started |
+| P15-H6 | Real DeepSeek regression for channel data + `都看`, plus history persistence | `[ ]` Not started |
+
+P15 out of scope: full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, vector databases, fixed SQL templates, keyword-heavy business rules, and any restoration of old Streamlit/eval/chart-agent paths.

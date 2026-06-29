@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Plan
 
-This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. P14 Product UI Shell And Business Workflow is complete through H8 full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 planning is pending. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
+This document tracks the active product plan for InsightFlow Agent. P11 General Data Analysis Product hardening is complete. P12 Report Productization is complete through docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete through H9 final documentation, artifact audit, regression, live verification, and closeout. P14 Product UI Shell And Business Workflow is complete through H8 full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 Analysis Reliability And History is planned as the next phase. Historical P0-P10 notes are retained only as context for why the current safety and tool boundaries exist.
 
 ## Current Product Direction
 
@@ -17,6 +17,7 @@ FastAPI backend
 + structured P12 workspace reports
 + P13 Analysis Workbench, clarification continuation, Data Settings, and chart display
 + P14 unified Chinese product shell and clickable UI reference
++ P15 planned analysis history, run restoration, schema-mismatch SQL recovery, and business-friendly failure UX
 + live DeepSeek/provider-backed product mode
 + guarded SQL candidate
 + validated SQL execution
@@ -48,6 +49,7 @@ The current product is not the historical Streamlit demo, not the old ecommerce-
 | P12 | Report Productization | Complete | H1 report storage and Markdown foundation complete; H2 synchronous workspace report runner complete; H3 FastAPI report APIs complete; H4 Next.js reports UI complete; H5 live DeepSeek report acceptance complete; H6 docs, artifact audit, and final verification complete |
 | P13 | Business Answer And Product UX | Complete | H1-H9 complete: Analysis Workbench, clarification continuation, business-facing answers, reports UI polish, Data Settings UI, chart product quality, real DeepSeek product acceptance, documentation, artifact audit, regression, live verification, and closeout |
 | P14 | Product UI Shell And Business Workflow | Complete | H1 clickable product UI prototype and full implementation plan complete; H2 shared Next.js product shell, design tokens, horizontal nav, and route wrappers complete; H3 data source management redesign complete; H4 Analysis Workbench redesign complete; H5 Report Center redesign complete; H6 Data Settings redesign complete; H7 Business Q&A preview route complete; H8 full regression/live acceptance/docs closeout complete |
+| P15 | Analysis Reliability And History | Planned | Next phase: persisted analysis history, run restoration after navigation, schema-mismatch SQL repair, business-friendly failure explanations, and real DeepSeek regressions |
 
 ## P11 Product Hardening Plan
 
@@ -497,3 +499,86 @@ Latest result: passed on 2026-06-29.
 - Post-H8 live-provider hardening fixed real DeepSeek structured-output variance, no-clarification routing, evidence anchoring for readable business answers, and clean resolved-question generation after user clarification.
 - P14 Business Q&A boundary test passed and confirms no backend chat or business-qa endpoint was added.
 - Artifact hygiene and legacy path audits passed as final closeout checks; generated workspaces, reports, charts, traces, frontend build output, node_modules, caches, `.env`, and `sample_data/` must remain untracked.
+
+## P15 Analysis Reliability And History Plan
+
+P15 is the next planned phase. It addresses two real product gaps found during live usage after P14:
+
+1. Analysis Workbench history is not product-grade. A run is persisted under the workspace, but the UI cannot list previous questions or restore previous results after navigation.
+2. Real DeepSeek can occasionally generate SQL for a stale or adjacent schema. The SQL reviewer correctly blocks those queries, but the product should attempt one schema-aware repair and then show a business-friendly failure if repair is not possible.
+
+Implementation plan: `docs/product/plans/2026-06-29-p15-analysis-reliability-and-history.md`.
+
+### P15 Product Direction
+
+Primary product shape:
+
+```text
+workspace
+-> 分析工作台
+-> ask a business question
+-> current analysis result
+-> persisted analysis history
+-> click previous run
+-> restore question thread, business answer, evidence, charts, and technical details
+-> continue clarification or follow-up when allowed
+```
+
+Failure recovery shape:
+
+```text
+LLM SQL candidate
+-> SQL reviewer
+-> if Unknown table / Unknown column
+-> one schema-aware repair attempt using the real workspace schema
+-> reviewer again
+-> execute if approved
+-> otherwise business-friendly failure summary with collapsed technical details
+```
+
+### P15 Clean-Code Requirements
+
+- Use persisted workspace run files as the source of truth for history; do not rely on `sessionStorage` as product state.
+- Add a small run-history boundary such as `workspaces/run_store.py`; do not scatter filesystem traversal through API handlers or React components.
+- Keep frontend API calls in `frontend/lib/api.ts`.
+- Extract history UI into a focused component such as `AnalysisHistoryPanel`; keep `AnalysisRunner` readable.
+- Do not introduce fixed SQL templates, keyword-heavy business rules, or ecommerce-specific fallback logic.
+- SQL repair must be bounded to one attempt and must still pass the existing SQL reviewer before execution.
+- Main UI must explain failures in business language; raw reviewer details stay collapsed in technical details.
+- Generated workspace runs/reports/charts/traces and local sample data must remain untracked.
+
+### P15 Suggested Task Queue
+
+| Task | Scope | Status |
+|---|---|---|
+| P15-H1 | Backend run history APIs: list workspace runs and load a run detail from persisted run files | Planned |
+| P15-H2 | Analysis Workbench history panel: show previous questions, statuses, summaries, and restore selected runs | Planned |
+| P15-H3 | Run detail source-of-truth cleanup: load run detail from backend instead of relying on `sessionStorage` | Planned |
+| P15-H4 | One-pass schema-mismatch SQL repair after reviewer detects unknown tables or columns | Planned |
+| P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | Planned |
+| P15-H6 | Real DeepSeek regression for the `最近30天几个渠道的数据` + `都看` scenario and history persistence | Planned |
+
+### P15 Acceptance
+
+- Users can leave Analysis Workbench, return later, and see previous questions for the current workspace.
+- Users can click any previous run and restore its question thread, answer, evidence, charts, and collapsed technical details.
+- Failed and waiting-for-clarification runs remain visible in history.
+- Run detail pages work after refresh and without `sessionStorage`.
+- If DeepSeek generates SQL against nonexistent tables or columns, the system attempts one schema-aware repair.
+- Repaired SQL still goes through the existing SQL reviewer before execution.
+- If repair fails, users see a clear Chinese explanation and useful next action, not a wall of raw `Unknown table` text.
+- The live DeepSeek regression for the channel data + "都看" scenario passes or returns a clean business-friendly failure.
+- Full backend tests, frontend tests, frontend build, live opt-in tests, artifact hygiene audit, and legacy path audit pass.
+
+### P15 Out Of Scope
+
+- Full Business Q&A chat backend.
+- Real SaaS integrations such as Slack, Jira, Power BI, Notion, email, CRM, or ticketing systems.
+- Auth/RBAC.
+- Deployment.
+- PDF/PPT export.
+- Scheduled reports.
+- Vector databases.
+- Replacing the SQL reviewer, evidence validator, artifact policy, or trace logger.
+- Adding fixed SQL templates or keyword-heavy business rule trees.
+- Restoring Streamlit, old ecommerce-only UI, old eval UI, old `chart_agent`, old `visualization_planner`, or old `chart_tool`.
