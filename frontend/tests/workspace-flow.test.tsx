@@ -416,15 +416,19 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: /业务问答/ }).getAttribute("href")).toBe(
       "/workspaces/ws_1/business-qa",
     );
+    expect(screen.getByText("业务问答模式")).toBeTruthy();
     expect(screen.getByText("未来模式预览")).toBeTruthy();
+    expect(screen.getByLabelText("业务问答预览消息")).toBeTruthy();
+    expect(screen.getByText(/最近 90 天哪个渠道应该加预算/)).toBeTruthy();
+    expect(screen.getByText("正在理解问题")).toBeTruthy();
     expect(screen.getByText("当前上下文")).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "业务问题" })).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 2, name: "业务结论" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "进入分析工作台" }).getAttribute("href")).toBe(
+    expect(screen.getByText("本轮产物")).toBeTruthy();
+    expect(screen.getByText("业务结论")).toBeTruthy();
+    expect(screen.getByText("证据表")).toBeTruthy();
+    expect(screen.getByText("图表")).toBeTruthy();
+    expect(screen.getByText("报告草稿")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开工作台查看完整证据" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/analysis",
-    );
-    expect(screen.getByRole("link", { name: "进入报告中心" }).getAttribute("href")).toBe(
-      "/workspaces/ws_1/reports",
     );
     expect(screen.queryByText("完整聊天产品已上线")).toBeNull();
   });
@@ -476,7 +480,7 @@ describe("workspace product components", () => {
     );
     expect(await screen.findByText("优先加码 paid_search，同时观察转化成本。")).toBeTruthy();
     expect(screen.getByText("分析线程")).toBeTruthy();
-    expect(screen.getByText("证据表")).toBeTruthy();
+    expect(screen.getAllByText("证据表").length).toBeGreaterThanOrEqual(1);
 
     const disclosure = screen.getByText("技术详情").closest("details");
     expect(disclosure?.hasAttribute("open")).toBe(false);
