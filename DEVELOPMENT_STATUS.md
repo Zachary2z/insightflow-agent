@@ -391,7 +391,7 @@ Suggested P15 task queue:
 | Task | Scope | Status |
 |---|---|---|
 | P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[x]` Complete |
-| P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[ ]` Not started |
+| P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[x]` Complete |
 | P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[ ]` Not started |
 | P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[ ]` Not started |
 | P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[ ]` Not started |
