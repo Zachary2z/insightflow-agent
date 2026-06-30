@@ -99,7 +99,7 @@ def test_provider_valid_output_selects_excel_exporter_and_writes_real_xlsx(tmp_p
     assert "not-real" not in workbook_xml
 
 
-def test_provider_valid_output_selects_powerbi_mock_without_network_or_api_key(tmp_path, monkeypatch):
+def test_provider_powerbi_mock_selection_is_rejected_and_falls_back_to_local_renderer(tmp_path, monkeypatch):
     from agents.visualization_agent import run_visualization_agent
 
     monkeypatch.delenv("POWERBI_API_KEY", raising=False)
@@ -109,13 +109,17 @@ def test_provider_valid_output_selects_powerbi_mock_without_network_or_api_key(t
         output_dir=tmp_path,
     )
 
+    decision = result["visualization_decision"]
     delivery = result["visualization_delivery_result"]
+    assert decision["provider_called"] is True
+    assert decision["fallback_used"] is True
+    assert decision["delivery_tool_id"] == "local_renderer"
+    assert "powerbi_publisher_mock" in decision["validation_error"]
     assert delivery["success"] is True
-    assert delivery["artifact_url"].startswith("mock://powerbi/run_powerbi_mock/")
+    assert Path(delivery["artifact_path"]).exists()
+    assert delivery["artifact_url"] == ""
     assert delivery["external_tool_called"] is True
-    assert delivery["tool_type"] == "mock_external_bi"
-    assert delivery["requires_network"] is False
-    assert delivery["requires_api_key"] is False
+    assert delivery["tool_type"] == "local_artifact"
     assert delivery["fabricated_data"] is False
 
 
@@ -283,7 +287,7 @@ def test_local_renderer_only_uses_execution_result_rows(tmp_path):
     assert result["fabricated_data"] is False
 
 
-def test_powerbi_mock_does_not_require_network_or_api_key(tmp_path, monkeypatch):
+def test_powerbi_mock_delivery_tool_is_not_a_runtime_option(tmp_path, monkeypatch):
     from tools.external_visualization_tool import call_external_visualization_tool
 
     monkeypatch.delenv("POWERBI_API_KEY", raising=False)
@@ -295,14 +299,13 @@ def test_powerbi_mock_does_not_require_network_or_api_key(tmp_path, monkeypatch)
         output_dir=tmp_path,
     )
 
-    assert result["success"] is True
-    assert result["artifact_url"].startswith("mock://powerbi/run_powerbi_no_auth/")
-    assert result["external_tool_called"] is True
-    assert result["requires_network"] is False
-    assert result["requires_api_key"] is False
+    assert result["success"] is False
+    assert result["artifact_url"] == ""
+    assert result["external_tool_called"] is False
+    assert "Unknown delivery tool: powerbi_publisher_mock" in result["error"]
 
 
-def test_workflow_visualization_trace_records_provider_fallback_policy_and_tool_metadata(tmp_path):
+def test_workflow_visualization_trace_records_provider_fallback_when_mock_saas_is_requested(tmp_path):
     from graph.workflow import run_workflow
 
     result = run_workflow(
@@ -325,14 +328,14 @@ def test_workflow_visualization_trace_records_provider_fallback_policy_and_tool_
 
     trace_event = next(event for event in result["trace"] if event.get("node") == "visualization_agent")
     assert result["visualization_trace"]["provider_called"] is True
-    assert result["visualization_trace"]["fallback_used"] is False
-    assert result["visualization_trace"]["delivery_tool_id"] == "powerbi_publisher_mock"
+    assert result["visualization_trace"]["fallback_used"] is True
+    assert result["visualization_trace"]["delivery_tool_id"] == "local_renderer"
     assert result["visualization_trace"]["external_tool_called"] is True
     assert result["visualization_trace"]["prompt_id"] == "visualization_agent"
-    assert result["visualization_trace"]["validation_error"] == ""
+    assert "powerbi_publisher_mock" in result["visualization_trace"]["validation_error"]
     assert result["visualization_trace"]["provider_error"] == ""
     assert trace_event["provider_called"] is True
-    assert trace_event["fallback_used"] is False
-    assert trace_event["delivery_tool_id"] == "powerbi_publisher_mock"
+    assert trace_event["fallback_used"] is True
+    assert trace_event["delivery_tool_id"] == "local_renderer"
     assert trace_event["external_tool_called"] is True
     assert trace_event["prompt_id"] == "visualization_agent"

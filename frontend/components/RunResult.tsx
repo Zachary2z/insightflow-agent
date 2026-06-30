@@ -1,5 +1,5 @@
 import React from "react";
-import type { ProductAnalysisResult } from "../lib/api";
+import type { BusinessAnswer, ProductAnalysisResult } from "../lib/api";
 import AnalysisThreadCard from "./AnalysisThreadCard";
 import BusinessAnswerCard from "./BusinessAnswerCard";
 import ChartArtifactGallery from "./ChartArtifactGallery";
@@ -16,117 +16,75 @@ type FollowUpPayload = {
   thread: NonNullable<ProductAnalysisResult["question_thread"]>;
 };
 
+type RunResultEnvelope = Record<string, unknown> & {
+  product_result?: unknown;
+};
+
 type RunResultProps = {
-  result: Record<string, unknown> | ProductAnalysisResult;
+  result: RunResultEnvelope;
   onContinueClarification?: (payload: ContinuePayload) => Promise<void> | void;
   onAskFollowUp?: (payload: FollowUpPayload) => Promise<void> | void;
   isContinuing?: boolean;
   continuationError?: string;
 };
 
-type ExecutionResult = {
-  columns: string[];
-  rows: Array<unknown[] | Record<string, unknown>>;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function productResult(result: Record<string, unknown> | ProductAnalysisResult): ProductAnalysisResult | null {
+const BUSINESS_ANSWER_KEYS = [
+  "headline",
+  "direct_answer",
+  "why",
+  "evidence_bullets",
+  "recommendations",
+  "caveats",
+  "confidence",
+];
+
+function isBusinessAnswer(value: unknown): value is BusinessAnswer {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const keys = Object.keys(value).sort();
+  if (keys.length !== BUSINESS_ANSWER_KEYS.length || keys.join("|") !== [...BUSINESS_ANSWER_KEYS].sort().join("|")) {
+    return false;
+  }
+  return (
+    typeof value.headline === "string" &&
+    value.headline.trim().length > 0 &&
+    typeof value.direct_answer === "string" &&
+    value.direct_answer.trim().length > 0 &&
+    typeof value.why === "string" &&
+    value.why.trim().length > 0 &&
+    Array.isArray(value.evidence_bullets) &&
+    Array.isArray(value.recommendations) &&
+    Array.isArray(value.caveats) &&
+    ["low", "medium", "high"].includes(String(value.confidence))
+  );
+}
+
+function productResult(result: RunResultEnvelope): ProductAnalysisResult | null {
   if (!isRecord(result)) {
     return null;
   }
   const record = result as Record<string, unknown>;
   if (isRecord(record.product_result)) {
-    return record.product_result as ProductAnalysisResult;
-  }
-  if (record.question_thread || record.business_answer || record.technical_details) {
-    return record as ProductAnalysisResult;
+    const product = record.product_result as Record<string, unknown>;
+    if (product.version === "p16.v1" && isBusinessAnswer(product.business_answer)) {
+      return product as ProductAnalysisResult;
+    }
   }
   return null;
 }
 
-function stringField(result: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = result[key];
-    if (typeof value === "string" && value.trim()) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function listField(result: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = result[key];
-    if (Array.isArray(value)) {
-      return value.map((item) => String(item));
-    }
-    if (typeof value === "string" && value.trim()) {
-      return [value];
-    }
-  }
-  return [];
-}
-
-function executionResult(result: Record<string, unknown>): ExecutionResult | null {
-  const candidate = result.execution_result;
-  if (!isRecord(candidate)) {
-    return null;
-  }
-  const rows = Array.isArray(candidate.rows) ? (candidate.rows as Array<unknown[] | Record<string, unknown>>) : [];
-  const columns = Array.isArray(candidate.columns)
-    ? candidate.columns.map((column) => String(column))
-    : rows.length > 0 && isRecord(rows[0])
-      ? Object.keys(rows[0])
-      : [];
-  return { columns, rows };
-}
-
-function fallbackProduct(result: Record<string, unknown>): ProductAnalysisResult {
-  const execution = executionResult(result);
-  const finalAnswer = stringField(result, ["final_answer", "answer", "summary", "error"]);
-  const sql = stringField(result, ["generated_sql", "final_sql", "sql"]);
-  const tracePath = stringField(result, ["trace_path"]);
-  const chartPaths = listField(result, ["chart_path", "chart_paths"]);
-
-  return {
-    version: "compat",
-    status: String(result.status || ""),
-    run_id: typeof result.run_id === "string" ? result.run_id : null,
-    question_thread: {
-      original_question: stringField(result, ["original_question", "user_question", "question"]),
-      system_understanding: "",
-      status: typeof result.status === "string" ? result.status : "",
-    },
-    business_answer: finalAnswer
-      ? {
-          headline: finalAnswer.split(/[。.!?？]/)[0] || finalAnswer,
-          summary: finalAnswer,
-          confidence: "medium",
-        }
-      : undefined,
-    evidence: execution
-      ? {
-          table_preview: {
-            columns: execution.columns,
-            rows: execution.rows,
-          },
-        }
-      : undefined,
-    chart_artifacts: chartPaths.map((path) => ({ title: "分析图表", path })),
-    technical_details: {
-      sql,
-      raw_rows: execution?.rows ?? [],
-      trace_path: tracePath,
-      provider_metadata: {
-        ...(isRecord(result.question_understanding) ? { question_understanding: result.question_understanding } : {}),
-        ...(isRecord(result.sql_planning) ? { sql_planning: result.sql_planning } : {}),
-        ...(isRecord(result.visualization_trace) ? { visualization: result.visualization_trace } : {}),
-      },
-    },
-  };
+function ProductResultError() {
+  return (
+    <section className="panel soft-warning" role="alert">
+      <h3>分析结果结构异常</h3>
+      <p>后端没有返回当前 P16 业务答案结构，请重新运行分析。</p>
+    </section>
+  );
 }
 
 export default function RunResult({
@@ -136,16 +94,10 @@ export default function RunResult({
   isContinuing = false,
   continuationError = "",
 }: RunResultProps) {
-  const product = productResult(result) ?? fallbackProduct(result as Record<string, unknown>);
-  const hasProductContent =
-    product.question_thread ||
-    product.business_answer ||
-    product.evidence ||
-    product.chart_artifacts?.length ||
-    product.technical_details;
+  const product = productResult(result);
 
-  if (!hasProductContent) {
-    return <p>本次分析暂未返回可展示结果。</p>;
+  if (!product) {
+    return <ProductResultError />;
   }
 
   return (

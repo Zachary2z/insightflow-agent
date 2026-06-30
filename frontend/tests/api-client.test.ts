@@ -15,6 +15,16 @@ import {
   uploadSource,
 } from "../lib/api";
 
+const businessAnswer = {
+  headline: "Paid search leads revenue.",
+  direct_answer: "Paid search leads revenue.",
+  why: "The returned evidence rows show paid search ahead.",
+  evidence_bullets: ["paid_search revenue is highest."],
+  recommendations: ["Review paid search budget."],
+  caveats: [],
+  confidence: "medium",
+};
+
 describe("api client", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -113,8 +123,8 @@ describe("api client", () => {
           run_id: "run_1",
           result: { final_answer: "Paid search leads revenue." },
           product_result: {
-            version: "p13.v1",
-            business_answer: { headline: "Paid search leads revenue." },
+            version: "p16.v1",
+            business_answer: businessAnswer,
           },
         }),
       });
@@ -152,13 +162,22 @@ describe("api client", () => {
         run_id: "run_2",
         result: { final_answer: "Products A and B lead revenue." },
         product_result: {
-          version: "p13.v1",
+          version: "p16.v1",
           status: "completed",
           question_thread: {
             original_question: "帮我看看销售情况",
             clarification_answer: "按商品，最近 90 天，看 Top 5",
             resolved_question: "分析最近 90 天商品销售额 Top 5。",
             status: "completed",
+          },
+          business_answer: {
+            headline: "商品 A 和 B 收入领先。",
+            direct_answer: "商品 A 和 B 在最近 90 天收入领先。",
+            why: "后端 product_result 提供了已校验的业务回答。",
+            evidence_bullets: ["商品 A 和 B 位于收入 Top 5。"],
+            recommendations: [],
+            caveats: [],
+            confidence: "medium",
           },
         },
       }),

@@ -12,6 +12,18 @@ from workspaces.store import WorkspaceStore
 SUPPORTED_REPORT_TYPES = {"business_review", "channel_performance", "revenue_trend"}
 
 
+def _business_answer() -> dict:
+    return {
+        "headline": "付费搜索收入领先",
+        "direct_answer": "付费搜索是本节收入最高的渠道。",
+        "why": "证据表显示 paid_search 收入为 200.0。",
+        "evidence_bullets": ["paid_search 收入为 200.0。"],
+        "recommendations": ["优先复盘付费搜索渠道。"],
+        "caveats": ["当前只基于报告章节查询结果。"],
+        "confidence": "high",
+    }
+
+
 def _client_with_fake_report_runner(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     calls = []
@@ -38,7 +50,7 @@ def _client_with_fake_report_runner(tmp_path):
             report_goal=report_goal.strip(),
             title="Fake Business Review",
             status="completed",
-            executive_summary=["Revenue is concentrated in paid search."],
+            executive_summary=["Revenue by Channel: 付费搜索收入领先 - 付费搜索是本节收入最高的渠道。"],
             sections=[
                 ReportSection(
                     section_id="revenue_by_channel",
@@ -46,7 +58,7 @@ def _client_with_fake_report_runner(tmp_path):
                     purpose="Compare channels.",
                     status="completed",
                     question="Which channels led revenue?",
-                    summary="Paid search led revenue.",
+                    business_answer=_business_answer(),
                     sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
                     columns=["channel", "revenue"],
                     rows_preview=[{"channel": "paid_search", "revenue": 200.0}],
@@ -98,6 +110,8 @@ def test_create_report_returns_persisted_report(tmp_path):
     assert payload["report_id"] == "report_fake_1"
     assert payload["report"]["report_id"] == "report_fake_1"
     assert payload["report"]["status"] == "completed"
+    assert payload["report"]["sections"][0]["business_answer"] == _business_answer()
+    assert "summary" not in payload["report"]["sections"][0]
     assert payload["report"]["sections"][0]["sql"].startswith("SELECT channel")
     assert payload["report"]["sections"][0]["technical_details"]["sql"].startswith("SELECT channel")
     assert payload["report"]["sections"][0]["technical_details"]["provider_metadata"]["sql_planning"][
@@ -143,9 +157,10 @@ def test_get_report_detail_returns_report(tmp_path):
     payload = response.json()
     assert payload["report"]["report_id"] == created["report_id"]
     assert payload["report"]["executive_summary"] == [
-        "Revenue is concentrated in paid search."
+        "Revenue by Channel: 付费搜索收入领先 - 付费搜索是本节收入最高的渠道。"
     ]
     assert "technical_details" in payload["report"]["sections"][0]
+    assert payload["report"]["sections"][0]["business_answer"]["headline"] == "付费搜索收入领先"
 
 
 def test_download_report_markdown_returns_markdown_file(tmp_path):
@@ -162,6 +177,10 @@ def test_download_report_markdown_returns_markdown_file(tmp_path):
     assert f'filename="{created["report_id"]}.md"' in response.headers["content-disposition"]
     assert "# Fake Business Review" in response.text
     assert "## Executive Summary" in response.text
+    assert "#### 结论" in response.text
+    assert "付费搜索收入领先" in response.text
+    assert "#### 直接回答" in response.text
+    assert "付费搜索是本节收入最高的渠道。" in response.text
     assert "## Technical Appendix" in response.text
     assert "```sql\nSELECT channel" in response.text
 

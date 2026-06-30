@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 from pathlib import Path
 from typing import Any, Callable
 
 from workspaces.analysis_runner import run_workspace_analysis
 from workspaces.models import utc_now_iso
+from workspaces.product_models import PRODUCT_RESULT_VERSION
+from workspaces.product_result_builder import business_answer_is_usable
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_models import ReportSection
 from workspaces.report_store import WorkspaceReportStore
@@ -179,6 +180,7 @@ def run_workspace_report(
                 title=section_plan["title"],
                 purpose=section_plan["purpose"],
                 status="failed",
+                business_answer=_missing_business_answer_failure(),
                 question=section_question,
                 error=str(exc),
             )
@@ -338,15 +340,28 @@ def _section_from_analysis_result(
     provider_metadata = _provider_metadata(analysis_result)
     trace_nodes = _trace_nodes(analysis_result.get("trace") or [])
     sql = str(analysis_result.get("generated_sql") or "")
-    error = _section_error(analysis_result, execution_result, status)
-    summary = _business_summary(analysis_result, sql)
+    business_answer = _business_answer_from_analysis_result(
+        analysis_result=analysis_result,
+        question=question,
+        execution_result=execution_result,
+    )
+    missing_business_answer = not business_answer
+    if missing_business_answer:
+        business_answer = _missing_business_answer_failure()
+        status = "failed"
+    error = _section_error(
+        analysis_result,
+        execution_result,
+        status,
+        missing_business_answer=missing_business_answer,
+    )
     return ReportSection(
         section_id=section_plan["section_id"],
         title=section_plan["title"],
         purpose=section_plan["purpose"],
         status=status,
+        business_answer=business_answer,
         question=question,
-        summary=summary,
         sql=sql,
         columns=columns,
         rows_preview=rows_preview,
@@ -366,6 +381,7 @@ def _section_from_analysis_result(
             "trace_nodes": trace_nodes,
             "trace_path": str(analysis_result.get("trace_path") or ""),
             "workspace_run_dir": str(analysis_result.get("workspace_run_dir") or ""),
+            "raw_final_answer": str(analysis_result.get("final_answer") or ""),
         },
         provider_metadata=provider_metadata,
         trace_nodes=trace_nodes,
@@ -383,14 +399,66 @@ def _analysis_succeeded(
     )
 
 
-def _business_summary(analysis_result: dict[str, Any], sql: str) -> str:
-    summary = str(analysis_result.get("final_answer") or "").strip()
-    summary = re.sub(r"```sql\s*.*?```", "", summary, flags=re.IGNORECASE | re.DOTALL).strip()
-    if sql:
-        summary = summary.replace(sql, "").strip()
-    if not summary:
-        return "本节分析已完成，业务证据与技术细节见下方章节和附录。"
-    return summary
+def _business_answer_from_analysis_result(
+    *,
+    analysis_result: dict[str, Any],
+    question: str,
+    execution_result: dict[str, Any],
+) -> dict[str, Any]:
+    evidence_result = (
+        analysis_result.get("evidence_result")
+        if isinstance(analysis_result.get("evidence_result"), dict)
+        else {}
+    )
+    product_result = (
+        analysis_result.get("product_result")
+        if isinstance(analysis_result.get("product_result"), dict)
+        else {}
+    )
+    candidates: list[dict[str, Any]] = []
+    if product_result.get("version") == PRODUCT_RESULT_VERSION and isinstance(
+        product_result.get("business_answer"),
+        dict,
+    ):
+        candidates.append(product_result["business_answer"])
+    if isinstance(analysis_result.get("business_answer"), dict):
+        candidates.append(analysis_result["business_answer"])
+    for candidate in candidates:
+        if business_answer_is_usable(candidate, question, execution_result, evidence_result):
+            return {
+                "headline": str(candidate.get("headline") or "").strip(),
+                "direct_answer": str(candidate.get("direct_answer") or "").strip(),
+                "why": str(candidate.get("why") or "").strip(),
+                "evidence_bullets": [
+                    str(item)
+                    for item in candidate.get("evidence_bullets") or []
+                    if str(item).strip()
+                ],
+                "recommendations": [
+                    str(item)
+                    for item in candidate.get("recommendations") or []
+                    if str(item).strip()
+                ],
+                "caveats": [
+                    str(item)
+                    for item in candidate.get("caveats") or []
+                    if str(item).strip()
+                ],
+                "confidence": str(candidate.get("confidence") or "medium"),
+            }
+    return {}
+
+
+def _missing_business_answer_failure() -> dict[str, Any]:
+    return {
+        "headline": "本节缺少可展示的业务结论",
+        "direct_answer": "本节分析没有返回当前 P16 business_answer 合同，因此不能把旧文本作为报告正文展示。",
+        "why": "报告章节只接受 headline、direct_answer、why、evidence_bullets、recommendations、caveats 和 confidence 组成的业务答案。",
+        "evidence_bullets": [],
+        "recommendations": ["请重新生成本报告章节，或重新运行分析以获得当前业务答案结构。"],
+        "caveats": ["旧 final_answer、SQL、trace 或 provider metadata 不会作为报告正文降级展示。"],
+        "confidence": "low",
+    }
 
 
 def _rows_preview(execution_result: dict[str, Any], limit: int = 20) -> list[dict[str, Any]]:
@@ -498,13 +566,22 @@ def _section_error(
     analysis_result: dict[str, Any],
     execution_result: dict[str, Any],
     status: str,
+    *,
+    missing_business_answer: bool = False,
 ) -> str | None:
     if status == "completed":
         return None
+    if missing_business_answer:
+        return "Missing current P16 business_answer contract"
+    business_answer = (
+        analysis_result.get("business_answer")
+        if isinstance(analysis_result.get("business_answer"), dict)
+        else {}
+    )
     return (
-        analysis_result.get("final_answer")
-        or execution_result.get("error")
+        execution_result.get("error")
         or analysis_result.get("error_message")
+        or business_answer.get("direct_answer")
         or "Section analysis failed"
     )
 
@@ -522,10 +599,17 @@ def _report_status(sections: list[ReportSection]) -> str:
 def _executive_summary(sections: list[ReportSection]) -> list[str]:
     summary = []
     for section in sections:
-        if section.status == "completed" and section.summary:
-            summary.append(f"{section.title}: {section.summary}")
+        answer = section.business_answer or {}
+        headline = str(answer.get("headline") or "").strip()
+        direct_answer = str(answer.get("direct_answer") or "").strip()
+        if section.status == "completed" and (headline or direct_answer):
+            value = headline
+            if direct_answer and direct_answer != headline:
+                value = f"{headline} - {direct_answer}" if headline else direct_answer
+            summary.append(f"{section.title}: {value}")
         elif section.status == "failed":
-            summary.append(f"{section.title}: section failed - {section.error}")
+            value = headline or direct_answer or section.error or "section failed"
+            summary.append(f"{section.title}: {value}")
     return summary
 
 

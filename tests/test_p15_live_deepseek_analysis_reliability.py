@@ -102,7 +102,7 @@ def _prepared_channel_workspace(tmp_path: Path) -> tuple[WorkspaceStore, str]:
 
 def _combined_answer(product_result: dict) -> str:
     answer = product_result.get("business_answer") or {}
-    return f"{answer.get('headline') or ''}\n{answer.get('summary') or ''}"
+    return f"{answer.get('headline') or ''}\n{answer.get('direct_answer') or ''}"
 
 
 def _assert_no_raw_reviewer_wall(text: str) -> None:

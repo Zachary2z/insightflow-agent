@@ -85,13 +85,22 @@ def _fallback_output(
     validation_error: str = "",
 ) -> tuple[dict[str, Any], str]:
     if not execution_result:
+        business_answer = build_business_answer(
+            {
+                "user_question": state.get("user_question", ""),
+                "final_answer": "缺少 execution_result，无法生成基于数据的回答。",
+                "execution_result": {},
+                "evidence_result": state.get("evidence_result") or {},
+            }
+        )
         return (
             {
                 "success": False,
                 "source": "provider_unavailable" if provider_called else "deterministic",
                 "provider_called": provider_called,
                 "fallback_used": True,
-                "final_answer": "缺少 execution_result，无法生成基于数据的回答。",
+                "final_answer": business_answer["direct_answer"],
+                "business_answer": business_answer,
                 "candidate_claims": [],
                 "data_used": False,
                 "error": "execution_result is required",
@@ -102,13 +111,22 @@ def _fallback_output(
             "error",
         )
     if not execution_result.get("success"):
+        business_answer = build_business_answer(
+            {
+                "user_question": state.get("user_question", ""),
+                "final_answer": f"SQL 执行失败：{execution_result.get('error', 'unknown error')}",
+                "execution_result": execution_result,
+                "evidence_result": state.get("evidence_result") or {},
+            }
+        )
         return (
             {
                 "success": False,
                 "source": "provider_unavailable" if provider_called else "deterministic",
                 "provider_called": provider_called,
                 "fallback_used": True,
-                "final_answer": f"SQL 执行失败：{execution_result.get('error', 'unknown error')}",
+                "final_answer": business_answer["direct_answer"],
+                "business_answer": business_answer,
                 "candidate_claims": [],
                 "data_used": False,
                 "error": execution_result.get("error", "execution_result failed"),
@@ -118,13 +136,23 @@ def _fallback_output(
             },
             "error",
         )
+    fallback_answer = _answer_from_result(state.get("user_question", ""), execution_result)
+    business_answer = build_business_answer(
+        {
+            "user_question": state.get("user_question", ""),
+            "final_answer": fallback_answer,
+            "execution_result": execution_result,
+            "evidence_result": state.get("evidence_result") or {},
+        }
+    )
     return (
         {
             "success": True,
             "source": "provider_unavailable" if provider_called else "deterministic",
             "provider_called": provider_called,
             "fallback_used": True,
-            "final_answer": _answer_from_result(state.get("user_question", ""), execution_result),
+            "final_answer": business_answer["direct_answer"],
+            "business_answer": business_answer,
             "candidate_claims": _row_claims(execution_result),
             "data_used": True,
             "error": "",
@@ -161,7 +189,15 @@ def _provider_output(state: dict[str, Any], provider: LLMProvider, execution_res
         model=getattr(provider, "model", "unknown"),
         metadata={"node": "insight_agent"},
     )
-    response = run_validated_llm_request(provider, request)
+    response = run_validated_llm_request(
+        provider,
+        request,
+        schema_context={
+            "user_question": state.get("user_question", ""),
+            "execution_result": execution_result,
+            "evidence_result": state.get("evidence_result") or {},
+        },
+    )
     if not response.get("success"):
         if response.get("error_type") == "llm_schema_validation_error":
             return _fallback_output(
@@ -178,13 +214,15 @@ def _provider_output(state: dict[str, Any], provider: LLMProvider, execution_res
         )
 
     content = response.get("content", {})
-    final_answer = _ensure_evidence_anchor(content.get("draft_summary", ""), execution_result)
+    provider_business_answer = content.get("business_answer") if isinstance(content.get("business_answer"), dict) else {}
+    final_answer = str(provider_business_answer.get("direct_answer") or "")
     output = {
         "success": True,
         "source": "provider",
         "provider_called": True,
         "fallback_used": False,
         "final_answer": final_answer,
+        "business_answer": provider_business_answer,
         "candidate_claims": content.get("candidate_claims", []),
         "data_used": True,
         "error": "",
@@ -211,11 +249,23 @@ def run_insight_agent(state: dict[str, Any], provider: LLMProvider | None = None
             provider_error="" if provider is None else "provider requires successful execution_result",
         )
 
+    business_answer = build_business_answer(
+        {
+            "user_question": state.get("user_question", ""),
+            "final_answer": output["final_answer"],
+            "business_answer": output.get("business_answer") if isinstance(output.get("business_answer"), dict) else {},
+            "execution_result": execution_result or {},
+            "evidence_result": state.get("evidence_result") or {},
+            "insight": output,
+        }
+    )
+    canonical_final_answer = business_answer.get("direct_answer") or business_answer.get("headline") or output["final_answer"]
+    output = {**output, "final_answer": canonical_final_answer}
     updated = {
         **state,
         "insight": output,
-        "business_answer": build_business_answer({"final_answer": output["final_answer"], "insight": output}),
-        "final_answer": output["final_answer"],
+        "business_answer": business_answer,
+        "final_answer": canonical_final_answer,
         "claims_to_validate": output.get("candidate_claims", []),
     }
     return append_trace(

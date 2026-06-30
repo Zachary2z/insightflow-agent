@@ -101,14 +101,13 @@ export type QuestionThread = {
 };
 
 export type BusinessAnswer = {
-  headline?: string;
-  summary?: string;
-  recommendations?: string[];
-  next_actions?: string[];
-  caveats?: string[];
-  confidence?: string;
-  source?: string;
-  quality_flags?: string[];
+  headline: string;
+  direct_answer: string;
+  why: string;
+  evidence_bullets: string[];
+  recommendations: string[];
+  caveats: string[];
+  confidence: "low" | "medium" | "high";
 };
 
 export type EvidenceSummary = {
@@ -139,12 +138,12 @@ export type TechnicalDetails = {
 };
 
 export type ProductAnalysisResult = {
-  version: "p13.v1" | string;
+  version: "p16.v1";
   workspace_id?: string;
   run_id?: string | null;
   status?: string;
   question_thread?: QuestionThread;
-  business_answer?: BusinessAnswer;
+  business_answer: BusinessAnswer;
   evidence?: EvidenceSummary;
   chart_artifacts?: ChartArtifact[];
   report?: Record<string, unknown> | null;
@@ -183,8 +182,8 @@ export type WorkspaceReportSection = {
   title: string;
   purpose?: string;
   status: string;
+  business_answer: BusinessAnswer;
   question?: string;
-  summary?: string;
   sql?: string;
   columns?: string[];
   rows_preview?: Array<Record<string, unknown>>;
@@ -208,6 +207,7 @@ export type WorkspaceReportSection = {
     trace_nodes?: string[];
     trace_path?: string;
     workspace_run_dir?: string;
+    raw_final_answer?: string;
     error?: string | null;
   };
   provider_metadata?: Record<string, unknown>;

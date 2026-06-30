@@ -37,15 +37,31 @@ def render_report_markdown(report: ReportRecord) -> str:
 
 
 def _render_business_section(section: ReportSection) -> list[str]:
+    answer = section.business_answer or {}
     lines = [
         f"### {section.title}",
         "",
         f"- Status: `{section.status}`",
         "",
-        section.summary or "_No section summary yet._",
+        "#### 结论",
+        "",
+        str(answer.get("headline") or "_No headline recorded._"),
+        "",
+        "#### 直接回答",
+        "",
+        str(answer.get("direct_answer") or "_No direct answer recorded._"),
+        "",
+        "#### 为什么",
+        "",
+        str(answer.get("why") or "_No reasoning recorded._"),
     ]
-    lines.extend(["", "#### Evidence Notes", ""])
-    lines.extend(_bullet_list(section.evidence_notes, "_No evidence notes recorded._"))
+    lines.extend(["", "#### 关键证据", ""])
+    lines.extend(_bullet_list(_text_list(answer.get("evidence_bullets")), "_No evidence bullets recorded._"))
+    lines.extend(["", "#### 建议动作", ""])
+    lines.extend(_bullet_list(_text_list(answer.get("recommendations")), "_No recommendations recorded._"))
+    lines.extend(["", "#### 限制说明", ""])
+    lines.extend(_bullet_list(_text_list(answer.get("caveats")), "_No caveats recorded._"))
+    lines.extend(["", "#### 置信度", "", str(answer.get("confidence") or "medium")])
     lines.extend(["", "#### Chart Artifacts", ""])
     lines.extend(
         _bullet_list(
@@ -175,18 +191,10 @@ def _bullet_list(items: list[str], empty_message: str) -> list[str]:
     return [f"- {item}" for item in items]
 
 
-def _provider_metadata_summary(report: ReportRecord) -> dict[str, Any]:
-    summary: dict[str, Any] = {}
-    if report.provider_metadata:
-        summary["report"] = report.provider_metadata
-    section_metadata = {
-        section.section_id: section.provider_metadata
-        for section in report.sections
-        if section.provider_metadata
-    }
-    if section_metadata:
-        summary["sections"] = section_metadata
-    return summary
+def _text_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
 
 
 def _progress_summary(report: ReportRecord) -> str:

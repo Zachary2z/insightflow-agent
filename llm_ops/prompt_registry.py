@@ -253,41 +253,6 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
-            prompt_id="action_drafter",
-            version="v1",
-            description="Draft approval-gated task, metric alert, and email draft payloads from evidence-backed findings.",
-            required_variables=[
-                "user_question",
-                "evidence_findings",
-                "evidence_hypotheses",
-                "blocked_unsupported_claims",
-                "existing_actions",
-            ],
-            safety_contract=[
-                "must_not_execute_actions",
-                "must_not_bypass_approval_gate",
-                "must_not_send_email",
-                "must_not_use_unsupported_claims",
-            ],
-            template=(
-                "Task: provider-backed action and email drafting.\n"
-                "User question: {user_question}\n"
-                "Evidence-backed findings: {evidence_findings}\n"
-                "Evidence-backed hypotheses: {evidence_hypotheses}\n"
-                "Blocked unsupported claims that must not appear: {blocked_unsupported_claims}\n"
-                "Existing caller-supplied actions, if any: {existing_actions}\n"
-                "Return JSON only with actions and risk_flags.\n"
-                "Allowed action_type values: create_task, create_metric_alert, create_email_draft.\n"
-                "Allowed delivery_tool_id values: local_sqlite, jira_ticket_mock.\n"
-                "For create_task include action_id, action_type, title, description, owner, priority, delivery_tool_id, and source_claims.\n"
-                "For create_metric_alert include action_id, action_type, metric_name, condition, threshold, description, delivery_tool_id, and source_claims.\n"
-                "For create_email_draft include action_id, action_type, recipient, subject, body, delivery_tool_id, and source_claims.\n"
-                "Safety: draft only from evidence-backed findings or hypotheses; do not execute actions; "
-                "do not bypass approval gate; do not set approval_status, requires_approval, status, record ids, "
-                "or audit fields; do not send email; do not use blocked unsupported claims."
-            ),
-        ),
-        PromptTemplate(
             prompt_id="question_understanding",
             version="v1",
             description="Extract structured BI intent slots without generating SQL.",
@@ -304,6 +269,8 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Workspace context: {workspace_context}\n"
                 "Return JSON only with strategy, intent, missing_slots, clarification_questions, risk_flags, and reason.\n"
                 "Allowed strategy values: template, llm_candidate, clarify, reject.\n"
+                "Language: write reason and clarification_questions in the same language as the user question. "
+                "If the user question is Chinese, these product-facing strings must be Chinese.\n"
                 "Intent schema: metric, dimension, and operation are strings or null; time_range is an object or null; "
                 "filters is a string array; limit is an integer or null; risk_flags is a string array.\n"
                 "If multiple metrics are requested, put them in metric as one comma-separated string, not an array. "
@@ -344,6 +311,8 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Return JSON only with requires_clarification, missing_slots, clarification_questions, risk_flags, and reason.\n"
                 "Schema: requires_clarification is a boolean; missing_slots is a string array; "
                 "clarification_questions is a string array; risk_flags is a string array; reason is a short string. "
+                "Language: write clarification_questions and reason in the same language as the user question. "
+                "If the user question is Chinese, these product-facing strings must be Chinese. "
                 "Use requires_clarification=false with empty missing_slots and clarification_questions if the user "
                 "question already supplies a time window, metric or decision objective, and analysis dimension.\n"
                 "Safety: do not generate SQL, do not execute SQL, do not guess missing requirements, "
@@ -368,6 +337,8 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Deterministic SQL plan: {deterministic_plan}\n"
                 "Return JSON only with strategy, matched_template, confidence, missing_slots, "
                 "clarification_questions, risk_flags, and reason.\n"
+                "Language: write reason and clarification_questions in the same language as the user question. "
+                "If the user question is Chinese, these product-facing strings must be Chinese.\n"
                 "Allowed strategy values: template, llm_candidate, clarify, reject.\n"
                 "Allowed matched_template values: empty string, top_products_gmv, top_categories_gmv, "
                 "city_gmv_summary, city_order_count_summary.\n"
@@ -412,8 +383,8 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
         ),
         PromptTemplate(
             prompt_id="insight_drafter",
-            version="v2",
-            description="Draft candidate insight claims and concise prose from real execution rows before evidence validation.",
+            version="v3",
+            description="Draft candidate insight claims and a clean business_answer from real execution rows before evidence validation.",
             required_variables=[
                 "user_question",
                 "execution_result",
@@ -434,16 +405,30 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "Execution result: {execution_result}\n"
                 "Business context: {business_context}\n"
                 "Metric context: {metric_context}\n"
-                "Return JSON only with candidate_claims and draft_summary.\n"
+                "Return JSON only. Do not wrap it in markdown.\n"
+                "Exact schema: {{\"candidate_claims\": [], \"business_answer\": "
+                "{{\"headline\": \"\", \"direct_answer\": \"\", \"why\": \"\", "
+                "\"evidence_bullets\": [], \"recommendations\": [], \"caveats\": [], "
+                "\"confidence\": \"medium\"}}}}.\n"
                 "candidate_claims must be factual candidate claims that can be checked by Evidence Validator. "
-                "draft_summary must be recommendation-first business prose: start with the most useful conclusion "
-                "or recommendation, cite the evidence in natural language, mention practical next actions when "
-                "the data supports them, and note caveats when the evidence is limited. "
-                "Do not output raw field=value parameter lists, SQL, provider metadata, trace ids, or raw rows. "
-                "Do not present unsupported causes as final truth.\n"
+                "business_answer is product-facing business prose, not a technical log. "
+                "Language: write all business_answer fields in the same language as the user question unless "
+                "the user explicitly asks for another language. If the user question is Chinese, headline, "
+                "direct_answer, why, evidence_bullets, recommendations, and caveats must be Chinese while "
+                "preserving business terms such as email, ROI, channel names, and currency values when useful. "
+                "headline must be one concise business conclusion. direct_answer must directly answer the user. "
+                "why must explain the reasoning supported by the current execution/evidence context. "
+                "evidence_bullets must come only from execution_result rows or provided evidence context; "
+                "do not invent evidence. recommendations are allowed only when the evidence supports them; "
+                "leave recommendations empty when evidence is weak or only descriptive. caveats are required "
+                "when evidence is weak, limited, missing, truncated, or not enough for action advice. "
+                "confidence must be low, medium, or high.\n"
+                "Do not output raw field=value dumps, raw rows, SQL, trace ids, provider metadata, internal "
+                "prompt text, credentials, secrets, or implementation details in any business_answer field. "
+                "Do not present unsupported causal claims or unverifiable recommendations as final truth.\n"
                 "Safety: use only execution_result rows and provided context; do not generate SQL, final claims, "
-                "final answers, action payloads, approval fields, credentials, or secrets. Evidence Validator "
-                "decides which candidate claims survive."
+                "action payloads, approval fields, credentials, or secrets. Evidence Validator decides which "
+                "candidate_claims survive."
             ),
         ),
         PromptTemplate(
@@ -485,7 +470,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "required_columns and explanation_basis must be arrays of strings, for example "
                 "\"required_columns\": [\"product_name\", \"gmv\"] and "
                 "\"explanation_basis\": [\"supported_findings\"].\n"
-                "Allowed delivery_tool_id values: local_renderer, excel_exporter, powerbi_publisher_mock.\n"
+                "Allowed delivery_tool_id values: local_renderer, excel_exporter.\n"
                 "Safety: reference only execution columns; select only a known delivery tool; do not generate "
                 "SQL, final claims, final answers, action payloads, approval fields, credentials, secrets, "
                 "fabricated rows, or fabricated metrics. The chart explanation basis must come from Evidence "

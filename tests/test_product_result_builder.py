@@ -1,3 +1,56 @@
+NEW_BUSINESS_ANSWER_KEYS = {
+    "headline",
+    "direct_answer",
+    "why",
+    "evidence_bullets",
+    "recommendations",
+    "caveats",
+    "confidence",
+}
+
+
+def _assert_new_business_answer_shape(answer):
+    assert set(answer) == NEW_BUSINESS_ANSWER_KEYS
+    assert isinstance(answer["headline"], str)
+    assert isinstance(answer["direct_answer"], str)
+    assert isinstance(answer["why"], str)
+    assert isinstance(answer["evidence_bullets"], list)
+    assert isinstance(answer["recommendations"], list)
+    assert isinstance(answer["caveats"], list)
+    assert answer["confidence"] in {"low", "medium", "high"}
+
+
+def _business_answer_text(answer):
+    return " ".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
+
+
+def test_empty_business_answer_returns_single_p16_contract():
+    from workspaces.product_models import PRODUCT_RESULT_VERSION, empty_business_answer
+
+    answer = empty_business_answer()
+
+    assert PRODUCT_RESULT_VERSION == "p16.v1"
+    _assert_new_business_answer_shape(answer)
+    assert answer == {
+        "headline": "",
+        "direct_answer": "",
+        "why": "",
+        "evidence_bullets": [],
+        "recommendations": [],
+        "caveats": [],
+        "confidence": "medium",
+    }
+
+
 def test_product_result_builder_splits_business_and_technical_fields():
     from workspaces.product_result_builder import build_product_analysis_result
 
@@ -37,19 +90,26 @@ def test_product_result_builder_splits_business_and_technical_fields():
 
     product = build_product_analysis_result(raw, workspace_id="ws_1", workspace_root=workspace_root)
 
-    assert product["version"] == "p13.v1"
+    assert product["version"] == "p16.v1"
     assert product["workspace_id"] == "ws_1"
     assert product["run_id"] == "run_1"
     assert product["status"] == "completed"
     assert product["question_thread"]["original_question"] == "哪个渠道该加预算？"
     assert product["question_thread"]["system_understanding"]
-    assert product["business_answer"]["headline"]
-    assert product["business_answer"]["summary"] == raw["final_answer"]
-    assert product["business_answer"]["source"] == "deterministic"
-    assert product["business_answer"]["quality_flags"] == []
+    answer = product["business_answer"]
+    _assert_new_business_answer_shape(answer)
+    assert answer["headline"]
+    assert answer["direct_answer"] == raw["final_answer"]
+    assert "paid_search" in answer["why"]
+    assert answer["evidence_bullets"] == ["第 1 行：channel 为 paid_search，revenue 为 200.0。"]
+    assert answer["recommendations"] == [raw["final_answer"]]
     assert "raw_rows" not in product["business_answer"]
-    assert "SELECT channel" not in product["business_answer"]["summary"]
-    assert "provider_called" not in product["business_answer"]["summary"]
+    assert "summary" not in answer
+    assert "next_actions" not in answer
+    assert "source" not in answer
+    assert "quality_flags" not in answer
+    assert "SELECT channel" not in _business_answer_text(answer)
+    assert "provider_called" not in _business_answer_text(answer)
     assert product["evidence"]["table_preview"]["columns"] == ["channel", "revenue"]
     assert product["evidence"]["table_preview"]["rows"] == [["paid_search", 200.0]]
     assert product["evidence"]["evidence_notes"] == ["paid_search revenue is 200.0"]
@@ -66,6 +126,69 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert "sql" not in product["business_answer"]
     assert "trace_path" not in product["business_answer"]
     assert "provider_metadata" not in product["business_answer"]
+
+
+def test_business_answer_rebuilds_internal_report_prompt_leaks():
+    from workspaces.product_result_builder import build_business_answer
+
+    raw = {
+        "status": "completed",
+        "user_question": (
+            "这是自动报告内部 section，不是用户澄清轮次。"
+            "本节意图提示：metric=收入; dimension=渠道。"
+            "本节问题：汇总最近 90 天收入最高的渠道。"
+        ),
+        "business_answer": {
+            "headline": "已完成问题「这是自动报告内部 section」的查询。",
+            "direct_answer": "本节问题：汇总最近 90 天收入最高的渠道。email 收入最高。",
+            "why": "本节意图提示：metric=收入; dimension=渠道。",
+            "evidence_bullets": ["email 收入为 44548.53。"],
+            "recommendations": [],
+            "caveats": [],
+            "confidence": "medium",
+        },
+        "final_answer": "已完成问题「这是自动报告内部 section」的查询，共返回 1 行结果。",
+        "execution_result": {
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["email", 44548.53]],
+        },
+        "evidence_result": {},
+    }
+
+    answer = build_business_answer(raw)
+    text = _business_answer_text(answer)
+
+    assert "这是自动报告内部 section" not in text
+    assert "本节意图提示" not in text
+    assert "本节问题" not in text
+    assert "原问题" not in text
+    assert "email" in text
+
+
+def test_chinese_business_answer_rebuilds_english_evidence_notes_from_rows():
+    from workspaces.product_result_builder import build_business_answer
+
+    raw = {
+        "status": "completed",
+        "user_question": "最近 90 天收入最高的渠道是哪个？",
+        "final_answer": "最近 90 天收入最高的渠道是 email，收入为 44548.53。",
+        "execution_result": {
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["email", 44548.53]],
+        },
+        "evidence_result": {
+            "data_supported_findings": [
+                {"claim": "email channel total revenue is $44,548.53 in recent 90 days"}
+            ]
+        },
+    }
+
+    answer = build_business_answer(raw)
+
+    assert answer["evidence_bullets"] == ["第 1 行：channel 为 email，total_revenue 为 44548.53。"]
+    assert "total revenue is" not in _business_answer_text(answer)
 
 
 def test_product_result_builder_handles_clarification_and_chart_paths():
@@ -90,7 +213,7 @@ def test_product_result_builder_handles_clarification_and_chart_paths():
 
     assert product["question_thread"] == {
         "original_question": "帮我分析渠道表现",
-        "system_understanding": "time range missing",
+        "system_understanding": "系统已识别：当前问题还需要补充更多分析条件。",
         "clarification_question": "你希望分析哪个时间范围？",
         "clarification_answer": "最近 90 天",
         "resolved_question": "分析最近 90 天各渠道表现并给出预算建议。",
@@ -154,11 +277,181 @@ def test_product_result_builder_turns_schema_review_failure_into_business_answer
     product = build_product_analysis_result(raw, workspace_id="ws_1")
     answer = product["business_answer"]
 
+    _assert_new_business_answer_shape(answer)
     assert answer["headline"] == "当前数据无法支持这次查询"
-    assert "不存在的表或字段" in answer["summary"]
-    assert "Unknown table" not in answer["summary"]
-    assert "Unknown column" not in answer["summary"]
-    assert any("渠道、收入、订单、投放花费和 ROI" in action for action in answer["next_actions"])
+    assert "不存在的表或字段" in answer["direct_answer"]
+    assert "没有执行未通过审核的 SQL" in " ".join(answer["caveats"])
+    assert "Unknown table" not in _business_answer_text(answer)
+    assert "Unknown column" not in _business_answer_text(answer)
+    assert any("当前数据已包含" in item for item in answer["recommendations"])
     assert any(log["name"] == "review_result" for log in product["technical_details"]["validation_logs"])
     assert any(log["name"] == "schema_repair" for log in product["technical_details"]["validation_logs"])
     assert "Unknown table: products" in str(product["technical_details"]["validation_logs"])
+
+
+def test_product_result_builder_preserves_clean_provider_business_answer():
+    from workspaces.product_result_builder import build_business_answer
+
+    provider_answer = {
+        "headline": "email 渠道收入最高",
+        "direct_answer": "最近 90 天 email 渠道收入最高，达到 44548.53。",
+        "why": "证据显示 email 渠道收入为 44548.53，高于其他渠道。",
+        "evidence_bullets": ["email 渠道收入为 44548.53。"],
+        "recommendations": ["复盘 email 渠道的转化动作，并评估是否扩大有效触达。"],
+        "caveats": ["当前结论只覆盖本次查询返回的数据。"],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？",
+            "business_answer": provider_answer,
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+            },
+            "evidence_result": {
+                "validation_status": "validated",
+                "data_supported_findings": [{"claim": "email 渠道收入为 44548.53。"}],
+            },
+        }
+    )
+
+    assert answer == provider_answer
+
+
+def test_product_result_builder_rejects_provider_business_answer_with_technical_leak():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "哪个渠道收入最高？",
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "建议看 email。trace_id=abc123 provider_metadata={model: deepseek}",
+                "why": "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+                "evidence_bullets": ["email 渠道收入为 100。"],
+                "recommendations": ["继续看 prompt_tokens 和 latency_ms。"],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["email", 100.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    business_text = _business_answer_text(answer)
+    assert "trace_id" not in business_text
+    assert "provider_metadata" not in business_text
+    assert "SELECT" not in business_text
+    assert "prompt_tokens" not in business_text
+    assert "latency_ms" not in business_text
+    assert answer["direct_answer"].startswith("已完成本轮查询")
+
+
+def test_product_result_builder_rewrites_english_answer_for_chinese_question_from_evidence():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_language_answer",
+            "status": "completed",
+            "user_question": "最近90天哪个渠道收入最高？为什么？",
+            "final_answer": (
+                "Based on the data, email is the top revenue channel for the last 90 days, "
+                "bringing in $44,548.53."
+            ),
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+                "row_count": 1,
+            },
+            "business_answer": {
+                "headline": "Based on the data, email is the top revenue channel.",
+                "summary": (
+                    "Based on the data, email is the top revenue channel for the last 90 days, "
+                    "bringing in $44,548.53."
+                ),
+            },
+            "insight": {"source": "provider"},
+        },
+        workspace_id="ws_language_answer",
+    )
+
+    answer = product["business_answer"]
+    _assert_new_business_answer_shape(answer)
+    assert answer["headline"].startswith("已完成本轮查询")
+    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert "证据表第一行显示" in answer["why"]
+    assert "Based on the data" not in answer["headline"]
+    assert "Based on the data" not in answer["direct_answer"]
+    assert "Based on the data" not in answer["why"]
+
+
+def test_product_result_builder_headline_does_not_split_decimal_values():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "final_answer": (
+                "为了提高整体收益，建议优先增加对email渠道的投入，因其ROI（0.379）最高，"
+                "且花费相对较低。相反，paid_search渠道ROI最低。"
+            )
+        }
+    )
+
+    assert "ROI（0.379）" in answer["headline"]
+    assert not answer["headline"].endswith("ROI（0.")
+
+
+def test_business_answer_with_weak_or_missing_evidence_does_not_force_recommendations():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "哪个渠道该加预算？",
+            "final_answer": "建议加大 paid_search 预算。",
+            "execution_result": {"success": True, "columns": ["channel"], "rows": []},
+            "evidence_result": {"validation_status": "not_validated", "data_supported_findings": []},
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    assert answer["recommendations"] == []
+    assert answer["confidence"] == "low"
+    assert answer["caveats"]
+    assert any("证据" in caveat or "数据" in caveat for caveat in answer["caveats"])
+
+
+def test_budget_question_evidence_fallback_still_produces_supported_recommendation():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "分析最近 90 天各渠道收入、投放成本和 ROI，告诉我哪个渠道应该加预算，并生成图表。",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue", "spend", "roi"],
+                "rows": [
+                    ["email", 23534.0, 2290.5, 10.27],
+                    ["paid_search", 34848.0, 9703.5, 3.59],
+                    ["social", 18191.0, 5748.0, 3.21],
+                    ["affiliate", 12931.0, 4134.5, 3.13],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    assert answer["recommendations"]
+    assert "email" in " ".join(answer["recommendations"])
+    assert "建议" in " ".join(answer["recommendations"])
+    assert answer["confidence"] == "medium"

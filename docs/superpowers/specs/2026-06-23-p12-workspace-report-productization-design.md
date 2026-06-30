@@ -1,6 +1,8 @@
-# P12 Workspace Report Productization Design
+# Historical / Superseded: P12 Workspace Report Productization Design
 
 Date: 2026-06-23
+
+This document is retained only as a historical P12 design snapshot. Current implementation guidance lives in docs/product/plans/, especially the P17 cleanup plan and the completed P16 clean business output model plan. The current report implementation uses the P16 business_answer contract for report sections and must not treat older section summary, old eval, Streamlit, mock SaaS, or action-workflow wording in this snapshot as current product guidance.
 
 ## Summary
 

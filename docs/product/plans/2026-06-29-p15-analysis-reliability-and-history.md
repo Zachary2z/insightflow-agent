@@ -346,5 +346,5 @@ Use `git status --short` and `git ls-files` audits before every P15 commit.
 - Scheduled reports.
 - Vector databases.
 - Replacing the SQL reviewer, evidence validator, artifact policy, or trace logger.
-- Adding fixed SQL templates or keyword-heavy business rule trees.
-- Restoring Streamlit, old ecommerce-only UI, old eval UI, old `chart_agent`, old `visualization_planner`, or old `chart_tool`.
+- Adding hardcoded SQL or keyword-heavy business rule trees.
+- Restoring historical UI/eval/chart product paths.

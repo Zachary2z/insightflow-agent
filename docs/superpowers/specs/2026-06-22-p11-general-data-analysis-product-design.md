@@ -1,6 +1,8 @@
-# P11 General Data Analysis Product Design
+# Historical / Superseded: P11 General Data Analysis Product Design
 
 Date: 2026-06-22
+
+This document is retained only as a historical P11 design snapshot. Current implementation guidance lives in docs/product/plans/, especially the P17 cleanup plan and the completed P16 clean business output model plan. The current analysis/report implementation uses the P16 business_answer contract and must not treat older Streamlit, demo, eval, mock SaaS, action-workflow, chart-agent, fixed-template, or keyword-inference wording in this snapshot as current product guidance.
 
 ## Decision
 

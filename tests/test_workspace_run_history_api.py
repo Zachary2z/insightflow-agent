@@ -40,9 +40,18 @@ def test_list_workspace_runs_includes_all_statuses_and_sorts_latest_first(tmp_pa
             "saved_at": "2026-06-29T10:00:00Z",
             "question_thread": {"original_question": "按渠道汇总收入", "status": "completed"},
             "product_result": {
+                "version": "p16.v1",
                 "status": "completed",
                 "question_thread": {"original_question": "按渠道汇总收入"},
-                "business_answer": {"headline": "邮件渠道收入最高"},
+                "business_answer": {
+                    "headline": "邮件渠道收入最高",
+                    "direct_answer": "邮件渠道收入最高。",
+                    "why": "证据表显示邮件渠道收入最高。",
+                    "evidence_bullets": ["邮件渠道收入最高。"],
+                    "recommendations": [],
+                    "caveats": [],
+                    "confidence": "medium",
+                },
                 "chart_artifacts": [{"path": "runs/run_oldcomplete/charts/channel.png"}],
             },
         },
@@ -114,9 +123,18 @@ def test_get_workspace_run_returns_result_and_product_result(tmp_path):
             "generated_sql": "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
             "execution_result": {"success": True, "columns": ["channel", "revenue"], "rows": [["email", 100.0]]},
             "product_result": {
+                "version": "p16.v1",
                 "status": "completed",
                 "question_thread": {"original_question": "按渠道汇总收入"},
-                "business_answer": {"headline": "邮件渠道收入最高", "summary": "邮件渠道收入最高。"},
+                "business_answer": {
+                    "headline": "邮件渠道收入最高",
+                    "direct_answer": "邮件渠道收入最高。",
+                    "why": "证据表第一行显示：channel 为 email，revenue 为 100.0。",
+                    "evidence_bullets": ["邮件渠道收入为 100.0。"],
+                    "recommendations": [],
+                    "caveats": [],
+                    "confidence": "medium",
+                },
                 "evidence": {"table_preview": {"columns": ["channel", "revenue"], "rows": [["email", 100.0]]}},
             },
         },
@@ -154,7 +172,103 @@ def test_get_workspace_run_builds_product_result_for_older_run_json(tmp_path):
     payload = response.json()
     assert payload["product_result"]["question_thread"]["original_question"] == "哪个渠道收入最高？"
     assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高。"
-    assert payload["result"]["product_result"]["business_answer"]["summary"] == "邮件渠道收入最高。"
+    assert payload["result"]["product_result"]["business_answer"]["direct_answer"] == "邮件渠道收入最高。"
+
+
+def test_get_workspace_run_rebuilds_stale_product_result_versions(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_stale_product1",
+        {
+            "status": "completed",
+            "user_question": "哪个渠道收入最高？",
+            "final_answer": "邮件渠道收入最高。",
+            "execution_result": {"success": True, "columns": ["channel"], "rows": [["email"]]},
+            "product_result": {
+                "version": "p13.v1",
+                "status": "completed",
+                "question_thread": {"original_question": "哪个渠道收入最高？"},
+                "business_answer": {
+                    "headline": "Old headline",
+                    "summary": "Old summary that should not survive.",
+                    "confidence": "medium",
+                },
+            },
+        },
+    )
+
+    response = client.get(f"/api/workspaces/{workspace_id}/runs/run_stale_product1")
+
+    assert response.status_code == 200
+    answer = response.json()["product_result"]["business_answer"]
+    assert response.json()["product_result"]["version"] == "p16.v1"
+    assert set(answer) == {
+        "headline",
+        "direct_answer",
+        "why",
+        "evidence_bullets",
+        "recommendations",
+        "caveats",
+        "confidence",
+    }
+    assert answer["direct_answer"] == "邮件渠道收入最高。"
+    assert "summary" not in answer
+
+
+def test_get_workspace_run_rebuilds_invalid_current_product_result(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_invalid_p16",
+        {
+            "status": "completed",
+            "user_question": "最近90天哪个渠道收入最高？",
+            "final_answer": "email 渠道收入最高。",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+            },
+            "product_result": {
+                "version": "p16.v1",
+                "status": "completed",
+                "question_thread": {"original_question": "最近90天哪个渠道收入最高？"},
+                "business_answer": {
+                    "headline": "Email is the top revenue channel",
+                    "direct_answer": "Email is the top revenue channel in the last 90 days.",
+                    "why": "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+                    "evidence_bullets": ["email total revenue is 44548.53."],
+                    "recommendations": ["Review prompt_tokens and provider_metadata."],
+                    "caveats": [],
+                    "confidence": "medium",
+                },
+            },
+        },
+    )
+
+    response = client.get(f"/api/workspaces/{workspace_id}/runs/run_invalid_p16")
+
+    assert response.status_code == 200
+    product = response.json()["product_result"]
+    answer = product["business_answer"]
+    assert product["version"] == "p16.v1"
+    assert answer["direct_answer"] == "email 渠道收入最高。"
+    business_text = " ".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
+    assert "Email is the top revenue channel" not in business_text
+    assert "SELECT" not in business_text
+    assert "provider_metadata" not in business_text
 
 
 def test_workspace_run_history_returns_404_for_missing_workspace_or_run(tmp_path):
@@ -216,7 +330,7 @@ def test_failed_runs_without_business_answer_or_evidence_are_not_filtered(tmp_pa
     ]
 
 
-def test_old_failed_run_with_raw_product_result_is_sanitized_in_history_and_detail(tmp_path):
+def test_failed_run_with_current_product_result_is_clean_in_history_and_detail(tmp_path):
     client, _store, workspace = _client_and_workspace(tmp_path)
     workspace_id = workspace["workspace_id"]
     raw_summary = "SQL 审核未通过，已停止执行。原因：Unknown table: products; Unknown column: product_name"
@@ -233,15 +347,19 @@ def test_old_failed_run_with_raw_product_result_is_sanitized_in_history_and_deta
                 "issues": ["Unknown table: products", "Unknown column: product_name"],
             },
             "product_result": {
-                "version": "p13.v1",
+                "version": "p16.v1",
                 "status": "failed",
                 "question_thread": {
                     "original_question": "分析最近 30 天商品表现",
                     "status": "failed",
                 },
                 "business_answer": {
-                    "headline": "SQL 审核未通过",
-                    "summary": raw_summary,
+                    "headline": "当前数据无法支持这次查询",
+                    "direct_answer": "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
+                    "why": "SQL 审核发现查询引用了当前数据中不存在的表或字段。",
+                    "evidence_bullets": [],
+                    "recommendations": [],
+                    "caveats": ["本轮没有执行未通过审核的 SQL。"],
                     "confidence": "low",
                 },
                 "evidence": {"table_preview": {"columns": [], "rows": []}},
@@ -275,11 +393,96 @@ def test_old_failed_run_with_raw_product_result_is_sanitized_in_history_and_deta
     product_result = detail.json()["product_result"]
     answer = product_result["business_answer"]
     assert answer["headline"] == "当前数据无法支持这次查询"
-    assert "不存在的表或字段" in answer["summary"]
+    assert "不存在的表或字段" in answer["direct_answer"]
     assert "Unknown table" not in answer["headline"]
-    assert "Unknown column" not in answer["summary"]
+    assert "Unknown column" not in answer["direct_answer"]
     assert "Unknown table: products" in str(product_result["technical_details"]["validation_logs"])
     assert detail.json()["result"]["product_result"]["business_answer"] == answer
+
+
+def test_failed_run_with_schema_issue_only_in_review_issues_uses_current_answer(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_issueonly1",
+        {
+            "status": "failed",
+            "saved_at": "2026-06-29T16:30:00Z",
+            "original_question": "分析最近 30 天商品表现",
+            "error_message": "SQL review rejected",
+            "review_result": {
+                "approved": False,
+                "issues": ["Unknown table: products", "Unknown column: product_name"],
+            },
+            "product_result": {
+                "version": "p16.v1",
+                "status": "failed",
+                "question_thread": {
+                    "original_question": "分析最近 30 天商品表现",
+                    "status": "failed",
+                },
+                "business_answer": {
+                    "headline": "当前数据无法支持这次查询",
+                    "direct_answer": "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
+                    "why": "SQL 审核发现查询引用了当前数据中不存在的表或字段。",
+                    "evidence_bullets": [],
+                    "recommendations": [],
+                    "caveats": ["本轮没有执行未通过审核的 SQL。"],
+                    "confidence": "low",
+                },
+                "evidence": {"table_preview": {"columns": [], "rows": []}},
+                "chart_artifacts": [],
+                "technical_details": {},
+            },
+        },
+    )
+
+    detail = client.get(f"/api/workspaces/{workspace_id}/runs/run_issueonly1")
+
+    assert detail.status_code == 200
+    answer = detail.json()["product_result"]["business_answer"]
+    assert answer["headline"] == "当前数据无法支持这次查询"
+    assert "不存在的表或字段" in answer["direct_answer"]
+    assert "Unknown table" not in answer["direct_answer"]
+
+
+def test_completed_chinese_run_with_english_final_answer_is_built_as_chinese_p16_answer(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_english1",
+        {
+            "status": "completed",
+            "saved_at": "2026-06-29T17:00:00Z",
+            "user_question": "最近90天哪个渠道收入最高？为什么？",
+            "final_answer": (
+                "Based on the data, email is the top revenue channel for the last 90 days, "
+                "bringing in $44,548.53."
+            ),
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+                "row_count": 1,
+            },
+        },
+    )
+
+    history = client.get(f"/api/workspaces/{workspace_id}/runs")
+    detail = client.get(f"/api/workspaces/{workspace_id}/runs/run_english1")
+
+    assert history.status_code == 200
+    summary = history.json()["runs"][0]
+    assert summary["headline"].startswith("已完成本轮查询")
+    assert "Based on the data" not in summary["headline"]
+
+    assert detail.status_code == 200
+    answer = detail.json()["product_result"]["business_answer"]
+    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert "证据表第一行显示" in answer["why"]
+    assert "Based on the data" not in answer["direct_answer"]
 
 
 def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp_path):

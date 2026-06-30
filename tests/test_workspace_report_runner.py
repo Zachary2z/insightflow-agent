@@ -9,6 +9,29 @@ from workspaces.report_runner import REPORT_TYPE_PRESETS, _section_question, run
 from workspaces.store import WorkspaceStore
 
 
+BUSINESS_ANSWER_KEYS = {
+    "headline",
+    "direct_answer",
+    "why",
+    "evidence_bullets",
+    "recommendations",
+    "caveats",
+    "confidence",
+}
+
+
+def _business_answer(call_index: int) -> dict:
+    return {
+        "headline": f"第 {call_index} 个章节的业务结论",
+        "direct_answer": f"第 {call_index} 个章节显示付费搜索收入领先，建议优先复盘渠道结构。",
+        "why": "证据表显示 paid_search 的收入高于 organic。",
+        "evidence_bullets": ["paid_search 收入为 200.0。"],
+        "recommendations": ["优先复盘付费搜索的投放效率。"],
+        "caveats": ["当前只基于报告章节查询返回的数据。"],
+        "confidence": "high",
+    }
+
+
 def _create_workspace_with_orders(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Report Runner Workspace")
@@ -47,6 +70,10 @@ def _fake_section_runner(calls):
         return {
             "status": "completed",
             "final_answer": f"Section answer {call_index} with business recommendation.",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": _business_answer(call_index),
+            },
             "generated_sql": (
                 "SELECT channel, SUM(revenue) AS revenue "
                 "FROM orders GROUP BY channel LIMIT 20"
@@ -111,10 +138,16 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
 
     saved = json.loads((report_dir / "report.json").read_text(encoding="utf-8"))
     markdown = (report_dir / "report.md").read_text(encoding="utf-8")
-    assert saved["sections"][0]["summary"] == "Section answer 1 with business recommendation."
-    assert "SELECT channel" not in saved["sections"][0]["summary"]
-    assert "provider_called" not in saved["sections"][0]["summary"]
-    assert "question_understanding_agent" not in saved["sections"][0]["summary"]
+    business_answer = saved["sections"][0]["business_answer"]
+    assert set(business_answer) == BUSINESS_ANSWER_KEYS
+    assert business_answer["headline"] == "第 1 个章节的业务结论"
+    assert business_answer["direct_answer"] == "第 1 个章节显示付费搜索收入领先，建议优先复盘渠道结构。"
+    assert business_answer["evidence_bullets"] == ["paid_search 收入为 200.0。"]
+    business_answer_text = json.dumps(business_answer, ensure_ascii=False)
+    assert "SELECT channel" not in business_answer_text
+    assert "provider_called" not in business_answer_text
+    assert "question_understanding_agent" not in business_answer_text
+    assert saved["executive_summary"][0] == "Overall Revenue: 第 1 个章节的业务结论 - 第 1 个章节显示付费搜索收入领先，建议优先复盘渠道结构。"
     assert saved["sections"][0]["columns"] == ["channel", "revenue"]
     assert saved["sections"][0]["rows_preview"][0] == {
         "channel": "paid_search",
@@ -153,6 +186,45 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
     trace = json.loads((report_dir / "trace.json").read_text(encoding="utf-8"))
     assert trace["report_id"] == report["report_id"]
     assert any(event["event"] == "section_completed" for event in trace["events"])
+
+
+def test_report_section_without_current_business_answer_gets_low_confidence_failure(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def legacy_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "final_answer": "Legacy final answer should not become the report body.",
+            "generated_sql": "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["paid_search", 200.0]],
+            },
+            "trace": [{"node": "sql_executor_node"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "生成收入趋势报告。",
+        section_runner=legacy_runner,
+    )
+
+    first_section = result["report"]["sections"][0]
+    assert first_section["status"] == "failed"
+    assert first_section["business_answer"] == {
+        "headline": "本节缺少可展示的业务结论",
+        "direct_answer": "本节分析没有返回当前 P16 business_answer 合同，因此不能把旧文本作为报告正文展示。",
+        "why": "报告章节只接受 headline、direct_answer、why、evidence_bullets、recommendations、caveats 和 confidence 组成的业务答案。",
+        "evidence_bullets": [],
+        "recommendations": ["请重新生成本报告章节，或重新运行分析以获得当前业务答案结构。"],
+        "caveats": ["旧 final_answer、SQL、trace 或 provider metadata 不会作为报告正文降级展示。"],
+        "confidence": "low",
+    }
+    assert "summary" not in first_section
+    assert "Legacy final answer should not become the report body." not in first_section["business_answer"]["direct_answer"]
 
 
 def test_business_review_section_questions_are_specific_internal_analysis_prompts():

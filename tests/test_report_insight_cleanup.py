@@ -80,7 +80,7 @@ def test_report_supervisor_stops_when_provider_plan_is_unavailable(tmp_path):
     assert not result.get("weekly_report_path")
 
 
-def test_insight_agent_uses_provider_draft_without_bypassing_evidence_boundary():
+def test_insight_agent_uses_provider_business_answer_without_bypassing_evidence_boundary():
     from agents.insight_agent import run_insight_agent
     from agents.supervisor import initialize_run
     from llm_ops.provider import MockLLMProvider
@@ -105,7 +105,15 @@ def test_insight_agent_uses_provider_draft_without_bypassing_evidence_boundary()
                     "Laptop Pro 14 的 GMV 为 511248.56",
                     "库存不足是主要原因",
                 ],
-                "draft_summary": "Laptop Pro 14 排名第一，但原因需要证据校验。",
+                "business_answer": {
+                    "headline": "Laptop Pro 14 销售额排名第一",
+                    "direct_answer": "Laptop Pro 14 排名第一，但原因需要证据校验。",
+                    "why": "执行结果显示 Laptop Pro 14 的 GMV 为 511248.56。",
+                    "evidence_bullets": ["Laptop Pro 14 的 GMV 为 511248.56。"],
+                    "recommendations": [],
+                    "caveats": ["库存不足仍需 Evidence Validator 校验，不能直接作为原因。"],
+                    "confidence": "medium",
+                },
             }
         ),
     )
@@ -116,6 +124,7 @@ def test_insight_agent_uses_provider_draft_without_bypassing_evidence_boundary()
     assert insight["fallback_used"] is False
     assert insight["candidate_claims"] == ["Laptop Pro 14 的 GMV 为 511248.56", "库存不足是主要原因"]
     assert insight["final_answer"] == "Laptop Pro 14 排名第一，但原因需要证据校验。"
+    assert result["business_answer"]["direct_answer"] == insight["final_answer"]
     assert result["claims_to_validate"] == insight["candidate_claims"]
     assert result["trace"][-1]["provider_called"] is True
     assert result["trace"][-1]["prompt_id"] == "insight_drafter"
@@ -143,7 +152,15 @@ def test_insight_agent_rejects_provider_final_claims_and_returns_structured_fall
         provider=MockLLMProvider(
             {
                 "candidate_claims": ["Laptop Pro 14 的 GMV 为 511248.56"],
-                "draft_summary": "Laptop Pro 14 GMV 最高。",
+                "business_answer": {
+                    "headline": "Laptop Pro 14 GMV 最高",
+                    "direct_answer": "Laptop Pro 14 GMV 最高。",
+                    "why": "执行结果显示 Laptop Pro 14 的 GMV 为 511248.56。",
+                    "evidence_bullets": ["Laptop Pro 14 的 GMV 为 511248.56。"],
+                    "recommendations": [],
+                    "caveats": [],
+                    "confidence": "high",
+                },
                 "final_claims": ["Laptop Pro 14 一定会继续增长"],
             }
         ),
@@ -171,7 +188,15 @@ def test_workflow_wires_provider_backed_insight_drafting(tmp_path):
         insight_drafting_provider=MockLLMProvider(
             {
                 "candidate_claims": ["Laptop Pro 14 的 GMV 为 511248.56"],
-                "draft_summary": "Provider drafted a candidate insight from execution rows.",
+                "business_answer": {
+                    "headline": "Laptop Pro 14 销售额最高",
+                    "direct_answer": "Laptop Pro 14 是最近 30 天销售额最高的商品，建议优先复盘其流量来源和转化路径。",
+                    "why": "执行结果显示 Laptop Pro 14 的 GMV 为 511248.56。",
+                    "evidence_bullets": ["Laptop Pro 14 的 GMV 为 511248.56。"],
+                    "recommendations": ["复盘 Laptop Pro 14 的流量来源和转化路径。"],
+                    "caveats": [],
+                    "confidence": "high",
+                },
             }
         ),
     )

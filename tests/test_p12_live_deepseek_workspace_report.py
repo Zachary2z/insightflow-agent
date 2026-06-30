@@ -129,12 +129,20 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
 
     for section in completed_sections:
         assert section["question"].strip()
-        assert section["summary"].strip()
+        business_answer = section["business_answer"]
+        assert business_answer["headline"].strip()
+        assert business_answer["direct_answer"].strip()
+        assert business_answer["why"].strip()
+        assert isinstance(business_answer["evidence_bullets"], list)
+        assert isinstance(business_answer["recommendations"], list)
+        assert isinstance(business_answer["caveats"], list)
+        assert business_answer["confidence"] in {"low", "medium", "high"}
         assert section["sql"].strip()
         assert section["rows_preview"]
-        assert "SELECT " not in section["summary"].upper()
-        assert "provider_called" not in section["summary"]
-        assert "这是自动报告内部 section" not in section["summary"]
+        business_answer_text = json.dumps(business_answer, ensure_ascii=False)
+        assert "SELECT " not in business_answer_text.upper()
+        assert "provider_called" not in business_answer_text
+        assert "这是自动报告内部 section" not in business_answer_text
         assert section["technical_details"]["internal_question"].startswith(
             "这是自动报告内部 section"
         )
@@ -204,6 +212,13 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
     assert "```sql" not in business_body
     assert "provider_called" not in business_body
     assert "这是自动报告内部 section" not in business_body
+    assert "#### 结论" in business_body
+    assert "#### 直接回答" in business_body
+    assert "#### 为什么" in business_body
+    assert "#### 关键证据" in business_body
+    assert "#### 建议动作" in business_body
+    assert "#### 限制说明" in business_body
+    assert "#### 置信度" in business_body
     assert "```sql" in appendix
     assert "provider_called" in appendix
     assert first_artifact_path in markdown

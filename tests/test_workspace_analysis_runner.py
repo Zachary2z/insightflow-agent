@@ -418,9 +418,9 @@ def test_workspace_analysis_schema_repair_failure_has_business_friendly_product_
     assert result["execution_result"] == {}
     answer = result["product_result"]["business_answer"]
     assert answer["headline"] == "当前数据无法支持这次查询"
-    assert "不存在的表或字段" in answer["summary"]
-    assert "Unknown table" not in answer["summary"]
-    assert "Unknown column" not in answer["summary"]
+    assert "不存在的表或字段" in answer["direct_answer"]
+    assert "Unknown table" not in answer["direct_answer"]
+    assert "Unknown column" not in answer["direct_answer"]
     assert "Unknown table" not in answer["headline"]
     technical = result["product_result"]["technical_details"]
     assert {log["name"] for log in technical["validation_logs"]} >= {"review_result", "schema_repair"}

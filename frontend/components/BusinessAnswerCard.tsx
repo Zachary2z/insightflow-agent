@@ -23,31 +23,35 @@ function TextList({ title, items }: { title: string; items?: string[] }) {
 }
 
 export default function BusinessAnswerCard({ answer }: BusinessAnswerCardProps) {
-  if (!answer || (!answer.headline && !answer.summary)) {
+  if (!answer) {
     return null;
   }
-
-  const flags = answer.quality_flags ?? [];
-  const hasRawParameterWarning = flags.includes("raw_parameter_dump_detected");
 
   return (
     <article className="panel business-answer">
       <div className="section-heading">
         <div>
-          <p className="product-eyebrow">Business Answer</p>
+          <p className="product-eyebrow">业务回答</p>
           <h3>业务结论</h3>
-          {answer.headline ? <p className="answer-headline">{answer.headline}</p> : null}
         </div>
-        {answer.confidence ? <span className="status-chip">置信度 {answer.confidence}</span> : null}
+        <span className="status-chip">置信度 {answer.confidence}</span>
       </div>
-      {answer.summary ? <p className="answer-summary">{answer.summary}</p> : null}
-      {hasRawParameterWarning ? (
-        <p className="soft-warning">回答已自动过滤技术参数，建议结合证据表补充业务解读。</p>
-      ) : null}
+      <section>
+        <h4>结论</h4>
+        <p className="answer-headline">{answer.headline}</p>
+      </section>
+      <section>
+        <h4>直接回答</h4>
+        <p className="answer-summary">{answer.direct_answer}</p>
+      </section>
+      <section>
+        <h4>为什么</h4>
+        <p>{answer.why}</p>
+      </section>
       <div className="answer-grid">
-        <TextList title="建议" items={answer.recommendations} />
-        <TextList title="下一步" items={answer.next_actions} />
-        <TextList title="注意事项" items={answer.caveats} />
+        <TextList title="关键证据" items={answer.evidence_bullets} />
+        <TextList title="建议动作" items={answer.recommendations} />
+        <TextList title="限制说明" items={answer.caveats} />
       </div>
     </article>
   );

@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from workspaces.models import utc_now_iso
+from workspaces.product_models import empty_business_answer
 
 
 @dataclass
@@ -12,8 +13,8 @@ class ReportSection:
     title: str
     purpose: str
     status: str
+    business_answer: dict[str, Any] = field(default_factory=empty_business_answer)
     question: str = ""
-    summary: str = ""
     sql: str = ""
     columns: list[str] = field(default_factory=list)
     rows_preview: list[dict[str, Any]] = field(default_factory=list)
@@ -27,14 +28,14 @@ class ReportSection:
 
     def __post_init__(self) -> None:
         if not self.technical_details:
-            self.technical_details = self._compat_technical_details()
+            self.technical_details = self._default_technical_details()
         if not self.business_artifacts and self.artifact_paths:
             self.business_artifacts = [
                 {"type": "chart", "path": path, "title": self.title}
                 for path in self.artifact_paths
             ]
 
-    def _compat_technical_details(self) -> dict[str, Any]:
+    def _default_technical_details(self) -> dict[str, Any]:
         details: dict[str, Any] = {}
         if self.question:
             details["internal_question"] = self.question
@@ -64,8 +65,8 @@ class ReportSection:
             title=data["title"],
             purpose=data.get("purpose", ""),
             status=data.get("status", "draft"),
+            business_answer=dict(data.get("business_answer", empty_business_answer())),
             question=data.get("question", ""),
-            summary=data.get("summary", ""),
             sql=data.get("sql", ""),
             columns=list(data.get("columns", [])),
             rows_preview=list(data.get("rows_preview", [])),

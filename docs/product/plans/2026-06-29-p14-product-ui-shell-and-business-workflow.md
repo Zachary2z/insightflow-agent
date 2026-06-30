@@ -14,7 +14,7 @@
 
 - Primary prototype: `docs/product/prototypes/p14-clickable-product-ui.html`
 - P13 design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`
-- P13 implementation plan: `docs/superpowers/plans/2026-06-24-p13-business-answer-product-ux-implementation-plan.md`
+- P13 implementation plan was a superseded generated file under `docs/superpowers/plans/` and has been deleted per artifact hygiene. Use this P14 plan and the P15 plan for current product implementation guidance.
 - Current frontend app routes: `frontend/app/workspaces/**`
 - Current frontend components: `frontend/components/**`
 - Current frontend tests: `frontend/tests/workspace-flow.test.tsx`, `frontend/tests/api-client.test.ts`
@@ -46,7 +46,7 @@ P14 is not a backend-agent rewrite. P14 is the product UI and workflow hardening
 - PDF/PPT export.
 - Scheduled reports.
 - Replacing the guarded SQL, evidence, visualization, report, or trace boundaries.
-- Restoring Streamlit, old ecommerce-only UI, old eval UI, old `chart_agent`, old `visualization_planner`, or old `chart_tool`.
+- Restoring historical UI/eval/chart product paths.
 
 ## File Structure
 
@@ -716,15 +716,7 @@ Expected: both live regressions pass.
 
 - [ ] **Step 5: Run legacy and artifact audits**
 
-Run:
-
-```bash
-rg -n "chart_agent|visualization_planner|chart_tool|streamlit run app.py|eval/run_eval.py|powerbi_publisher_mock|fixed template|deterministic action template|keyword inference" README.md DEVELOPMENT_PLAN.md DEVELOPMENT_STATUS.md api frontend graph agents workspaces tests
-
-git ls-files | rg "(^\\.env$|frontend/\\.next/|(^|/)\\.pytest_cache/|(^|/)__pycache__/|^workspaces/.+/runs/|^workspaces/.+/reports/|^reports/charts/.+\\.(png|jpg|jpeg|svg)$|^reports/markdown/.+\\.(md|html|pdf)$|^logs/traces/.+\\.json$|^sample_data/)"
-```
-
-Expected: legacy hits are historical/test-boundary only; tracked generated-artifact check produces no generated files.
+Run the closeout legacy-path audit and generated-artifact audit. Expected: legacy hits are historical/test-boundary only; tracked generated-artifact check produces no generated files.
 
 - [ ] **Step 6: Update closeout docs**
 

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from tools.action_tool import DEFAULT_ACTION_DB_PATH
 from tools.trace_logger import DEFAULT_TRACE_DIR
 
 
@@ -109,85 +107,12 @@ def _eval_metrics(eval_summary: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
-        (table_name,),
-    ).fetchone()
-    return row is not None
-
-
-def _read_approval_records(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    if not _table_exists(conn, "approvals"):
-        return []
-    rows = conn.execute(
-        """
-        SELECT approval_id, run_id, approval_status, approved_by, reason, created_at
-        FROM approvals
-        ORDER BY created_at ASC
-        """
-    ).fetchall()
-    return [
-        {
-            "approval_id": row[0],
-            "run_id": row[1],
-            "approval_status": row[2],
-            "approved_by": row[3],
-            "reason": row[4],
-            "created_at": row[5],
-        }
-        for row in rows
-    ]
-
-
-def _read_audit_logs(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    if not _table_exists(conn, "audit_logs"):
-        return []
-    rows = conn.execute(
-        """
-        SELECT audit_log_id, run_id, event_type, actor, payload_json, created_at
-        FROM audit_logs
-        ORDER BY created_at ASC
-        """
-    ).fetchall()
-    logs = []
-    for row in rows:
-        try:
-            payload = json.loads(row[4] or "{}")
-        except Exception:
-            payload = {}
-        logs.append(
-            {
-                "audit_log_id": row[0],
-                "run_id": row[1],
-                "event_type": row[2],
-                "actor": row[3],
-                "payload": payload,
-                "created_at": row[5],
-            }
-        )
-    return logs
-
-
-def _read_action_records(action_db_path: str | Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, str]]]:
-    path = Path(action_db_path)
-    if not path.exists():
-        return [], [], []
-    try:
-        with sqlite3.connect(path) as conn:
-            return _read_approval_records(conn), _read_audit_logs(conn), []
-    except Exception as exc:
-        return [], [], [{"action_db_path": str(path), "error": str(exc)}]
-
-
 def build_trace_dashboard(
     trace_dir: str | Path = DEFAULT_TRACE_DIR,
     eval_summary: dict[str, Any] | None = None,
-    action_db_path: str | Path = DEFAULT_ACTION_DB_PATH,
 ) -> dict[str, Any]:
     traces, load_errors = _load_trace_files(trace_dir)
     events = list(_event_iter(traces))
-    approval_records, audit_logs, action_load_errors = _read_action_records(action_db_path)
     failure_distribution = eval_summary.get("failure_type_distribution") if eval_summary else None
 
     return {
@@ -202,7 +127,5 @@ def build_trace_dashboard(
         "sql_fix_count": _sql_fix_count(events),
         "failure_type_distribution": dict(failure_distribution or _trace_failure_distribution(traces, events)),
         "eval_metrics": _eval_metrics(eval_summary),
-        "approval_records": approval_records,
-        "audit_logs": audit_logs,
-        "load_errors": load_errors + action_load_errors,
+        "load_errors": load_errors,
     }

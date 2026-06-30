@@ -20,6 +20,7 @@ logs/traces/*
 logs/traces/**/*
 reports/charts/*
 reports/markdown/*
+sample_data/
 workspaces/*
 !workspaces/
 !workspaces/*.py

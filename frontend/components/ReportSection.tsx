@@ -11,6 +11,60 @@ type ReportSectionProps = {
 
 type ReportBusinessArtifact = NonNullable<WorkspaceReportSection["business_artifacts"]>[number];
 
+const BUSINESS_ANSWER_KEYS = [
+  "headline",
+  "direct_answer",
+  "why",
+  "evidence_bullets",
+  "recommendations",
+  "caveats",
+  "confidence",
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isBusinessAnswer(value: unknown): value is WorkspaceReportSection["business_answer"] {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const keys = Object.keys(value).sort();
+  if (keys.length !== BUSINESS_ANSWER_KEYS.length || keys.join("|") !== [...BUSINESS_ANSWER_KEYS].sort().join("|")) {
+    return false;
+  }
+  return (
+    typeof value.headline === "string" &&
+    value.headline.trim().length > 0 &&
+    typeof value.direct_answer === "string" &&
+    value.direct_answer.trim().length > 0 &&
+    typeof value.why === "string" &&
+    value.why.trim().length > 0 &&
+    Array.isArray(value.evidence_bullets) &&
+    Array.isArray(value.recommendations) &&
+    Array.isArray(value.caveats) &&
+    ["low", "medium", "high"].includes(String(value.confidence))
+  );
+}
+
+function TextList({ title, items, emptyText }: { title: string; items?: string[]; emptyText?: string }) {
+  const visibleItems = items?.filter((item) => item.trim()) ?? [];
+  return (
+    <section>
+      <h4>{title}</h4>
+      {visibleItems.length ? (
+        <ul>
+          {visibleItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : emptyText ? (
+        <p>{emptyText}</p>
+      ) : null}
+    </section>
+  );
+}
+
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     completed: "已完成",
@@ -66,7 +120,8 @@ function artifactUrl(artifact: ReportBusinessArtifact, workspaceId: string, repo
 }
 
 export default function ReportSection({ section, workspaceId, reportId }: ReportSectionProps) {
-  const artifacts = businessArtifacts(section);
+  const answer = isBusinessAnswer(section.business_answer) ? section.business_answer : null;
+  const artifacts = answer ? businessArtifacts(section) : [];
 
   return (
     <ProductCard className="report-section-card">
@@ -78,28 +133,34 @@ export default function ReportSection({ section, workspaceId, reportId }: Report
           章节状态：{statusLabel(section.status)}
         </StatusPill>
       </header>
-      {section.summary ? (
-        <section>
-          <h4>业务摘要</h4>
-          <p>{section.summary}</p>
+      {answer ? (
+        <div className="report-business-answer">
+          <section>
+            <h4>结论</h4>
+            <p className="answer-headline">{answer.headline}</p>
+          </section>
+          <section>
+            <h4>直接回答</h4>
+            <p className="answer-summary">{answer.direct_answer}</p>
+          </section>
+          <section>
+            <h4>为什么</h4>
+            <p>{answer.why}</p>
+          </section>
+          <TextList title="关键证据" items={answer.evidence_bullets} />
+          <TextList title="建议动作" items={answer.recommendations} />
+          <TextList title="限制说明" items={answer.caveats} />
+          <section>
+            <h4>置信度</h4>
+            <p>置信度 {answer.confidence}</p>
+          </section>
+        </div>
+      ) : (
+        <section role="alert">
+          <h4>报告章节结构异常</h4>
+          <p>后端没有返回完整的 P16 business_answer，请重新生成报告。</p>
         </section>
-      ) : null}
-      {section.error ? (
-        <section>
-          <h4>状态说明</h4>
-          <p role="alert">{section.error}</p>
-        </section>
-      ) : null}
-      {section.evidence_notes?.length ? (
-        <section>
-          <h4>证据说明</h4>
-          <ul>
-            {section.evidence_notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      )}
       {artifacts.length ? (
         <section>
           <h4>图表或附件</h4>

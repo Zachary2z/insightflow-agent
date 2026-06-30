@@ -26,6 +26,18 @@ def _ok(prompt_id: str, content: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in str(text or ""))
+
+
+def _requires_cjk_response(schema_context: dict[str, Any]) -> bool:
+    user_question = str(schema_context.get("user_question") or "")
+    if not _contains_cjk(user_question):
+        return False
+    lowered = user_question.lower()
+    return not any(marker in lowered for marker in ("用英文", "英文回答", "answer in english", "in english"))
+
+
 def _validate_report_planner(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(content, dict):
         return _error("report_planner", "report_planner output must be an object")
@@ -212,7 +224,7 @@ def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
 
 
-def _validate_insight_drafter(content: Any) -> dict[str, Any]:
+def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
     prompt_id = "insight_drafter"
     if not isinstance(content, dict):
         return _error(prompt_id, "insight_drafter output must be an object")
@@ -247,16 +259,80 @@ def _validate_insight_drafter(content: Any) -> dict[str, Any]:
     if not candidate_claims:
         return _error(prompt_id, "candidate_claims must not be empty")
 
-    draft_summary = content.get("draft_summary", "")
-    if not isinstance(draft_summary, str):
-        return _error(prompt_id, "draft_summary must be a string")
-    draft_summary = draft_summary.strip()
-    if not draft_summary:
-        return _error(prompt_id, "draft_summary is required")
-    if _looks_like_raw_parameter_dump(draft_summary):
-        return _error(prompt_id, "draft_summary must not be a raw parameter dump")
+    business_answer = content.get("business_answer")
+    if not isinstance(business_answer, dict):
+        return _error(prompt_id, "business_answer is required and must be an object")
+    extra_top_level = sorted(set(content) - {"candidate_claims", "business_answer"})
+    if extra_top_level:
+        return _error(
+            prompt_id,
+            f"insight_drafter must not return unsupported top-level fields: {', '.join(extra_top_level)}",
+        )
 
-    return _ok(prompt_id, {"candidate_claims": candidate_claims, "draft_summary": draft_summary})
+    allowed_keys = {
+        "headline",
+        "direct_answer",
+        "why",
+        "evidence_bullets",
+        "recommendations",
+        "caveats",
+        "confidence",
+    }
+    extra_keys = sorted(set(business_answer) - allowed_keys)
+    if extra_keys:
+        return _error(prompt_id, f"business_answer contains unsupported fields: {', '.join(extra_keys)}")
+
+    normalized_answer: dict[str, Any] = {}
+    for field in ("headline", "direct_answer", "why"):
+        if field not in business_answer:
+            return _error(prompt_id, f"business_answer.{field} is required")
+        value = business_answer.get(field)
+        if not isinstance(value, str):
+            return _error(prompt_id, f"business_answer.{field} must be a string")
+        value = value.strip()
+        if not value:
+            return _error(prompt_id, f"business_answer.{field} must not be empty")
+        normalized_answer[field] = value
+
+    for field in ("evidence_bullets", "recommendations", "caveats"):
+        if field not in business_answer:
+            return _error(prompt_id, f"business_answer.{field} is required")
+        ok, items, message = _string_list(business_answer.get(field), f"business_answer.{field}")
+        if not ok:
+            return _error(prompt_id, message)
+        normalized_answer[field] = items
+
+    confidence = str(business_answer.get("confidence", "")).strip()
+    if confidence not in {"low", "medium", "high"}:
+        return _error(prompt_id, "business_answer.confidence must be one of low, medium, high")
+    normalized_answer["confidence"] = confidence
+
+    business_text_fields = [
+        normalized_answer["headline"],
+        normalized_answer["direct_answer"],
+        normalized_answer["why"],
+        *normalized_answer["evidence_bullets"],
+        *normalized_answer["recommendations"],
+        *normalized_answer["caveats"],
+    ]
+    for field_text in business_text_fields:
+        if _contains_technical_leak(field_text):
+            return _error(prompt_id, "business_answer fields must not contain technical SQL, trace, or provider metadata")
+        if _looks_like_raw_parameter_dump(field_text):
+            return _error(prompt_id, "business_answer fields must not contain raw parameter dumps")
+
+    if _requires_cjk_response(schema_context):
+        language_error = _cjk_business_answer_language_error(normalized_answer)
+        if language_error:
+            return _error(prompt_id, language_error)
+
+    if _schema_context_has_weak_evidence(schema_context):
+        if normalized_answer["recommendations"]:
+            return _error(prompt_id, "business_answer.recommendations must be empty when evidence is weak")
+        if not normalized_answer["caveats"]:
+            return _error(prompt_id, "business_answer.caveats is required when evidence is weak or limited")
+
+    return _ok(prompt_id, {"candidate_claims": candidate_claims, "business_answer": normalized_answer})
 
 
 def _looks_like_raw_parameter_dump(text: str) -> bool:
@@ -272,90 +348,56 @@ def _looks_like_raw_parameter_dump(text: str) -> bool:
     return dump_lines >= max(1, len(lines) // 2)
 
 
-def _validate_action_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
-    prompt_id = "action_drafter"
-    if not isinstance(content, dict):
-        return _error(prompt_id, "action_drafter output must be an object")
+def _contains_technical_leak(text: str) -> bool:
+    value = str(text or "")
+    if re.search(r"\b(?:SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA)\b", value, re.IGNORECASE):
+        return True
+    technical_markers = (
+        "trace_id",
+        "trace id",
+        "trace_path",
+        "provider_metadata",
+        "provider_called",
+        "prompt_id",
+        "prompt_version",
+        "latency_ms",
+        "completion_tokens",
+        "prompt_tokens",
+        "raw_rows",
+    )
+    lowered = value.lower()
+    return any(marker in lowered for marker in technical_markers)
 
-    top_level_blocked_fields = {
-        "approval_status",
-        "requires_approval",
-        "created_actions",
-        "record_id",
-        "task_id",
-        "alert_id",
-        "draft_id",
-        "audit_log_id",
-        "send_email",
-    }
-    action_blocked_fields = {*top_level_blocked_fields, "status"}
-    leaked = sorted(top_level_blocked_fields & set(content))
-    if leaked:
-        return _error(prompt_id, f"action_drafter must not return blocked fields: {', '.join(leaked)}")
 
-    actions = content.get("actions", [])
-    if not isinstance(actions, list):
-        return _error(prompt_id, "actions must be a list")
+def _cjk_business_answer_language_error(answer: dict[str, Any]) -> str:
+    for field in ("headline", "direct_answer", "why"):
+        if not _contains_cjk(str(answer.get(field) or "")):
+            return f"输出语言必须跟随用户问题；中文问题下 business_answer.{field} 必须包含中文"
+    for field in ("evidence_bullets", "recommendations", "caveats"):
+        for index, item in enumerate(answer.get(field) or []):
+            if str(item).strip() and not _contains_cjk(str(item)):
+                return (
+                    "输出语言必须跟随用户问题；中文问题下 "
+                    f"business_answer.{field}[{index}] 必须包含中文"
+                )
+    return ""
 
-    allowed_action_types = {"create_task", "create_metric_alert", "create_email_draft"}
-    allowed_claims = set(schema_context.get("allowed_claims", []))
-    blocked_claims = [str(claim).strip() for claim in schema_context.get("blocked_unsupported_claims", []) if str(claim).strip()]
-    normalized_actions = []
-    for index, action in enumerate(actions):
-        if not isinstance(action, dict):
-            return _error(prompt_id, f"actions[{index}] must be an object")
-        leaked = sorted(action_blocked_fields & set(action))
-        if leaked:
-            return _error(prompt_id, f"actions[{index}] must not return blocked fields: {', '.join(leaked)}")
 
-        action_type = str(action.get("action_type", "")).strip()
-        if action_type not in allowed_action_types:
-            return _error(prompt_id, f"actions[{index}].action_type is not allowed: {action_type}")
-
-        source_ok, source_claims, message = _string_list(action.get("source_claims", []), f"actions[{index}].source_claims")
-        if not source_ok:
-            return _error(prompt_id, message)
-        for claim in source_claims:
-            if allowed_claims and claim not in allowed_claims:
-                return _error(prompt_id, f"actions[{index}].source_claims contains unverified claim: {claim}")
-
-        action_text = " ".join(str(value) for value in action.values())
-        for blocked_claim in blocked_claims:
-            if blocked_claim in action_text:
-                return _error(prompt_id, f"actions[{index}] includes blocked unsupported claim: {blocked_claim}")
-
-        normalized = {
-            "action_id": str(action.get("action_id") or f"action_{index + 1}").strip(),
-            "action_type": action_type,
-            "source": "provider_action_drafter",
-            "source_claims": source_claims,
-            "delivery_tool_id": str(action.get("delivery_tool_id") or "local_sqlite").strip() or "local_sqlite",
-        }
-        if action_type == "create_task":
-            for field in ("title", "description", "owner", "priority"):
-                value = str(action.get(field, "")).strip()
-                if not value:
-                    return _error(prompt_id, f"actions[{index}].{field} is required")
-                normalized[field] = value
-        elif action_type == "create_metric_alert":
-            for field in ("metric_name", "condition", "threshold", "description"):
-                value = str(action.get(field, "")).strip()
-                if not value:
-                    return _error(prompt_id, f"actions[{index}].{field} is required")
-                normalized[field] = value
-        else:
-            for field in ("recipient", "subject", "body"):
-                value = str(action.get(field, "")).strip()
-                if not value:
-                    return _error(prompt_id, f"actions[{index}].{field} is required")
-                normalized[field] = value
-        normalized_actions.append(normalized)
-
-    risk_ok, risk_flags, message = _string_list(content.get("risk_flags", []), "risk_flags")
-    if not risk_ok:
-        return _error(prompt_id, message)
-
-    return _ok(prompt_id, {"actions": normalized_actions, "risk_flags": risk_flags})
+def _schema_context_has_weak_evidence(schema_context: dict[str, Any]) -> bool:
+    execution_result = schema_context.get("execution_result")
+    if not isinstance(execution_result, dict):
+        return False
+    if not execution_result or execution_result.get("success") is False:
+        return True
+    if not execution_result.get("rows"):
+        return True
+    evidence_result = schema_context.get("evidence_result")
+    if isinstance(evidence_result, dict):
+        validation_status = str(evidence_result.get("validation_status") or evidence_result.get("status") or "").lower()
+        notes = evidence_result.get("data_supported_findings") or evidence_result.get("evidence_notes") or []
+        if validation_status in {"failed", "not_validated", "rejected"} and not notes:
+            return True
+    return False
 
 
 def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:
@@ -858,9 +900,7 @@ def validate_prompt_output(
     if prompt_id == "insight_claim_typer":
         return _validate_insight_claim_typer(content)
     if prompt_id == "insight_drafter":
-        return _validate_insight_drafter(content)
-    if prompt_id == "action_drafter":
-        return _validate_action_drafter(content, context)
+        return _validate_insight_drafter(content, context)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":

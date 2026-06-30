@@ -7,6 +7,21 @@ from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
 from workspaces.store import WorkspaceStore
 
 
+def _business_answer() -> dict:
+    return {
+        "headline": "付费搜索和邮件贡献主要收入",
+        "direct_answer": "本节显示付费搜索收入最高，邮件渠道也有稳定贡献。",
+        "why": "证据表按渠道汇总后，paid_search 收入为 200.0，email 收入为 100.0。",
+        "evidence_bullets": [
+            "paid_search 收入为 200.0。",
+            "email 收入为 100.0。",
+        ],
+        "recommendations": ["优先复盘付费搜索的投放效率。"],
+        "caveats": ["当前只基于预览结果。"],
+        "confidence": "high",
+    }
+
+
 def _create_workspace(tmp_path):
     workspace_store = WorkspaceStore(root_dir=tmp_path / "workspaces")
     workspace = workspace_store.create_workspace("Report Workspace")
@@ -22,8 +37,7 @@ def _sample_report(workspace_id: str) -> ReportRecord:
         title="Leadership Business Review",
         status="completed",
         executive_summary=[
-            "Revenue is concentrated in paid search and email.",
-            "Channel mix should be reviewed next month.",
+            "Revenue by Channel: 付费搜索和邮件贡献主要收入 - 本节显示付费搜索收入最高，邮件渠道也有稳定贡献。",
         ],
         sections=[
             ReportSection(
@@ -32,7 +46,7 @@ def _sample_report(workspace_id: str) -> ReportRecord:
                 purpose="Compare revenue contribution across channels.",
                 status="completed",
                 question="Which channels generated the most revenue?",
-                summary="Paid search led revenue in the previewed result.",
+                business_answer=_business_answer(),
                 sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
                 columns=["channel", "revenue"],
                 rows_preview=[
@@ -80,6 +94,7 @@ def test_report_store_saves_and_loads_canonical_report_json(tmp_path):
 
     assert Path(saved.json_path).is_file()
     assert loaded.to_dict() == saved.to_dict()
+    assert loaded.sections[0].business_answer["headline"] == "付费搜索和邮件贡献主要收入"
     assert loaded.sections[0].rows_preview[0]["channel"] == "paid_search"
 
 
@@ -95,14 +110,28 @@ def test_report_store_renders_markdown_with_required_report_details(tmp_path):
     assert "## Report Goal" in markdown
     assert "Summarize revenue and channel performance for leadership." in markdown
     assert "## Executive Summary" in markdown
-    assert "- Revenue is concentrated in paid search and email." in markdown
+    assert "- Revenue by Channel: 付费搜索和邮件贡献主要收入 - 本节显示付费搜索收入最高，邮件渠道也有稳定贡献。" in markdown
     assert markdown.index("## Executive Summary") < markdown.index("## Technical Appendix")
     assert "## Business Sections" in markdown
     assert "### Revenue by Channel" in markdown
+    assert "#### 结论" in markdown
+    assert "付费搜索和邮件贡献主要收入" in markdown
+    assert "#### 直接回答" in markdown
+    assert "本节显示付费搜索收入最高，邮件渠道也有稳定贡献。" in markdown
+    assert "#### 为什么" in markdown
+    assert "#### 关键证据" in markdown
+    assert "- paid_search 收入为 200.0。" in markdown
+    assert "#### 建议动作" in markdown
+    assert "- 优先复盘付费搜索的投放效率。" in markdown
+    assert "#### 限制说明" in markdown
+    assert "- 当前只基于预览结果。" in markdown
+    assert "#### 置信度" in markdown
+    assert "high" in markdown
     assert "- `artifacts/section_revenue_by_channel.png`" in markdown
-    assert "Preview is based on grouped rows" in markdown
     business_body = markdown.split("## Technical Appendix", 1)[0]
     appendix = markdown.split("## Technical Appendix", 1)[1]
+    assert "Paid search led revenue in the previewed result." not in business_body
+    assert "Preview is based on grouped rows" not in business_body
     assert "Compare revenue contribution across channels." not in business_body
     assert "Which channels generated the most revenue?" not in business_body
     assert "SELECT channel" not in business_body

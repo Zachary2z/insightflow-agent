@@ -1,453 +1,88 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-29
+Last updated: 2026-06-30
 
-This file is the living status tracker for InsightFlow Agent.
-
-## Status Legend
-
-- `[x]` Done
-- `[~]` In progress
-- `[ ]` Not started
-- `[!]` Blocked or needs decision
+This is the concise current status surface for InsightFlow Agent.
 
 ## Current Snapshot
 
 | Field | Status |
 |---|---|
-| Current phase | P15 Analysis Reliability And History complete |
-| Current task | P15-H6 Real DeepSeek product regression complete |
-| Next planned task | None; P15 is closed |
-| Last completed task | P15-H6 Real DeepSeek Product Regression And P15 Closeout |
-| Main product target | Coherent Chinese business data-analysis product with persisted analysis history, recoverable run details, schema-aware SQL recovery, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
+| Current phase | P18 External Business Tool Calling |
+| Current task | P18 external business tool calling design/implementation |
+| Next planned task | P18 external business tool calling design/implementation |
+| Last completed task | P17-H6 Final Artifact Hygiene, Regression, And Live Acceptance |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
-| Active analysis entry | P11: `POST /api/workspaces/{workspace_id}/runs`; P12: `POST /api/workspaces/{workspace_id}/reports` |
-| Out of scope for P15 | Full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, fixed SQL templates, keyword-heavy business rules, old demo restoration, and unguarded LLM execution |
+| Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
+| Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
+| Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
+| Main product target | Chinese business data-analysis product with guarded SQL/evidence execution, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
+| Out of scope for P17 | New product features, real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, and old demo restoration |
 
 ## Phase Overview
 
-| Phase | Goal | Overall |
+| Phase | Status | Current meaning |
 |---|---|---|
-| P0 | Agentic SQL Core | `[x]` Historical foundation complete |
-| P1 | Reliable Analysis & Report Core | `[x]` Historical foundation complete |
-| P2 | Business Review & Action Workflow | `[x]` Historical foundation complete |
-| P3 | MCP & Engineering Core | `[x]` Scoped baseline complete |
-| P4 | Realistic Scenario Dataset | `[x]` Complete |
-| P5 | Lightweight Semantic Layer | `[x]` Complete |
-| P6 | Scenario Analysis Planner | `[x]` Complete |
-| P7 | Visualization Intelligence | `[x]` Complete |
-| P8.1 | Visualization Agent Dedupe & External Tool Calling | `[x]` Complete |
-| P8.2 | Intent & SQL Planning Agent Cleanup | `[x]` Complete |
-| P8.3 | Report & Insight Agent Cleanup | `[x]` Complete |
-| P8.4 | Action Agent & Tool Adapter Cleanup | `[x]` Complete |
-| P8.5 | Agent Pipeline UX | `[x]` Complete, now superseded as a UI direction by P11 Next.js |
-| P9 | Realistic Eval And Demo Polish | `[x]` Historical eval/demo polish complete |
-| P10 | MCP Contract & Lightweight Engineering Hardening | `[x]` Complete |
-| P11 | General Data Analysis Product | `[x]` H1-H5 complete; final verification passed |
-| P12 | Report Productization | `[x]` Complete; H1 foundation, H2 synchronous runner, H3 FastAPI APIs, H4 Next.js reports UI, H5 live DeepSeek report acceptance, and H6 docs/artifact audit/final verification complete |
-| P13 | Business Answer And Product UX | `[x]` Complete; H1-H9 closed with documentation, artifact audit, regression, live verification, and closeout |
-| P14 | Product UI Shell And Business Workflow | `[x]` H1-H8 complete; full regression/live acceptance/docs closeout passed |
-| P15 | Analysis Reliability And History | `[x]` Complete; H1 backend run history APIs, H2 Analysis Workbench history panel, H3 run detail backend source of truth, H4 one-pass schema-mismatch SQL repair, H5 business-friendly failure UX, and H6 real DeepSeek product regression are closed |
+| P0-P10 | `[x]` Complete | Historical foundations for SQL safety, evidence validation, provider plumbing, MCP wrappers, visualization, and trace/artifact hygiene |
+| P11 | `[x]` Complete | Workspace data import, profile, semantic-layer draft, and ad hoc analysis through FastAPI + Next.js |
+| P12 | `[x]` Complete | Workspace report APIs, runner, storage, Markdown download, and report UI |
+| P13 | `[x]` Complete | Business-facing answers, clarification continuation, report reader polish, Data Settings, chart display |
+| P14 | `[x]` Complete | Unified Chinese product shell and core workspace pages |
+| P15 | `[x]` Complete | Persisted analysis history/detail, schema repair, business-friendly failure UX, real DeepSeek reliability regression |
+| P16 | `[x]` Complete | Single clean `business_answer` contract across analysis, reports, Markdown, frontend rendering, and run restoration |
+| P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
+| P18 | `[ ]` Future | Real China-oriented external tool integrations after P17 closeout |
 
-## P11 Product Hardening
+## P17 Task Status
 
-Audit date: 2026-06-23
+| Task | Status | Notes |
+|---|---|---|
+| P17-H1 | `[x]` Complete | Added dependency boundary tests proving current product entry points do not require removed historical paths |
+| P17-H2 | `[x]` Complete | Removed legacy action-path code and provider/prompt hooks outside the current product |
+| P17-H3 | `[x]` Complete | Current visualization delivery runtime is local chart rendering and local workbook export only |
+| P17-H4 | `[x]` Complete | Old eval/demo files are deleted or untracked; old design snapshots began being marked historical |
+| P17-H5 | `[x]` Complete | Simplified README, DEVELOPMENT_PLAN, DEVELOPMENT_STATUS, and retained P11/P12/P13 specs so current product guidance is obvious |
+| P17-H6 | `[x]` Complete | Final artifact hygiene, legacy audit, focused/full regressions, frontend build, and real DeepSeek acceptance |
 
-P11 makes InsightFlow a general workspace data-analysis product:
+## Current Product Chain
 
 ```text
-workspace
--> data source import
--> profile
--> semantic draft
--> natural business question
--> DeepSeek/provider-backed understanding and planning
+workspace import
+-> profile and semantic layer
+-> question understanding
+-> clarification router
+-> SQL planning
 -> guarded SQL candidate
--> validated SQL execution
--> evidence
--> visualization/artifact
--> trace
+-> SQL review
+-> schema repair
+-> SQL execution
+-> evidence validation
+-> insight/business answer
+-> visualization
+-> report
+-> Next.js product UI
 ```
 
-### Hardening Task Checklist
+## Latest Verified Baseline
 
-| Task | Scope | Status | Verification |
-|---|---|---|---|
-| H1 | Add workspace CSV/Excel upload, SQLite import, and source listing FastAPI endpoints | `[x]` Complete | `tests/test_workspace_api.py`, `tests/test_workspace_importers.py` |
-| H2 | Wire Next.js pages into API-backed workspace list/create, data source, profile, semantic draft, analysis, and run-result flows | `[x]` Complete | `cd frontend && npm test && npm run build` |
-| H3 | Remove tracked Streamlit UI, old RunManager, old non-workspace run API, and legacy async run tests | `[x]` Complete | `tests/test_p11_cleanup_boundaries.py`, `tests/test_project_initialization.py` |
-| H4 | Strengthen P11 live DeepSeek acceptance with a natural business question and workspace-rooted artifact assertions | `[x]` Complete | `tests/test_p11_live_deepseek_workspace_analysis.py` with live flags |
-| H5 | Clean current product documentation so historical demo/eval/mock paths are not current guidance | `[x]` Complete | H5 documentation audit plus final verification |
+Latest P17-H6 closeout result on 2026-06-30:
 
-### Remaining P11 Work
-
-No H1-H5 implementation or verification work remains.
-
-## Final Verification Summary
-
-Latest P15-H6 result: passed on 2026-06-29.
-
-P15-H6 verification result summary:
-
-- Added a real opt-in DeepSeek regression in `tests/test_p15_live_deepseek_analysis_reliability.py` for `给我一下最近30天几个渠道的数据`; when the model asks for metrics, the test answers only `都看` and verifies the continuation combines the answer with the original question instead of requiring a full rewrite.
-- The live regression uses a temporary workspace with realistic `orders`, `marketing_spend`, and `customers` data, generated profile, and semantic-layer draft. It does not commit generated data or keys.
-- The verified live run triggered the intended metric clarification, continued with `都看`, completed through real provider-backed product mode, returned a readable Chinese business answer with evidence rows, and restored the final run from persisted history detail.
-- Workspace analysis now writes the full product result back to the workspace run file after product-result building, so history detail can restore business answer, evidence, question thread, SQL technical detail, and provider metadata after navigation.
-- Added a non-live run-history regression proving old persisted failed runs with raw `product_result.business_answer` are sanitized in history/detail while raw reviewer logs stay in technical details.
-- Focused backend tests passed: `python3 -m pytest tests/test_workspace_run_history_api.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` with `22 passed`.
-- Focused frontend workspace flow tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `43 passed`.
+- README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS were simplified into current product/status surfaces.
+- P11/P12/P13 superpowers specs are marked Historical / Superseded and point current guidance to `docs/product/plans/`, P16 `business_answer`, and P17 cleanup.
+- Old eval/demo/action/mock/chart wording is retained only in Historical / Superseded notes, cleanup plans, or test-boundary assertions.
+- Final artifact hygiene keeps generated reports, charts, traces, workspace instances, frontend build output, pytest cache, and `__pycache__` out of the working artifact set, with only required `.gitkeep` placeholders retained.
+- Legacy audit found superseded cleanup terms only in historical/superseded notes or deletion-boundary tests, not active product entry points.
+- Focused cleanup boundary tests passed: `python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q` with `19 passed`.
+- Full backend regression passed: `python3 -m pytest`.
+- Frontend tests passed: `cd frontend && npm test`.
 - Frontend production build passed: `cd frontend && npm run build`.
-- Full backend suite passed: `python3 -m pytest` with `303 passed, 13 skipped`.
-- Real DeepSeek P15 regression passed with `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1`, `INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1`, `INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1`, and `INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1`: `1 passed`.
-
-Latest P15-H5 result: passed on 2026-06-29.
-
-P15-H5 verification result summary:
-
-- TDD red confirmed before implementation: focused product-result and workspace-analysis tests failed because unrepaired SQL review failures still surfaced raw reviewer wording in the business answer headline/summary.
-- Product result building now maps failed SQL review results, especially schema mismatch failures, to a Chinese business answer with headline `当前数据无法支持这次查询`, a non-technical summary, and actionable next steps.
-- Raw reviewer and schema repair details remain available in `technical_details.validation_logs`, provider metadata, and trace; unrepaired SQL still leaves the run status as `failed`, keeps `execution_result == {}`, and does not execute rejected SQL.
-- Analysis history failure summaries now use the same business-friendly schema-mismatch summary instead of raw `Unknown table` / `Unknown column` walls, while failed runs remain visible.
-- Focused product result tests passed: `python3 -m pytest tests/test_product_result_builder.py -q` with `4 passed`.
-- Focused workspace analysis and run history API tests passed: `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_run_history_api.py -q` with `16 passed`.
-- Focused frontend workspace flow tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `43 passed`.
-- Frontend production build passed: `cd frontend && npm run build`.
-- Full backend suite passed: `python3 -m pytest` with `301 passed, 12 skipped`.
-- Audit grep for raw SQL reviewer text found only test assertions that prove raw details stay in validation logs, and legacy chart/tool grep hits remained historical documentation or existing cleanup-boundary tests.
-
-Latest P15-H4 result: passed on 2026-06-29.
-
-P15-H4 verification result summary:
-
-- TDD red confirmed before implementation: three focused workspace-analysis tests failed because schema repair metadata and the one-pass review/repair/review loop did not exist.
-- Workspace analysis now allows schema-mismatch provider SQL candidates to reach SQL Reviewer for the first rejection, attempts one provider-backed schema repair with original question, rejected SQL, reviewer issues, workspace schema, and semantic hints, and sends the repaired SQL back through SQL Reviewer before execution.
-- Repair success records `schema_repair_attempted`, `schema_repair_succeeded`, `schema_repair_reason`, rejected/repaired SQL summaries, and technical metadata; repair failure does not execute SQL and does not retry a third time.
-- Focused workspace analysis tests passed: `python3 -m pytest tests/test_workspace_analysis_runner.py -q` with `8 passed`.
-- SQL validator, run history API, product result builder, and provider-backed clarification router regressions passed with focused pytest commands.
-
-Latest P15-H3 result: passed on 2026-06-29.
-
-P15-H3 verification result summary:
-
-- TDD red confirmed before implementation: focused Run Detail tests failed because `RunResultLoader` still showed the browser-session cache miss copy and never called `getWorkspaceRun()`.
-- Focused Run Detail and workspace flow frontend tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `41 passed`.
-- Full frontend test suite passed: `cd frontend && npm test` with `51 passed`.
-- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces/[workspaceId]/runs/[runId]`.
-- P15-H1 backend run history API regression passed: `python3 -m pytest tests/test_workspace_run_history_api.py -q` with `7 passed`.
-- Run Detail now loads persisted run detail through `getWorkspaceRun(workspaceId, runId)`, merges `product_result` for `RunResult`, shows Chinese loading/error states, and no longer depends on `sessionStorage` to render after refresh or in a new browser session.
-- SQL, raw rows, and provider metadata remain under `RunResult` technical details, collapsed by default.
-- `sessionStorage` remains only as the existing optional Workbench / Business Q&A run-detail cache, not as the Run Detail source of truth.
-
-Latest P15-H2 result: passed on 2026-06-29.
-
-P15-H2 verification result summary:
-
-- Focused Analysis Workbench history tests passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `40 passed`.
-- Full frontend test suite passed: `cd frontend && npm test` with `50 passed`.
-- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces/[workspaceId]/analysis`.
-- P15-H1 backend run history API regression passed: `python3 -m pytest tests/test_workspace_run_history_api.py -q` with `7 passed`.
-- Analysis Workbench now loads persisted run history from the backend run history API, shows completed, failed, waiting-for-clarification, and running status labels in Chinese, keeps failed runs visible, and restores a selected run through `getWorkspaceRun()`.
-- History refreshes after new analysis, clarification continuation, and follow-up analysis. `sessionStorage` remains only as the existing optional run-detail cache, not as the history source.
-
-Latest P14-H8 result: passed on 2026-06-29.
-
-P14-H8 verification result summary:
-
-- Full frontend test suite passed: `cd frontend && npm test` with `46 passed`.
-- Frontend production build passed: `cd frontend && npm run build`, including `/workspaces`, `/workspaces/new`, `/workspaces/[workspaceId]/profile`, `/semantic-layer`, `/runs/[runId]`, `/business-qa`, `/analysis`, `/reports`, and `/settings`.
-- Full backend suite passed: `python3 -m pytest` with `289 passed, 12 skipped`.
-- Real DeepSeek live acceptance passed with `.env`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`: `5 passed` across P11 workspace analysis, P12 workspace report, and P13 product acceptance.
-- Post-H8 audit fixed remaining route-level product drift: home/workspace entry pages, field profile, semantic-layer draft, and run detail now use Chinese product chrome and tests.
-- Post-H8 live/provider hardening fixed real DeepSeek output normalization for multi-metric intent fields, null/object list fields, clarification-router no-clarification decisions, and evidence anchoring for business answers.
-- Clarification continuation now merges original question and user clarification answer without injecting the clarification prompt options into the resolved analysis question.
-- P14 final product state is 数据源管理, 分析工作台, 报告中心, 数据设置, and 业务问答 preview.
-- Business Q&A remains a preview route that reuses the existing workspace analysis API and product result objects; it is not a complete chat product and no backend chat endpoint was added.
-- Real SaaS integrations, auth/RBAC, deployment, vector databases, PDF/PPT export, scheduled reports, and full Business Q&A chat remain outside P14 scope.
-- Artifact hygiene and legacy path audit were run as H8 closeout checks; generated outputs must remain untracked and old Streamlit/eval/chart-agent product paths must remain absent.
-
-Latest P14-H7 result: passed on 2026-06-29.
-
-P14-H7 verification result summary:
-
-- Focused Business Q&A preview frontend tests passed: `frontend/tests/product-shell.test.tsx` and `frontend/tests/workspace-flow.test.tsx` with `33 passed`.
-- Full frontend test suite passed: `41 passed`.
-- Frontend production build passed and included `/workspaces/[workspaceId]/business-qa`.
-- Backend analysis/clarification regressions plus P14 Business Q&A endpoint boundary test passed: `8 passed`.
-- Business Q&A navigation now points to `/workspaces/{workspaceId}/business-qa` and marks `业务问答` active on the preview route.
-- Business Q&A preview page is clearly labeled `未来模式预览`, reuses the existing `runAnalysis` / `/api/workspaces/{workspace_id}/runs` concept for one-round preview answers, and does not add a backend chat endpoint.
-- The preview answer area reuses existing product result objects through `RunResult`; SQL, raw rows, and provider metadata remain inside collapsed `技术详情`.
-- Legacy path audit hits remained historical documentation or existing mock-boundary tests; no Streamlit, old eval UI, old `chart_agent`, `visualization_planner`, or `chart_tool` product path was restored.
-- Tracked generated-artifact audit produced no output for `.env`, `frontend/.next`, `frontend/node_modules`, workspace run/report directories, report chart/markdown outputs, trace JSON, or `sample_data/`.
-
-Latest P14-H6 result: passed on 2026-06-29.
-
-P14-H6 verification result summary:
-
-- Focused data-settings frontend tests passed: `frontend/tests/workspace-flow.test.tsx` with `29 passed`.
-- Data Settings now uses the shared P14 ProductShell route with active `数据设置` navigation and a Chinese `数据设置` page title.
-- Data Settings now presents `数据准备总览`, `数据源`, `字段画像`, `语义层`, `真实模型模式`, and `安全与审计` as business-facing ProductCard sections.
-- Empty data sources, missing field profile, missing semantic layer, provider features, SQL review, sensitive-field blocking, Trace, and technical-details policy now render with Chinese product copy.
-- Technical audit detail remains collapsed by default; provider metadata, raw config, SQL/raw-row policy detail, and trace-oriented configuration are only rendered after expanding `技术详情`.
-
-Latest P14-H5 result: passed on 2026-06-29.
-
-P14-H5 verification result summary:
-
-- Focused report-center frontend tests passed: `frontend/tests/workspace-flow.test.tsx` with `28 passed`.
-- Product shell plus workspace flow frontend regression passed: `29 passed`.
-- Full frontend test suite passed: `37 passed`.
-- Frontend production build passed and included `/workspaces/[workspaceId]/reports` plus `/workspaces/[workspaceId]/reports/[reportId]`.
-- Report backend regressions passed: `28 passed` across `tests/test_workspace_report_api.py`, `tests/test_workspace_report_runner.py`, and `tests/test_workspace_report_store.py`.
-- Report UI now uses the shared P14 ProductShell, Chinese report-center copy, Chinese empty/status/type labels, business-facing generation examples, visible Markdown download, and collapsed technical appendix for paths, trace, SQL, provider metadata, and raw JSON details.
-
-Latest P13-H9 result: passed on 2026-06-25.
-
-P13-H9 verification result summary:
-
-- Full backend suite passed: `279 passed, 12 skipped`.
-- Frontend tests passed: `33 passed`.
-- Frontend production build passed: Next.js compiled successfully and generated all workspace app routes, including analysis, reports, run detail, and settings.
-- Live DeepSeek P13 product acceptance passed: `3 passed`, covering readable business answer quality, chart artifact URL output, clarification continuation, resolved question, and deterministic product/live no-key fallback.
-- Live DeepSeek P11 workspace analysis regression passed: `1 passed`.
-- Live DeepSeek P12 workspace report regression passed: `1 passed`.
-- H9 live verification exposed a continuation routing regression where provider-backed clarification or SQL planning could ask for more context after a resolved question; fixed by routing continuation contexts into the guarded SQL path and added `tests/test_clarification_routing.py`.
-- Legacy path audit command completed. Hits were historical/audit documentation, mock boundary tests for `powerbi_publisher_mock`, and cleanup-boundary assertions that `chart_tool.py` remains absent; no active Streamlit, old eval, `chart_agent`, `visualization_planner`, or `chart_tool` product path was restored.
-- Artifact hygiene audit completed. The required broad tracked-file regex produced only false positives for `.env.example` and frontend route source paths containing `/reports/`; a stricter tracked generated-artifact check produced no output. `.env`, API keys, workspace runs/reports, report chart images, traces, `frontend/.next`, `.pytest_cache`, `__pycache__`, and untracked `sample_data/` are not tracked.
-
-Latest P13-H8 result: passed on 2026-06-24.
-
-P13-H8 verification result summary:
-
-- Real DeepSeek P13 product acceptance passed for a business analysis question with provider-backed understanding, SQL planning, guarded SQL candidate generation, insight drafting, visualization, readable business answer, evidence preview, chart artifact URL, and technical SQL details.
-- Real DeepSeek P13 clarification continuation passed: the first run stopped for clarification, persisted a pending run, accepted a short user clarification answer, generated a visible resolved question, and completed the guarded product flow.
-- Product/live mode fallback without an API key continued to support the deterministic SQL path.
-
-Latest P13-H7 result: passed on 2026-06-24.
-
-P13-H7 verification result summary:
-
-- Chart/backend focused tests passed: `25 passed`.
-- Frontend chart/workspace API tests passed: `33 passed`.
-- Frontend production build passed: Next.js compiled successfully and generated all app routes.
-- Suggested report/analysis regressions passed: `27 passed`.
-
-Latest P13-H6 result: passed on 2026-06-24.
-
-Required P12-H6 commands:
-
-```bash
-python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
-python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
-INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
-INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
-INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 \
-python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
-python3 -m pytest -q
-cd frontend && npm test
-cd frontend && npm run build
-```
-
-Final verification result summary:
-
-- P13-H6 backend settings API tests passed: `3 passed`.
-- P13-H6 frontend settings/client tests passed: `31 passed`.
-- P13-H6 frontend production build passed: Next.js compiled successfully and generated the `/workspaces/[workspaceId]/settings` route.
-- Suggested report/analysis regressions passed: `27 passed`.
-- Targeted P12 backend report tests passed: `28 passed`.
-- Non-live P12 DeepSeek acceptance command passed by opt-in skip when `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS` is unset: `1 skipped`.
-- Live DeepSeek P12 report acceptance passed with provider flags enabled: `1 passed`, with expected matplotlib CJK glyph warnings.
-- Full backend pytest suite passed: `246 passed, 10 skipped`, with matplotlib CJK glyph warnings.
-- Frontend unit tests passed: `19 passed`.
-- Frontend production build passed: Next.js compiled successfully and generated all app routes.
-
-Required audits completed:
-
-- Documentation audit: every remaining old-term hit must be in an explicit Historical, Superseded, legacy, or retained low-level fixture context.
-- Tracked artifact audit: no tracked old UI/API/eval files, generated frontend build output, generated report/chart artifacts, or generated trace JSON.
-- Artifact hygiene audit: `.env`, `.venv/`, `frontend/node_modules/`, `frontend/.next/`, `.pytest_cache/`, `__pycache__/`, `reports/charts/*`, `logs/traces/*`, `workspaces/*/reports/*`, `eval/report.md`, `data/action_ops.db`, and `.superpowers/*` are ignored or untracked. Only intentional `.gitkeep` placeholders remain tracked for empty artifact directories.
-- Legacy path audit command run: `rg -n "chart_agent|visualization_planner|chart_tool|old|legacy|TODO|deprecated|fixed template|deterministic action template|keyword inference"`. Hits were Historical/Superseded docs, cleanup-boundary tests, or false positives such as `old_price`, `threshold`, `stakeholder`, and `placeholder`; no active legacy chart/Streamlit/eval path was restored.
+- Real DeepSeek live acceptance passed for P15 analysis reliability, P12 workspace reports, and P13 product acceptance with product live/provider flags.
 
 ## Historical / Superseded Notes
 
-The following terms are intentionally retained only in historical notes or fixture notes:
+This section is historical cleanup context only, not current product guidance.
 
-- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, mock jira demos, `powerbi_publisher_mock`, fixed template behavior, deterministic action template behavior, and chart keyword inference are old demo/eval or cleanup-history terms, not current product instructions.
-- Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level tests directly use it for schema, SQL validation, SQL execution, workflow, report, MCP, and provider regression coverage. It is not the current product database and is not used by the workspace API as a default.
-
-## Update Rules
-
-After future verification:
-
-1. Keep P13 marked complete unless a new scoped P13 follow-up is explicitly opened.
-2. Record exact verification results in this file or in the final task response.
-
-## P14 Planning Snapshot
-
-Clickable UI reference: `docs/product/prototypes/p14-clickable-product-ui.html`.
-
-Implementation plan: `docs/product/plans/2026-06-29-p14-product-ui-shell-and-business-workflow.md`.
-
-P14 selected product direction:
-
-```text
-workspace
--> 数据源管理
--> 分析工作台
--> 报告中心
--> 数据设置
--> 业务问答 preview
-```
-
-Key P14 decisions:
-
-- P14 is a product UI and workflow hardening phase, not a backend-agent rewrite.
-- The tracked clickable HTML prototype is the visual reference for Next.js implementation.
-- Navigation should be a shared horizontal product shell, not per-page link strips.
-- The primary UI should be Chinese and business-facing.
-- Data source management should replace the old English `Datasets` page feel.
-- Business Q&A is a preview route for future compatibility, not a completed chat product.
-- Guarded SQL, evidence validation, report generation, artifact handling, trace boundaries, and live DeepSeek acceptance must remain intact.
-
-Suggested P14 task queue:
-
-| Task | Scope | Status |
-|---|---|---|
-| P14-H1 | Clickable product UI prototype and full implementation plan | `[x]` Complete |
-| P14-H2 | Shared Next.js product shell, design tokens, horizontal nav, and route wrappers | `[x]` Complete |
-| P14-H3 | Data source management redesign: `/datasets` becomes 数据源管理 | `[x]` Complete |
-| P14-H4 | Analysis Workbench redesign to match prototype while preserving clarification continuation | `[x]` Complete |
-| P14-H5 | Report Center redesign with collapsed technical appendix | `[x]` Complete |
-| P14-H6 | Data Settings redesign: data source, field profile, semantic layer, model mode, safety/audit | `[x]` Complete |
-| P14-H7 | Business Q&A preview route with no new backend chat endpoint | `[x]` Complete |
-| P14-H8 | Full regression, real DeepSeek live acceptance, docs closeout, artifact audit | `[x]` Complete |
-
-## P13 Planning Snapshot
-
-Design spec: `docs/superpowers/specs/2026-06-24-p13-business-answer-product-ux-design.md`.
-
-Implementation plan: `docs/superpowers/plans/2026-06-24-p13-business-answer-product-ux-implementation-plan.md`.
-
-P13 selected product direction:
-
-```text
-Analysis Workbench
--> compact integrated question thread
--> clarification continuation
--> resolved question
--> guarded SQL/evidence/chart execution
--> business answer
--> report generation
--> collapsed technical details
-```
-
-Future-compatible direction:
-
-```text
-Business Q&A Mode
--> chat-style surface that reuses the same question/evidence/answer/report/progress objects
-```
-
-Key P13 decisions:
-
-- Analysis Workbench is the implementation target.
-- Business Q&A Mode is designed for future compatibility but is not a full P13 implementation target.
-- Clarification is a normal product state, not an error.
-- Users should answer only the missing detail; they should not rewrite the full question.
-- The system must combine the original question, system understanding, clarification answer, and workspace context into a visible `resolved_question`.
-- Business answers must be recommendation-first, readable, evidence-backed, and not raw parameter dumps.
-- SQL, raw rows, trace, provider metadata, and validation logs stay available but collapsed under technical details.
-- Reports must read like business reports; internal prompts and provider metadata do not belong in the main report body.
-- Data Settings should cover data sources, profile, semantic layer, product/live model mode, and safety/audit boundaries.
-
-Suggested P13 task queue:
-
-| Task | Scope | Status |
-|---|---|---|
-| P13-H1 | Product output model: question thread, business answer, evidence, charts, report, technical details | `[x]` Complete |
-| P13-H2 | Clarification continuation: pending run, clarification answer, resolved question, continue analysis | `[x]` Complete |
-| P13-H3 | Business answer quality and product/live provider mode | `[x]` Complete |
-| P13-H4 | Analysis Workbench UI with compact integrated question thread | `[x]` Complete |
-| P13-H5 | Reports UI polish and collapsed technical appendix | `[x]` Complete |
-| P13-H6 | Data Settings UI | `[x]` Complete |
-| P13-H7 | Chart product quality and Chinese text support | `[x]` Complete |
-| P13-H8 | Real DeepSeek product acceptance for answer quality and clarification continuation | `[x]` Complete |
-| P13-H9 | Docs, artifact audit, regression, final verification | `[x]` Complete |
-
-## P12 Planning Snapshot
-
-Design spec: `docs/superpowers/specs/2026-06-23-p12-workspace-report-productization-design.md`.
-
-MVP decisions:
-
-- Page display plus Markdown download.
-- Synchronous generation first.
-- Async generation is deferred.
-- First report types: `business_review`, `channel_performance`, `revenue_trend`.
-- P11 single-question analysis remains separate at `/workspaces/{workspace_id}/analysis`.
-- P12 reports live at `/workspaces/{workspace_id}/reports`.
-
-Backend report APIs:
-
-```text
-POST /api/workspaces/{workspace_id}/reports
-GET  /api/workspaces/{workspace_id}/reports
-GET  /api/workspaces/{workspace_id}/reports/{report_id}
-GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
-```
-
-Completed task queue:
-
-| Task | Scope | Status |
-|---|---|---|
-| P12-H1 | Report domain model, storage layout, Markdown renderer; no provider calls yet | `[x]` Complete |
-| P12-H2 | Synchronous workspace report runner; report presets produce section purposes/questions, not SQL templates or keyword rule trees | `[x]` Complete |
-| P12-H3 | FastAPI report APIs | `[x]` Complete |
-| P12-H4 | Next.js reports UI and Markdown download | `[x]` Complete |
-| P12-H5 | Live DeepSeek workspace report acceptance | `[x]` Complete |
-| P12-H6 | Docs, artifact audit, final verification | `[x]` Complete |
-
-P12 MVP excludes PDF/PPT export, async queues, scheduled reports, email delivery, real SaaS integrations, auth/RBAC, deployment, hardcoded SQL templates, keyword-heavy report rule trees, silent semantic-layer overwrites, and any restoration of historical Streamlit/ecommerce/eval product paths.
-
-## P15 Planning Snapshot
-
-Implementation plan: `docs/product/plans/2026-06-29-p15-analysis-reliability-and-history.md`.
-
-P15 selected product direction:
-
-```text
-Analysis Workbench
--> ask a business question
--> persist each workspace run
--> show analysis history after navigation or refresh
--> restore previous question thread, answer, evidence, charts, and technical details
--> repair schema-mismatch SQL once when reviewer detects unknown tables or columns
--> show business-friendly failure when repair cannot safely complete
-```
-
-Key P15 decisions:
-
-- Workspace run files are the source of truth for analysis history.
-- `sessionStorage` must not be the product source of truth for run restoration.
-- Backend should expose run list/detail APIs instead of making the frontend infer history from local state.
-- Analysis history must include completed, failed, and waiting-for-clarification runs.
-- SQL schema repair is allowed exactly once and must still pass SQL Reviewer before execution.
-- Do not add fixed SQL templates, keyword-heavy rule trees, or ecommerce-specific fallback logic.
-- Main UI must explain failures in Chinese business language; raw reviewer details stay collapsed under technical details.
-- Real DeepSeek regression should cover the observed `给我一下最近30天几个渠道的数据` plus `都看` scenario.
-
-Suggested P15 task queue:
-
-| Task | Scope | Status |
-|---|---|---|
-| P15-H1 | Backend run history APIs: list workspace runs and load run detail from persisted run files | `[x]` Complete |
-| P15-H2 | Analysis Workbench history panel: previous questions, statuses, summaries, restore selected run | `[x]` Complete |
-| P15-H3 | Run detail source-of-truth cleanup: backend detail API over `sessionStorage` | `[x]` Complete |
-| P15-H4 | One-pass schema-mismatch SQL repair after SQL Reviewer unknown table/column failure | `[x]` Complete |
-| P15-H5 | Business-friendly failure UX for unrepaired SQL review failures | `[x]` Complete |
-| P15-H6 | Real DeepSeek regression for channel data + `都看`, plus history persistence | `[x]` Complete |
-
-P15 out of scope: full Business Q&A chat backend, real SaaS integrations, auth/RBAC, deployment, PDF/PPT export, scheduled reports, vector databases, fixed SQL templates, keyword-heavy business rules, and any restoration of old Streamlit/eval/chart-agent paths.
+- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old cleanup terms.
+- Historical retained fixture: `data/ecommerce.db` remains for low-level tests that directly exercise schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is not the current product database.
+- Historical P11/P12/P13 specs under `docs/superpowers/specs/` must be treated as snapshots. Current guidance is `docs/product/plans/`, the P16 `business_answer` contract, and P17 cleanup.

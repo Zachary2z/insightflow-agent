@@ -1,35 +1,38 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based, multi-agent data analysis product. The current product combines P11 ad hoc workspace analysis, P12 workspace reports, P13 business-facing product UX, the completed P14 product UI shell work, and completed P15 analysis reliability/history hardening:
+InsightFlow Agent is a workspace-based business data analysis product. The current product is a FastAPI backend plus a Next.js frontend that lets users import business data, ask natural-language analysis questions, generate workspace reports, and inspect guarded evidence, charts, artifacts, and technical traces.
+
+Current product chain:
 
 ```text
-workspace
--> data source import
--> profile
--> semantic-layer draft
--> P11 natural-language ad hoc analysis
--> P12 structured workspace reports
--> P13 Analysis Workbench, Data Settings, chart display, and product/live acceptance
--> P14 unified Chinese product shell, shared design tokens, and clickable UI reference
--> P15 persisted analysis history, run restoration, schema repair, and business-friendly failures
--> validated SQL, evidence, visualization, artifacts, and trace output
+workspace data import
+-> profile and semantic-layer draft
+-> business question or report goal
+-> question understanding and clarification
+-> SQL planning and guarded SQL candidate
+-> SQL review and one-pass schema repair
+-> SQL execution
+-> evidence validation
+-> P16 business_answer
+-> visualization artifacts and reports
+-> Next.js product UI
 ```
 
-Streamlit, the original ecommerce demo, the old eval runner, and mock Jira/Power BI demos are historical development context only. They are not current product entry points.
+The product is intentionally guarded: LLM/provider-backed steps may understand, plan, draft SQL candidates, draft business wording, and choose visualization delivery. Deterministic tools still own SQL approval, SQL execution, evidence checks, chart/tool policy checks, artifact writing, and trace persistence.
 
 ## Current Status
 
-P11 General Data Analysis Product is complete. P12 Report Productization is complete through H6 docs, artifact audit, and final verification. P13 Business Answer And Product UX is complete, including P13-H9 documentation, artifact audit, regression, live verification, and final closeout. P14 Product UI Shell And Business Workflow is complete through H1-H8, including the clickable prototype/planning, shared Next.js product shell, data source management redesign, Analysis Workbench redesign, Report Center redesign, Data Settings redesign, Business Q&A preview route, full regression, real DeepSeek live acceptance, docs closeout, and artifact audit. P15 Analysis Reliability And History is complete through H1-H6, including analysis history APIs, backend-backed run detail, one-pass schema-mismatch SQL repair, business-friendly failure UX, full product-result persistence, and a real DeepSeek `都看` clarification continuation regression.
-
-| Product area | Status | Entry |
+| Product area | Status | Current entry |
 |---|---|---|
-| P11 ad hoc workspace analysis | Complete | `/workspaces/{workspaceId}/analysis` |
-| P12 workspace reports | Complete | `/workspaces/{workspaceId}/reports` |
-| P13 Analysis Workbench, Data Settings, and chart display | Complete; H1-H9 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/settings` |
-| P14 unified product UI shell | Complete; H1-H8 closed | `docs/product/prototypes/p14-clickable-product-ui.html` |
-| P15 analysis reliability and history | Complete; H1-H6 closed | `/workspaces/{workspaceId}/analysis`, `/workspaces/{workspaceId}/runs/{runId}` |
+| FastAPI product backend | Active | `uvicorn api.app:app --reload` |
+| Next.js product frontend | Active | `frontend/`, `npm run dev` |
+| Workspace import/profile/semantic layer | Complete | `/api/workspaces`, `/sources`, `/profile`, `/semantic-layer/draft` |
+| P11 ad hoc workspace analysis | Complete | `POST /api/workspaces/{workspace_id}/runs` |
+| P12 workspace reports | Complete | `POST /api/workspaces/{workspace_id}/reports` |
+| P16 clean business output model | Complete | `business_answer` with `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
+| P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
 
-P15-H6 Real DeepSeek product regression and P15 closeout are complete. The live regression covers the observed `给我一下最近30天几个渠道的数据` plus `都看` continuation path and verifies persisted run history/detail restoration.
+P17-H1 through P17-H6 are complete. The cleanup boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance. P18 is the next direction for real external business tool calling.
 
 ## Quickstart
 
@@ -55,89 +58,41 @@ npm install
 npm run dev
 ```
 
-Open the frontend at `http://localhost:3000`, create a workspace, import CSV/Excel/SQLite data, generate a profile, generate a semantic-layer draft, then use:
+Open `http://localhost:3000`, create a workspace, import CSV/Excel/SQLite data, generate a profile, generate a semantic-layer draft, then use:
 
-- P11 analysis: `/workspaces/{workspaceId}/analysis`
-- P12 reports: `/workspaces/{workspaceId}/reports`
-- P14 data settings: `/workspaces/{workspaceId}/settings`
-- P14 Business Q&A preview: `/workspaces/{workspaceId}/business-qa`
-- Previous analysis runs are restored from backend history at `/workspaces/{workspaceId}/runs/{runId}`.
-
-## P14 Product State
-
-P14 closes the current product UI phase with these product surfaces:
-
-- 数据源管理: CSV/Excel upload, SQLite import, source list, and data-readiness copy.
-- 分析工作台: business question input, clarification continuation, business answer, evidence, chart artifacts, and collapsed technical details.
-- 报告中心: report generation, report list, business report reader, Markdown download, and collapsed technical appendix.
-- 数据设置: data sources, field profile, semantic layer, product/live model mode, and safety/audit status.
-- 业务问答预览: a clearly labeled future-mode preview that reuses the existing workspace analysis API and product result objects.
-- Entry and support pages: home, workspace list/create, field profile, semantic-layer draft, and run detail now use the same Chinese product chrome instead of separate English demo-style pages.
-
-Business Q&A remains a preview, not a complete multi-turn chat product. P14 does not add a backend chat endpoint.
-
-Real SaaS integrations, auth/RBAC, deployment, scheduled reports, PDF/PPT export, vector databases, and full Business Q&A chat remain outside the P14 scope.
-
-P14-H1, P14-H2, P14-H3, P14-H4, P14-H5, P14-H6, P14-H7, and P14-H8 are complete.
-
-## P15 Reliability And History
-
-P15 closes the analysis reliability phase:
-
-- Analysis Workbench history lists persisted completed, failed, and waiting-for-clarification runs.
-- Run detail pages load from the backend source of truth rather than browser `sessionStorage`.
-- Workspace analysis persists the full product result so history detail can restore question thread, business answer, evidence rows, charts, SQL technical detail, provider metadata, and validation logs.
-- Schema-mismatch SQL review failures get one schema-aware repair attempt before any execution.
-- If repair cannot safely complete, users see Chinese business-friendly failure copy while raw reviewer details remain in collapsed technical details.
-- Real DeepSeek regression covers `给我一下最近30天几个渠道的数据`; when the model asks for metrics, the user can answer only `都看` and the system continues with the original context.
-
-## P13 Product Capabilities
-
-P13 adds business-facing product surfaces on top of the guarded P11/P12 runtime:
-
-- Analysis Workbench with workspace readiness, compact business-question input, integrated analysis thread, business answer, evidence, chart artifacts, and collapsed technical details.
-- Clarification continuation: when the workflow asks for missing context, the user can answer only that detail; the system persists the pending run, creates a visible resolved question, and continues through the normal guarded analysis path.
-- Business answer quality: product-facing answers are recommendation-first, evidence-backed, and guarded against raw `field=value` or key-value row dumps.
-- Business reports: report reader, progress/status summary, Markdown download, and collapsed technical appendix for SQL, provider metadata, trace, and raw rows.
-- Data Settings: data sources, profile, semantic layer, product/live model mode, and safety/audit boundaries.
-- Chart image display: workspace artifact URLs serve rendered chart images into the frontend, with product metadata such as title, units, value labels, and business annotation.
-- Real DeepSeek product acceptance: opt-in live tests cover P13 answer quality, chart artifacts, and clarification continuation, while P11/P12 live tests remain available for regression.
-
-Business Q&A Mode remains future-compatible only. P13 keeps the question/evidence/answer/report/technical-detail objects ready for a future chat surface, but it does not ship a full Business Q&A chat product.
+- `/workspaces/{workspaceId}/analysis` for ad hoc business analysis.
+- `/workspaces/{workspaceId}/reports` for structured workspace reports.
+- `/workspaces/{workspaceId}/settings` for data readiness, profile, semantic layer, model mode, and safety/audit status.
+- `/workspaces/{workspaceId}/runs/{runId}` to restore a persisted analysis result.
 
 ## Current Product APIs
 
-Workspace APIs:
+Workspace and data preparation:
 
 ```text
 POST /api/workspaces
 GET  /api/workspaces
 GET  /api/workspaces/{workspace_id}
 GET  /api/workspaces/{workspace_id}/settings
-```
-
-Data source APIs:
-
-```text
 POST /api/workspaces/{workspace_id}/sources/upload
 POST /api/workspaces/{workspace_id}/sources/sqlite
 GET  /api/workspaces/{workspace_id}/sources
-```
-
-Analysis preparation APIs:
-
-```text
 POST /api/workspaces/{workspace_id}/profile
 POST /api/workspaces/{workspace_id}/semantic-layer/draft
 ```
 
-P11 ad hoc analysis API:
+Analysis and artifacts:
 
 ```text
 POST /api/workspaces/{workspace_id}/runs
+GET  /api/workspaces/{workspace_id}/runs
+GET  /api/workspaces/{workspace_id}/runs/{run_id}
+GET  /api/workspaces/{workspace_id}/artifacts/{relative_path}
 ```
 
-P12 report APIs:
+`POST /api/workspaces/{workspace_id}/runs` accepts either a new `user_question` or a continuation request with `pending_run_id` and `clarification_answer`.
+
+Reports:
 
 ```text
 POST /api/workspaces/{workspace_id}/reports
@@ -146,101 +101,60 @@ GET  /api/workspaces/{workspace_id}/reports/{report_id}
 GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
 ```
 
-P13 artifact display and continuation support:
+Supported report types are `business_review`, `channel_performance`, and `revenue_trend`.
 
-```text
-POST /api/workspaces/{workspace_id}/runs
-GET  /api/workspaces/{workspace_id}/artifacts/{relative_path}
+## Business Answer Contract
+
+Analysis results and report sections use the P16 contract:
+
+```json
+{
+  "headline": "",
+  "direct_answer": "",
+  "why": "",
+  "evidence_bullets": [],
+  "recommendations": [],
+  "caveats": [],
+  "confidence": "medium"
+}
 ```
 
-`POST /api/workspaces/{workspace_id}/runs` accepts either a new `user_question` request or a continuation request with `pending_run_id` and `clarification_answer`.
+Product-facing fields must stay business-readable, evidence-backed, and free of raw SQL, trace IDs, provider metadata, raw row dumps, or internal prompt text. Technical details remain available in collapsed UI sections and trace artifacts.
 
-The workspace run API calls `workspaces.analysis_runner.run_workspace_analysis()`, which runs `graph.workflow.run_workflow()` against the workspace `analysis.db`. The old non-workspace `/api/runs` route is intentionally removed.
+## Current Architecture
 
-## P12 Report Capabilities
-
-Supported report types:
-
-- `business_review`
-- `channel_performance`
-- `revenue_trend`
-
-The report MVP supports synchronous generation, page display in the Next.js UI, and Markdown download from the report detail page. Report sections reuse the P11-safe analysis path: provider-backed understanding/planning may participate, while SQL validation, SQL review, execution, evidence validation, visualization policy, artifact handling, and trace persistence remain guarded.
-
-Each generated report is stored under the workspace report directory:
-
-```text
-workspaces/{workspace_id}/reports/{report_id}/
-  report.json
-  report.md
-  trace.json
-  artifacts/
-```
-
-`report.json` is the canonical machine-readable record. `report.md` is the downloadable user artifact. `trace.json` records report-level and section-level events. `artifacts/` contains report-facing chart/artifact files copied under the report directory.
-
-## Live DeepSeek Acceptance
-
-Live provider tests are explicit opt-in. To verify the P13 product path with a real DeepSeek-backed provider chain:
-
-```bash
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-python3 -m pytest tests/test_p13_live_deepseek_product_acceptance.py -q
-```
-
-The P13 acceptance test creates a workspace, imports generated business CSV data, profiles it, drafts semantic context, verifies a readable business answer with chart artifacts, then verifies clarification continuation from pending run to resolved question to completed analysis.
-
-To verify the P12 report path:
-
-```bash
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
-```
-
-The acceptance test creates a workspace, imports generated business CSV data, profiles it, drafts semantic context, generates a `business_review` report, requires live provider participation for understanding, SQL planning, guarded SQL candidate generation, and visualization, then verifies reviewed SQL execution, report-local Markdown, report-local chart artifacts, and trace output.
-
-The P11 ad hoc analysis live acceptance remains available:
-
-```bash
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py -q
-```
-
-The P15 reliability live regression is:
-
-```bash
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
-INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 \
-INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
-INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1 \
-python3 -m pytest tests/test_p15_live_deepseek_analysis_reliability.py -q
-```
+| Layer | Current owner |
+|---|---|
+| Product API | `api/app.py` |
+| Frontend | `frontend/app`, `frontend/components`, `frontend/lib/api.ts` |
+| Workspace store/import/profile/semantic draft | `workspaces/` |
+| Analysis runner | `workspaces.analysis_runner`, `graph/workflow.py`, `graph/nodes.py` |
+| Report runner/storage/Markdown | `workspaces.report_runner`, `workspaces.report_store`, `workspaces.report_markdown` |
+| Provider prompts and structured output | `llm_ops/` |
+| Question understanding and clarification | `question_understanding/`, `agents/question_understanding.py`, `agents/clarification_router.py` |
+| SQL planning and guarded candidates | `sql_planning/`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py` |
+| SQL safety and execution | `tools/sql_validator.py`, `tools/sql_executor.py`, `agents/sql_reviewer.py`, `agents/schema_repair.py` |
+| Evidence safety | `tools/evidence_tool.py`, `agents/evidence_validator.py` |
+| Visualization | `agents/visualization_agent.py`, `visualization/`, `visualization_delivery/`, `tools/external_visualization_tool.py` |
+| Trace and artifacts | `tools/trace_logger.py`, workspace run directories, workspace report directories |
+| MCP wrappers | `mcp_servers/database_server.py`, `mcp_servers/report_server.py` |
 
 ## Verification
 
-Backend:
+Focused cleanup boundary:
 
 ```bash
-python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
-set -a; [ -f .env ] && source .env; set +a; \
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 \
-INSIGHTFLOW_PRODUCT_LIVE_MODE=1 \
-python3 -m pytest tests/test_p11_live_deepseek_workspace_analysis.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p13_live_deepseek_product_acceptance.py -q
-python3 -m pytest tests/test_p13_live_deepseek_product_acceptance.py -q
-python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q
-python3 -m pytest -q
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q
 ```
 
-Frontend:
+Current backend regression:
+
+```bash
+python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
+python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+```
+
+Frontend regression:
 
 ```bash
 cd frontend
@@ -248,9 +162,11 @@ npm test
 npm run build
 ```
 
+Live provider acceptance is explicit opt-in and requires local environment configuration. Keep real DeepSeek live tests; they cover workspace analysis, workspace reports, product answer quality, clarification continuation, and history reliability.
+
 ## Generated Artifacts
 
-Generated runtime outputs must not be committed. Keep these paths untracked:
+Generated runtime outputs must not be committed:
 
 - `.env`
 - `.venv/`
@@ -258,42 +174,20 @@ Generated runtime outputs must not be committed. Keep these paths untracked:
 - `frontend/.next/`
 - `.pytest_cache/`
 - `__pycache__/`
+- `sample_data/`
 - `reports/charts/*`
 - `logs/traces/*`
+- `workspaces/*/runs/*`
 - `workspaces/*/reports/*`
-- `eval/report.md`
-- `data/action_ops.db`
-- `.superpowers/*`
 
 Tracked `.gitkeep` files may remain only to preserve empty artifact directories.
 
-## Current Architecture
-
-Current product layers:
-
-| Layer | Current owner |
-|---|---|
-| Frontend | `frontend/app` and `frontend/components` |
-| Product API | `api/app.py` |
-| Workspace store/import/profile/semantic draft | `workspaces/` |
-| P11 runtime workflow | `graph/workflow.py`, `workspaces.analysis_runner` |
-| P12 report runner/storage/Markdown | `workspaces.report_runner`, `workspaces.report_store`, `workspaces.report_markdown` |
-| Provider and structured output | `llm_ops/` |
-| Question understanding and clarification | `question_understanding/`, `agents/question_understanding.py`, `agents/clarification_router.py` |
-| SQL planning and guarded candidates | `sql_planning/`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py` |
-| SQL safety and execution | `tools/sql_validator.py`, `tools/sql_executor.py`, `agents/sql_reviewer.py` |
-| Evidence safety | `tools/evidence_tool.py`, `agents/evidence_validator.py` |
-| Visualization | `agents/visualization_agent.py`, `visualization/`, `visualization_delivery/`, `tools/external_visualization_tool.py` |
-| Trace and artifacts | `tools/trace_logger.py`, workspace run directories, workspace report directories |
-
-The LLM may understand, plan, draft SQL candidates, draft wording, and choose visualization delivery. Deterministic validators and tools still own SQL approval, SQL execution, evidence checks, chart/tool policy checks, approval gates, audit, and trace persistence.
-
 ## Historical / Superseded Context
 
-P0-P10 are retained as historical engineering context and low-level safety coverage. They should not be treated as current product entry points.
+This section is historical cleanup context only, not current product guidance.
 
-- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, mock jira demos, `powerbi_publisher_mock`, fixed template behavior, deterministic action template behavior, and chart keyword inference are old demo/eval or cleanup-history terms, not current P11/P12/P13/P14 product guidance.
-- Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level schema, SQL validator, SQL executor, workflow, report, MCP, and provider regression tests still use it directly. It is not the default product database, not the API default, and not the current quickstart data source.
-- Historical generated-output locations such as eval reports, trace JSON, chart PNG/XLSX files, action DBs, frontend build output, and dependency directories must not be committed.
+- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old demo/eval/action/mock/chart cleanup terms.
+- Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level schema, SQL validator, SQL executor, workflow, report, MCP, and provider regressions still use it directly. It is not the default product database and is not the quickstart data source.
+- Current implementation guidance lives in `docs/product/plans/`, especially the P16 clean business output model and P17 product codebase cleanup plans.
 
-For the detailed phase tracker, see [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) and [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).
+For the concise roadmap, see [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). For the current task/status surface, see [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).

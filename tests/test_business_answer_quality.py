@@ -1,6 +1,34 @@
 from llm_ops.provider import MockLLMProvider
 
 
+NEW_BUSINESS_ANSWER_KEYS = {
+    "headline",
+    "direct_answer",
+    "why",
+    "evidence_bullets",
+    "recommendations",
+    "caveats",
+    "confidence",
+}
+
+
+def _assert_new_business_answer_shape(answer):
+    assert set(answer) == NEW_BUSINESS_ANSWER_KEYS
+
+
+def _business_answer_text(answer):
+    return " ".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
+
+
 def test_business_answer_rejects_raw_key_value_dump():
     from workspaces.product_result_builder import build_business_answer
 
@@ -12,10 +40,12 @@ def test_business_answer_rejects_raw_key_value_dump():
         }
     )
 
+    _assert_new_business_answer_shape(answer)
     assert answer["headline"] != "channel=paid_search, revenue=200.0, order_count=10"
-    assert answer["quality_flags"] == ["raw_parameter_dump_detected"]
-    assert "channel=" not in answer["summary"]
-    assert "revenue=" not in answer["summary"]
+    assert "channel=" not in _business_answer_text(answer)
+    assert "revenue=" not in _business_answer_text(answer)
+    assert answer["confidence"] == "low"
+    assert answer["caveats"]
 
 
 def test_business_answer_keeps_raw_rows_out_of_product_fields():
@@ -37,15 +67,11 @@ def test_business_answer_keeps_raw_rows_out_of_product_fields():
         workspace_id="ws_quality",
     )
 
-    business_text = " ".join(
-        [
-            product["business_answer"]["headline"],
-            product["business_answer"]["summary"],
-            *product["business_answer"]["recommendations"],
-            *product["business_answer"]["next_actions"],
-        ]
-    )
+    _assert_new_business_answer_shape(product["business_answer"])
+    business_text = _business_answer_text(product["business_answer"])
     assert "channel=" not in business_text
+    assert "revenue=" not in business_text
+    assert "order_count=" not in business_text
     assert "SELECT" not in business_text
     assert "provider_metadata" not in product["business_answer"]
     assert product["technical_details"]["raw_rows"] == [["paid_search", 200.0, 10]]
@@ -69,22 +95,106 @@ def test_provider_insight_output_becomes_recommendation_first_business_answer():
     provider = MockLLMProvider(
         {
             "candidate_claims": ["paid_search revenue is 200.0"],
-            "draft_summary": "建议优先加码 paid_search，因为它贡献了最高收入 200.0。",
+            "business_answer": {
+                "headline": "建议优先加码 paid_search",
+                "direct_answer": "建议优先加码 paid_search，因为它贡献了最高收入 200.0。",
+                "why": "证据显示 paid_search 贡献收入 200.0。",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": ["优先复盘 paid_search 的投放效率。"],
+                "caveats": [],
+                "confidence": "high",
+            },
         }
     )
 
     result = run_insight_agent(state, provider=provider)
 
     assert result["insight"]["source"] == "provider"
+    _assert_new_business_answer_shape(result["business_answer"])
     assert result["business_answer"]["headline"].startswith("建议")
-    assert result["business_answer"]["summary"].startswith("建议")
+    assert result["business_answer"]["direct_answer"].startswith("建议")
     assert result["business_answer"]["confidence"]
-    assert result["business_answer"]["quality_flags"] == []
     assert "channel=" not in result["final_answer"]
-    assert "channel=" not in result["business_answer"]["summary"]
+    assert result["final_answer"] == result["business_answer"]["direct_answer"]
+    assert "channel=" not in _business_answer_text(result["business_answer"])
 
 
-def test_business_answer_extracts_recommendation_from_plain_english_guidance():
+def test_chinese_question_rejects_english_provider_business_summary():
+    from agents.insight_agent import run_insight_agent
+
+    state = {
+        "run_id": "run_provider_language",
+        "session_id": "session_provider_language",
+        "user_question": "最近90天哪个渠道收入最高？为什么？",
+        "execution_result": {
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["email", 44548.53]],
+            "row_count": 1,
+        },
+        "trace": [],
+    }
+    provider = MockLLMProvider(
+        {
+            "candidate_claims": ["email total revenue is 44548.53"],
+            "business_answer": {
+                "headline": "Email is the top revenue channel",
+                "direct_answer": (
+                    "Based on the data, email is the top revenue channel for the last 90 days, "
+                    "bringing in $44,548.53."
+                ),
+                "why": "The first evidence row shows email at 44548.53 total revenue.",
+                "evidence_bullets": ["email total revenue is 44548.53."],
+                "recommendations": ["Review the email channel plan."],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        }
+    )
+
+    result = run_insight_agent(state, provider=provider)
+
+    assert result["insight"]["fallback_used"] is True
+    assert result["insight"]["validation_error"]
+    assert "输出语言" in result["insight"]["validation_error"]
+    _assert_new_business_answer_shape(result["business_answer"])
+    assert "已完成问题" in result["business_answer"]["direct_answer"]
+    assert "Based on the data" not in _business_answer_text(result["business_answer"])
+
+
+def test_chinese_question_localizes_english_system_understanding():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_language_thread",
+            "status": "completed",
+            "user_question": "最近90天哪个渠道收入最高？为什么？",
+            "question_understanding": {
+                "strategy": "llm_candidate",
+                "intent": {
+                    "metric": "revenue",
+                    "dimension": "channel",
+                    "time_range": {"type": "last_n_days", "value": 90},
+                },
+                "reason": (
+                    "User explicitly asks for the channel with highest revenue in the last 90 days."
+                ),
+            },
+            "final_answer": "email 渠道收入最高。",
+        },
+        workspace_id="ws_language",
+    )
+
+    understanding = product["question_thread"]["system_understanding"]
+    assert understanding.startswith("系统已识别")
+    assert "收入" in understanding
+    assert "渠道" in understanding
+    assert "最近 90 天" in understanding
+    assert "User explicitly" not in understanding
+
+
+def test_business_answer_without_evidence_does_not_extract_plain_guidance_as_recommendation():
     from workspaces.product_result_builder import build_business_answer
 
     answer = build_business_answer(
@@ -97,21 +207,204 @@ def test_business_answer_extracts_recommendation_from_plain_english_guidance():
         }
     )
 
-    assert answer["recommendations"]
-    assert "increase email budget" in answer["recommendations"][0]
+    _assert_new_business_answer_shape(answer)
+    assert answer["recommendations"] == []
+    assert answer["confidence"] == "low"
+    assert answer["caveats"]
 
 
-def test_insight_drafter_validation_rejects_raw_parameter_dump():
+def test_insight_drafter_validation_rejects_draft_summary_only_output():
     from llm_ops.structured_output import validate_prompt_output
 
     result = validate_prompt_output(
         "insight_drafter",
         {
             "candidate_claims": ["paid_search revenue is 200.0"],
-            "draft_summary": "channel=paid_search, revenue=200.0, order_count=10",
+            "draft_summary": "建议优先加码 paid_search，因为它贡献了最高收入 200.0。",
         },
     )
 
     assert result["success"] is False
     assert result["error_type"] == "llm_schema_validation_error"
+    assert "business_answer" in result["error"]
+
+
+def test_insight_drafter_validation_rejects_extra_old_draft_summary_field():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["paid_search revenue is 200.0"],
+            "draft_summary": "建议优先加码 paid_search。",
+            "business_answer": {
+                "headline": "建议优先加码 paid_search",
+                "direct_answer": "建议优先加码 paid_search，因为它贡献了最高收入 200.0。",
+                "why": "证据显示 paid_search 收入为 200.0。",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": ["复盘 paid_search 的投放效率。"],
+                "caveats": [],
+                "confidence": "high",
+            },
+        },
+        schema_context={"user_question": "哪个渠道该加预算？"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "draft_summary" in result["error"]
+
+
+def test_insight_drafter_validation_rejects_english_business_answer_for_chinese_question():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["email total revenue is 44548.53"],
+            "business_answer": {
+                "headline": "Email is the top revenue channel",
+                "direct_answer": "Email is the top revenue channel in the last 90 days.",
+                "why": "The evidence row shows email revenue is 44548.53.",
+                "evidence_bullets": ["email total revenue is 44548.53."],
+                "recommendations": ["Increase email budget."],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "最近90天哪个渠道收入最高？"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "中文问题" in result["error"]
+
+
+def test_insight_drafter_validation_rejects_partially_english_business_fields_for_chinese_question():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["email total revenue is 44548.53"],
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "Email is the top revenue channel in the last 90 days.",
+                "why": "The evidence row shows email revenue is 44548.53.",
+                "evidence_bullets": ["email 渠道收入为 44548.53。"],
+                "recommendations": ["Increase email budget."],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "最近90天哪个渠道收入最高？"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "business_answer.direct_answer" in result["error"]
+    assert "中文" in result["error"]
+
+
+def test_insight_drafter_validation_allows_english_business_terms_inside_chinese_sentences():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["email ROI 为 0.38"],
+            "business_answer": {
+                "headline": "email 渠道的 ROI 最高",
+                "direct_answer": "建议优先复盘 email 渠道，因为它的 ROI 为 0.38。",
+                "why": "证据显示 email 在当前结果中 ROI 领先，且 paid_search 可作为对比渠道。",
+                "evidence_bullets": ["email 的 ROI 为 0.38。", "paid_search 的 ROI 低于 email。"],
+                "recommendations": ["继续观察 email 的预算效率，并对比 paid_search 的转化质量。"],
+                "caveats": ["当前结论只覆盖本次 execution_result 返回的数据。"],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "最近90天哪个渠道 ROI 最高？"},
+    )
+
+    assert result["success"] is True
+    assert result["content"]["business_answer"]["headline"] == "email 渠道的 ROI 最高"
+
+
+def test_insight_drafter_validation_rejects_sql_trace_and_provider_metadata_in_business_fields():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["paid_search revenue is 200.0"],
+            "business_answer": {
+                "headline": "建议优先加码 paid_search",
+                "direct_answer": "建议优先加码 paid_search。trace_id=abc123 provider_metadata={model: deepseek}",
+                "why": "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "哪个渠道该加预算？"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "technical" in result["error"] or "技术" in result["error"]
+
+
+def test_insight_drafter_validation_rejects_raw_parameter_dump_in_business_answer():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["paid_search revenue is 200.0"],
+            "business_answer": {
+                "headline": "建议优先加码 paid_search",
+                "direct_answer": "channel=paid_search, revenue=200.0, order_count=10",
+                "why": "证据显示 paid_search 收入最高。",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "哪个渠道该加预算？"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
     assert "raw parameter" in result["error"]
+
+
+def test_product_result_builder_rejects_mixed_language_provider_business_answer_for_chinese_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？",
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "Email is the top revenue channel in the last 90 days.",
+                "why": "The evidence row shows email revenue is 44548.53.",
+                "evidence_bullets": ["email 渠道收入为 44548.53。"],
+                "recommendations": ["Increase email budget."],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+            },
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    assert "Email is the top revenue channel" not in _business_answer_text(answer)
+    assert "The evidence row shows" not in _business_answer_text(answer)
+    assert "Increase email budget" not in _business_answer_text(answer)
+    assert answer["direct_answer"].startswith("已完成本轮查询")

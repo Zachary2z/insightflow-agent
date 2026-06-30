@@ -40,6 +40,7 @@ function sectionDetails(section: WorkspaceReportSection) {
     trace_nodes: section.technical_details?.trace_nodes ?? section.trace_nodes,
     trace_path: section.technical_details?.trace_path,
     workspace_run_dir: section.technical_details?.workspace_run_dir,
+    raw_final_answer: section.technical_details?.raw_final_answer,
     error: section.technical_details?.error ?? section.error,
   };
 }
@@ -58,6 +59,7 @@ function SectionTechnicalDetails({ section }: { section: WorkspaceReportSection 
       <JsonBlock title="Trace nodes" value={details.trace_nodes} />
       <JsonBlock title="Trace path" value={details.trace_path} />
       <JsonBlock title="Workspace run directory" value={details.workspace_run_dir} />
+      <JsonBlock title="Raw final answer" value={details.raw_final_answer} />
       <JsonBlock title="Error" value={details.error} />
     </article>
   );

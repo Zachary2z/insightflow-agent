@@ -1,7 +1,6 @@
 def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
     from llm_ops.runtime_provider import (
         product_live_mode_enabled,
-        provider_action_drafter_enabled,
         provider_claim_typing_enabled,
         provider_clarification_router_enabled,
         provider_insight_drafting_enabled,
@@ -23,7 +22,6 @@ def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
     assert provider_claim_typing_enabled(env) is True
     assert provider_visualization_agent_enabled(env) is True
     assert provider_report_writer_enabled(env) is True
-    assert provider_action_drafter_enabled(env) is False
 
 
 def test_product_live_mode_preserves_explicit_provider_flags():

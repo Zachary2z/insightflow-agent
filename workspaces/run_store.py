@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from workspaces.product_result_builder import build_product_analysis_result
+from workspaces.product_result_builder import build_product_analysis_result, business_answer_is_usable
 from workspaces.store import WorkspaceStore
 
 
@@ -117,7 +117,7 @@ class WorkspaceRunStore:
             existing = raw["product_result"]
         elif isinstance(result.get("product_result"), dict):
             existing = result["product_result"]
-        if existing is not None and not _needs_product_result_rebuild(result, existing):
+        if existing is not None and _is_current_product_result(existing, result):
             return existing
         return build_product_analysis_result(result, workspace_id=workspace_id, workspace_root=workspace_root)
 
@@ -198,9 +198,9 @@ def _failure_texts(result: dict[str, Any], product_result: dict[str, Any]) -> li
     raw_answer = result.get("business_answer") if isinstance(result.get("business_answer"), dict) else {}
     texts.extend(
         [
-            product_answer.get("summary"),
+            product_answer.get("direct_answer"),
             product_answer.get("headline"),
-            raw_answer.get("summary"),
+            raw_answer.get("direct_answer"),
             raw_answer.get("headline"),
         ]
     )
@@ -212,7 +212,7 @@ def _failure_texts(result: dict[str, Any], product_result: dict[str, Any]) -> li
         ]
     )
     review = result.get("review_result") if isinstance(result.get("review_result"), dict) else {}
-    for key in ("reasons", "errors", "validation_errors"):
+    for key in ("reasons", "errors", "validation_errors", "issues"):
         value = review.get(key)
         if isinstance(value, list):
             texts.extend(value)
@@ -230,11 +230,31 @@ def _has_schema_mismatch(texts: list[str]) -> bool:
     return any(marker in combined for marker in _SCHEMA_MISMATCH_MARKERS)
 
 
-def _needs_product_result_rebuild(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
-    status = str(result.get("status") or product_result.get("status") or "")
-    if status != "failed":
+def _is_current_product_result(product_result: dict[str, Any], result: dict[str, Any]) -> bool:
+    if product_result.get("version") != "p16.v1":
         return False
-    return _has_schema_mismatch(_failure_texts(result, product_result))
+    answer = product_result.get("business_answer")
+    if not isinstance(answer, dict):
+        return False
+    return business_answer_is_usable(
+        answer,
+        _question(result, product_result),
+        _execution_context(result, product_result),
+        result.get("evidence_result") if isinstance(result.get("evidence_result"), dict) else None,
+    )
+
+
+def _execution_context(result: dict[str, Any], product_result: dict[str, Any]) -> dict[str, Any] | None:
+    execution_result = result.get("execution_result")
+    if isinstance(execution_result, dict):
+        return execution_result
+    evidence = product_result.get("evidence") if isinstance(product_result.get("evidence"), dict) else {}
+    preview = evidence.get("table_preview") if isinstance(evidence.get("table_preview"), dict) else {}
+    rows = preview.get("rows")
+    columns = preview.get("columns")
+    if isinstance(rows, list) and isinstance(columns, list):
+        return {"success": True, "columns": columns, "rows": rows}
+    return None
 
 
 def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:

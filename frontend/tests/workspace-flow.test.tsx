@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
 import BusinessQAPreview from "../components/BusinessQAPreview";
+import BusinessAnswerCard from "../components/BusinessAnswerCard";
 import ChartArtifactGallery from "../components/ChartArtifactGallery";
 import DataSettings from "../components/DataSettings";
 import DatasetManager from "../components/DatasetManager";
@@ -10,6 +11,7 @@ import ProfileSummary from "../components/ProfileSummary";
 import ProfileWorkspace from "../components/ProfileWorkspace";
 import ReportGenerator from "../components/ReportGenerator";
 import ReportList from "../components/ReportList";
+import ReportSection from "../components/ReportSection";
 import ReportViewer from "../components/ReportViewer";
 import RunResult from "../components/RunResult";
 import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
@@ -427,7 +429,7 @@ describe("workspace product components", () => {
           run_id: "run_done",
           status: "completed",
           question: "哪个渠道收入最高？",
-          headline: "Email produced the most revenue.",
+          headline: "email 渠道收入最高。",
           saved_at: "2026-06-29T12:00:00Z",
           has_chart: true,
           requires_clarification: false,
@@ -461,7 +463,8 @@ describe("workspace product components", () => {
     await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledWith("ws_1"));
     expect(await screen.findByText("历史分析")).toBeTruthy();
     expect(screen.getByText("哪个渠道收入最高？")).toBeTruthy();
-    expect(screen.getByText(/Email produced the most revenue/)).toBeTruthy();
+    expect(screen.getByText(/email 渠道收入最高/)).toBeTruthy();
+    expect(screen.queryByText(/Email produced the most revenue/)).toBeNull();
     expect(screen.getByText("分析不存在字段")).toBeTruthy();
     expect(screen.getByText(/系统尝试使用当前工作区中不存在的表或字段/)).toBeTruthy();
     expect(screen.getByText("帮我看看销售情况")).toBeTruthy();
@@ -494,12 +497,16 @@ describe("workspace product components", () => {
       run_id: "run_history",
       result: {
         product_result: {
-          version: "p13.v1",
+          version: "p16.v1",
           status: "completed",
           question_thread: { original_question: "恢复历史问题", status: "completed" },
           business_answer: {
             headline: "历史业务结论",
-            summary: "这是从后端历史详情恢复的完整结果。",
+            direct_answer: "这是从后端历史详情恢复的完整结果。",
+            why: "来自后端保存的 run detail。",
+            evidence_bullets: [],
+            recommendations: [],
+            caveats: [],
             confidence: "medium",
           },
           evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
@@ -556,7 +563,7 @@ describe("workspace product components", () => {
       run_id: "run_1",
       result: {
         product_result: {
-          version: "p13.v1",
+          version: "p16.v1",
           status: "completed",
           question_thread: {
             original_question: "哪个渠道收入最高？",
@@ -565,8 +572,10 @@ describe("workspace product components", () => {
           },
           business_answer: {
             headline: "Email produced the most revenue.",
-            summary: "Email 贡献最高收入。",
-            next_actions: ["复核 email 投放预算"],
+            direct_answer: "Email 贡献最高收入。",
+            why: "证据表第一行显示：channel 为 email，revenue 为 100。",
+            evidence_bullets: ["email revenue is 100"],
+            recommendations: ["复核 email 投放预算"],
             caveats: [],
             confidence: "medium",
           },
@@ -611,7 +620,7 @@ describe("workspace product components", () => {
         generated_sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
       },
       product_result: {
-        version: "p13.v1",
+        version: "p16.v1",
         workspace_id: "ws_1",
         run_id: "run_1",
         status: "completed",
@@ -623,8 +632,10 @@ describe("workspace product components", () => {
         },
         business_answer: {
           headline: "Email produced the most revenue.",
-          summary: "Email 贡献最高收入。",
-          next_actions: ["复核 email 投放预算"],
+          direct_answer: "Email 贡献最高收入。",
+          why: "证据表第一行显示：channel 为 email，revenue 为 100。",
+          evidence_bullets: ["email revenue is 100"],
+          recommendations: ["复核 email 投放预算"],
           caveats: [],
           confidence: "medium",
         },
@@ -707,7 +718,7 @@ describe("workspace product components", () => {
       run_id: "run_qa_1",
       result: {
         product_result: {
-          version: "p13.v1",
+          version: "p16.v1",
           status: "completed",
           question_thread: {
             original_question: "下个月预算应该优先投哪个渠道？",
@@ -716,9 +727,10 @@ describe("workspace product components", () => {
           },
           business_answer: {
             headline: "优先加码 paid_search，同时观察转化成本。",
-            summary: "paid_search 贡献更高收入，但需要结合成本观察。",
+            direct_answer: "paid_search 贡献更高收入，但需要结合成本观察。",
+            why: "证据表第一行显示：channel 为 paid_search，revenue 为 200。",
+            evidence_bullets: ["paid_search revenue is 200"],
             recommendations: ["先提高 paid_search 预算"],
-            next_actions: ["进入分析工作台做深度拆解"],
             caveats: [],
             confidence: "medium",
           },
@@ -782,7 +794,7 @@ describe("workspace product components", () => {
       <RunResult
         result={{
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: {
               original_question: "帮我分析渠道表现",
@@ -793,8 +805,10 @@ describe("workspace product components", () => {
             },
             business_answer: {
               headline: "建议优先加码 paid_search",
-              summary: "paid_search 收入最高。",
-              next_actions: ["提高预算"],
+              direct_answer: "paid_search 收入最高。",
+              why: "证据表第一行显示：channel 为 paid_search，revenue 为 200。",
+              evidence_bullets: ["paid_search revenue is 200"],
+              recommendations: ["提高预算"],
               caveats: [],
               confidence: "medium",
             },
@@ -826,10 +840,18 @@ describe("workspace product components", () => {
       <RunResult
         result={{
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: { original_question: "看收入" },
-            business_answer: { headline: "收入稳定", summary: "收入保持稳定。", confidence: "medium" },
+            business_answer: {
+              headline: "收入稳定",
+              direct_answer: "收入保持稳定。",
+              why: "证据表第一行显示：channel 为 email。",
+              evidence_bullets: ["email 渠道有收入记录。"],
+              recommendations: [],
+              caveats: [],
+              confidence: "medium",
+            },
             evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
             chart_artifacts: [],
             technical_details: {
@@ -860,16 +882,19 @@ describe("workspace product components", () => {
       <RunResult
         result={{
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "failed",
             question_thread: { original_question: "按商品看看最近 30 天收入", status: "failed" },
             business_answer: {
               headline: "当前数据无法支持这次查询",
-              summary: "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
-              next_actions: [
+              direct_answer: "系统尝试使用当前工作区中不存在的表或字段，因此没有执行查询。",
+              why: "SQL 审核发现查询引用了当前数据中不存在的表或字段。",
+              evidence_bullets: [],
+              recommendations: [
                 "可以改问当前数据已包含的渠道、收入、订单、投放花费和 ROI。",
                 "如果要分析商品、订单明细或产品维度，请先上传对应数据表。",
               ],
+              caveats: ["本轮没有执行未通过审核的 SQL。"],
               confidence: "low",
             },
             evidence: { table_preview: { columns: [], rows: [] } },
@@ -939,7 +964,7 @@ describe("workspace product components", () => {
         run_id: "run_pending",
         result: {
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "waiting_for_clarification",
             question_thread: {
               pending_run_id: "pending_1",
@@ -948,7 +973,15 @@ describe("workspace product components", () => {
               clarification_question: "你希望分析哪个时间范围？",
               status: "waiting_for_clarification",
             },
-            business_answer: {},
+            business_answer: {
+              headline: "需要补充时间范围",
+              direct_answer: "请先补充时间范围后再继续分析。",
+              why: "当前问题还缺少必要分析条件。",
+              evidence_bullets: [],
+              recommendations: [],
+              caveats: ["补充时间范围后才能执行查询。"],
+              confidence: "low",
+            },
             evidence: { table_preview: { columns: [], rows: [] } },
             chart_artifacts: [],
             technical_details: {},
@@ -961,7 +994,7 @@ describe("workspace product components", () => {
         run_id: "run_done",
         result: {
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: {
               original_question: "帮我分析渠道表现",
@@ -971,8 +1004,10 @@ describe("workspace product components", () => {
             },
             business_answer: {
               headline: "paid_search 表现最好",
-              summary: "收入最高。",
-              next_actions: [],
+              direct_answer: "收入最高。",
+              why: "证据表支持 paid_search 表现最好。",
+              evidence_bullets: [],
+              recommendations: [],
               caveats: [],
               confidence: "medium",
             },
@@ -1014,7 +1049,7 @@ describe("workspace product components", () => {
         run_id: "run_done",
         result: {
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: {
               original_question: "帮我分析最近90天哪些渠道收益比较好",
@@ -1024,7 +1059,11 @@ describe("workspace product components", () => {
             },
             business_answer: {
               headline: "email 渠道收益最好",
-              summary: "email 收益最高。",
+              direct_answer: "email 收益最高。",
+              why: "证据表显示 email 渠道收益最好。",
+              evidence_bullets: ["email 渠道收益最高。"],
+              recommendations: [],
+              caveats: [],
               confidence: "medium",
             },
             evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
@@ -1039,7 +1078,7 @@ describe("workspace product components", () => {
         run_id: "run_followup",
         result: {
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: {
               original_question: "基于上一轮分析继续追问",
@@ -1048,7 +1087,11 @@ describe("workspace product components", () => {
             },
             business_answer: {
               headline: "email 的客单价更高",
-              summary: "email 渠道收益高主要来自客单价。",
+              direct_answer: "email 渠道收益高主要来自客单价。",
+              why: "证据表显示 email 客单价更高。",
+              evidence_bullets: ["email 客单价更高。"],
+              recommendations: [],
+              caveats: [],
               confidence: "medium",
             },
             evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
@@ -1087,10 +1130,18 @@ describe("workspace product components", () => {
       <RunResult
         result={{
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: { original_question: "分析渠道" },
-            business_answer: { headline: "先看业务结论", summary: "这是业务摘要。", confidence: "medium" },
+            business_answer: {
+              headline: "先看业务结论",
+              direct_answer: "这是业务摘要。",
+              why: "证据表第一行显示：channel 为 email。",
+              evidence_bullets: ["email 渠道有收入记录。"],
+              recommendations: [],
+              caveats: [],
+              confidence: "medium",
+            },
             evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
             chart_artifacts: [],
             technical_details: { sql: "SELECT 1", raw_rows: [[1]] },
@@ -1103,6 +1154,49 @@ describe("workspace product components", () => {
     expect(text).toContain("业务结论");
     expect(text.indexOf("先看业务结论")).toBeLessThan(text.indexOf("证据表"));
     expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术详情"));
+  });
+
+  it("renders only the P16 business answer contract fields in business order", () => {
+    const { container } = render(
+      <BusinessAnswerCard
+        answer={
+          {
+            headline: "建议优先关注 email 渠道",
+            direct_answer: "email 渠道贡献最高收入。",
+            why: "证据显示 email 收入排在第一。",
+            evidence_bullets: ["email 收入为 100。"],
+            recommendations: ["复核 email 的投放预算。"],
+            caveats: ["样本只覆盖最近 30 天。"],
+            confidence: "high",
+            summary: "旧摘要不应展示。",
+            next_actions: ["旧动作不应展示。"],
+            source: "legacy",
+            quality_flags: ["legacy"],
+          } as never
+        }
+      />,
+    );
+
+    expect(screen.getByText("结论")).toBeTruthy();
+    expect(screen.getByText("建议优先关注 email 渠道")).toBeTruthy();
+    expect(screen.getByText("直接回答")).toBeTruthy();
+    expect(screen.getByText("email 渠道贡献最高收入。")).toBeTruthy();
+    expect(screen.getByText("为什么")).toBeTruthy();
+    expect(screen.getByText("关键证据")).toBeTruthy();
+    expect(screen.getByText("建议动作")).toBeTruthy();
+    expect(screen.getByText("限制说明")).toBeTruthy();
+    expect(screen.getByText("置信度 high")).toBeTruthy();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("结论")).toBeLessThan(text.indexOf("直接回答"));
+    expect(text.indexOf("直接回答")).toBeLessThan(text.indexOf("为什么"));
+    expect(text.indexOf("为什么")).toBeLessThan(text.indexOf("关键证据"));
+    expect(text.indexOf("关键证据")).toBeLessThan(text.indexOf("建议动作"));
+    expect(text.indexOf("建议动作")).toBeLessThan(text.indexOf("限制说明"));
+    expect(text).not.toContain("Business Answer");
+    expect(text).not.toContain("旧摘要不应展示");
+    expect(text).not.toContain("旧动作不应展示");
+    expect(text).not.toContain("legacy");
   });
 
   it("renders chart artifact images with title alt text and hides local paths from the main UI", () => {
@@ -1134,19 +1228,22 @@ describe("workspace product components", () => {
     expect(screen.getByText("暂无图表")).toBeTruthy();
   });
 
-  it("shows a business-friendly quality warning for raw parameter dump flags", () => {
+  it("shows business-friendly caveats for sanitized raw parameter dumps", () => {
     render(
       <RunResult
         result={{
           product_result: {
-            version: "p13.v1",
+            version: "p16.v1",
             status: "completed",
             question_thread: { original_question: "分析渠道" },
             business_answer: {
               headline: "查询已完成",
-              summary: "已完成查询。",
+              direct_answer: "已完成查询。",
+              why: "当前回答已移除技术参数格式内容。",
+              evidence_bullets: [],
+              recommendations: [],
+              caveats: ["模型原始回答包含参数格式内容，已从业务结论中移除。"],
               confidence: "low",
-              quality_flags: ["raw_parameter_dump_detected"],
             },
             evidence: { table_preview: { columns: [], rows: [] } },
             chart_artifacts: [],
@@ -1156,7 +1253,55 @@ describe("workspace product components", () => {
       />,
     );
 
-    expect(screen.getByText("回答已自动过滤技术参数，建议结合证据表补充业务解读。")).toBeTruthy();
+    expect(screen.getByText("模型原始回答包含参数格式内容，已从业务结论中移除。")).toBeTruthy();
+  });
+
+  it("does not synthesize product output from raw final_answer fields", () => {
+    render(
+      <RunResult
+        result={{
+          status: "completed",
+          final_answer: "Raw legacy final answer should stay hidden.",
+          execution_result: { columns: ["channel"], rows: [["email"]] },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("分析结果结构异常")).toBeTruthy();
+    expect(screen.getByText("后端没有返回当前 P16 业务答案结构，请重新运行分析。")).toBeTruthy();
+    expect(screen.queryByText("Raw legacy final answer should stay hidden.")).toBeNull();
+    expect(screen.queryByText("email")).toBeNull();
+  });
+
+  it("rejects legacy business_answer fields instead of rendering fallback product content", () => {
+    render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p16.v1",
+            status: "completed",
+            question_thread: { original_question: "哪个渠道收入最高？" },
+            business_answer: {
+              summary: "旧 summary 不应展示。",
+              next_actions: ["旧 next_actions 不应展示。"],
+              source: "legacy",
+              quality_flags: ["old_shape"],
+            },
+            evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
+            chart_artifacts: [],
+            technical_details: { sql: "SELECT channel FROM orders" },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("分析结果结构异常")).toBeTruthy();
+    expect(screen.getByText("后端没有返回当前 P16 业务答案结构，请重新运行分析。")).toBeTruthy();
+    expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
+    expect(screen.queryByText("旧 next_actions 不应展示。")).toBeNull();
+    expect(screen.queryByText("legacy")).toBeNull();
+    expect(screen.queryByText("email")).toBeNull();
+    expect(screen.queryByText("技术详情")).toBeNull();
   });
 
   it("renders an empty report list state", async () => {
@@ -1277,7 +1422,16 @@ describe("workspace product components", () => {
             purpose: "Compare channels.",
             status: "completed",
             question: "Which channels led revenue?",
-            summary: "Paid search led revenue.",
+            summary: "旧 summary 不应展示。",
+            business_answer: {
+              headline: "付费搜索收入领先",
+              direct_answer: "付费搜索是本节收入最高的渠道。",
+              why: "证据表显示 paid_search 收入为 200。",
+              evidence_bullets: ["paid_search 收入为 200。"],
+              recommendations: ["优先复盘付费搜索渠道。"],
+              caveats: ["当前只基于报告章节查询结果。"],
+              confidence: "high",
+            },
             sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
             columns: ["channel", "revenue"],
             rows_preview: [{ channel: "paid_search", revenue: 200 }],
@@ -1318,8 +1472,21 @@ describe("workspace product components", () => {
     expect(screen.getByText("管理层摘要 / Executive Summary")).toBeTruthy();
     expect(screen.getByText("报告章节")).toBeTruthy();
     expect(screen.getByText("Revenue grew.")).toBeTruthy();
-    expect(screen.getByText("Paid search led revenue.")).toBeTruthy();
-    expect(screen.getByText("Rows preview came from workspace data.")).toBeTruthy();
+    expect(screen.getByText("结论")).toBeTruthy();
+    expect(screen.getByText("付费搜索收入领先")).toBeTruthy();
+    expect(screen.getByText("直接回答")).toBeTruthy();
+    expect(screen.getByText("付费搜索是本节收入最高的渠道。")).toBeTruthy();
+    expect(screen.getByText("为什么")).toBeTruthy();
+    expect(screen.getByText("证据表显示 paid_search 收入为 200。")).toBeTruthy();
+    expect(screen.getByText("关键证据")).toBeTruthy();
+    expect(screen.getByText("paid_search 收入为 200。")).toBeTruthy();
+    expect(screen.getByText("建议动作")).toBeTruthy();
+    expect(screen.getByText("优先复盘付费搜索渠道。")).toBeTruthy();
+    expect(screen.getByText("限制说明")).toBeTruthy();
+    expect(screen.getByText("当前只基于报告章节查询结果。")).toBeTruthy();
+    expect(screen.getByText("置信度 high")).toBeTruthy();
+    expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
+    expect(screen.queryByText("Rows preview came from workspace data.")).toBeNull();
     expect(screen.getByText("图表或附件")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Revenue by Channel" }).getAttribute("src")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
@@ -1350,6 +1517,44 @@ describe("workspace product components", () => {
     );
   });
 
+  it("rejects malformed report business_answer instead of rendering legacy report body", () => {
+    render(
+      <ReportSection
+        workspaceId="ws_1"
+        reportId="report_1"
+        section={
+          {
+            section_id: "legacy_section",
+            title: "Legacy Section",
+            status: "completed",
+            summary: "旧 summary 不应展示。",
+            business_answer: {
+              summary: "旧业务摘要不应展示。",
+              next_actions: ["旧行动不应展示。"],
+              direct_answer: "",
+            },
+            artifact_paths: ["artifacts/legacy.png"],
+            business_artifacts: [
+              {
+                type: "chart",
+                path: "artifacts/legacy.png",
+                title: "Legacy Chart",
+              },
+            ],
+          } as never
+        }
+      />,
+    );
+
+    expect(screen.getByText("报告章节结构异常")).toBeTruthy();
+    expect(screen.getByText("后端没有返回完整的 P16 business_answer，请重新生成报告。")).toBeTruthy();
+    expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
+    expect(screen.queryByText("旧业务摘要不应展示。")).toBeNull();
+    expect(screen.queryByText("旧行动不应展示。")).toBeNull();
+    expect(screen.queryByText("直接回答")).toBeNull();
+    expect(screen.queryByText("Legacy Chart")).toBeNull();
+  });
+
   it("renders the report detail route inside the product shell", async () => {
     vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
@@ -1365,7 +1570,23 @@ describe("workspace product components", () => {
         title: "管理层收入复盘报告",
         status: "completed",
         executive_summary: ["收入增长稳定。"],
-        sections: [{ section_id: "summary", title: "收入概览", status: "completed", summary: "收入保持增长。" }],
+        sections: [
+          {
+            section_id: "summary",
+            title: "收入概览",
+            status: "completed",
+            summary: "旧 summary 不应展示。",
+            business_answer: {
+              headline: "收入保持增长",
+              direct_answer: "本节显示收入保持增长。",
+              why: "证据表显示最近周期收入高于上一周期。",
+              evidence_bullets: ["最近周期收入增长。"],
+              recommendations: [],
+              caveats: ["当前只基于报告章节查询结果。"],
+              confidence: "medium",
+            },
+          },
+        ],
       },
     });
 
@@ -1379,6 +1600,8 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("收入增长稳定。")).toBeTruthy();
+    expect(screen.getByText("本节显示收入保持增长。")).toBeTruthy();
+    expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
   });
 
   it.each([
@@ -1404,15 +1627,61 @@ describe("workspace product components", () => {
         sections:
           status === "partial"
             ? [
-                { section_id: "done", title: "Done", status: "completed", summary: "Done." },
-                { section_id: "failed", title: "Failed", status: "failed", error: "Failed." },
+                {
+                  section_id: "done",
+                  title: "Done",
+                  status: "completed",
+                  business_answer: {
+                    headline: "已完成",
+                    direct_answer: "本章节已完成。",
+                    why: "章节分析成功返回业务答案。",
+                    evidence_bullets: [],
+                    recommendations: [],
+                    caveats: [],
+                    confidence: "medium",
+                  },
+                },
+                {
+                  section_id: "failed",
+                  title: "Failed",
+                  status: "failed",
+                  business_answer: {
+                    headline: "章节生成失败",
+                    direct_answer: "本章节未能生成业务答案。",
+                    why: "章节分析没有完成。",
+                    evidence_bullets: [],
+                    recommendations: [],
+                    caveats: ["可重新生成报告。"],
+                    confidence: "low",
+                  },
+                  error: "Failed.",
+                },
               ]
             : [
                 {
                   section_id: "section",
                   title: "Section",
                   status: status === "completed" ? "completed" : status === "running" ? "running" : "failed",
-                  summary: status === "completed" ? "Done." : "",
+                  business_answer:
+                    status === "completed"
+                      ? {
+                          headline: "已完成",
+                          direct_answer: "本章节已完成。",
+                          why: "章节分析成功返回业务答案。",
+                          evidence_bullets: [],
+                          recommendations: [],
+                          caveats: [],
+                          confidence: "medium",
+                        }
+                      : {
+                          headline: status === "running" ? "章节仍在生成" : "章节生成失败",
+                          direct_answer: status === "running" ? "本章节仍在生成。" : "本章节未能生成业务答案。",
+                          why: status === "running" ? "报告任务尚未完成。" : "章节分析没有完成。",
+                          evidence_bullets: [],
+                          recommendations: [],
+                          caveats: status === "running" ? [] : ["可重新生成报告。"],
+                          confidence: "low",
+                        },
                   error: status === "failed" ? "Failed." : null,
                 },
               ],

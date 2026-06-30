@@ -168,6 +168,60 @@ def test_report_planner_prompt_describes_strict_section_object_schema():
     assert "string lists are invalid" in rendered["prompt"]
 
 
+def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+    from llm_ops.structured_output import validate_prompt_output
+
+    rendered = DEFAULT_PROMPT_REGISTRY.render(
+        "insight_drafter",
+        {
+            "user_question": "哪个渠道该加预算？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["paid_search", 200.0]],
+            },
+            "business_context": {},
+            "metric_context": {},
+        },
+    )
+
+    assert rendered["success"] is True
+    assert "candidate_claims" in rendered["prompt"]
+    assert "business_answer" in rendered["prompt"]
+    assert "draft_summary" not in rendered["prompt"]
+
+    accepted = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["paid_search 收入为 200.0。"],
+            "business_answer": {
+                "headline": "建议优先关注 paid_search",
+                "direct_answer": "建议优先关注 paid_search，因为当前查询显示它的收入为 200.0。",
+                "why": "证据来自执行结果中的 paid_search 收入记录。",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": ["复盘 paid_search 的投放效率。"],
+                "caveats": [],
+                "confidence": "high",
+            },
+        },
+        schema_context={"user_question": "哪个渠道该加预算？"},
+    )
+    rejected = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["paid_search 收入为 200.0。"],
+            "draft_summary": "建议优先关注 paid_search。",
+        },
+        schema_context={"user_question": "哪个渠道该加预算？"},
+    )
+
+    assert accepted["success"] is True
+    assert accepted["content"]["business_answer"]["direct_answer"].startswith("建议")
+    assert rejected["success"] is False
+    assert "business_answer" in rejected["error"]
+
+
 def test_validated_request_returns_structured_error_for_schema_mismatch():
     from llm_ops.provider import LLMRequest, MockLLMProvider
     from llm_ops.structured_output import run_validated_llm_request
@@ -388,12 +442,66 @@ def test_visualization_agent_normalizes_explanation_basis_string():
         },
         schema_context={
             "execution_columns": ["product_name", "gmv"],
-            "delivery_tool_ids": ["local_renderer", "excel_exporter", "powerbi_publisher_mock"],
+            "delivery_tool_ids": ["local_renderer", "excel_exporter"],
         },
     )
 
     assert result["success"] is True
     assert result["content"]["chart_spec"]["explanation_basis"] == ["supported_findings"]
+
+
+def test_visualization_agent_rejects_mock_saas_delivery_tool_ids():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "visualization_agent",
+        {
+            "chart_spec": {
+                "chart_type": "ranked_bar",
+                "title": "Top products",
+                "x": "product_name",
+                "y": "gmv",
+                "y_secondary": "",
+                "series": "",
+                "required_columns": ["product_name", "gmv"],
+                "explanation_basis": ["supported_findings"],
+            },
+            "delivery_tool_id": "powerbi_publisher_mock",
+            "tool_reason": "Publish to a mock SaaS BI destination.",
+        },
+        schema_context={
+            "execution_columns": ["product_name", "gmv"],
+            "delivery_tool_ids": ["local_renderer", "excel_exporter"],
+        },
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "powerbi_publisher_mock" in result["error"]
+
+
+def test_visualization_agent_prompt_does_not_expose_mock_saas_delivery_tools():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    rendered = DEFAULT_PROMPT_REGISTRY.render(
+        "visualization_agent",
+        {
+            "user_question": "帮我生成销售图表。",
+            "analysis_steps": [],
+            "execution_columns": ["product_name", "gmv"],
+            "execution_sample_rows": [["Cameras", 1200.0]],
+            "evidence_result": {"success": True},
+            "delivery_tool_catalog": [
+                {"delivery_tool_id": "local_renderer"},
+                {"delivery_tool_id": "excel_exporter"},
+            ],
+        },
+    )
+
+    assert rendered["success"] is True
+    assert "local_renderer" in rendered["prompt"]
+    assert "excel_exporter" in rendered["prompt"]
+    assert "powerbi_publisher_mock" not in rendered["prompt"]
 
 
 def test_malformed_json_returns_structured_error_without_crashing():

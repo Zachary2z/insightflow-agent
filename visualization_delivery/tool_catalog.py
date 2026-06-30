@@ -24,12 +24,6 @@ DELIVERY_TOOL_CATALOG: dict[str, DeliveryTool] = {
         tool_type="local_file_export",
         description="Export execution columns and rows to a local XLSX workbook.",
     ),
-    "powerbi_publisher_mock": DeliveryTool(
-        tool_id="powerbi_publisher_mock",
-        tool_type="mock_external_bi",
-        description="Mock a Power BI publish call without network, OAuth, or API keys.",
-        is_mock=True,
-    ),
 }
 
 

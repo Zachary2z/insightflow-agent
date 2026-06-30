@@ -1,5 +1,4 @@
 import json
-import sqlite3
 from pathlib import Path
 
 
@@ -8,17 +7,15 @@ DB_PATH = ROOT / "data" / "ecommerce.db"
 
 
 def test_mcp_servers_expose_json_compatible_tool_contracts():
-    from mcp_servers.action_server import get_tool_contract as get_action_contract
     from mcp_servers.database_server import get_tool_contract as get_database_contract
     from mcp_servers.report_server import get_tool_contract as get_report_contract
 
-    contracts = [get_database_contract(), get_report_contract(), get_action_contract()]
+    contracts = [get_database_contract(), get_report_contract()]
     by_server = {contract["server_name"]: contract for contract in contracts}
 
     assert set(by_server) == {
         "database-mcp-server",
         "report-mcp-server",
-        "action-mcp-server",
     }
     assert {tool["name"] for tool in by_server["database-mcp-server"]["tools"]} == {
         "get_database_schema",
@@ -28,11 +25,6 @@ def test_mcp_servers_expose_json_compatible_tool_contracts():
     assert {tool["name"] for tool in by_server["report-mcp-server"]["tools"]} == {
         "generate_chart",
         "save_report",
-    }
-    assert {tool["name"] for tool in by_server["action-mcp-server"]["tools"]} == {
-        "create_task",
-        "create_metric_alert",
-        "create_email_draft",
     }
 
     serialized = json.dumps(contracts, ensure_ascii=False)
@@ -44,6 +36,7 @@ def test_mcp_servers_expose_json_compatible_tool_contracts():
     assert "log_trace" not in serialized
     assert "eval_runner" not in serialized
     assert "chart_tool" not in serialized
+    assert "action-mcp-server" not in serialized
 
     for contract in contracts:
         assert contract["contract_scope"] == "external_safe_tool_contract"
@@ -143,68 +136,3 @@ def test_report_mcp_layer_generates_chart_and_requires_evidence_for_report_save(
 
     assert saved_report["success"] is True
     assert Path(saved_report["result"]["report_path"]).exists()
-
-
-def test_action_mcp_layer_requires_approval_before_creating_operational_records(tmp_path):
-    from mcp_servers.action_server import (
-        mcp_create_email_draft,
-        mcp_create_metric_alert,
-        mcp_create_task,
-    )
-
-    db_path = tmp_path / "action_ops.db"
-    blocked = mcp_create_task(
-        db_path=db_path,
-        task={
-            "run_id": "run_mcp_action",
-            "title": "Follow up declining category",
-            "description": "Review Cameras GMV decline.",
-            "owner": "运营团队",
-            "priority": "high",
-        },
-        approval_status="waiting_for_approval",
-    )
-    task_result = mcp_create_task(
-        db_path=db_path,
-        task={
-            "run_id": "run_mcp_action",
-            "title": "Follow up declining category",
-            "description": "Review Cameras GMV decline.",
-            "owner": "运营团队",
-            "priority": "high",
-        },
-        approval_status="approved",
-    )
-    alert_result = mcp_create_metric_alert(
-        db_path=db_path,
-        alert={
-            "run_id": "run_mcp_action",
-            "metric_name": "category_gmv_change",
-            "condition": "below",
-            "threshold": "-10%",
-            "description": "Monitor declining category GMV.",
-        },
-        approval_status="approved",
-    )
-    draft_result = mcp_create_email_draft(
-        db_path=db_path,
-        draft={
-            "run_id": "run_mcp_action",
-            "recipient": "ops@example.com",
-            "subject": "Category GMV review",
-            "body": "Please review the Cameras GMV decline.",
-        },
-        approval_status="approved",
-    )
-
-    assert blocked["success"] is False
-    assert "approval required" in blocked["error"]
-
-    assert task_result["success"] is True
-    assert alert_result["success"] is True
-    assert draft_result["success"] is True
-
-    with sqlite3.connect(db_path) as conn:
-        assert conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM metric_alerts").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM email_drafts").fetchone()[0] == 1

@@ -79,20 +79,29 @@ def _prepared_business_workspace(tmp_path: Path) -> tuple[WorkspaceStore, str, d
 
 def _assert_business_answer_readable(answer: dict) -> None:
     headline = str(answer.get("headline") or "").strip()
-    summary = str(answer.get("summary") or "").strip()
-    combined = f"{headline}\n{summary}"
+    direct_answer = str(answer.get("direct_answer") or "").strip()
+    why = str(answer.get("why") or "").strip()
+    combined = "\n".join(
+        [
+            headline,
+            direct_answer,
+            why,
+            "\n".join(str(item) for item in answer.get("evidence_bullets") or []),
+            "\n".join(str(item) for item in answer.get("recommendations") or []),
+            "\n".join(str(item) for item in answer.get("caveats") or []),
+        ]
+    )
 
     assert len(headline) >= 8
-    assert len(summary) >= 40
+    assert len(direct_answer) >= 40
     assert "channel=" not in combined
     assert "revenue=" not in combined
     assert "order_count=" not in combined
-    assert not summary.lstrip().startswith("1.")
+    assert not direct_answer.lstrip().startswith("1.")
     assert "SELECT " not in combined.upper()
     assert answer.get("confidence")
     assert (
         "建议" in combined
-        or answer.get("next_actions")
         or answer.get("recommendations")
     )
 
@@ -100,7 +109,12 @@ def _assert_business_answer_readable(answer: dict) -> None:
 def _assert_provider_chain(result: dict) -> None:
     assert result["question_understanding"]["provider_called"] is True
     assert result["sql_planning"]["provider_called"] is True
-    assert result["llm_sql_enhancement"]["provider_called"] is True
+    enhancement = result.get("llm_sql_enhancement")
+    if enhancement:
+        assert enhancement["provider_called"] is True
+    else:
+        assert result.get("sql_routing_strategy") != "llm_candidate"
+        assert result["generated_sql"].strip()
     assert result["insight"]["provider_called"] is True
     assert result["visualization_trace"]["provider_called"] is True
     assert result["execution_result"]["success"] is True
@@ -130,7 +144,8 @@ def test_live_deepseek_product_analysis_completes_with_business_answer_and_chart
     assert product_result["technical_details"]["sql"].strip()
     answer_text = (
         f"{product_result['business_answer']['headline']}\n"
-        f"{product_result['business_answer']['summary']}"
+        f"{product_result['business_answer']['direct_answer']}\n"
+        f"{product_result['business_answer']['why']}"
     )
     assert "SELECT " not in answer_text.upper()
 

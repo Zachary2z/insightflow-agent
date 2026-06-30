@@ -1,4 +1,6 @@
-# P13 Business Answer And Product UX Design
+# Historical / Superseded: P13 Business Answer And Product UX Design
+
+This document is retained only as a historical P13 design snapshot. Current implementation guidance lives in docs/product/plans/, especially the P17 cleanup plan and the completed P16 clean business output model plan. The current analysis/report implementation uses the P16 business_answer contract and must not treat older product-model, report-summary, Streamlit, eval, mock SaaS, action-workflow, or future Business Q&A wording in this snapshot as current product guidance.
 
 ## Goal
 

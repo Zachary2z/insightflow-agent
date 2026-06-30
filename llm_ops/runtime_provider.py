@@ -60,10 +60,6 @@ def provider_insight_drafting_enabled(env: dict[str, str] | None = None) -> bool
     return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING", env)
 
 
-def provider_action_drafter_enabled(env: dict[str, str] | None = None) -> bool:
-    return _flag_enabled("INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER", env)
-
-
 def provider_analysis_planner_enabled(env: dict[str, str] | None = None) -> bool:
     return _flag_enabled("INSIGHTFLOW_USE_PROVIDER_ANALYSIS_PLANNER", env)
 
@@ -179,23 +175,6 @@ def build_insight_drafting_provider(
     env: dict[str, str] | None = None,
 ) -> LLMProvider | None:
     if not provider_insight_drafting_enabled(env):
-        return None
-
-    config = load_deepseek_config(env_path=env_path, require_api_key=True)
-    if not config.success:
-        return None
-
-    try:
-        return DeepSeekProvider(config)
-    except Exception:
-        return None
-
-
-def build_action_drafter_provider(
-    env_path: str | Path = ".env",
-    env: dict[str, str] | None = None,
-) -> LLMProvider | None:
-    if not provider_action_drafter_enabled(env):
         return None
 
     config = load_deepseek_config(env_path=env_path, require_api_key=True)

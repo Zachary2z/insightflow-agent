@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-PRODUCT_RESULT_VERSION = "p13.v1"
+PRODUCT_RESULT_VERSION = "p16.v1"
 
 
 def empty_question_thread() -> dict[str, Any]:
@@ -21,13 +21,12 @@ def empty_question_thread() -> dict[str, Any]:
 def empty_business_answer() -> dict[str, Any]:
     return {
         "headline": "",
-        "summary": "",
+        "direct_answer": "",
+        "why": "",
+        "evidence_bullets": [],
         "recommendations": [],
-        "next_actions": [],
         "caveats": [],
         "confidence": "medium",
-        "source": "",
-        "quality_flags": [],
     }
 
 

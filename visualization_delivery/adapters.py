@@ -208,28 +208,6 @@ def _export_excel(
     return result
 
 
-def _publish_powerbi_mock(
-    *,
-    chart_spec: dict[str, Any],
-    execution_result: dict[str, Any],
-    run_id: str,
-    started_at: float,
-) -> dict[str, Any]:
-    artifact_name = _safe_filename(chart_spec.get("title") or chart_spec.get("chart_type") or "visualization")
-    result = {
-        **_base_result(
-            delivery_tool_id="powerbi_publisher_mock",
-            run_id=run_id,
-            execution_result=execution_result,
-            started_at=started_at,
-        ),
-        "artifact_path": "",
-        "artifact_url": f"mock://powerbi/{run_id}/{artifact_name}",
-    }
-    result["trace_event"] = _trace_event(result)
-    return result
-
-
 def execute_delivery_tool(
     *,
     delivery_tool_id: str,
@@ -254,13 +232,6 @@ def execute_delivery_tool(
                 execution_result=execution_result,
                 run_id=run_id,
                 output_dir=output_dir,
-                started_at=started_at,
-            )
-        if tool_id == "powerbi_publisher_mock":
-            return _publish_powerbi_mock(
-                chart_spec=chart_spec,
-                execution_result=execution_result,
-                run_id=run_id,
                 started_at=started_at,
             )
         return _failure(tool_id, f"Unknown delivery tool: {tool_id}", started_at)
