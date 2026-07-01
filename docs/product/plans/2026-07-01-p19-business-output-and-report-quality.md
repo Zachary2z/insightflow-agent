@@ -259,6 +259,8 @@ Acceptance:
 
 Goal: Add the core review-and-revision loop with structured contracts.
 
+Status: Complete as of 2026-07-01.
+
 Scope:
 
 - Add Answer Reviewer Agent contract and structured validation.

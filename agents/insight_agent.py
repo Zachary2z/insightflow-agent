@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agents.answer_reviewer import review_answer
+from agents.final_answer_composer import compose_final_answer_result
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
@@ -237,7 +239,12 @@ def _provider_output(state: dict[str, Any], provider: LLMProvider, execution_res
     return output, "success"
 
 
-def run_insight_agent(state: dict[str, Any], provider: LLMProvider | None = None) -> dict[str, Any]:
+def run_insight_agent(
+    state: dict[str, Any],
+    provider: LLMProvider | None = None,
+    answer_reviewer_provider: LLMProvider | None = None,
+    final_answer_composer_provider: LLMProvider | None = None,
+) -> dict[str, Any]:
     execution_result = state.get("execution_result")
     if provider and execution_result and execution_result.get("success"):
         output, status = _provider_output(state, provider, execution_result)
@@ -249,18 +256,50 @@ def run_insight_agent(state: dict[str, Any], provider: LLMProvider | None = None
             provider_error="" if provider is None else "provider requires successful execution_result",
         )
 
+    draft_business_answer = output.get("business_answer") if isinstance(output.get("business_answer"), dict) else {}
+    answer_review = review_answer(
+        user_question=state.get("user_question", ""),
+        execution_result=execution_result or {},
+        evidence_result=state.get("evidence_result") or {},
+        draft_business_answer=draft_business_answer,
+        profile_context={
+            "business_context": state.get("business_context") or {},
+            "metric_context": state.get("metric_context") or {},
+            "workspace_context": state.get("workspace_context") or {},
+        },
+        provider=answer_reviewer_provider,
+    )
+    composition = compose_final_answer_result(
+        user_question=state.get("user_question", ""),
+        execution_result=execution_result or {},
+        evidence_result=state.get("evidence_result") or {},
+        draft_business_answer=draft_business_answer,
+        reviewer_result=answer_review,
+        provider=final_answer_composer_provider,
+    )
+
     business_answer = build_business_answer(
         {
             "user_question": state.get("user_question", ""),
-            "final_answer": output["final_answer"],
-            "business_answer": output.get("business_answer") if isinstance(output.get("business_answer"), dict) else {},
+            "final_answer": composition["business_answer"].get("direct_answer") or output["final_answer"],
+            "business_answer": composition["business_answer"],
             "execution_result": execution_result or {},
             "evidence_result": state.get("evidence_result") or {},
             "insight": output,
         }
     )
     canonical_final_answer = business_answer.get("direct_answer") or business_answer.get("headline") or output["final_answer"]
-    output = {**output, "final_answer": canonical_final_answer}
+    output = {
+        **output,
+        "final_answer": canonical_final_answer,
+        "business_answer": business_answer,
+        "answer_review": answer_review,
+        "answer_composition": {
+            "source": composition.get("source", "deterministic"),
+            "provider_called": bool(composition.get("provider_called", False)),
+            "error": composition.get("error", ""),
+        },
+    }
     updated = {
         **state,
         "insight": output,

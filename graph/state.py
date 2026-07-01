@@ -96,6 +96,8 @@ class AgentState(TypedDict, total=False):
     retry_count: int
 
     insight: dict[str, Any]
+    answer_review: dict[str, Any]
+    answer_composition: dict[str, Any]
     final_answer: str
     data_used: bool
 

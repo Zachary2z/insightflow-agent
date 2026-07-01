@@ -145,6 +145,87 @@ def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_p
     assert result["business_answer"] == result["product_result"]["business_answer"]
 
 
+def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Reviewer Composer Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE results (entity_name TEXT, score_value REAL)")
+        conn.executemany("INSERT INTO results VALUES (?, ?)", [("Alpha", 91.0), ("Beta", 83.0)])
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="Which entity should we prioritize?",
+        initial_sql="SELECT entity_name, score_value FROM results ORDER BY score_value DESC LIMIT 20",
+        providers={
+            "insight_drafting": MockLLMProvider(
+                {
+                    "candidate_claims": ["Alpha score_value is 91.0", "Beta score_value is 83.0"],
+                    "business_answer": {
+                        "headline": "Gamma wins on margin_rate",
+                        "direct_answer": "Prioritize Gamma because margin_rate is strongest.",
+                        "why": "Gamma margin_rate is 0.42.",
+                        "evidence_bullets": ["Gamma margin_rate is 0.42."],
+                        "recommendations": ["Move resources to Gamma using margin_rate."],
+                        "caveats": [],
+                        "confidence": "high",
+                    },
+                }
+            ),
+            "answer_reviewer": MockLLMProvider(
+                {
+                    "status": "revise",
+                    "language": "en",
+                    "supported_entities": ["Alpha", "Beta"],
+                    "unsupported_entities": ["Gamma"],
+                    "supported_metrics": ["score_value"],
+                    "unsupported_metrics": ["margin_rate"],
+                    "issues": [
+                        {
+                            "type": "entity_mismatch",
+                            "message": "Gamma is absent from evidence.",
+                            "affected_fields": ["direct_answer"],
+                        }
+                    ],
+                    "revision_instructions": ["Remove unsupported entity and metric."],
+                    "confidence": "high",
+                }
+            ),
+            "final_answer_composer": MockLLMProvider(
+                {
+                    "headline": "Alpha is the supported priority",
+                    "direct_answer": "Prioritize Alpha because the returned evidence ranks it first on score_value.",
+                    "why": "The result rows show Alpha at 91.0 versus Beta at 83.0.",
+                    "evidence_bullets": ["Alpha score_value is 91.0.", "Beta score_value is 83.0."],
+                    "recommendations": ["Use Alpha as the next review focus."],
+                    "caveats": ["This only uses the current query result."],
+                    "confidence": "medium",
+                }
+            ),
+        },
+    )
+
+    assert result["status"] == "completed"
+    answer_text = " ".join(
+        [
+            result["business_answer"]["headline"],
+            result["business_answer"]["direct_answer"],
+            result["business_answer"]["why"],
+            *result["business_answer"]["evidence_bullets"],
+            *result["business_answer"]["recommendations"],
+            *result["business_answer"]["caveats"],
+        ]
+    )
+    assert result["insight"]["answer_review"]["status"] == "revise"
+    assert result["insight"]["answer_composition"]["source"] == "provider"
+    assert "Alpha" in answer_text
+    assert "Gamma" not in answer_text
+    assert "margin_rate" not in answer_text
+    assert result["product_result"]["business_answer"] == result["business_answer"]
+
+
 def test_workspace_analysis_persists_full_product_result_for_history_detail(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Persisted Analysis Workspace")

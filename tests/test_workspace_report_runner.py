@@ -288,6 +288,59 @@ def test_report_does_not_inherit_conflicting_section_answer_or_repeat_long_direc
     assert "这里的长正文不应被 executive summary 原样重复" not in summary_text
 
 
+def test_report_section_reuses_reviewed_composed_business_answer(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def reviewed_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "final_answer": "Old draft said Gamma should win on margin_rate.",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": {
+                    "headline": "Alpha 是当前证据支持的优先对象",
+                    "direct_answer": "当前证据支持优先关注 Alpha，因为它在 score_value 上排名第一。",
+                    "why": "执行结果显示 Alpha 的 score_value 为 91.0，高于 Beta 的 83.0。",
+                    "evidence_bullets": ["Alpha score_value 为 91.0。", "Beta score_value 为 83.0。"],
+                    "recommendations": ["围绕 Alpha 做下一步复盘，并继续跟踪 score_value。"],
+                    "caveats": ["本结论只基于当前查询返回的数据。"],
+                    "confidence": "medium",
+                },
+            },
+            "insight": {
+                "answer_review": {
+                    "status": "revise",
+                    "unsupported_entities": ["Gamma"],
+                    "unsupported_metrics": ["margin_rate"],
+                },
+                "answer_composition": {"source": "provider"},
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["entity_name", "score_value"],
+                "rows": [["Alpha", 91.0], ["Beta", 83.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "trace": [{"node": "answer_reviewer_agent"}, {"node": "final_answer_composer"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "生成一份复盘报告。",
+        section_runner=reviewed_runner,
+    )
+
+    answer = result["report"]["sections"][0]["business_answer"]
+    answer_text = json.dumps(answer, ensure_ascii=False)
+    assert result["report"]["sections"][0]["status"] == "completed"
+    assert "Alpha" in answer_text
+    assert "Gamma" not in answer_text
+    assert "margin_rate" not in answer_text
+    assert "Old draft" not in answer_text
+
+
 def test_business_review_section_questions_are_specific_internal_analysis_prompts():
     report_goal = "基于最近 90 天的订单、客户和营销数据，生成面向管理层的收入复盘报告。"
     sections = {

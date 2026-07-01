@@ -37,7 +37,9 @@ from graph.state import AgentState
 from llm_ops.provider import LLMProvider
 from llm_ops.runtime_provider import (
     build_analysis_planner_provider,
+    build_answer_reviewer_provider,
     build_clarification_provider,
+    build_final_answer_composer_provider,
     build_claim_typing_provider,
     build_insight_drafting_provider,
     build_question_understanding_provider,
@@ -55,6 +57,8 @@ def build_workflow(
     visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     insight_drafting_provider: LLMProvider | None = None,
+    answer_reviewer_provider: LLMProvider | None = None,
+    final_answer_composer_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ):
     workflow = StateGraph(AgentState)
@@ -90,7 +94,12 @@ def build_workflow(
     workflow.add_node("fix", error_fix_node)
     workflow.add_node(
         "insight",
-        lambda state: insight_node(dict(state), provider=insight_drafting_provider),
+        lambda state: insight_node(
+            dict(state),
+            provider=insight_drafting_provider,
+            answer_reviewer_provider=answer_reviewer_provider,
+            final_answer_composer_provider=final_answer_composer_provider,
+        ),
     )
     workflow.add_node(
         "claim_typing",
@@ -167,6 +176,8 @@ def run_workflow(
     visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
     insight_drafting_provider: LLMProvider | None = None,
+    answer_reviewer_provider: LLMProvider | None = None,
+    final_answer_composer_provider: LLMProvider | None = None,
     claim_typing_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
@@ -201,6 +212,8 @@ def run_workflow(
     viz_provider = visualization_agent_provider or build_visualization_agent_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
     insight_provider = insight_drafting_provider or build_insight_drafting_provider()
+    reviewer_provider = answer_reviewer_provider or build_answer_reviewer_provider()
+    composer_provider = final_answer_composer_provider or build_final_answer_composer_provider()
     typing_provider = claim_typing_provider or build_claim_typing_provider()
     app = build_workflow(
         question_understanding_provider=question_provider,
@@ -210,6 +223,8 @@ def run_workflow(
         visualization_agent_provider=viz_provider,
         sql_candidate_provider=candidate_provider,
         insight_drafting_provider=insight_provider,
+        answer_reviewer_provider=reviewer_provider,
+        final_answer_composer_provider=composer_provider,
         claim_typing_provider=typing_provider,
     )
     return dict(app.invoke(state))

@@ -119,6 +119,89 @@ def test_provider_insight_output_becomes_recommendation_first_business_answer():
     assert "channel=" not in _business_answer_text(result["business_answer"])
 
 
+def test_insight_agent_reviews_and_composes_provider_draft_before_final_answer():
+    from agents.insight_agent import run_insight_agent
+
+    state = {
+        "run_id": "run_reviewed_answer",
+        "session_id": "session_reviewed_answer",
+        "user_question": "Which entity should we prioritize?",
+        "execution_result": {
+            "success": True,
+            "columns": ["entity_name", "score_value"],
+            "rows": [["Alpha", 91.0], ["Beta", 83.0]],
+            "row_count": 2,
+        },
+        "evidence_result": {"validation_status": "validated"},
+        "trace": [],
+    }
+    draft_provider = MockLLMProvider(
+        {
+            "candidate_claims": ["Alpha score_value is 91.0", "Beta score_value is 83.0"],
+            "business_answer": {
+                "headline": "Gamma wins on margin_rate",
+                "direct_answer": "Prioritize Gamma because margin_rate is strongest.",
+                "why": "Gamma margin_rate is 0.42.",
+                "evidence_bullets": ["Gamma margin_rate is 0.42."],
+                "recommendations": ["Move resources to Gamma using margin_rate."],
+                "caveats": [],
+                "confidence": "high",
+            },
+        }
+    )
+    reviewer_provider = MockLLMProvider(
+        {
+            "status": "revise",
+            "language": "en",
+            "supported_entities": ["Alpha", "Beta"],
+            "unsupported_entities": ["Gamma"],
+            "supported_metrics": ["score_value"],
+            "unsupported_metrics": ["margin_rate"],
+            "issues": [
+                {
+                    "type": "entity_mismatch",
+                    "message": "Gamma is absent from the execution/evidence rows.",
+                    "affected_fields": ["headline", "direct_answer", "recommendations"],
+                },
+                {
+                    "type": "metric_mismatch",
+                    "message": "margin_rate is absent from the execution/evidence rows.",
+                    "affected_fields": ["why", "evidence_bullets"],
+                },
+            ],
+            "revision_instructions": ["Remove Gamma and margin_rate; use returned evidence only."],
+            "confidence": "high",
+        }
+    )
+    composer_provider = MockLLMProvider(
+        {
+            "headline": "Alpha is the supported priority",
+            "direct_answer": "Prioritize Alpha because the returned evidence ranks it first on score_value.",
+            "why": "The result rows show Alpha at 91.0 versus Beta at 83.0.",
+            "evidence_bullets": ["Alpha score_value is 91.0.", "Beta score_value is 83.0."],
+            "recommendations": ["Use Alpha as the next review focus and keep tracking score_value."],
+            "caveats": ["This only uses the current query result."],
+            "confidence": "medium",
+        }
+    )
+
+    result = run_insight_agent(
+        state,
+        provider=draft_provider,
+        answer_reviewer_provider=reviewer_provider,
+        final_answer_composer_provider=composer_provider,
+    )
+
+    _assert_new_business_answer_shape(result["business_answer"])
+    business_text = _business_answer_text(result["business_answer"])
+    assert result["insight"]["answer_review"]["status"] == "revise"
+    assert result["insight"]["answer_composition"]["source"] == "provider"
+    assert "Gamma" not in business_text
+    assert "margin_rate" not in business_text
+    assert "Alpha" in business_text
+    assert result["final_answer"] == result["business_answer"]["direct_answer"]
+
+
 def test_chinese_question_rejects_english_provider_business_summary():
     from agents.insight_agent import run_insight_agent
 

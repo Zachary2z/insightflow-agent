@@ -83,6 +83,8 @@ def run_workspace_analysis(
         visualization_agent_provider=provider_map.get("visualization_agent"),
         sql_candidate_provider=provider_map.get("sql_candidate"),
         insight_drafting_provider=provider_map.get("insight_drafting"),
+        answer_reviewer_provider=provider_map.get("answer_reviewer"),
+        final_answer_composer_provider=provider_map.get("final_answer_composer"),
         claim_typing_provider=provider_map.get("claim_typing"),
     )
     result["workspace_id"] = workspace_id
@@ -163,6 +165,8 @@ def run_workspace_analysis_continuation(
             visualization_agent_provider=provider_map.get("visualization_agent"),
             sql_candidate_provider=provider_map.get("sql_candidate"),
             insight_drafting_provider=provider_map.get("insight_drafting"),
+            answer_reviewer_provider=provider_map.get("answer_reviewer"),
+            final_answer_composer_provider=provider_map.get("final_answer_composer"),
             claim_typing_provider=provider_map.get("claim_typing"),
         )
     except Exception as exc:

@@ -436,6 +436,85 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
+            prompt_id="answer_reviewer",
+            version="v1",
+            description="Review whether a draft business_answer is supported by execution/evidence rows without writing final prose.",
+            required_variables=[
+                "user_question",
+                "execution_result",
+                "evidence_result",
+                "draft_business_answer",
+                "profile_context",
+            ],
+            safety_contract=[
+                "must_not_write_final_user_prose",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_only_review_evidence_support",
+                "must_not_return_business_answer",
+            ],
+            template=(
+                "Task: answer evidence review.\n"
+                "User question: {user_question}\n"
+                "Execution result: {execution_result}\n"
+                "Evidence result: {evidence_result}\n"
+                "Draft business_answer: {draft_business_answer}\n"
+                "Profile or semantic context: {profile_context}\n"
+                "Return JSON only. Do not wrap it in markdown.\n"
+                "Exact schema: {{\"status\": \"accept|revise|downgrade_to_insufficient_evidence\", "
+                "\"language\": \"zh|en\", \"supported_entities\": [], \"unsupported_entities\": [], "
+                "\"supported_metrics\": [], \"unsupported_metrics\": [], \"issues\": [{{\"type\": "
+                "\"entity_mismatch|metric_mismatch|insufficient_evidence|tradeoff_missing|unsupported_claim\", "
+                "\"message\": \"\", \"affected_fields\": []}}], \"revision_instructions\": [], "
+                "\"confidence\": \"low|medium|high\"}}.\n"
+                "Responsibilities: check whether named entities and metrics in the draft are present in the "
+                "execution/evidence rows; mark unsupported claims; mark tradeoff_missing when multiple returned "
+                "metrics point to different leaders but the draft forces one conclusion; choose downgrade when "
+                "evidence is absent or cannot support the answer. Do not write the final business answer. "
+                "Do not return business_answer, SQL, prompts, trace paths, raw provider metadata, action payloads, "
+                "credentials, or secrets."
+            ),
+        ),
+        PromptTemplate(
+            prompt_id="final_answer_composer",
+            version="v1",
+            description="Compose the final P16 business_answer from draft answer, reviewer result, and execution/evidence rows.",
+            required_variables=[
+                "user_question",
+                "execution_result",
+                "evidence_result",
+                "draft_business_answer",
+                "reviewer_result",
+            ],
+            safety_contract=[
+                "must_preserve_p16_business_answer_shape",
+                "must_not_generate_sql",
+                "must_not_execute_sql",
+                "must_not_expose_reviewer_json",
+                "must_not_add_unsupported_claims",
+            ],
+            template=(
+                "Task: final answer composition.\n"
+                "User question: {user_question}\n"
+                "Execution result: {execution_result}\n"
+                "Evidence result: {evidence_result}\n"
+                "Draft business_answer: {draft_business_answer}\n"
+                "Reviewer result: {reviewer_result}\n"
+                "Return JSON only. Do not wrap it in markdown.\n"
+                "Exact schema: {{\"headline\": \"\", \"direct_answer\": \"\", \"why\": \"\", "
+                "\"evidence_bullets\": [], \"recommendations\": [], \"caveats\": [], "
+                "\"confidence\": \"low|medium|high\"}}.\n"
+                "Language: write the answer in the same language as the user question unless explicitly asked "
+                "otherwise. If reviewer status is accept, keep the useful draft answer but normalize the shape "
+                "and remove any unsafe/internal text. If status is revise, remove unsupported entities, "
+                "unsupported metrics, and unsupported claims while preserving supported business judgment. "
+                "If status is downgrade_to_insufficient_evidence, clearly say evidence is insufficient and "
+                "explain what data is missing. Do not expose reviewer JSON, prompt text, SQL, trace paths, "
+                "provider metadata, raw rows, action payloads, credentials, or secrets. Do not execute SQL or "
+                "invent new evidence."
+            ),
+        ),
+        PromptTemplate(
             prompt_id="visualization_agent",
             version="v1",
             description="Choose a validated chart spec and visualization delivery tool from real execution evidence.",

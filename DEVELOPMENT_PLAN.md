@@ -96,7 +96,7 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P18-H5 | Tighten provider prompt/validation only where deterministic consistency is insufficient | Complete |
 | P18-H6 | Focused/full regression, real DeepSeek acceptance gating, artifact hygiene, and documentation closeout | Complete |
 | P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete |
-| P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Planned |
+| P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete |
 | P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Planned |
 | P19-H4 | Synthesize reports and chart narrative from reviewed business answers | Planned |
 | P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Planned |
@@ -105,7 +105,7 @@ P17 must keep current workspace analysis, workspace reports, SQL review, SQL exe
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 is complete. P19 is the next product quality phase. It should improve the business readability, evidence alignment, report synthesis, chart narrative, and live DeepSeek acceptance of the current analysis/report product before adding authenticated external publishing integrations. P19 should stay compact: close the current alignment hole, add reviewer/composer foundation, polish answer quality, synthesize reports/charts, then do quality closeout. It should not grow into a list of predicted failure patches; deterministic code stays as a small final safety check.
+P18 is complete. P19 is the active product quality phase. P19-H1 closed the immediate deterministic alignment hole, and P19-H2 added the reviewer/composer foundation. The remaining P19 work should improve business readability, grounded recommendations, report synthesis, chart narrative, and live DeepSeek acceptance of the current analysis/report product before adding authenticated external publishing integrations. P19 should stay compact: polish answer quality, synthesize reports/charts, then do quality closeout. It should not grow into a list of predicted failure patches; deterministic code stays as a small final safety check.
 
 P20 is reserved for responsiveness after P19 quality is stable: Route Classifier Agent, safe fast factual path, progress states, semantic/profile caching, and background chart/report work. P21 is reserved for real business tool calling and exports after quality and responsiveness are stable, with China-oriented tools/artifacts preferred over Google Sheets examples.
 

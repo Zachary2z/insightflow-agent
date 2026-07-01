@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H1 complete / ready for H2 reviewer-composer planning |
-| Next planned task | P19-H2 Answer Reviewer Agent and Final Answer Composer contract |
+| Current task | P19-H2 complete / ready for H3 business answer quality polish |
+| Next planned task | P19-H3 Business answer quality polish |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -42,7 +42,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Task | Status | Notes |
 |---|---|---|
 | P19-H1 | `[x]` Complete | Plain why/evidence entity conflicts are now corrected or downgraded by the small deterministic guard |
-| P19-H2 | `[ ]` Planned | Add reviewer/composer foundation with structured contracts and deterministic tests |
+| P19-H2 | `[x]` Complete | Added Answer Reviewer Agent and Final Answer Composer contracts, deterministic/provider tests, and product/report integration |
 | P19-H3 | `[ ]` Planned | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers |
 | P19-H4 | `[ ]` Planned | Synthesize reports and chart narrative from reviewed business answers |
 | P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
@@ -109,6 +109,13 @@ P19 planning note on 2026-07-01:
 - Planning update: P19 is intentionally compacted into five H tasks so development is easier to steer, but each H task still requires tests, code cleanup, artifact hygiene, and focused/full verification.
 - Cleanup policy update: P19 should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
 - Future notes: P20 should optimize responsiveness with route classification, fast factual path, progress states, caching, and background work. P21 should add real business tool calling/export after P19/P20 are stable.
+
+P19-H2 completion note on 2026-07-01:
+
+- Added structured `answer_reviewer` and `final_answer_composer` contracts with validation tests.
+- Integrated reviewer/composer after insight drafting and before final P16 business answer normalization.
+- Report sections reuse the reviewed/composed `business_answer`; deterministic `answer_consistency.py` remains the final small guardrail.
+- Focused backend tests, full backend regression, frontend Vitest, and frontend production build passed.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

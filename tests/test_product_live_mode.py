@@ -1,8 +1,10 @@
 def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
     from llm_ops.runtime_provider import (
         product_live_mode_enabled,
+        provider_answer_reviewer_enabled,
         provider_claim_typing_enabled,
         provider_clarification_router_enabled,
+        provider_final_answer_composer_enabled,
         provider_insight_drafting_enabled,
         provider_question_understanding_enabled,
         provider_report_writer_enabled,
@@ -19,6 +21,8 @@ def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
     assert provider_sql_planning_enabled(env) is True
     assert provider_sql_candidate_enabled(env) is True
     assert provider_insight_drafting_enabled(env) is True
+    assert provider_answer_reviewer_enabled(env) is True
+    assert provider_final_answer_composer_enabled(env) is True
     assert provider_claim_typing_enabled(env) is True
     assert provider_visualization_agent_enabled(env) is True
     assert provider_report_writer_enabled(env) is True

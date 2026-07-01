@@ -224,6 +224,169 @@ def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
     return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
 
 
+def _validate_answer_reviewer(content: Any) -> dict[str, Any]:
+    prompt_id = "answer_reviewer"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "answer_reviewer output must be an object")
+
+    allowed_keys = {
+        "status",
+        "language",
+        "supported_entities",
+        "unsupported_entities",
+        "supported_metrics",
+        "unsupported_metrics",
+        "issues",
+        "revision_instructions",
+        "confidence",
+    }
+    extra_keys = sorted(set(content) - allowed_keys)
+    if extra_keys:
+        return _error(prompt_id, f"answer_reviewer must not return unsupported fields: {', '.join(extra_keys)}")
+
+    status = str(content.get("status", "")).strip()
+    if status not in {"accept", "revise", "downgrade_to_insufficient_evidence"}:
+        return _error(
+            prompt_id,
+            "status must be one of accept, revise, downgrade_to_insufficient_evidence",
+        )
+    language = str(content.get("language", "")).strip()
+    if language not in {"zh", "en"}:
+        return _error(prompt_id, "language must be one of zh, en")
+    confidence = str(content.get("confidence", "")).strip()
+    if confidence not in {"low", "medium", "high"}:
+        return _error(prompt_id, "confidence must be one of low, medium, high")
+
+    normalized: dict[str, Any] = {"status": status, "language": language, "confidence": confidence}
+    for field in (
+        "supported_entities",
+        "unsupported_entities",
+        "supported_metrics",
+        "unsupported_metrics",
+        "revision_instructions",
+    ):
+        ok, items, message = _string_list(content.get(field, []), field)
+        if not ok:
+            return _error(prompt_id, message)
+        normalized[field] = items
+
+    issues = content.get("issues", [])
+    if not isinstance(issues, list):
+        return _error(prompt_id, "issues must be a list")
+    allowed_issue_types = {
+        "entity_mismatch",
+        "metric_mismatch",
+        "insufficient_evidence",
+        "tradeoff_missing",
+        "unsupported_claim",
+    }
+    normalized_issues = []
+    for index, issue in enumerate(issues):
+        if not isinstance(issue, dict):
+            return _error(prompt_id, f"issues[{index}] must be an object")
+        issue_type = str(issue.get("type", "")).strip()
+        if issue_type not in allowed_issue_types:
+            return _error(
+                prompt_id,
+                f"issues[{index}].type must be one of {', '.join(sorted(allowed_issue_types))}",
+            )
+        message = str(issue.get("message", "")).strip()
+        if not message:
+            return _error(prompt_id, f"issues[{index}].message is required")
+        fields_ok, affected_fields, fields_message = _string_list(issue.get("affected_fields", []), "affected_fields")
+        if not fields_ok:
+            return _error(prompt_id, f"issues[{index}].{fields_message}")
+        normalized_issues.append(
+            {
+                "type": issue_type,
+                "message": message,
+                "affected_fields": affected_fields,
+            }
+        )
+    normalized["issues"] = normalized_issues
+
+    return _ok(
+        prompt_id,
+        {
+            "status": normalized["status"],
+            "language": normalized["language"],
+            "supported_entities": normalized["supported_entities"],
+            "unsupported_entities": normalized["unsupported_entities"],
+            "supported_metrics": normalized["supported_metrics"],
+            "unsupported_metrics": normalized["unsupported_metrics"],
+            "issues": normalized["issues"],
+            "revision_instructions": normalized["revision_instructions"],
+            "confidence": normalized["confidence"],
+        },
+    )
+
+
+def _validate_final_answer_composer(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "final_answer_composer"
+    if not isinstance(content, dict):
+        return _error(prompt_id, "final_answer_composer output must be an object")
+
+    allowed_keys = {
+        "headline",
+        "direct_answer",
+        "why",
+        "evidence_bullets",
+        "recommendations",
+        "caveats",
+        "confidence",
+    }
+    extra_keys = sorted(set(content) - allowed_keys)
+    if extra_keys:
+        return _error(prompt_id, f"final_answer_composer must not return unsupported fields: {', '.join(extra_keys)}")
+
+    normalized_answer: dict[str, Any] = {}
+    for field in ("headline", "direct_answer", "why"):
+        value = content.get(field)
+        if not isinstance(value, str):
+            return _error(prompt_id, f"{field} must be a string")
+        value = value.strip()
+        if not value:
+            return _error(prompt_id, f"{field} must not be empty")
+        normalized_answer[field] = value
+
+    for field in ("evidence_bullets", "recommendations", "caveats"):
+        ok, items, message = _string_list(content.get(field), field)
+        if not ok:
+            return _error(prompt_id, message)
+        normalized_answer[field] = items
+
+    confidence = str(content.get("confidence", "")).strip()
+    if confidence not in {"low", "medium", "high"}:
+        return _error(prompt_id, "confidence must be one of low, medium, high")
+    normalized_answer["confidence"] = confidence
+
+    business_text_fields = [
+        normalized_answer["headline"],
+        normalized_answer["direct_answer"],
+        normalized_answer["why"],
+        *normalized_answer["evidence_bullets"],
+        *normalized_answer["recommendations"],
+        *normalized_answer["caveats"],
+    ]
+    for field_text in business_text_fields:
+        if _contains_internal_prompt_leak(field_text):
+            return _error(prompt_id, "business_answer fields must not contain internal prompt text")
+        if _contains_technical_leak(field_text):
+            return _error(prompt_id, "business_answer fields must not contain technical SQL, trace, or provider metadata")
+        if _looks_like_raw_parameter_dump(field_text):
+            return _error(prompt_id, "business_answer fields must not contain raw parameter dumps")
+        lowered = field_text.lower()
+        if "reviewer_result" in lowered or "unsupported_entities=" in lowered:
+            return _error(prompt_id, "business_answer fields must not expose reviewer internals")
+
+    if _requires_cjk_response(schema_context):
+        language_error = _cjk_business_answer_language_error(normalized_answer)
+        if language_error:
+            return _error(prompt_id, language_error)
+
+    return _ok(prompt_id, normalized_answer)
+
+
 def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
     prompt_id = "insight_drafter"
     if not isinstance(content, dict):
@@ -992,6 +1155,10 @@ def validate_prompt_output(
         return _validate_report_writer(content, context)
     if prompt_id == "insight_claim_typer":
         return _validate_insight_claim_typer(content)
+    if prompt_id == "answer_reviewer":
+        return _validate_answer_reviewer(content)
+    if prompt_id == "final_answer_composer":
+        return _validate_final_answer_composer(content, context)
     if prompt_id == "insight_drafter":
         return _validate_insight_drafter(content, context)
     if prompt_id == "question_understanding":
