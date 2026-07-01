@@ -378,9 +378,25 @@ Completion notes:
 
 P20 and P21 are intentionally recorded here only as future direction. They should not distract from P19 quality work.
 
-### P20: Responsive Analysis Experience
+### P20: General Business Analysis Foundation
 
-Goal: Shorten perceived and actual waiting time after the analysis quality loop is reliable.
+Goal: Reorganize the product into a general business data analysis foundation after real P19 testing exposed over-rigid answer/report constraints.
+
+Likely scope:
+
+- Clean old/conflicting paths and compatibility code instead of preserving historical behavior.
+- Generalize data profiling and semantic-layer context for different uploaded business datasets.
+- Add a reusable analysis task contract for dimensions, metrics, time ranges, filters, decision goals, and missing slots.
+- Stabilize factual evidence, metric formulas, and comparison scope before answer/report writing.
+- Let model-backed answer/report writers explain and recommend within the evidence boundary, while validators check facts instead of blocking reasonable judgment.
+
+Quality requirement: P20 must not hardcode `orders`, `channel`, `marketing_spend`, `revenue`, ROI-only channel analysis, or budget recommendation scenarios. The current Chinese sample data is an acceptance fixture, not the product schema.
+
+Detailed plan: `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`.
+
+### P21: Responsive Analysis Experience
+
+Goal: Shorten perceived and actual waiting time after the generalized analysis foundation is reliable.
 
 Likely scope:
 
@@ -393,7 +409,7 @@ Likely scope:
 
 Quality requirement: fast path must never handle advice, budget, strategy, causal, or report-generation questions unless the router and safety checks classify them as low-risk factual requests.
 
-### P21: Real Business Tool Calling
+### P22: Real Business Tool Calling
 
 Goal: Connect useful China-oriented business outputs after quality and responsiveness are stable.
 

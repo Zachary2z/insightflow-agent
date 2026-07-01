@@ -6,6 +6,7 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md`
 - `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`
 - `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`
+- `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`
 
 ## Current Product Direction
 
@@ -22,6 +23,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P17 cleanup that removes non-current historical paths while preserving the real multi-agent/tool-calling chain.
 - P18 consistency checks across conclusions, evidence, recommendations, chart annotations, and reports.
 - P19 business-output/report quality work that moves from one-off consistency patches toward an Answer Reviewer Agent, Final Answer Composer, and small deterministic safety guardrail.
+- P20 general business analysis foundation work that cleans old paths and separates factual tools, model judgment, fact validation, and expression/report writing so the product can handle different uploaded business datasets.
 
 Current runtime chain:
 
@@ -58,8 +60,9 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
 | P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, cleanup, and live acceptance | Complete |
-| P20 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
-| P21 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
+| P20 | General business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation | Planned |
+| P21 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
+| P22 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
 
 ## P16 Business Answer Contract
 
@@ -79,7 +82,7 @@ Current analysis results and report sections use:
 
 Report sections reuse this same shape. Main product fields must not contain raw SQL, trace IDs, provider metadata, raw row dumps, internal prompt text, or unsupported claims. Technical details remain available under collapsed UI/appendix sections.
 
-## P17/P18/P19 Roadmap
+## P17/P18/P19/P20 Roadmap
 
 | Task | Scope | Status |
 |---|---|---|
@@ -100,14 +103,20 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete |
 | P19-H4 | Synthesize reports and chart narrative from reviewed business answers, with language-aware report labels and business-readable evidence summaries | Complete |
 | P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete |
+| P20-H0 | Architecture cleanup and main path inventory; remove old paths and conflicting compatibility code | Complete |
+| P20-H1 | General data profiling and semantic layer for arbitrary uploaded business datasets | Planned |
+| P20-H2 | General analysis task contract and clarification continuation | Planned |
+| P20-H3 | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope | Planned |
+| P20-H4 | Business insight, answer, chart, and report generation from validated evidence | Planned |
+| P20-H5 | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled | Planned |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. The H4 repair also keeps English reports fully English in Markdown/frontend labels while Chinese reports remain Chinese, and evidence summaries use shared business field labels instead of raw column names. P20 and P21 are future directions only; do not implement them inside P19 closeout.
+P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. The H4 repair also keeps English reports fully English in Markdown/frontend labels while Chinese reports remain Chinese, and evidence summaries use shared business field labels instead of raw column names.
 
-P20 is reserved for responsiveness after P19 quality is stable: Route Classifier Agent, safe fast factual path, progress states, semantic/profile caching, and background chart/report work. P21 is reserved for real business tool calling and exports after quality and responsiveness are stable, with China-oriented tools/artifacts preferred over Google Sheets examples. Both are explicitly out of scope for P19-H5.
+P20 is now reserved for the general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must avoid table-specific rule trees, fixed answer templates, and old compatibility paths. P20-H0 is complete: the active FastAPI/Next.js workspace chain was inventoried, stale P17 status assertions were updated, and the trace-driven SQL template-mining/eval helper path was removed while preserving provider smoke validation. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved. Responsiveness work moves to P21, and real China-oriented external business tool calling/export moves to P22 after the generalized answer/report foundation is stable.
 
 ## Current Entry Points
 
@@ -153,7 +162,7 @@ cd frontend && npm test
 cd frontend && npm run build
 ```
 
-P19 should begin from `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`. It must keep the P16 `business_answer` public shape, avoid table-specific rule trees, keep live DeepSeek tests opt-in, preserve deterministic unit-test stability, prefer reviewer/composer model feedback over narrow keyword patches, and keep each H task covered by tests, cleanup, and full closeout verification. Old paths and compatibility code that conflict with the current FastAPI/Next.js workspace product should be deleted, not preserved for historical behavior.
+P20 should begin from `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must keep live DeepSeek tests opt-in, preserve deterministic unit-test stability where the behavior is still current, and prefer general contracts over narrow keyword patches. It should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
 
 ## Historical / Superseded Context
 

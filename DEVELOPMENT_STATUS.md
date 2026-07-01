@@ -8,17 +8,17 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H5 quality closeout complete |
-| Next planned task | P20 responsive analysis experience research and planning |
-| Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout |
+| Current phase | P20 General Business Analysis Foundation |
+| Current task | P20-H0 architecture cleanup complete; next is P20-H1 generalized profiling and semantic layer |
+| Next planned task | P20-H1 general data profiling and semantic layer for arbitrary uploaded business datasets |
+| Last completed task | P20-H0 architecture cleanup and main path inventory |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
-| Main product target | Chinese business data-analysis product with guarded SQL/evidence execution, 数据源管理, 分析工作台, 报告中心, 数据设置, and future-compatible 业务问答 preview |
-| Out of scope for P17 | New product features, real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, and old demo restoration |
+| Main product target | General business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, business answers, and management reports |
+| Out of scope for P20 | Real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
 
 ## Phase Overview
 
@@ -34,8 +34,20 @@ This is the concise current status surface for InsightFlow Agent.
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
 | P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
 | P19 | `[x]` Complete | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, cleanup, and live acceptance |
-| P20 | `[ ]` Future | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background work |
-| P21 | `[ ]` Future | Real business tool calling and exports after quality and responsiveness are stable |
+| P20 | `[~]` In progress | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation |
+| P21 | `[ ]` Future | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background work |
+| P22 | `[ ]` Future | Real business tool calling and exports after generalized analysis quality and responsiveness are stable |
+
+## P20 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P20-H0 | `[x]` Complete | Architecture cleanup and main path inventory; removed stale template-mining eval/helper path and clarified current product chain |
+| P20-H1 | `[ ]` Planned | General data profiling and semantic layer for arbitrary uploaded business datasets |
+| P20-H2 | `[ ]` Planned | General analysis task contract and clarification continuation |
+| P20-H3 | `[ ]` Planned | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope |
+| P20-H4 | `[ ]` Planned | Business insight, answer, chart, and report generation from validated evidence |
+| P20-H5 | `[ ]` Planned | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled |
 
 ## P19 Task Status
 
@@ -90,6 +102,16 @@ workspace import
 
 ## Latest Verified Baseline
 
+Latest P20-H0 cleanup result on 2026-07-01:
+
+- Current main path inventory remains: import/profile/semantic layer -> question understanding/clarification -> SQL planning/review/schema repair/execution -> evidence validation -> reviewer/composer/business answer -> visualization/report -> Next.js UI.
+- Added `tests/test_p20_architecture_cleanup_boundaries.py` to protect active agent/tool boundaries and prevent old action/chart/mock/eval/template-mining paths from returning to the main product chain.
+- Removed the old trace-driven SQL template-mining helper path: `sql_planning.feedback`, `tests/test_llm_template_mining_eval_suite.py`, and `template_mining_event` trace payloads from `agents/guarded_llm_enhancer.py`.
+- Preserved provider structured-output smoke coverage in `tests/test_llm_smoke_eval.py`.
+- Focused cleanup baseline initially failed because P17 boundary tests still asserted P19/responsiveness-era status text; those assertions now point at P20 General Business Analysis Foundation.
+- Verification passed: cleanup/P20 focused boundaries `22 passed`; project initialization/MCP boundaries `9 passed`; workspace analysis/report/product-result/business-answer focused regression `60 passed`; full backend regression `391 passed, 13 skipped`; frontend workspace-flow Vitest `49 passed`; full frontend Vitest `62 passed`; frontend production build passed.
+- Legacy audit after cleanup found remaining old action/chart/mock/eval/template terms only in Historical / Superseded documentation or negative boundary/provider tests; no active main product import depends on them.
+
 Latest P18-H6 closeout result on 2026-07-01:
 
 - P18 focused regression passed for answer consistency, report runner, product result builder, business answer quality, and DeepSeek structured output.
@@ -108,7 +130,7 @@ P19 planning note on 2026-07-01:
 - Direction update: P19 should not become an expanding deterministic patch list for every possible model mistake. The next design direction is an Answer Reviewer Agent plus Final Answer Composer, with small deterministic checks as the last safety guardrail.
 - Planning update: P19 is intentionally compacted into five H tasks so development is easier to steer, but each H task still requires tests, code cleanup, artifact hygiene, and focused/full verification.
 - Cleanup policy update: P19 should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
-- Future notes: P20 should optimize responsiveness with route classification, fast factual path, progress states, caching, and background work. P21 should add real business tool calling/export after P19/P20 are stable.
+- Future notes at the time of P19 planning originally pointed P20 toward responsiveness, but real product testing later re-scoped P20 into the general business analysis foundation. Responsiveness is now P21 and real business tool calling/export is now P22.
 
 P19-H2 completion note on 2026-07-01:
 
@@ -151,7 +173,7 @@ P19-H5 completion note on 2026-07-01:
 - H5 fixed a live acceptance quality gap where a clean provider factual answer could omit recommendations and caveats; the product result builder now fills only minimal evidence-based next-step guidance and query-scope caveats for sufficiently supported answers.
 - Artifact hygiene was rechecked: generated databases, reports, report Markdown, chart artifacts, traces, `.env`, frontend build output, `.superpowers`, and real DeepSeek temporary artifacts remain untracked/ignored and were not staged.
 - Cleanup audit found old action/chart/mock/template terms only in historical notes, deleted-file assertions, ignored generated artifacts, or necessary test doubles; no current product entry point was restored or duplicated.
-- P20 responsiveness and P21 real business tool calling remain future directions only.
+- This older closeout note has been superseded by the P20 planning note below: P20 is now the general business analysis foundation, while responsiveness moves to P21 and real business tool calling moves to P22.
 
 P19 closeout fix note on 2026-07-01:
 
@@ -160,7 +182,15 @@ P19 closeout fix note on 2026-07-01:
 - Workspace settings model-mode summary reads the merged local `.env` and process environment, so provider key presence and product live mode remain separate states.
 - Frontend coverage now includes loading, key-only, live-mode-on, and fetch-failure model status states without relying on a real backend.
 - Local ignored generated artifacts were cleaned from `.superpowers`, chart PNG outputs, run workspaces, pytest/cache directories, `__pycache__`, and frontend build output; retained `.env`, tracked placeholders, and the historical `data/ecommerce.db` fixture were not removed or staged.
-- P20 responsiveness and P21 real business tool calling remain future directions only.
+- P20 has been re-scoped after real product testing: it is now the general business analysis foundation phase, not responsiveness work. Responsiveness moves to P21 and real business tool calling moves to P22.
+
+P20 planning note on 2026-07-01:
+
+- Real P19 workspace testing showed that the system can query useful evidence but still over-downgrade answers to "证据不足" because safety, evidence, consistency, and expression responsibilities are too tightly coupled.
+- P20 should split the chain into factual tool output, model judgment, fact validation, and business expression/report writing.
+- P20 must support general business datasets by reasoning over dimensions, metrics, time fields, filters, decision goals, evidence rows, chart intents, and report sections instead of hardcoding `orders`, `channel`, `marketing_spend`, `revenue`, or ROI-only channel analysis.
+- P20 cleanup policy: delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
+- P20 implementation guidance lives in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

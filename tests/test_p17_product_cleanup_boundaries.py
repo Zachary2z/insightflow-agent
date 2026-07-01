@@ -343,12 +343,12 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
         in p17_plan
     )
     assert "P17 is complete. P18 is the next phase" in p17_plan
-    assert "Current phase | P19 Business Output And Report Quality" in status
-    assert "Current task | P19-H5 quality closeout complete" in status
-    assert "Next planned task | P20 responsive analysis experience research and planning" in status
-    assert "Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout" in status
+    assert "Current phase | P20 General Business Analysis Foundation" in status
+    assert "Current task | P20-H0 architecture cleanup complete; next is P20-H1 generalized profiling and semantic layer" in status
+    assert "Next planned task | P20-H1 general data profiling and semantic layer for arbitrary uploaded business datasets" in status
+    assert "Last completed task | P20-H0 architecture cleanup and main path inventory" in status
     assert "Latest P17-H6 closeout result on 2026-06-30" in status
-    assert "P17/P18/P19 Roadmap" in plan
+    assert "P17/P18/P19/P20 Roadmap" in plan
     assert "P17-H5 | Product docs/status simplification | Complete" in plan
     assert "P17-H6 | Final artifact hygiene, legacy audit, backend/frontend regression, and real DeepSeek acceptance | Complete" in plan
     assert "P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete" in plan
@@ -360,6 +360,7 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     )
     assert "P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete" in plan
     assert "P17 progress summary: H1-H6 are complete" in plan
+    assert "P20 general business analysis foundation" in plan
 
 
 def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
@@ -371,7 +372,7 @@ def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
         "| P17-H4 | Delete obsolete historical eval/demo docs and tests that no longer protect current product behavior | Complete |"
         in p17_plan
     )
-    assert "Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout" in status
+    assert "Last completed task | P20-H0 architecture cleanup and main path inventory" in status
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 

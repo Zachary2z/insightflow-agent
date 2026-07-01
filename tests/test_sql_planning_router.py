@@ -107,40 +107,6 @@ def test_sql_planning_llm_candidate_route_never_calls_provider_or_returns_sql():
     assert "generated_sql" not in result
 
 
-def test_template_mining_feedback_flags_repeated_successful_llm_candidate_patterns():
-    from sql_planning.feedback import summarize_template_mining_feedback
-
-    events = [
-        {
-            "strategy": "llm_candidate",
-            "success": True,
-            "intent": {"metric": "repurchase_rate", "dimension": "user", "operation": "trend"},
-        },
-        {
-            "strategy": "llm_candidate",
-            "success": True,
-            "intent": {"metric": "repurchase_rate", "dimension": "user", "operation": "trend"},
-        },
-        {
-            "strategy": "llm_candidate",
-            "success": False,
-            "intent": {"metric": "aov", "dimension": "channel", "operation": "comparison"},
-        },
-    ]
-
-    result = summarize_template_mining_feedback(events, min_success_count=2)
-
-    assert result["success"] is True
-    assert result["candidates"] == [
-        {
-            "intent_signature": "repurchase_rate:user:trend",
-            "success_count": 2,
-            "recommended_template_id": "repurchase_rate_user_trend",
-            "reason": "Repeated successful llm_candidate pattern can be promoted to a deterministic template.",
-        }
-    ]
-
-
 def test_sql_planning_agent_writes_state_and_trace_without_sql_generation():
     from agents.sql_planning_router import run_sql_planning_router_agent
     from agents.supervisor import initialize_run

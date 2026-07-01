@@ -33,8 +33,9 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
 | P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
 | P19 report and chart synthesis | Complete | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, technical appendix, and H5 live acceptance |
+| P20 general business analysis foundation | In progress | `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md` |
 
-P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, P19 reviewer/composer and report-synthesis surfaces, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P19.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0 is complete. P20 is the current foundation phase: clean old/conflicting paths, generalize data profiling and semantic context, introduce a reusable analysis task contract, stabilize factual evidence and metric formulas, and make answers/reports use validated evidence without fixed demo templates. Real external business tool calling remains a later product phase after the generalized analysis foundation and responsiveness work are stable.
 
 ## Quickstart
 
@@ -143,6 +144,16 @@ Product-facing fields must stay business-readable, evidence-backed, and free of 
 | Trace and artifacts | `tools/trace_logger.py`, workspace run directories, workspace report directories |
 | MCP wrappers | `mcp_servers/database_server.py`, `mcp_servers/report_server.py` |
 
+P20 should keep this product recognizably multi-agent and tool-calling, but with cleaner boundaries:
+
+- data profiling and semantic-layer tools describe the current workspace instead of relying on a fixed demo schema;
+- task-routing agents convert natural-language questions into dimensions, metrics, time ranges, filters, and decision goals;
+- SQL/calculation/chart/report tools produce structured evidence and artifacts;
+- model-backed insight/report writers explain and recommend within the evidence boundary;
+- validators check factual numbers, rankings, fields, and metric formulas without blocking reasonable evidence-backed business judgment.
+
+P20-H0 cleanup note: the old trace-driven SQL template-mining/eval helper path was removed from active code (`sql_planning.feedback`, `tests/test_llm_template_mining_eval_suite.py`, and `template_mining_event` trace payloads). Current provider smoke validation remains in `tests/test_llm_smoke_eval.py`.
+
 ## Verification
 
 Focused cleanup boundary:
@@ -202,6 +213,6 @@ This section is historical cleanup context only, not current product guidance.
 
 - Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old demo/eval/action/mock/chart cleanup terms.
 - Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level schema, SQL validator, SQL executor, workflow, report, MCP, and provider regressions still use it directly. It is not the default product database and is not the quickstart data source.
-- Current implementation guidance lives in `docs/product/plans/`, especially the P16 clean business output model and P17 product codebase cleanup plans.
+- Current implementation guidance lives in `docs/product/plans/`, especially the P20 general business analysis foundation plan.
 
 For the concise roadmap, see [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). For the current task/status surface, see [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).

@@ -11,56 +11,6 @@ class _SequenceProvider:
         return response
 
 
-def test_template_mining_reads_successful_llm_candidate_from_workflow_trace(tmp_path):
-    from graph.workflow import run_workflow
-    from llm_ops.provider import MockLLMProvider
-    from sql_planning.feedback import mine_template_candidates_from_trace_files
-
-    result = run_workflow(
-        "最近 30 天按用户分析复购率趋势",
-        trace_dir=tmp_path,
-        run_id="run_template_mining_trace",
-        sql_candidate_provider=MockLLMProvider(
-            {
-                "sql_candidates": [
-                    {
-                        "sql": (
-                            "SELECT users.id, COUNT(DISTINCT orders.id) AS order_count "
-                            "FROM users JOIN orders ON users.id = orders.user_id "
-                            "WHERE orders.status = 'paid' "
-                            "GROUP BY users.id "
-                            "HAVING COUNT(DISTINCT orders.id) > 1 "
-                            "LIMIT 100"
-                        ),
-                        "rationale": "User-level repeat purchase proxy from paid orders.",
-                    }
-                ]
-            }
-        ),
-    )
-
-    mining = mine_template_candidates_from_trace_files([result["trace_path"]], min_success_count=1)
-
-    assert mining["success"] is True
-    assert mining["source"] == "workflow_trace"
-    assert mining["candidates"] == [
-        {
-            "intent_signature": "repurchase_rate:user:trend",
-            "success_count": 1,
-            "recommended_template_id": "repurchase_rate_user_trend",
-            "sample_questions": ["最近 30 天按用户分析复购率趋势"],
-            "auto_apply": False,
-            "reason": "Repeated successful llm_candidate pattern can be promoted to a deterministic template.",
-        }
-    ]
-    assert "sql" not in mining["candidates"][0]
-    assert any(
-        event.get("node") == "guarded_sql_candidate_agent"
-        and event.get("template_mining_event", {}).get("accepted") is True
-        for event in result["trace"]
-    )
-
-
 def test_llm_smoke_eval_validates_schema_and_expected_failures():
     from llm_ops.eval_smoke import run_llm_smoke_eval
 
