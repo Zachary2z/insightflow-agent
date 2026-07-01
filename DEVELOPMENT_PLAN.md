@@ -57,7 +57,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P16 | Clean business output model: one `business_answer` shape across backend, frontend, reports, Markdown, and run restoration | Complete |
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
-| P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, and live acceptance | Planned |
+| P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, cleanup, and live acceptance | Complete |
 | P20 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
 | P21 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
 
@@ -99,15 +99,15 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete |
 | P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete |
 | P19-H4 | Synthesize reports and chart narrative from reviewed business answers, with language-aware report labels and business-readable evidence summaries | Complete |
-| P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Planned |
+| P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 is complete. P19 is the active product quality phase. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, and P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix. The H4 repair also keeps English reports fully English in Markdown/frontend labels while Chinese reports remain Chinese, and evidence summaries use shared business field labels instead of raw column names. The remaining P19 work is quality closeout and live DeepSeek acceptance before adding authenticated external publishing integrations. P19 should stay compact: finish regression/live acceptance and cleanup. It should not grow into a list of predicted failure patches; deterministic code stays as a small final safety check.
+P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. The H4 repair also keeps English reports fully English in Markdown/frontend labels while Chinese reports remain Chinese, and evidence summaries use shared business field labels instead of raw column names. P20 and P21 are future directions only; do not implement them inside P19 closeout.
 
-P20 is reserved for responsiveness after P19 quality is stable: Route Classifier Agent, safe fast factual path, progress states, semantic/profile caching, and background chart/report work. P21 is reserved for real business tool calling and exports after quality and responsiveness are stable, with China-oriented tools/artifacts preferred over Google Sheets examples.
+P20 is reserved for responsiveness after P19 quality is stable: Route Classifier Agent, safe fast factual path, progress states, semantic/profile caching, and background chart/report work. P21 is reserved for real business tool calling and exports after quality and responsiveness are stable, with China-oriented tools/artifacts preferred over Google Sheets examples. Both are explicitly out of scope for P19-H5.
 
 ## Current Entry Points
 

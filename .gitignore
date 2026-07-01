@@ -20,6 +20,12 @@ logs/traces/*
 logs/traces/**/*
 reports/charts/*
 reports/markdown/*
+reports/**
+!reports/
+!reports/charts/
+!reports/charts/.gitkeep
+!reports/markdown/
+!reports/markdown/.gitkeep
 sample_data/
 workspaces/*
 !workspaces/

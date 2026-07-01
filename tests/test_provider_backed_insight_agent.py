@@ -54,7 +54,7 @@ def test_provider_backed_insight_agent_generates_business_answer_not_parameter_d
         "why": "证据显示 paid_search 的收入为 200.0。",
         "evidence_bullets": ["paid_search 收入为 200.0。"],
         "recommendations": ["优先复盘 paid_search 的投放和转化动作。"],
-        "caveats": [],
+        "caveats": ["当前结论只基于本次查询返回的数据和时间范围。"],
         "confidence": "high",
     }
     assert result["final_answer"] == result["business_answer"]["direct_answer"]

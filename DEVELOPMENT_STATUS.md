@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H4 repair complete / ready for H5 quality closeout |
-| Next planned task | P19-H5 Quality closeout and live acceptance |
-| Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
+| Current task | P19-H5 quality closeout complete |
+| Next planned task | P20 responsive analysis experience research and planning |
+| Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -33,7 +33,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P16 | `[x]` Complete | Single clean `business_answer` contract across analysis, reports, Markdown, frontend rendering, and run restoration |
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
 | P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
-| P19 | `[ ]` Planned | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, and live acceptance |
+| P19 | `[x]` Complete | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, cleanup, and live acceptance |
 | P20 | `[ ]` Future | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background work |
 | P21 | `[ ]` Future | Real business tool calling and exports after quality and responsiveness are stable |
 
@@ -45,7 +45,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P19-H2 | `[x]` Complete | Added Answer Reviewer Agent and Final Answer Composer contracts, deterministic/provider tests, and product/report integration |
 | P19-H3 | `[x]` Complete | Polished business answer quality: vocabulary, units, grounded recommendations, tradeoffs, caveats, and report-section reuse |
 | P19-H4 | `[x]` Complete | Reports synthesize reviewed answers into management narrative, with language-aware Markdown/frontend labels and business-labeled evidence summaries |
-| P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
+| P19-H5 | `[x]` Complete | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup audit, and artifact hygiene |
 
 ## P18 Task Status
 
@@ -139,6 +139,19 @@ P19-H4 repair note on 2026-07-01:
 - English report goals now render English business labels in Markdown and the frontend report reader, including section labels, chart captions, status/progress metadata, and chart download copy; Chinese report goals keep the Chinese reading experience.
 - Report-level chart/evidence summaries reuse the shared business field label helper so fields such as `total_revenue`, `order_count`, `avg_order_value`, and `segment` are shown as business-readable labels instead of raw column names.
 - Focused repair regressions cover English Markdown without Chinese labels, Chinese Markdown retention, business-labeled evidence summaries, and frontend English/Chinese report detail rendering.
+
+P19-H5 completion note on 2026-07-01:
+
+- Focused backend regression passed for workspace analysis, workspace reports, product result builder, reviewer/composer, business-answer quality, chart/report cleanup, and P17 cleanup boundaries: `100 passed`.
+- Full backend pytest passed: `388 passed, 13 skipped`.
+- Frontend Vitest passed: `60 passed`.
+- Frontend production build passed.
+- Real DeepSeek acceptance completed against temporary generated workspace data outside the repo for three Chinese business questions: a single-metric top-revenue question, a revenue-vs-ROI tradeoff question, and a management channel-review report.
+- Live acceptance showed real provider participation, SQL review approval, Chinese business answers with evidence, recommendations and limits, chart artifacts with displayable report/API paths, and report-level management summary, key findings, action priorities, chart/evidence, and risks/limits.
+- H5 fixed a live acceptance quality gap where a clean provider factual answer could omit recommendations and caveats; the product result builder now fills only minimal evidence-based next-step guidance and query-scope caveats for sufficiently supported answers.
+- Artifact hygiene was rechecked: generated databases, reports, report Markdown, chart artifacts, traces, `.env`, frontend build output, `.superpowers`, and real DeepSeek temporary artifacts remain untracked/ignored and were not staged.
+- Cleanup audit found old action/chart/mock/template terms only in historical notes, deleted-file assertions, ignored generated artifacts, or necessary test doubles; no current product entry point was restored or duplicated.
+- P20 responsiveness and P21 real business tool calling remain future directions only.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

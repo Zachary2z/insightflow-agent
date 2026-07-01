@@ -92,9 +92,16 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
     evidence_result = raw.get("evidence_result") if isinstance(raw.get("evidence_result"), dict) else {}
 
     if business_answer_is_usable(existing, user_question, execution_result, evidence_result):
+        normalized = _complete_minimum_business_answer(
+            _normalize_business_answer(existing, chinese=chinese),
+            user_question=user_question,
+            execution_result=execution_result,
+            evidence_result=evidence_result,
+            chinese=chinese,
+        )
         return apply_answer_consistency(
             user_question=user_question,
-            business_answer=_normalize_business_answer(existing, chinese=chinese),
+            business_answer=normalized,
             execution_result=execution_result,
             evidence_result=evidence_result,
         )
@@ -250,6 +257,43 @@ def _normalize_business_answer(existing: dict[str, Any], *, chinese: bool) -> di
     )
 
 
+def _complete_minimum_business_answer(
+    answer: dict[str, Any],
+    *,
+    user_question: str,
+    execution_result: dict[str, Any],
+    evidence_result: dict[str, Any],
+    chinese: bool,
+) -> dict[str, Any]:
+    weak_evidence = _has_weak_evidence(execution_result, evidence_result)
+    completed = dict(answer)
+    if not _list_of_text(completed.get("recommendations")) and not weak_evidence:
+        completed["recommendations"] = _business_recommendations(
+            str(completed.get("direct_answer") or ""),
+            user_question=user_question,
+            execution_result=execution_result,
+            chinese=chinese,
+        )
+    if not _list_of_text(completed.get("caveats")):
+        completed["caveats"] = _business_caveats(
+            [],
+            fallback_reason="",
+            weak_evidence=weak_evidence,
+            execution_result=execution_result,
+            chinese=chinese,
+        )
+    return _business_answer(
+        headline=str(completed.get("headline") or ""),
+        direct_answer=str(completed.get("direct_answer") or ""),
+        why=str(completed.get("why") or ""),
+        evidence_bullets=_list_of_text(completed.get("evidence_bullets")),
+        recommendations=_list_of_text(completed.get("recommendations")),
+        caveats=_list_of_text(completed.get("caveats")),
+        confidence=str(completed.get("confidence") or "medium"),
+        chinese=chinese,
+    )
+
+
 def _business_answer_texts(answer: dict[str, Any]) -> list[str]:
     return [
         str(answer.get("headline") or ""),
@@ -366,7 +410,58 @@ def _business_recommendations(
     supported = _supported_budget_recommendation(user_question, execution_result or {}, chinese=chinese)
     if supported:
         return [supported]
+    generic = _generic_evidence_recommendation(user_question, execution_result or {}, chinese=chinese)
+    if generic:
+        return [generic]
     return []
+
+
+def _generic_evidence_recommendation(
+    user_question: str,
+    execution_result: dict[str, Any],
+    *,
+    chinese: bool,
+) -> str:
+    rows = execution_result.get("rows") or []
+    if not rows:
+        return ""
+    columns = [str(column) for column in execution_result.get("columns") or []]
+    pairs = _row_pairs(rows[0], columns)
+    entity = _first_business_entity(pairs)
+    if chinese:
+        if entity:
+            return f"建议将 {entity} 作为下一步复盘对象，并继续用同口径数据跟踪本次查询返回的指标。"
+        return "建议基于本次查询结果继续做同口径复盘，并在后续分析中补充更细的业务拆解。"
+    if entity:
+        return f"Use {entity} as the next review focus and keep tracking the returned metrics on the same basis."
+    return "Use this query result as the next review input and add more business detail in a follow-up analysis."
+
+
+def _first_business_entity(pairs: list[tuple[str, Any]]) -> str:
+    for key, value in pairs:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        if _value_is_number(value):
+            continue
+        if str(key).lower() in {"order_date", "date", "month", "week", "created_at"}:
+            continue
+        return text
+    return ""
+
+
+def _value_is_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int | float):
+        return True
+    if isinstance(value, str):
+        try:
+            float(value.replace(",", ""))
+        except ValueError:
+            return False
+        return True
+    return False
 
 
 def _supported_budget_recommendation(user_question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
@@ -437,6 +532,12 @@ def _business_caveats(
         )
     if weak_evidence:
         caveats.append(_weak_evidence_caveat(execution_result, chinese=chinese))
+    if not caveats:
+        caveats.append(
+            "当前结论只基于本次查询返回的数据和时间范围。"
+            if chinese
+            else "This conclusion only uses the data and time range returned by this query."
+        )
     return list(dict.fromkeys(caveats))
 
 

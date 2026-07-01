@@ -344,9 +344,9 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     )
     assert "P17 is complete. P18 is the next phase" in p17_plan
     assert "Current phase | P19 Business Output And Report Quality" in status
-    assert "Current task | P19-H4 complete / ready for H5 quality closeout" in status
-    assert "Next planned task | P19-H5 Quality closeout and live acceptance" in status
-    assert "Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout" in status
+    assert "Current task | P19-H5 quality closeout complete" in status
+    assert "Next planned task | P20 responsive analysis experience research and planning" in status
+    assert "Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout" in status
     assert "Latest P17-H6 closeout result on 2026-06-30" in status
     assert "P17/P18/P19 Roadmap" in plan
     assert "P17-H5 | Product docs/status simplification | Complete" in plan
@@ -354,7 +354,11 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     assert "P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete" in plan
     assert "P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete" in plan
     assert "P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete" in plan
-    assert "P19-H4 | Synthesize reports and chart narrative from reviewed business answers | Complete" in plan
+    assert (
+        "P19-H4 | Synthesize reports and chart narrative from reviewed business answers, with language-aware report labels and business-readable evidence summaries | Complete"
+        in plan
+    )
+    assert "P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete" in plan
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 
@@ -367,7 +371,7 @@ def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
         "| P17-H4 | Delete obsolete historical eval/demo docs and tests that no longer protect current product behavior | Complete |"
         in p17_plan
     )
-    assert "Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout" in status
+    assert "Last completed task | P19-H5 regression, live acceptance, artifact hygiene, cleanup audit, docs closeout" in status
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 

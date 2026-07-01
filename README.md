@@ -32,9 +32,9 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P16 clean business output model | Complete | `business_answer` with `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
 | P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
-| P19 report and chart synthesis | In progress | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, and technical appendix |
+| P19 report and chart synthesis | Complete | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, technical appendix, and H5 live acceptance |
 
-P18-H1 through P18-H6 are complete. P19-H1 through P19-H4 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, P19 reviewer/composer and report-synthesis surfaces, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P19.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, P19 reviewer/composer and report-synthesis surfaces, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P19.
 
 ## Quickstart
 
@@ -156,6 +156,7 @@ Current backend regression:
 ```bash
 python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
 python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest
 ```
 
 P18 focused regression:
@@ -185,6 +186,9 @@ Generated runtime outputs must not be committed:
 - `.pytest_cache/`
 - `__pycache__/`
 - `sample_data/`
+- `data/*.db`
+- `eval/report.md`
+- `reports/**`
 - `reports/charts/*`
 - `logs/traces/*`
 - `workspaces/*/runs/*`

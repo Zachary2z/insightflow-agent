@@ -321,6 +321,37 @@ def test_product_result_builder_preserves_clean_provider_business_answer():
     assert answer == provider_answer
 
 
+def test_clean_provider_business_answer_gets_minimum_recommendation_and_caveat():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高，为什么？",
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "最近 90 天 email 渠道收入最高，达到 44548.53。",
+                "why": "证据显示 email 渠道收入为 44548.53，高于其他渠道。",
+                "evidence_bullets": ["email 渠道收入为 44548.53。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "high",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    assert answer["recommendations"]
+    assert answer["caveats"]
+    assert "email" in " ".join(answer["recommendations"])
+    assert any("本次查询" in caveat or "时间范围" in caveat for caveat in answer["caveats"])
+
+
 def test_product_result_builder_rejects_provider_business_answer_with_technical_leak():
     from workspaces.product_result_builder import build_business_answer
 
