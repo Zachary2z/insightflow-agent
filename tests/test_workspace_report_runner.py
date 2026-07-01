@@ -92,6 +92,11 @@ def _fake_section_runner(calls):
             },
             "visualization_trace": {
                 "artifact_path": str(artifact_path),
+                "chart_spec": {
+                    "title": f"第 {call_index} 节渠道收入图",
+                    "unit": "元",
+                    "business_annotation": "paid_search 收入领先，支持优先复盘渠道结构。",
+                },
                 "provider_called": False,
             },
             "provider_metadata": {"fake": {"call_index": call_index}},
@@ -106,6 +111,151 @@ def _fake_section_runner(calls):
         }
 
     return runner
+
+
+def _narrative_business_answer(
+    *,
+    headline: str,
+    direct_answer: str,
+    why: str,
+    evidence_bullets: list[str],
+    recommendations: list[str] | None = None,
+    caveats: list[str] | None = None,
+    confidence: str = "high",
+) -> dict:
+    return {
+        "headline": headline,
+        "direct_answer": direct_answer,
+        "why": why,
+        "evidence_bullets": evidence_bullets,
+        "recommendations": recommendations or [],
+        "caveats": caveats or ["当前只基于报告章节查询结果。"],
+        "confidence": confidence,
+    }
+
+
+def test_report_synthesizes_management_narrative_instead_of_section_concatenation(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    answers = [
+        _narrative_business_answer(
+            headline="微信私域收入规模领先",
+            direct_answer="最近 90 天微信私域总收入最高，是收入规模主线。",
+            why="证据显示微信私域收入为 890262.07 元，高于抖音信息流。",
+            evidence_bullets=["微信私域收入为 890262.07 元。", "抖音信息流收入为 740113.50 元。"],
+            recommendations=["优先复盘微信私域的可复制获客动作。"],
+        ),
+        _narrative_business_answer(
+            headline="百度搜索订单数领先",
+            direct_answer="从订单数看，百度搜索最高，说明规模和订单效率存在不同口径。",
+            why="证据显示百度搜索订单数为 165，微信私域订单数为 144。",
+            evidence_bullets=["百度搜索订单数为 165。", "微信私域订单数为 144。"],
+            recommendations=["把百度搜索作为订单获取效率的下一步验证对象。"],
+        ),
+        _narrative_business_answer(
+            headline="ROI 数据缺失，不能直接给投放加码结论",
+            direct_answer="当前报告没有 ROI 或利润数据，预算建议应先写成下一步验证。",
+            why="返回字段只有渠道、收入和订单数，没有 ROI、利润或转化率。",
+            evidence_bullets=["当前证据表缺少 ROI、利润、转化率字段。"],
+            recommendations=["下一步补充 ROI、利润和转化率后，再判断预算加码。"],
+            caveats=["缺少 ROI、利润、转化率，不能直接推导投放收益。"],
+            confidence="medium",
+        ),
+    ]
+
+    def narrative_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        index = min(len(calls), len(answers) - 1)
+        calls.append(user_question)
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": answers[index],
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "order_count"],
+                "rows": [["微信私域", 890262.07, 144], ["百度搜索", 650220.0, 165]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "trace": [{"node": "final_answer_composer"}],
+        }
+
+    calls = []
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成面向管理层的中文渠道经营复盘报告，关注收入规模、订单效率和预算决策边界。",
+        section_runner=narrative_runner,
+    )
+
+    report = result["report"]
+    summary_text = "\n".join(report["executive_summary"])
+    findings_text = "\n".join(report["key_findings"])
+    actions_text = "\n".join(report["action_priorities"])
+    limits_text = "\n".join(report["risks_and_limits"])
+
+    assert report["executive_summary"]
+    assert report["executive_summary"][0] != "Overall Revenue: 微信私域收入规模领先"
+    assert "管理层" in summary_text
+    assert "微信私域" in summary_text
+    assert "百度搜索" in findings_text
+    assert any(marker in findings_text for marker in ("口径", "取舍", "不同"))
+    assert "下一步补充 ROI、利润和转化率" in actions_text
+    assert "ROI" in limits_text
+    assert "利润" in limits_text
+    assert "SELECT" not in summary_text + findings_text + actions_text + limits_text
+    assert "final_answer_composer" not in summary_text + findings_text + actions_text + limits_text
+
+
+def test_report_synthesis_respects_english_goal_language(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def english_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": {
+                    "headline": "Paid search leads revenue",
+                    "direct_answer": "Paid search has the highest revenue in the returned data.",
+                    "why": "The evidence table shows paid_search revenue is 200.0.",
+                    "evidence_bullets": ["paid_search revenue is 200.0."],
+                    "recommendations": ["Review paid search efficiency before increasing spend."],
+                    "caveats": ["ROI and profit are not available in this report section."],
+                    "confidence": "high",
+                },
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["paid_search", 200.0], ["organic", 150.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "trace": [{"node": "final_answer_composer"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "Create an English leadership report about revenue and channel performance.",
+        section_runner=english_runner,
+    )
+
+    report_text = "\n".join(
+        [
+            *result["report"]["executive_summary"],
+            *result["report"]["key_findings"],
+            *result["report"]["action_priorities"],
+            *result["report"]["risks_and_limits"],
+        ]
+    )
+    assert "Executive summary" in report_text
+    assert "Key findings" in report_text
+    assert "管理层" not in report_text
+    assert "关键发现" not in report_text
+    assert "建议动作" not in report_text
 
 
 def test_business_review_generates_multiple_sections_and_persists_report_artifacts(tmp_path):
@@ -147,7 +297,11 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
     assert "SELECT channel" not in business_answer_text
     assert "provider_called" not in business_answer_text
     assert "question_understanding_agent" not in business_answer_text
-    assert saved["executive_summary"][0] == "Overall Revenue: 第 1 个章节的业务结论"
+    assert saved["executive_summary"][0].startswith("管理层摘要：")
+    assert saved["key_findings"]
+    assert saved["action_priorities"]
+    assert saved["risks_and_limits"]
+    assert saved["chart_and_evidence"]
     assert saved["sections"][0]["columns"] == ["channel", "revenue"]
     assert saved["sections"][0]["rows_preview"][0] == {
         "channel": "paid_search",
@@ -176,16 +330,61 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
     ]
     for section in saved["sections"]:
         assert section["artifact_paths"]
+        assert section["business_artifacts"][0]["title"].endswith("渠道收入图")
+        assert section["business_artifacts"][0]["unit"] == "元"
+        assert "paid_search 收入领先" in section["business_artifacts"][0]["business_annotation"]
         for artifact_path in section["artifact_paths"]:
             assert artifact_path.startswith("artifacts/")
             assert (report_dir / artifact_path).is_file()
             assert Path(artifact_path).is_relative_to("artifacts")
             assert "runs/fake_run" not in artifact_path
+            assert f"![" in markdown
             assert artifact_path in markdown
+            assert "单位：元" in markdown
 
     trace = json.loads((report_dir / "trace.json").read_text(encoding="utf-8"))
     assert trace["report_id"] == report["report_id"]
     assert any(event["event"] == "section_completed" for event in trace["events"])
+
+
+def test_report_with_no_charts_stays_readable_without_internal_errors(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def no_chart_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": _business_answer(1),
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["paid_search", 200.0], ["organic", 150.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "visualization_trace": {
+                "rendering_status": "failed",
+                "error": "matplotlib backend error",
+                "trace_path": "/tmp/internal-trace.json",
+            },
+            "trace": [{"node": "visualization_agent"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "生成中文收入趋势报告。",
+        section_runner=no_chart_runner,
+    )
+    markdown = Path(result["report"]["markdown_path"]).read_text(encoding="utf-8")
+    business_body = markdown.split("## 技术附录", 1)[0]
+
+    assert result["report"]["chart_and_evidence"] == ["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"]
+    assert "暂无可展示图表" in business_body
+    assert "matplotlib backend error" not in business_body
+    assert "internal-trace" not in business_body
 
 
 def test_report_section_without_current_business_answer_gets_low_confidence_failure(tmp_path):

@@ -1414,7 +1414,11 @@ describe("workspace product components", () => {
         report_goal: "Review revenue.",
         title: "Business Review",
         status: "completed",
-        executive_summary: ["Revenue grew."],
+        executive_summary: ["管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。"],
+        key_findings: ["关键发现：付费搜索收入最高，邮件渠道次之。"],
+        action_priorities: ["行动优先级：先复盘付费搜索投放效率。"],
+        chart_and_evidence: ["图表：渠道收入对比，单位：元。注释：付费搜索贡献主要收入。"],
+        risks_and_limits: ["风险边界：当前报告缺少 ROI、利润和转化率。"],
         sections: [
           {
             section_id: "revenue_by_channel",
@@ -1440,7 +1444,9 @@ describe("workspace product components", () => {
               {
                 type: "chart",
                 path: "artifacts/revenue_by_channel_1.png",
-                title: "Revenue by Channel",
+                title: "渠道收入对比",
+                unit: "元",
+                business_annotation: "付费搜索贡献主要收入。",
               },
             ],
             evidence_notes: ["Rows preview came from workspace data."],
@@ -1469,9 +1475,17 @@ describe("workspace product components", () => {
     expect(await screen.findByText("Business Review")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
-    expect(screen.getByText("管理层摘要 / Executive Summary")).toBeTruthy();
+    expect(screen.getByText("管理层摘要")).toBeTruthy();
+    expect(screen.getByText("关键发现")).toBeTruthy();
+    expect(screen.getByText("行动优先级")).toBeTruthy();
+    expect(screen.getByText("图表与证据")).toBeTruthy();
+    expect(screen.getByText("风险与边界")).toBeTruthy();
     expect(screen.getByText("报告章节")).toBeTruthy();
-    expect(screen.getByText("Revenue grew.")).toBeTruthy();
+    expect(screen.getByText("管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。")).toBeTruthy();
+    expect(screen.getByText("关键发现：付费搜索收入最高，邮件渠道次之。")).toBeTruthy();
+    expect(screen.getByText("行动优先级：先复盘付费搜索投放效率。")).toBeTruthy();
+    expect(screen.getByText("图表：渠道收入对比，单位：元。注释：付费搜索贡献主要收入。")).toBeTruthy();
+    expect(screen.getByText("风险边界：当前报告缺少 ROI、利润和转化率。")).toBeTruthy();
     expect(screen.getByText("结论")).toBeTruthy();
     expect(screen.getByText("付费搜索收入领先")).toBeTruthy();
     expect(screen.getByText("直接回答")).toBeTruthy();
@@ -1488,7 +1502,9 @@ describe("workspace product components", () => {
     expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
     expect(screen.queryByText("Rows preview came from workspace data.")).toBeNull();
     expect(screen.getByText("图表或附件")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Revenue by Channel" }).getAttribute("src")).toBe(
+    expect(screen.getByText("单位：元")).toBeTruthy();
+    expect(screen.getAllByText("付费搜索贡献主要收入。").length).toBeGreaterThan(0);
+    expect(screen.getByRole("img", { name: "渠道收入对比" }).getAttribute("src")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
     );
     expect(screen.getByRole("link", { name: "下载图表" }).getAttribute("href")).toBe(
@@ -1515,6 +1531,56 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: "下载 Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
+  });
+
+  it("shows a friendly report chart empty state without internal visualization errors", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "revenue_trend",
+        report_goal: "生成中文收入趋势报告",
+        title: "收入趋势报告",
+        status: "completed",
+        executive_summary: ["管理层摘要：本报告基于章节业务答案阅读。"],
+        key_findings: ["关键发现：收入保持稳定。"],
+        action_priorities: ["行动优先级：继续观察收入变化。"],
+        chart_and_evidence: ["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"],
+        risks_and_limits: ["风险边界：当前缺少利润和转化率。"],
+        sections: [
+          {
+            section_id: "trend",
+            title: "收入趋势",
+            status: "completed",
+            business_answer: {
+              headline: "收入保持稳定",
+              direct_answer: "当前收入趋势没有明显异常。",
+              why: "章节证据显示收入波动较小。",
+              evidence_bullets: ["最近周期收入保持稳定。"],
+              recommendations: [],
+              caveats: ["当前没有生成可展示图表。"],
+              confidence: "medium",
+            },
+            business_artifacts: [],
+            technical_details: {
+              error: "matplotlib backend error",
+              trace_path: "/tmp/internal-trace.json",
+            },
+          },
+        ],
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    expect(await screen.findByText("暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。")).toBeTruthy();
+    expect(screen.queryByText(/matplotlib backend error/)).toBeNull();
+    expect(screen.queryByText(/internal-trace/)).toBeNull();
   });
 
   it("rejects malformed report business_answer instead of rendering legacy report body", () => {

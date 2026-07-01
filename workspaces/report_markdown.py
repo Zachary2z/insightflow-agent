@@ -7,30 +7,35 @@ from workspaces.report_models import ReportRecord, ReportSection
 
 
 def render_report_markdown(report: ReportRecord) -> str:
+    chinese = _report_is_chinese(report)
+    headings = _headings(chinese)
     lines: list[str] = [
         f"# {report.title}",
         "",
-        "## Report Goal",
+        f"## {headings['goal']}",
         "",
         report.report_goal or "_No report goal provided._",
         "",
-        "## Status And Progress",
-        "",
-        f"- Status: `{report.status}`",
-        f"- Progress: {_progress_summary(report)}",
-        "",
-        "## Executive Summary",
+        f"## {headings['summary']}",
         "",
     ]
     lines.extend(_bullet_list(report.executive_summary, "_No executive summary yet._"))
-    lines.extend(["", "## Business Sections", ""])
+    lines.extend(["", f"## {headings['findings']}", ""])
+    lines.extend(_bullet_list(report.key_findings, "_No key findings yet._"))
+    lines.extend(["", f"## {headings['actions']}", ""])
+    lines.extend(_bullet_list(report.action_priorities, "_No action priorities yet._"))
+    lines.extend(["", f"## {headings['charts']}", ""])
+    lines.extend(_render_chart_and_evidence(report, empty_message="_No chart or evidence summary yet._"))
+    lines.extend(["", f"## {headings['limits']}", ""])
+    lines.extend(_bullet_list(report.risks_and_limits, "_No risks or limits recorded._"))
+    lines.extend(["", f"## {headings['sections']}", ""])
     if report.sections:
         for section in report.sections:
             lines.extend(_render_business_section(section))
             lines.append("")
     else:
         lines.extend(["_No report sections yet._", ""])
-    lines.extend(["## Technical Appendix", ""])
+    lines.extend([f"## {headings['appendix']}", ""])
     lines.extend(_render_report_appendix(report))
     lines.append("")
     return "\n".join(lines)
@@ -62,15 +67,59 @@ def _render_business_section(section: ReportSection) -> list[str]:
     lines.extend(["", "#### 限制说明", ""])
     lines.extend(_bullet_list(_text_list(answer.get("caveats")), "_No caveats recorded._"))
     lines.extend(["", "#### 置信度", "", str(answer.get("confidence") or "medium")])
-    lines.extend(["", "#### Chart Artifacts", ""])
-    lines.extend(
-        _bullet_list(
-            [f"`{path}`" for path in section.artifact_paths],
-            "_No chart artifacts recorded._",
-        )
-    )
+    lines.extend(["", "#### 图表与证据", ""])
+    lines.extend(_render_section_artifacts(section))
     if section.error:
         lines.extend(["", "#### Error", "", section.error])
+    return lines
+
+
+def _render_chart_and_evidence(report: ReportRecord, *, empty_message: str) -> list[str]:
+    lines: list[str] = []
+    rendered_paths: set[str] = set()
+    for section in report.sections:
+        for artifact in section.business_artifacts or []:
+            path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
+            title = str(artifact.get("title") or section.title or "报告图表").strip()
+            if not path_or_url or path_or_url in rendered_paths:
+                continue
+            rendered_paths.add(path_or_url)
+            lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
+            lines.extend(_artifact_caption_lines(artifact, section_title=section.title))
+    if report.chart_and_evidence:
+        lines.extend(_bullet_list(report.chart_and_evidence, empty_message))
+    return lines or [empty_message]
+
+
+def _render_section_artifacts(section: ReportSection) -> list[str]:
+    artifacts = section.business_artifacts or [
+        {"type": "chart", "path": path, "title": section.title}
+        for path in section.artifact_paths
+    ]
+    if not artifacts:
+        return ["_No chart artifacts recorded._"]
+    lines: list[str] = []
+    for artifact in artifacts:
+        path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
+        title = str(artifact.get("title") or section.title or "报告图表").strip()
+        if path_or_url:
+            lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
+        lines.extend(_artifact_caption_lines(artifact, section_title=section.title))
+    return lines
+
+
+def _artifact_caption_lines(artifact: dict[str, Any], *, section_title: str) -> list[str]:
+    title = str(artifact.get("title") or section_title or "报告图表").strip()
+    unit = str(artifact.get("unit") or "").strip()
+    annotation = str(artifact.get("business_annotation") or "").strip()
+    lines = [f"- 图表标题：{title}"]
+    if unit:
+        lines.append(f"- 单位：{unit}")
+    if annotation:
+        lines.append(f"- 业务注释：{annotation}")
+    path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
+    if path_or_url:
+        lines.append(f"- 图表链接：{path_or_url}")
     return lines
 
 
@@ -210,3 +259,46 @@ def _progress_summary(report: ReportRecord) -> str:
     if running or report.status == "running":
         details.append("still running")
     return ", ".join(details)
+
+
+def _report_is_chinese(report: ReportRecord) -> bool:
+    text = "\n".join(
+        [
+            report.report_goal,
+            *report.executive_summary,
+            *report.key_findings,
+            *report.action_priorities,
+            *report.risks_and_limits,
+        ]
+    )
+    if "english" in text.lower():
+        return False
+    return any("\u4e00" <= char <= "\u9fff" for char in text) or not text.strip()
+
+
+def _headings(chinese: bool) -> dict[str, str]:
+    if chinese:
+        return {
+            "goal": "报告目标",
+            "summary": "管理层摘要",
+            "findings": "关键发现",
+            "actions": "行动优先级",
+            "charts": "图表与证据",
+            "limits": "风险与边界",
+            "sections": "章节业务答案",
+            "appendix": "技术附录",
+        }
+    return {
+        "goal": "Report Goal",
+        "summary": "Executive Summary",
+        "findings": "Key Findings",
+        "actions": "Action Priorities",
+        "charts": "Chart And Evidence",
+        "limits": "Risks And Limits",
+        "sections": "Business Sections",
+        "appendix": "Technical Appendix",
+    }
+
+
+def _escape_image_alt(value: str) -> str:
+    return value.replace("[", "(").replace("]", ")").replace("\n", " ")

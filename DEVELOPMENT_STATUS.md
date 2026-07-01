@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H3 complete / ready for H4 report and chart synthesis |
-| Next planned task | P19-H4 Report and chart synthesis |
+| Current task | P19-H4 complete / ready for H5 quality closeout |
+| Next planned task | P19-H5 Quality closeout and live acceptance |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -44,7 +44,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P19-H1 | `[x]` Complete | Plain why/evidence entity conflicts are now corrected or downgraded by the small deterministic guard |
 | P19-H2 | `[x]` Complete | Added Answer Reviewer Agent and Final Answer Composer contracts, deterministic/provider tests, and product/report integration |
 | P19-H3 | `[x]` Complete | Polished business answer quality: vocabulary, units, grounded recommendations, tradeoffs, caveats, and report-section reuse |
-| P19-H4 | `[ ]` Planned | Synthesize reports and chart narrative from reviewed business answers |
+| P19-H4 | `[x]` Complete | Reports now synthesize reviewed section answers into management summary, key findings, action priorities, chart/evidence narrative, risks/limits, and technical appendix |
 | P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
 
 ## P18 Task Status
@@ -124,6 +124,15 @@ P19-H3 completion note on 2026-07-01:
 - Product result and report section normalization apply the same field-label cleanup while keeping raw columns, rows, SQL, traces, and provider metadata in technical details.
 - Added focused regression coverage for Chinese output, field-label polish, multi-metric tradeoffs, no invented ROI/profit advice, internal metadata leakage, and report section business answers.
 - Follow-up fix: English questions now keep English fallback wording and English business labels instead of mixing Chinese labels into accepted/composed answers.
+
+P19-H4 completion note on 2026-07-01:
+
+- Report records now expose management-facing `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, and `risks_and_limits` synthesized from reviewed/composed section `business_answer` values.
+- Markdown reports use Chinese-first management structure for Chinese goals and English headings/content for English goals, with SQL, trace paths, provider metadata, raw rows, and internal section prompts kept in the technical appendix.
+- Chart artifacts carry title, unit, safe business annotation, and path/URL into report JSON, Markdown image embeds, and the frontend report detail view.
+- Missing charts render a business-friendly “暂无可展示图表” explanation instead of visualization errors or trace metadata in the main report body.
+- Focused P19-H4 backend regression passed: `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_store.py tests/test_workspace_report_api.py tests/test_report_insight_cleanup.py tests/test_chart_product_quality.py tests/test_product_result_builder.py -q` with `57 passed`.
+- Focused frontend report regression passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `48 passed`.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

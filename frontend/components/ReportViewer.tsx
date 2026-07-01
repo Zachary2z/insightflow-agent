@@ -40,6 +40,23 @@ function progressSummary(report: WorkspaceReport) {
   return parts.join("，");
 }
 
+function NarrativeList({ title, items }: { title: string; items?: string[] }) {
+  const visibleItems = items?.filter((item) => item.trim()) ?? [];
+  if (!visibleItems.length) {
+    return null;
+  }
+  return (
+    <section className="report-summary">
+      <h3>{title}</h3>
+      <ul>
+        {visibleItems.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function ReportViewer({ workspaceId, reportId }: ReportViewerProps) {
   const [report, setReport] = useState<WorkspaceReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,16 +121,11 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
           </div>
           <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} />
         </div>
-        {report.executive_summary?.length ? (
-          <section className="report-summary">
-            <h3>管理层摘要 / Executive Summary</h3>
-            <ul>
-              {report.executive_summary.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+        <NarrativeList title="管理层摘要" items={report.executive_summary} />
+        <NarrativeList title="关键发现" items={report.key_findings} />
+        <NarrativeList title="行动优先级" items={report.action_priorities} />
+        <NarrativeList title="图表与证据" items={report.chart_and_evidence} />
+        <NarrativeList title="风险与边界" items={report.risks_and_limits} />
       </ProductCard>
       <section className="report-sections">
         <div className="product-section-title">

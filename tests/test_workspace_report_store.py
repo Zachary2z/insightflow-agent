@@ -37,7 +37,19 @@ def _sample_report(workspace_id: str) -> ReportRecord:
         title="Leadership Business Review",
         status="completed",
         executive_summary=[
-            "Revenue by Channel: 付费搜索和邮件贡献主要收入 - 本节显示付费搜索收入最高，邮件渠道也有稳定贡献。",
+            "管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。",
+        ],
+        key_findings=[
+            "关键发现：付费搜索收入最高，邮件渠道次之，收入贡献存在明显梯队。",
+        ],
+        action_priorities=[
+            "行动优先级：先复盘付费搜索投放效率，再验证邮件渠道是否可扩量。",
+        ],
+        chart_and_evidence=[
+            "图表：渠道收入对比，单位：元。注释：付费搜索贡献主要收入。路径：artifacts/section_revenue_by_channel.png",
+        ],
+        risks_and_limits=[
+            "风险边界：当前报告缺少 ROI、利润和转化率，不能直接推导预算加码。",
         ],
         sections=[
             ReportSection(
@@ -54,6 +66,15 @@ def _sample_report(workspace_id: str) -> ReportRecord:
                     {"channel": "email", "revenue": 100.0},
                 ],
                 artifact_paths=["artifacts/section_revenue_by_channel.png"],
+                business_artifacts=[
+                    {
+                        "type": "chart",
+                        "title": "渠道收入对比",
+                        "path": "artifacts/section_revenue_by_channel.png",
+                        "unit": "元",
+                        "business_annotation": "付费搜索贡献主要收入。",
+                    }
+                ],
                 evidence_notes=[
                     "Preview is based on grouped rows returned by the workspace database.",
                 ],
@@ -107,12 +128,22 @@ def test_report_store_renders_markdown_with_required_report_details(tmp_path):
     markdown = Path(saved.markdown_path).read_text(encoding="utf-8")
 
     assert markdown.startswith("# Leadership Business Review")
-    assert "## Report Goal" in markdown
+    assert "## 报告目标" in markdown
     assert "Summarize revenue and channel performance for leadership." in markdown
-    assert "## Executive Summary" in markdown
-    assert "- Revenue by Channel: 付费搜索和邮件贡献主要收入 - 本节显示付费搜索收入最高，邮件渠道也有稳定贡献。" in markdown
-    assert markdown.index("## Executive Summary") < markdown.index("## Technical Appendix")
-    assert "## Business Sections" in markdown
+    assert "## 管理层摘要" in markdown
+    assert "- 管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。" in markdown
+    assert "## 关键发现" in markdown
+    assert "- 关键发现：付费搜索收入最高，邮件渠道次之，收入贡献存在明显梯队。" in markdown
+    assert "## 行动优先级" in markdown
+    assert "- 行动优先级：先复盘付费搜索投放效率，再验证邮件渠道是否可扩量。" in markdown
+    assert "## 图表与证据" in markdown
+    assert "![渠道收入对比](artifacts/section_revenue_by_channel.png)" in markdown
+    assert "单位：元" in markdown
+    assert "付费搜索贡献主要收入。" in markdown
+    assert "## 风险与边界" in markdown
+    assert "- 风险边界：当前报告缺少 ROI、利润和转化率，不能直接推导预算加码。" in markdown
+    assert markdown.index("## 管理层摘要") < markdown.index("## 技术附录")
+    assert "## 章节业务答案" in markdown
     assert "### Revenue by Channel" in markdown
     assert "#### 结论" in markdown
     assert "付费搜索和邮件贡献主要收入" in markdown
@@ -127,9 +158,8 @@ def test_report_store_renders_markdown_with_required_report_details(tmp_path):
     assert "- 当前只基于预览结果。" in markdown
     assert "#### 置信度" in markdown
     assert "high" in markdown
-    assert "- `artifacts/section_revenue_by_channel.png`" in markdown
-    business_body = markdown.split("## Technical Appendix", 1)[0]
-    appendix = markdown.split("## Technical Appendix", 1)[1]
+    business_body = markdown.split("## 技术附录", 1)[0]
+    appendix = markdown.split("## 技术附录", 1)[1]
     assert "Paid search led revenue in the previewed result." not in business_body
     assert "Preview is based on grouped rows" not in business_body
     assert "Compare revenue contribution across channels." not in business_body
@@ -137,7 +167,7 @@ def test_report_store_renders_markdown_with_required_report_details(tmp_path):
     assert "SELECT channel" not in business_body
     assert "deepseek-chat" not in business_body
     assert "trace://section_revenue_by_channel/sql" not in business_body
-    assert "## Technical Appendix" in markdown
+    assert "## 技术附录" in markdown
     assert "<details>" in appendix
     assert "<summary>Revenue by Channel</summary>" in appendix
     assert "```sql\nSELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel\n```" in appendix

@@ -32,8 +32,9 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P16 clean business output model | Complete | `business_answer` with `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
 | P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
+| P19 report and chart synthesis | In progress | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, and technical appendix |
 
-P18-H1 through P18-H6 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P18.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H4 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, P19 reviewer/composer and report-synthesis surfaces, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P19.
 
 ## Quickstart
 
@@ -103,6 +104,8 @@ GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
 ```
 
 Supported report types are `business_review`, `channel_performance`, and `revenue_trend`.
+
+Report records now expose management-facing narrative fields before section details: `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, `risks_and_limits`, then a collapsed technical appendix for SQL, traces, raw previews, and provider metadata.
 
 ## Business Answer Contract
 

@@ -50,7 +50,11 @@ def _client_with_fake_report_runner(tmp_path):
             report_goal=report_goal.strip(),
             title="Fake Business Review",
             status="completed",
-            executive_summary=["Revenue by Channel: 付费搜索收入领先 - 付费搜索是本节收入最高的渠道。"],
+            executive_summary=["管理层摘要：付费搜索是收入主线。"],
+            key_findings=["关键发现：付费搜索收入最高。"],
+            action_priorities=["行动优先级：先复盘付费搜索渠道。"],
+            chart_and_evidence=["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"],
+            risks_and_limits=["风险边界：当前只基于报告章节查询结果。"],
             sections=[
                 ReportSection(
                     section_id="revenue_by_channel",
@@ -156,9 +160,11 @@ def test_get_report_detail_returns_report(tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["report"]["report_id"] == created["report_id"]
-    assert payload["report"]["executive_summary"] == [
-        "Revenue by Channel: 付费搜索收入领先 - 付费搜索是本节收入最高的渠道。"
-    ]
+    assert payload["report"]["executive_summary"] == ["管理层摘要：付费搜索是收入主线。"]
+    assert payload["report"]["key_findings"] == ["关键发现：付费搜索收入最高。"]
+    assert payload["report"]["action_priorities"] == ["行动优先级：先复盘付费搜索渠道。"]
+    assert payload["report"]["chart_and_evidence"] == ["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"]
+    assert payload["report"]["risks_and_limits"] == ["风险边界：当前只基于报告章节查询结果。"]
     assert "technical_details" in payload["report"]["sections"][0]
     assert payload["report"]["sections"][0]["business_answer"]["headline"] == "付费搜索收入领先"
 
@@ -176,12 +182,16 @@ def test_download_report_markdown_returns_markdown_file(tmp_path):
     assert response.headers["content-type"].startswith("text/markdown")
     assert f'filename="{created["report_id"]}.md"' in response.headers["content-disposition"]
     assert "# Fake Business Review" in response.text
-    assert "## Executive Summary" in response.text
+    assert "## 管理层摘要" in response.text
+    assert "## 关键发现" in response.text
+    assert "## 行动优先级" in response.text
+    assert "## 图表与证据" in response.text
+    assert "## 风险与边界" in response.text
     assert "#### 结论" in response.text
     assert "付费搜索收入领先" in response.text
     assert "#### 直接回答" in response.text
     assert "付费搜索是本节收入最高的渠道。" in response.text
-    assert "## Technical Appendix" in response.text
+    assert "## 技术附录" in response.text
     assert "```sql\nSELECT channel" in response.text
 
 

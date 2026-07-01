@@ -223,6 +223,10 @@ export type WorkspaceReport = {
   title: string;
   status: string;
   executive_summary?: string[];
+  key_findings?: string[];
+  action_priorities?: string[];
+  chart_and_evidence?: string[];
+  risks_and_limits?: string[];
   sections?: WorkspaceReportSection[];
   markdown_path?: string;
   json_path?: string;

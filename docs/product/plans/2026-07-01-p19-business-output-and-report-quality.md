@@ -308,6 +308,8 @@ Completion notes:
 
 Goal: Make reports read like management documents and make charts support the same story.
 
+Status: Complete as of 2026-07-01.
+
 Scope:
 
 - Synthesize report output from reviewed business answers instead of concatenating sections.
@@ -320,6 +322,15 @@ Acceptance:
 - Reports have a coherent executive summary and action plan.
 - Chart narrative does not contradict the final answer.
 - Report Markdown and frontend reader show Chinese business-facing content first.
+
+Completion notes:
+
+- Report records now synthesize reviewed/composed section `business_answer` values into report-level `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, and `risks_and_limits`.
+- Chinese report goals produce Chinese management structure by default; English report goals keep English report-level labels and avoid mixed Chinese field labels.
+- Markdown embeds chart images/links directly in the business body and carries chart title, unit, and safe business annotation alongside the report evidence narrative.
+- Frontend report detail renders the same management sections and chart unit/annotation in the main report body, while SQL, trace paths, provider metadata, raw rows, and internal section prompts remain in the collapsed technical appendix.
+- Missing chart output uses a business-friendly no-chart explanation and does not expose visualization errors or internal trace paths in the main report.
+- Added focused coverage for synthesized summaries, language consistency, metric tradeoffs, chart metadata, no-chart fallback copy, technical leakage boundaries, Markdown rendering, API payloads, and frontend report detail rendering.
 
 ### P19-H5: Quality Closeout And Live Acceptance
 
@@ -347,7 +358,7 @@ Acceptance:
 1. P19-H1: close the current deterministic alignment hole.
 2. P19-H2: add reviewer/composer foundation.
 3. P19-H3: polish business answer quality. Complete.
-4. P19-H4: synthesize reports and chart narrative.
+4. P19-H4: synthesize reports and chart narrative. Complete.
 5. P19-H5: live acceptance, regression, cleanup, and closeout.
 
 ## Future Phase Notes

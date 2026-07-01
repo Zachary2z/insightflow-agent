@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from workspaces.analysis_runner import run_workspace_analysis
+from workspaces.answer_consistency import safe_chart_annotation
 from workspaces.models import utc_now_iso
 from workspaces.product_models import PRODUCT_RESULT_VERSION
 from workspaces.product_result_builder import build_business_answer
@@ -188,7 +189,7 @@ def run_workspace_report(
         report.sections.append(section)
 
     report.status = _report_status(report.sections)
-    report.executive_summary = _executive_summary(report.sections)
+    _synthesize_report_narrative(report)
     report.provider_metadata = {
         "section_count": len(report.sections),
         "completed_section_count": sum(
@@ -367,10 +368,13 @@ def _section_from_analysis_result(
         rows_preview=rows_preview,
         artifact_paths=artifact_paths,
         evidence_notes=_evidence_notes(analysis_result.get("evidence_result") or {}),
-        business_artifacts=[
-            {"type": "chart", "path": path, "title": section_plan["title"]}
-            for path in artifact_paths
-        ],
+        business_artifacts=_business_artifacts(
+            section_plan=section_plan,
+            analysis_result=analysis_result,
+            artifact_paths=artifact_paths,
+            business_answer=business_answer,
+            execution_result=execution_result,
+        ),
         technical_details={
             "internal_question": question,
             "purpose": section_plan["purpose"],
@@ -503,6 +507,60 @@ def _analysis_artifact_paths(analysis_result: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(paths))
 
 
+def _business_artifacts(
+    *,
+    section_plan: dict[str, str],
+    analysis_result: dict[str, Any],
+    artifact_paths: list[str],
+    business_answer: dict[str, Any],
+    execution_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    visualization_trace = analysis_result.get("visualization_trace") or {}
+    chart_spec = visualization_trace.get("chart_spec") if isinstance(visualization_trace.get("chart_spec"), dict) else {}
+    title = _summary_safe_text(
+        chart_spec.get("title")
+        or visualization_trace.get("title")
+        or section_plan["title"]
+    )
+    unit = _summary_safe_text(chart_spec.get("unit") or visualization_trace.get("unit") or "")
+    annotation = safe_chart_annotation(
+        annotation=str(
+            chart_spec.get("business_annotation")
+            or visualization_trace.get("business_annotation")
+            or ""
+        ),
+        business_answer=business_answer,
+        execution_result=execution_result,
+    )
+    artifacts = [
+        {
+            "type": "chart",
+            "path": path,
+            "title": title or section_plan["title"],
+            "unit": unit,
+            "business_annotation": annotation,
+        }
+        for path in artifact_paths
+    ]
+    url = str(
+        visualization_trace.get("url")
+        or visualization_trace.get("image_url")
+        or visualization_trace.get("chart_url")
+        or ""
+    ).strip()
+    if url and not artifacts:
+        artifacts.append(
+            {
+                "type": "chart",
+                "url": url,
+                "title": title or section_plan["title"],
+                "unit": unit,
+                "business_annotation": annotation,
+            }
+        )
+    return artifacts
+
+
 def _evidence_notes(evidence_result: dict[str, Any]) -> list[str]:
     notes = []
     for key in ("data_supported_findings", "hypotheses", "unsupported_claims_blocked"):
@@ -587,18 +645,199 @@ def _report_status(sections: list[ReportSection]) -> str:
     return "failed"
 
 
-def _executive_summary(sections: list[ReportSection]) -> list[str]:
-    summary = []
+def _synthesize_report_narrative(report: Any) -> None:
+    chinese = _report_uses_chinese(report.report_goal)
+    completed = [section for section in report.sections if section.status == "completed"]
+    failed = [section for section in report.sections if section.status == "failed"]
+    findings = _key_findings(completed, chinese=chinese)
+    actions = _action_priorities(completed, chinese=chinese)
+    chart_evidence = _chart_and_evidence(completed, chinese=chinese)
+    limits = _risks_and_limits(report.sections, chinese=chinese)
+
+    report.executive_summary = _management_summary(
+        findings=findings,
+        actions=actions,
+        failed_count=len(failed),
+        chinese=chinese,
+    )
+    report.key_findings = findings
+    report.action_priorities = actions
+    report.chart_and_evidence = chart_evidence
+    report.risks_and_limits = limits
+
+
+def _key_findings(sections: list[ReportSection], *, chinese: bool) -> list[str]:
+    candidates: list[str] = []
     for section in sections:
         answer = section.business_answer or {}
-        headline = str(answer.get("headline") or "").strip()
-        direct_answer = str(answer.get("direct_answer") or "").strip()
-        if section.status == "completed" and (headline or direct_answer):
-            summary.append(f"{section.title}: {_executive_summary_value(headline, direct_answer)}")
-        elif section.status == "failed":
-            value = _executive_summary_value(headline, direct_answer) or section.error or "section failed"
-            summary.append(f"{section.title}: {value}")
-    return summary
+        headline = _executive_summary_value(
+            str(answer.get("headline") or ""),
+            str(answer.get("direct_answer") or ""),
+        )
+        if headline:
+            candidates.append(headline)
+        for item in _text_list(answer.get("evidence_bullets"))[:2]:
+            candidates.append(_short_summary_text(item, limit=120))
+    findings = _dedupe_texts(candidates)[:5]
+    if not findings:
+        return [
+            "关键发现：本报告没有足够的已完成章节来形成稳定结论。"
+            if chinese
+            else "Key findings: The report does not have enough completed sections to form a stable conclusion."
+        ]
+
+    prefix = "关键发现：" if chinese else "Key findings: "
+    if _has_tradeoff_language(" ".join(findings)):
+        tradeoff = (
+            "不同指标或章节存在判断口径差异，决策时需要先明确以收入规模、效率还是风险为主。"
+            if chinese
+            else "Different metrics or sections point to different decision bases, so leadership should choose the revenue, efficiency, or risk lens first."
+        )
+        findings.append(tradeoff)
+    return [f"{prefix}{item}" for item in _dedupe_texts(findings)[:5]]
+
+
+def _action_priorities(sections: list[ReportSection], *, chinese: bool) -> list[str]:
+    actions: list[str] = []
+    for section in sections:
+        answer = section.business_answer or {}
+        for recommendation in _text_list(answer.get("recommendations")):
+            clean = _summary_safe_text(recommendation)
+            if clean:
+                actions.append(clean)
+        for text in [
+            *_text_list(answer.get("evidence_bullets")),
+            *_text_list(answer.get("caveats")),
+            str(answer.get("why") or ""),
+        ]:
+            if _mentions_missing_decision_metric(text):
+                actions.append(
+                    "下一步补充 ROI、利润和转化率后，再判断预算加码。"
+                    if chinese
+                    else "Next, add ROI, profit, and conversion rate before deciding whether to increase budget."
+                )
+    if not actions:
+        return [
+            "行动优先级：当前证据不足以直接给出行动建议，下一步先补充同口径对比数据。"
+            if chinese
+            else "Action priorities: Evidence is not strong enough for direct action; first add comparable evidence."
+        ]
+    prefix = "行动优先级：" if chinese else "Action priorities: "
+    return [f"{prefix}{item}" for item in _dedupe_texts(actions)[:5]]
+
+
+def _chart_and_evidence(sections: list[ReportSection], *, chinese: bool) -> list[str]:
+    items: list[str] = []
+    has_chart = any(section.business_artifacts for section in sections)
+    if not has_chart:
+        return [
+            "暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"
+            if chinese
+            else "No chart is available yet; read this report from the section evidence tables and business conclusions."
+        ]
+    for section in sections:
+        for artifact in section.business_artifacts or []:
+            title = _summary_safe_text(artifact.get("title") or section.title)
+            unit = _summary_safe_text(artifact.get("unit") or "")
+            annotation = _summary_safe_text(artifact.get("business_annotation") or "")
+            path_or_url = _summary_safe_text(artifact.get("url") or artifact.get("path") or "")
+            if not (title or path_or_url):
+                continue
+            if chinese:
+                parts = [f"图表：{title or section.title}"]
+                if unit:
+                    parts.append(f"单位：{unit}")
+                if annotation:
+                    parts.append(f"注释：{annotation}")
+                if path_or_url:
+                    parts.append(f"路径：{path_or_url}")
+                items.append("，".join(parts) + "。")
+            else:
+                parts = [f"Chart: {title or section.title}"]
+                if unit:
+                    parts.append(f"unit: {unit}")
+                if annotation:
+                    parts.append(f"annotation: {annotation}")
+                if path_or_url:
+                    parts.append(f"link: {path_or_url}")
+                items.append("; ".join(parts) + ".")
+        if section.rows_preview:
+            row_summary = _evidence_row_summary(section.rows_preview[0], chinese=chinese)
+            if row_summary:
+                items.append(
+                    f"证据表摘要：{row_summary}。"
+                    if chinese
+                    else f"Evidence table summary: {row_summary}."
+                )
+    if not items:
+        return [
+            "暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"
+            if chinese
+            else "No chart is available yet; read this report from the section evidence tables and business conclusions."
+        ]
+    return _dedupe_texts(items)[:6]
+
+
+def _risks_and_limits(sections: list[ReportSection], *, chinese: bool) -> list[str]:
+    limits: list[str] = []
+    for section in sections:
+        answer = section.business_answer or {}
+        limits.extend(_summary_safe_text(item) for item in _text_list(answer.get("caveats")))
+        if section.status == "failed":
+            limits.append(
+                f"{section.title} 未完成，相关结论需要重新生成后确认。"
+                if chinese
+                else f"{section.title} did not complete, so related conclusions need regeneration."
+            )
+
+    columns = {column.lower() for section in sections for column in (section.columns or [])}
+    missing_metric_groups = []
+    if not columns.intersection({"roi", "roas"}):
+        missing_metric_groups.append("ROI" if chinese else "ROI")
+    if not columns.intersection({"profit", "gross_profit", "margin", "margin_rate"}):
+        missing_metric_groups.append("利润" if chinese else "profit")
+    if not columns.intersection({"conversion_rate", "conversions", "cvr"}):
+        missing_metric_groups.append("转化率" if chinese else "conversion rate")
+    if missing_metric_groups:
+        joined = "、".join(missing_metric_groups) if chinese else ", ".join(missing_metric_groups)
+        limits.append(
+            f"当前报告未返回 {joined}，预算、效率或收益判断需要补充这些数据后再确认。"
+            if chinese
+            else f"The report does not return {joined}, so budget, efficiency, or return decisions need those data points first."
+        )
+    if not limits:
+        limits.append(
+            "风险边界：当前结论只覆盖本报告各章节查询返回的样本和时间范围。"
+            if chinese
+            else "Risks and limits: Conclusions only cover the sample and time range returned by this report."
+        )
+    prefix = "风险边界：" if chinese else "Risks and limits: "
+    return [f"{prefix}{item}" for item in _dedupe_texts(limits)[:5]]
+
+
+def _management_summary(
+    *,
+    findings: list[str],
+    actions: list[str],
+    failed_count: int,
+    chinese: bool,
+) -> list[str]:
+    finding_texts = [_strip_report_prefix(item) for item in findings[:2]]
+    action_text = _strip_report_prefix(actions[0]) if actions else ""
+    if chinese:
+        body = "；".join(item for item in finding_texts if item)
+        if action_text:
+            body = f"{body}。优先动作是：{action_text}" if body else f"优先动作是：{action_text}"
+        if failed_count:
+            body = f"{body}。另有 {failed_count} 个章节未完成，相关结论需复核" if body else f"另有 {failed_count} 个章节未完成，相关结论需复核"
+        return [f"管理层摘要：{body or '当前报告没有足够信息形成管理层结论。'}"]
+
+    body = "; ".join(item for item in finding_texts if item)
+    if action_text:
+        body = f"{body}. Priority action: {action_text}" if body else f"Priority action: {action_text}"
+    if failed_count:
+        body = f"{body}. {failed_count} section(s) did not complete and need review" if body else f"{failed_count} section(s) did not complete and need review"
+    return [f"Executive summary: {body or 'The report does not have enough information for a leadership conclusion.'}"]
 
 
 def _executive_summary_value(headline: str, direct_answer: str) -> str:
@@ -610,6 +849,71 @@ def _executive_summary_value(headline: str, direct_answer: str) -> str:
             return f"{headline}；{suffix}" if _contains_cjk(headline + direct_answer) else f"{headline}; {suffix}"
         return headline
     return _short_summary_text(direct_answer)
+
+
+def _report_uses_chinese(report_goal: str) -> bool:
+    text = str(report_goal or "")
+    lowered = text.lower()
+    if any(marker in lowered for marker in ("english", "英文", "用英文")):
+        return False
+    return _contains_cjk(text) or not text.strip()
+
+
+def _text_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _dedupe_texts(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        text = _summary_safe_text(item)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def _evidence_row_summary(row: dict[str, Any], *, chinese: bool) -> str:
+    if not row:
+        return ""
+    separator = "，" if chinese else ", "
+    relation = " 为 " if chinese else " is "
+    parts = [
+        f"{key}{relation}{value}"
+        for key, value in list(row.items())[:5]
+        if str(key).strip()
+    ]
+    return separator.join(parts)
+
+
+def _strip_report_prefix(text: str) -> str:
+    value = str(text or "").strip()
+    for prefix in (
+        "管理层摘要：",
+        "关键发现：",
+        "行动优先级：",
+        "风险边界：",
+        "Executive summary: ",
+        "Key findings: ",
+        "Action priorities: ",
+        "Risks and limits: ",
+    ):
+        if value.startswith(prefix):
+            return value[len(prefix) :].strip()
+    return value
+
+
+def _mentions_missing_decision_metric(text: str) -> bool:
+    value = str(text or "").lower()
+    missing_markers = ("缺少", "没有", "未返回", "missing", "not available")
+    metric_markers = ("roi", "利润", "profit", "转化率", "conversion")
+    return any(marker in value for marker in missing_markers) and any(
+        marker in value for marker in metric_markers
+    )
 
 
 def _short_summary_text(text: str, limit: int = 96) -> str:

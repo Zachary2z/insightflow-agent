@@ -89,6 +89,10 @@ class ReportRecord:
     title: str
     status: str = "draft"
     executive_summary: list[str] = field(default_factory=list)
+    key_findings: list[str] = field(default_factory=list)
+    action_priorities: list[str] = field(default_factory=list)
+    chart_and_evidence: list[str] = field(default_factory=list)
+    risks_and_limits: list[str] = field(default_factory=list)
     sections: list[ReportSection] = field(default_factory=list)
     markdown_path: str = ""
     json_path: str = ""
@@ -113,6 +117,10 @@ class ReportRecord:
             title=data.get("title", data["report_id"]),
             status=data.get("status", "draft"),
             executive_summary=list(data.get("executive_summary", [])),
+            key_findings=list(data.get("key_findings", [])),
+            action_priorities=list(data.get("action_priorities", [])),
+            chart_and_evidence=list(data.get("chart_and_evidence", [])),
+            risks_and_limits=list(data.get("risks_and_limits", [])),
             sections=[
                 ReportSection.from_dict(section)
                 for section in data.get("sections", [])

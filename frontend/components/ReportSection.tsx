@@ -172,6 +172,7 @@ export default function ReportSection({ section, workspaceId, reportId }: Report
                   {url ? <img src={url} alt={artifact.title || section.title || "报告图表"} /> : null}
                   <figcaption>
                     <strong>{artifact.title || section.title || "报告图表"}</strong>
+                    {artifact.unit ? <span>单位：{artifact.unit}</span> : null}
                     {artifact.business_annotation ? <span>{artifact.business_annotation}</span> : null}
                     {url ? (
                       <a href={url} download>
