@@ -222,6 +222,129 @@ def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
     assert "business_answer" in rejected["error"]
 
 
+def test_insight_drafter_prompt_includes_business_consistency_constraints():
+    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
+
+    rendered = DEFAULT_PROMPT_REGISTRY.render(
+        "insight_drafter",
+        {
+            "user_question": "最近90天按渠道看收入、ROI 和投放成本，哪个渠道最值得加预算？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "roi", "spend"],
+                "rows": [
+                    ["email", 44548.53, 8.2, 5400.0],
+                    ["paid_search", 39120.0, 3.1, 12600.0],
+                ],
+            },
+            "business_context": {},
+            "metric_context": {},
+        },
+    )
+
+    assert rendered["success"] is True
+    prompt = rendered["prompt"]
+    assert "same language as the user question" in prompt
+    assert "raw rows" in prompt
+    assert "field=value" in prompt
+    assert "decision basis" in prompt
+    assert "tradeoff" in prompt
+    assert "Do not recommend budget changes without sufficient comparative evidence" in prompt
+    assert "business_answer is product-facing business prose" in prompt
+
+
+def test_insight_drafter_validation_rejects_budget_action_from_single_row_evidence():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["自然流量 ROI 为 16.22。"],
+            "business_answer": {
+                "headline": "自然流量 ROI 最高，付费渠道应减少预算",
+                "direct_answer": "当前返回结果显示自然流量 ROI 最高，因此应减少付费渠道预算。",
+                "why": "证据表第一行显示自然流量 ROI 为 16.22。",
+                "evidence_bullets": ["自然流量 ROI 为 16.22。"],
+                "recommendations": ["减少付费渠道预算，并把预算转向自然流量。"],
+                "caveats": [],
+                "confidence": "high",
+            },
+        },
+        schema_context={
+            "user_question": "最近90天哪个渠道 ROI 最高，哪个渠道应该减少预算？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "total_spend", "roi"],
+                "rows": [["自然流量", 452191.41, 26255.44, 16.22]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        },
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "comparative evidence" in result["error"] or "比较证据" in result["error"]
+
+
+def test_insight_drafter_validation_allows_evidence_gathering_recommendation_from_single_row():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["自然流量 ROI 为 16.22。"],
+            "business_answer": {
+                "headline": "仅能确认自然流量的当前 ROI，不能判断预算减少对象",
+                "direct_answer": "当前返回结果只显示自然流量一行，不能据此确定哪个渠道应该减少预算。",
+                "why": "证据表第一行显示自然流量 ROI 为 16.22，但缺少其他渠道的同口径对比。",
+                "evidence_bullets": ["自然流量 ROI 为 16.22。"],
+                "recommendations": ["补充完整渠道对比数据后，再判断预算调整对象。"],
+                "caveats": ["仅返回 1 行，比较证据不足，不足以判断哪个渠道应该减少预算。"],
+                "confidence": "low",
+            },
+        },
+        schema_context={
+            "user_question": "最近90天哪个渠道 ROI 最高，哪个渠道应该减少预算？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "total_spend", "roi"],
+                "rows": [["自然流量", 452191.41, 26255.44, 16.22]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        },
+    )
+
+    assert result["success"] is True
+    assert result["content"]["business_answer"]["recommendations"] == [
+        "补充完整渠道对比数据后，再判断预算调整对象。"
+    ]
+
+
+def test_insight_drafter_validation_rejects_internal_report_section_prompt_in_business_answer():
+    from llm_ops.structured_output import validate_prompt_output
+
+    result = validate_prompt_output(
+        "insight_drafter",
+        {
+            "candidate_claims": ["渠道收入已按当前执行结果汇总。"],
+            "business_answer": {
+                "headline": "这是自动报告内部 section，不是用户澄清轮次",
+                "direct_answer": "本节问题：按渠道汇总最近 90 天收入。",
+                "why": "本节意图提示：metric=收入; dimension=渠道。",
+                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+        },
+        schema_context={"user_question": "生成经营复盘报告。"},
+    )
+
+    assert result["success"] is False
+    assert result["error_type"] == "llm_schema_validation_error"
+    assert "internal" in result["error"] or "内部" in result["error"]
+
+
 def test_validated_request_returns_structured_error_for_schema_mismatch():
     from llm_ops.provider import LLMRequest, MockLLMProvider
     from llm_ops.structured_output import run_validated_llm_request

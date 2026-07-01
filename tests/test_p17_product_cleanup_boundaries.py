@@ -343,12 +343,9 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
         in p17_plan
     )
     assert "P17 is complete. P18 is the next phase" in p17_plan
-    assert (
-        "Current task | P18 external business tool calling design/implementation"
-        in status
-    )
-    assert "Next planned task | P18 external business tool calling design/implementation" in status
-    assert "Last completed task | P17-H6 Final Artifact Hygiene, Regression, And Live Acceptance" in status
+    assert "Current task | P18 complete / waiting for next phase planning" in status
+    assert "Next planned task | P19 or next product phase planning" in status
+    assert "Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout" in status
     assert "Latest P17-H6 closeout result on 2026-06-30" in status
     assert "P17/P18 Roadmap" in plan
     assert "P17-H5 | Product docs/status simplification | Complete" in plan
@@ -365,7 +362,7 @@ def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
         "| P17-H4 | Delete obsolete historical eval/demo docs and tests that no longer protect current product behavior | Complete |"
         in p17_plan
     )
-    assert "Last completed task | P17-H6 Final Artifact Hygiene, Regression, And Live Acceptance" in status
+    assert "Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout" in status
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 

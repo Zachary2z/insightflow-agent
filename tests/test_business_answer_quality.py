@@ -87,19 +87,19 @@ def test_provider_insight_output_becomes_recommendation_first_business_answer():
         "execution_result": {
             "success": True,
             "columns": ["channel", "revenue"],
-            "rows": [["paid_search", 200.0]],
-            "row_count": 1,
+            "rows": [["paid_search", 200.0], ["organic", 120.0]],
+            "row_count": 2,
         },
         "trace": [],
     }
     provider = MockLLMProvider(
         {
-            "candidate_claims": ["paid_search revenue is 200.0"],
+            "candidate_claims": ["paid_search revenue is 200.0", "organic revenue is 120.0"],
             "business_answer": {
                 "headline": "建议优先加码 paid_search",
-                "direct_answer": "建议优先加码 paid_search，因为它贡献了最高收入 200.0。",
-                "why": "证据显示 paid_search 贡献收入 200.0。",
-                "evidence_bullets": ["paid_search 收入为 200.0。"],
+                "direct_answer": "建议优先加码 paid_search，因为它在当前对比中贡献了最高收入 200.0。",
+                "why": "证据显示 paid_search 贡献收入 200.0，高于 organic 的 120.0。",
+                "evidence_bullets": ["paid_search 收入为 200.0。", "organic 收入为 120.0。"],
                 "recommendations": ["优先复盘 paid_search 的投放效率。"],
                 "caveats": [],
                 "confidence": "high",

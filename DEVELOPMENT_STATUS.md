@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-06-30
+Last updated: 2026-07-01
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P18 External Business Tool Calling |
-| Current task | P18 external business tool calling design/implementation |
-| Next planned task | P18 external business tool calling design/implementation |
-| Last completed task | P17-H6 Final Artifact Hygiene, Regression, And Live Acceptance |
+| Current phase | P18 Business Answer Consistency |
+| Current task | P18 complete / waiting for next phase planning |
+| Next planned task | P19 or next product phase planning |
+| Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -32,7 +32,18 @@ This is the concise current status surface for InsightFlow Agent.
 | P15 | `[x]` Complete | Persisted analysis history/detail, schema repair, business-friendly failure UX, real DeepSeek reliability regression |
 | P16 | `[x]` Complete | Single clean `business_answer` contract across analysis, reports, Markdown, frontend rendering, and run restoration |
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
-| P18 | `[ ]` Future | Real China-oriented external tool integrations after P17 closeout |
+| P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
+
+## P18 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P18-H1 | `[x]` Complete | Added RED tests for multi-metric conflict, insufficient comparison evidence, chart annotation conflict, and report inheritance; focused tests intentionally fail until H2-H4 |
+| P18-H2 | `[x]` Complete | Added `workspaces/answer_consistency.py` and applied it in `build_business_answer()`; multi-metric tradeoff and single-row budget-reduction RED tests now pass |
+| P18-H3 | `[x]` Complete | Align chart annotations with the final business answer |
+| P18-H4 | `[x]` Complete | Report sections reuse consistency-checked answers; executive summaries stay concise and do not repeat long section direct answers |
+| P18-H5 | `[x]` Complete | Tightened insight drafter prompt and lightweight structured validation for language, raw/internal text, and unsupported single-row budget actions |
+| P18-H6 | `[x]` Complete | Focused/full regression, frontend checks, live acceptance gating, artifact hygiene, and docs closeout |
 
 ## P17 Task Status
 
@@ -66,6 +77,15 @@ workspace import
 
 ## Latest Verified Baseline
 
+Latest P18-H6 closeout result on 2026-07-01:
+
+- P18 focused regression passed for answer consistency, report runner, product result builder, business answer quality, and DeepSeek structured output.
+- Full backend regression passed after updating stale P17 boundary assertions to the current P18 closeout status: `350 passed, 13 skipped`.
+- Frontend Vitest and production build passed.
+- Real DeepSeek acceptance was not run because the current environment has a DeepSeek key but does not have the live opt-in flags configured.
+- Legacy audit found old chart/action/mock/eval/Streamlit terms only in historical/superseded notes and boundary tests, not active product guidance.
+- Generated artifacts, frontend build output, pytest cache, runtime workspace outputs, traces, and sample data remain ignored and must not be committed.
+
 Latest P17-H6 closeout result on 2026-06-30:
 
 - README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS were simplified into current product/status surfaces.
@@ -86,3 +106,4 @@ This section is historical cleanup context only, not current product guidance.
 - Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old cleanup terms.
 - Historical retained fixture: `data/ecommerce.db` remains for low-level tests that directly exercise schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is not the current product database.
 - Historical P11/P12/P13 specs under `docs/superpowers/specs/` must be treated as snapshots. Current guidance is `docs/product/plans/`, the P16 `business_answer` contract, and P17 cleanup.
+- Real China-oriented external tool calling is deferred until after P18 answer consistency, so external publishing/exporting does not amplify inconsistent conclusions.

@@ -4,6 +4,7 @@ This document tracks the active product direction, not the full historical build
 
 - `docs/product/plans/2026-06-30-p16-clean-business-output-model.md`
 - `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md`
+- `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`
 
 ## Current Product Direction
 
@@ -52,7 +53,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P15 | Analysis reliability and history: persisted run history/detail, one-pass schema repair, business-friendly failures, real DeepSeek regression | Complete |
 | P16 | Clean business output model: one `business_answer` shape across backend, frontend, reports, Markdown, and run restoration | Complete |
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
-| P18 | Real business external tool calling for China-oriented workflows | Future |
+| P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
 
 ## P16 Business Answer Contract
 
@@ -82,13 +83,18 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P17-H4 | Delete obsolete eval/demo files and mark old design snapshots historical | Complete |
 | P17-H5 | Product docs/status simplification | Complete |
 | P17-H6 | Final artifact hygiene, legacy audit, backend/frontend regression, and real DeepSeek acceptance | Complete |
-| P18 | Connect real China-oriented business tools such as Feishu, WeCom/DingTalk, Tencent Docs, and WPS/Excel-compatible exports | Future |
+| P18-H1 | Add failing tests for multi-metric conflict, insufficient comparison evidence, and chart annotation conflict | Complete |
+| P18-H2 | Implement lightweight answer consistency helpers and apply them in product result builder | Complete |
+| P18-H3 | Align chart annotations with the final business answer | Complete |
+| P18-H4 | Make report sections and executive summaries reuse consistency-checked answers | Complete |
+| P18-H5 | Tighten provider prompt/validation only where deterministic consistency is insufficient | Complete |
+| P18-H6 | Focused/full regression, real DeepSeek acceptance gating, artifact hygiene, and documentation closeout | Complete |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 should start only after P17 closeout. It should add real authenticated external integrations with clear API/error-handling behavior instead of reviving placeholder demos.
+P18 is complete. Real authenticated external integrations remain a future P19 or next product phase planning topic, because publishing or exporting inconsistent conclusions would amplify product risk.
 
 ## Current Entry Points
 
@@ -134,7 +140,7 @@ cd frontend && npm test
 cd frontend && npm run build
 ```
 
-P17-H6 closeout also requires the legacy audit, artifact audit, and real DeepSeek P12/P13/P15 acceptance tests with explicit live/product/provider flags. P18 should begin from the current external-tool design direction, not by restoring placeholder integrations.
+P17-H6 closeout also requires the legacy audit, artifact audit, and real DeepSeek P12/P13/P15 acceptance tests with explicit live/product/provider flags. P18 should begin from the current answer-consistency plan, not by restoring placeholder integrations or adding table-specific business rules.
 
 ## Historical / Superseded Context
 

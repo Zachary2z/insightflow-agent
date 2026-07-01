@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from workspaces.answer_consistency import apply_answer_consistency, safe_chart_annotation
 from workspaces.product_models import (
     PRODUCT_RESULT_VERSION,
     empty_business_answer,
@@ -35,18 +36,20 @@ def build_product_analysis_result(
 ) -> dict[str, Any]:
     resolved_workspace_id = workspace_id or raw.get("workspace_id") or ""
     resolved_workspace_root = workspace_root or raw.get("workspace_root") or _workspace_root_from_raw(raw)
+    business_answer = build_business_answer(raw)
     return {
         "version": PRODUCT_RESULT_VERSION,
         "workspace_id": resolved_workspace_id,
         "run_id": raw.get("run_id") or "",
         "status": raw.get("status", "unknown"),
         "question_thread": build_question_thread(raw),
-        "business_answer": build_business_answer(raw),
+        "business_answer": business_answer,
         "evidence": build_evidence(raw.get("execution_result") or {}, raw.get("evidence_result") or {}),
         "chart_artifacts": build_chart_artifacts(
             raw,
             workspace_id=str(resolved_workspace_id),
             workspace_root=resolved_workspace_root,
+            business_answer=business_answer,
         ),
         "report": raw.get("report_result") or None,
         "technical_details": build_technical_details(raw),
@@ -87,7 +90,12 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
     evidence_result = raw.get("evidence_result") if isinstance(raw.get("evidence_result"), dict) else {}
 
     if business_answer_is_usable(existing, user_question, execution_result, evidence_result):
-        return _normalize_business_answer(existing)
+        return apply_answer_consistency(
+            user_question=user_question,
+            business_answer=_normalize_business_answer(existing),
+            execution_result=execution_result,
+            evidence_result=evidence_result,
+        )
 
     direct_answer, fallback_reason = _safe_direct_answer(raw, user_question, execution_result)
     weak_evidence = _has_weak_evidence(execution_result, evidence_result)
@@ -104,7 +112,7 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
         execution_result=execution_result,
     )
 
-    return _business_answer(
+    answer = _business_answer(
         headline=_headline_from(direct_answer),
         direct_answer=direct_answer,
         why=_business_why(direct_answer, evidence_bullets, execution_result),
@@ -116,6 +124,12 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
         ),
         caveats=caveats,
         confidence="low" if weak_evidence or unsafe_fallback else "medium",
+    )
+    return apply_answer_consistency(
+        user_question=user_question,
+        business_answer=answer,
+        execution_result=execution_result,
+        evidence_result=evidence_result,
     )
 
 
@@ -498,6 +512,7 @@ def build_chart_artifacts(
     *,
     workspace_id: str = "",
     workspace_root: str | Path | None = None,
+    business_answer: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     visualization_trace = raw.get("visualization_trace") if isinstance(raw.get("visualization_trace"), dict) else {}
     delivery = (
@@ -512,6 +527,11 @@ def build_chart_artifacts(
     value_label = bool(chart_spec.get("value_label") or visualization_trace.get("value_label") or False)
     annotation = str(
         chart_spec.get("business_annotation") or visualization_trace.get("business_annotation") or ""
+    )
+    safe_annotation = safe_chart_annotation(
+        annotation=annotation,
+        business_answer=business_answer or build_business_answer(raw),
+        execution_result=raw.get("execution_result") if isinstance(raw.get("execution_result"), dict) else {},
     )
 
     paths = _unique_text(
@@ -541,7 +561,7 @@ def build_chart_artifacts(
                 "rendering_status": str(visualization_trace.get("rendering_status") or "rendered"),
                 "unit": unit,
                 "value_label": value_label,
-                "business_annotation": annotation,
+                "business_annotation": safe_annotation,
             }
         )
         artifacts.append(artifact)

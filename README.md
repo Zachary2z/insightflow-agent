@@ -31,8 +31,9 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P12 workspace reports | Complete | `POST /api/workspaces/{workspace_id}/reports` |
 | P16 clean business output model | Complete | `business_answer` with `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
+| P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
 
-P17-H1 through P17-H6 are complete. The cleanup boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance. P18 is the next direction for real external business tool calling.
+P18-H1 through P18-H6 are complete. Cleanup and consistency boundary tests protect the current FastAPI workspace APIs, workspace analysis/report runners, LangGraph product chain, Next.js product renderers, MCP database/report wrappers, P16 `business_answer` contract, P18 consistency layer, simplified product docs/status surfaces, artifact hygiene, legacy audit boundaries, and live DeepSeek acceptance gating. Real external business tool calling remains a future product phase after P18.
 
 ## Quickstart
 
@@ -152,6 +153,12 @@ Current backend regression:
 ```bash
 python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
 python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+```
+
+P18 focused regression:
+
+```bash
+python3 -m pytest tests/test_answer_consistency.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py tests/test_business_answer_quality.py tests/test_deepseek_provider_structured_output.py -q
 ```
 
 Frontend regression:

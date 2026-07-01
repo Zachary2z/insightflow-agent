@@ -8,7 +8,7 @@ from typing import Any, Callable
 from workspaces.analysis_runner import run_workspace_analysis
 from workspaces.models import utc_now_iso
 from workspaces.product_models import PRODUCT_RESULT_VERSION
-from workspaces.product_result_builder import business_answer_is_usable
+from workspaces.product_result_builder import build_business_answer
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_models import ReportSection
 from workspaces.report_store import WorkspaceReportStore
@@ -424,28 +424,19 @@ def _business_answer_from_analysis_result(
     if isinstance(analysis_result.get("business_answer"), dict):
         candidates.append(analysis_result["business_answer"])
     for candidate in candidates:
-        if business_answer_is_usable(candidate, question, execution_result, evidence_result):
-            return {
-                "headline": str(candidate.get("headline") or "").strip(),
-                "direct_answer": str(candidate.get("direct_answer") or "").strip(),
-                "why": str(candidate.get("why") or "").strip(),
-                "evidence_bullets": [
-                    str(item)
-                    for item in candidate.get("evidence_bullets") or []
-                    if str(item).strip()
-                ],
-                "recommendations": [
-                    str(item)
-                    for item in candidate.get("recommendations") or []
-                    if str(item).strip()
-                ],
-                "caveats": [
-                    str(item)
-                    for item in candidate.get("caveats") or []
-                    if str(item).strip()
-                ],
-                "confidence": str(candidate.get("confidence") or "medium"),
+        answer = build_business_answer(
+            {
+                "status": analysis_result.get("status") or "",
+                "user_question": question,
+                "original_question": analysis_result.get("original_question") or question,
+                "question": analysis_result.get("question") or question,
+                "business_answer": candidate,
+                "execution_result": execution_result,
+                "evidence_result": evidence_result,
             }
+        )
+        if answer.get("headline") or answer.get("direct_answer") or answer.get("why"):
+            return answer
     return {}
 
 
@@ -603,14 +594,63 @@ def _executive_summary(sections: list[ReportSection]) -> list[str]:
         headline = str(answer.get("headline") or "").strip()
         direct_answer = str(answer.get("direct_answer") or "").strip()
         if section.status == "completed" and (headline or direct_answer):
-            value = headline
-            if direct_answer and direct_answer != headline:
-                value = f"{headline} - {direct_answer}" if headline else direct_answer
-            summary.append(f"{section.title}: {value}")
+            summary.append(f"{section.title}: {_executive_summary_value(headline, direct_answer)}")
         elif section.status == "failed":
-            value = headline or direct_answer or section.error or "section failed"
+            value = _executive_summary_value(headline, direct_answer) or section.error or "section failed"
             summary.append(f"{section.title}: {value}")
     return summary
+
+
+def _executive_summary_value(headline: str, direct_answer: str) -> str:
+    headline = _summary_safe_text(headline)
+    direct_answer = _summary_safe_text(direct_answer)
+    if headline:
+        if _has_tradeoff_language(direct_answer) and not _has_tradeoff_language(headline):
+            suffix = "需要按判断口径取舍" if _contains_cjk(direct_answer) else "decision basis required"
+            return f"{headline}；{suffix}" if _contains_cjk(headline + direct_answer) else f"{headline}; {suffix}"
+        return headline
+    return _short_summary_text(direct_answer)
+
+
+def _short_summary_text(text: str, limit: int = 96) -> str:
+    text = _summary_safe_text(text)
+    if len(text) <= limit:
+        return text
+    for marker in ("。", ".", "；", ";"):
+        index = text.find(marker)
+        if 0 < index < limit:
+            return text[: index + 1].strip()
+    return text[:limit].rstrip() + "..."
+
+
+def _summary_safe_text(text: str) -> str:
+    value = " ".join(str(text or "").split())
+    blocked_markers = (
+        "SELECT",
+        "WITH ",
+        "provider_metadata",
+        "provider_called",
+        "trace_id",
+        "trace_path",
+        "prompt_id",
+        "本节意图提示",
+        "本节问题",
+        "自动报告内部 section",
+        "内部 section 提示",
+    )
+    for marker in blocked_markers:
+        if marker.lower() in value.lower():
+            return ""
+    return value
+
+
+def _has_tradeoff_language(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(marker in lowered for marker in ("取舍", "权衡", "口径", "如果目标", "tradeoff", "decision basis"))
+
+
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in str(text or ""))
 
 
 def _section_trace_event(

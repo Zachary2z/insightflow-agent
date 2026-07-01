@@ -316,6 +316,8 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
         *normalized_answer["caveats"],
     ]
     for field_text in business_text_fields:
+        if _contains_internal_prompt_leak(field_text):
+            return _error(prompt_id, "business_answer fields must not contain internal report section prompt text")
         if _contains_technical_leak(field_text):
             return _error(prompt_id, "business_answer fields must not contain technical SQL, trace, or provider metadata")
         if _looks_like_raw_parameter_dump(field_text):
@@ -331,6 +333,12 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
             return _error(prompt_id, "business_answer.recommendations must be empty when evidence is weak")
         if not normalized_answer["caveats"]:
             return _error(prompt_id, "business_answer.caveats is required when evidence is weak or limited")
+
+    if _schema_context_has_single_row_action_limit(schema_context, normalized_answer):
+        return _error(
+            prompt_id,
+            "business_answer must not recommend budget or resource changes without sufficient comparative evidence",
+        )
 
     return _ok(prompt_id, {"candidate_claims": candidate_claims, "business_answer": normalized_answer})
 
@@ -369,6 +377,19 @@ def _contains_technical_leak(text: str) -> bool:
     return any(marker in lowered for marker in technical_markers)
 
 
+def _contains_internal_prompt_leak(text: str) -> bool:
+    lowered = str(text or "").lower()
+    markers = (
+        "这是自动报告内部 section",
+        "自动报告内部 section",
+        "本节意图提示",
+        "本节问题",
+        "本节目的",
+        "internal section",
+    )
+    return any(marker in lowered for marker in markers)
+
+
 def _cjk_business_answer_language_error(answer: dict[str, Any]) -> str:
     for field in ("headline", "direct_answer", "why"):
         if not _contains_cjk(str(answer.get(field) or "")):
@@ -398,6 +419,78 @@ def _schema_context_has_weak_evidence(schema_context: dict[str, Any]) -> bool:
         if validation_status in {"failed", "not_validated", "rejected"} and not notes:
             return True
     return False
+
+
+def _schema_context_has_single_row_action_limit(
+    schema_context: dict[str, Any],
+    answer: dict[str, Any],
+) -> bool:
+    execution_result = schema_context.get("execution_result")
+    if not isinstance(execution_result, dict):
+        return False
+    rows = execution_result.get("rows") or []
+    if len(rows) != 1:
+        return False
+    recommendations = [str(item).strip() for item in answer.get("recommendations") or [] if str(item).strip()]
+    return any(_is_budget_or_resource_action_recommendation(item) for item in recommendations)
+
+
+def _is_budget_or_resource_action_recommendation(text: str) -> bool:
+    lowered = str(text or "").lower()
+    if not lowered or _is_evidence_gathering_recommendation(lowered):
+        return False
+    action_markers = (
+        "加预算",
+        "增加预算",
+        "减少预算",
+        "削减预算",
+        "降低预算",
+        "转移预算",
+        "转向",
+        "加大投放",
+        "增加投放",
+        "减少投放",
+        "削减投放",
+        "降低投放",
+        "资源倾斜",
+        "投入资源",
+        "increase budget",
+        "reduce budget",
+        "cut budget",
+        "shift budget",
+        "allocate budget",
+        "move budget",
+        "increase spend",
+        "reduce spend",
+        "cut spend",
+        "shift spend",
+        "shift resources",
+        "allocate resources",
+        "move resources",
+    )
+    return any(marker in lowered for marker in action_markers)
+
+
+def _is_evidence_gathering_recommendation(text: str) -> bool:
+    markers = (
+        "补充",
+        "获取",
+        "增加同口径",
+        "更多",
+        "完整",
+        "对比数据",
+        "对比证据",
+        "比较证据",
+        "再判断",
+        "再决定",
+        "add complete comparison evidence",
+        "get more",
+        "gather more",
+        "collect more",
+        "comparison evidence",
+        "before deciding",
+    )
+    return any(marker in text for marker in markers)
 
 
 def _nullable_string(value: Any, field_name: str) -> tuple[bool, str, str]:

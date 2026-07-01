@@ -231,7 +231,7 @@ P17-H6 completed final cleanup closeout:
 - legacy audit found old Streamlit, eval runner, action delivery, mock SaaS, chart-agent/planner/tool, fixed-template, deterministic-action-template, and keyword-inference terms only in Historical / Superseded documentation or deletion-boundary tests, not active product entry points;
 - full backend pytest, focused cleanup boundaries, frontend Vitest, frontend production build, and real DeepSeek P12/P13/P15 live acceptance passed.
 
-P17 is complete. P18 is the next phase and should focus on real authenticated external business tool integrations instead of reviving placeholder demos.
+P17 is complete. P18 is the next phase and should focus on business answer consistency before real authenticated external business tool integrations. External integrations remain important, but they should not publish or export inconsistent conclusions.
 
 ## Acceptance
 
@@ -247,9 +247,16 @@ P17 acceptance checklist is complete:
 - real DeepSeek P12, P13, and P15 acceptance tests pass;
 - generated artifacts, caches, workspace runs, chart files, trace files, sample data, `.env`, `.venv`, and dependency directories remain untracked.
 
-## P18 Placeholder
+## P18 Follow-Up
 
-P18 will start after P17 cleanup. Its working direction is real China-oriented external tool calling:
+P18 starts after P17 cleanup with `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`. Its working direction is:
+
+- align `headline`, `direct_answer`, `why`, evidence bullets, recommendations, chart annotations, and report summaries;
+- handle multi-metric tradeoffs without hardcoding sample tables or field values;
+- avoid unsupported budget/action recommendations when comparative evidence is insufficient;
+- keep the implementation small, readable, and free of keyword-heavy business rule trees.
+
+Real China-oriented external tool calling is deferred to a later phase:
 
 - Feishu Bitable / Feishu Docs for evidence tables and report publishing;
 - WeCom or DingTalk messages for analysis/report notification;

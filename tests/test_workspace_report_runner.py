@@ -147,7 +147,7 @@ def test_business_review_generates_multiple_sections_and_persists_report_artifac
     assert "SELECT channel" not in business_answer_text
     assert "provider_called" not in business_answer_text
     assert "question_understanding_agent" not in business_answer_text
-    assert saved["executive_summary"][0] == "Overall Revenue: 第 1 个章节的业务结论 - 第 1 个章节显示付费搜索收入领先，建议优先复盘渠道结构。"
+    assert saved["executive_summary"][0] == "Overall Revenue: 第 1 个章节的业务结论"
     assert saved["sections"][0]["columns"] == ["channel", "revenue"]
     assert saved["sections"][0]["rows_preview"][0] == {
         "channel": "paid_search",
@@ -225,6 +225,67 @@ def test_report_section_without_current_business_answer_gets_low_confidence_fail
     }
     assert "summary" not in first_section
     assert "Legacy final answer should not become the report body." not in first_section["business_answer"]["direct_answer"]
+
+
+def test_report_does_not_inherit_conflicting_section_answer_or_repeat_long_direct_answer(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def conflicting_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": {
+                    "headline": "高价值企业最值得重点运营",
+                    "direct_answer": (
+                        "高价值企业最值得重点运营，因为它的客单价最高。"
+                        "但本报告章节问题只是内部 section 提示生成的自动分析，"
+                        "这里的长正文不应被 executive summary 原样重复。"
+                    ),
+                    "why": "证据表第一行显示：segment 为 成长型团队，total_revenue 为 2798216.93，order_count 为 628。",
+                    "evidence_bullets": [
+                        "成长型团队收入为 2798216.93，订单量为 628。",
+                        "高价值企业客单价为 6348.56。",
+                    ],
+                    "recommendations": ["优先把运营资源投入高价值企业。"],
+                    "caveats": [],
+                    "confidence": "high",
+                },
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["segment", "total_revenue", "order_count", "avg_revenue_per_order"],
+                "rows": [
+                    ["成长型团队", 2798216.93, 628, 4455.76],
+                    ["高价值企业", 2158510.79, 340, 6348.56],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "trace": [{"node": "sql_executor_node"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "按客户分群看收入、订单量和客单价，判断哪个分群最值得重点运营。",
+        section_runner=conflicting_runner,
+    )
+
+    first_section = result["report"]["sections"][0]
+    answer = first_section["business_answer"]
+    answer_text = json.dumps(answer, ensure_ascii=False)
+    assert first_section["status"] == "completed"
+    assert "成长型团队" in answer_text
+    assert "高价值企业" in answer_text
+    assert any(marker in answer_text for marker in ("取舍", "权衡", "口径", "如果目标", "按收入", "按客单价"))
+    assert not (
+        "高价值企业最值得重点运营" in answer["headline"] + answer["direct_answer"]
+        and "证据表第一行显示：segment 为 成长型团队" in answer["why"]
+    )
+    summary_text = " ".join(result["report"]["executive_summary"])
+    assert "内部 section 提示" not in summary_text
+    assert "这里的长正文不应被 executive summary 原样重复" not in summary_text
 
 
 def test_business_review_section_questions_are_specific_internal_analysis_prompts():
