@@ -36,27 +36,6 @@ def schema_node(state: AgentState) -> AgentState:
 
 
 def metric_node(state: AgentState) -> AgentState:
-    if state.get("workspace_id"):
-        metric_context = {
-            "success": True,
-            "source": "workspace_semantic_layer",
-            "matched_metrics": [],
-            "metrics": {},
-            "semantic_layer_path": state.get("semantic_layer_path"),
-            "profile_path": state.get("profile_path"),
-        }
-        updated = {**state, "metric_context": metric_context}
-        return append_trace(
-            updated,
-            {
-                "node": "metric_agent",
-                "tool_name": "workspace_semantic_layer",
-                "tool_input_summary": state.get("semantic_layer_path") or "",
-                "tool_output_summary": "workspace semantic context attached",
-                "status": "success",
-                "latency_ms": 0,
-            },
-        )
     return run_metric_agent(dict(state))
 
 

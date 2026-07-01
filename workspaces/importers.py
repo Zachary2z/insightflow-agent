@@ -13,7 +13,7 @@ from workspaces.store import WorkspaceStore
 
 
 def sanitize_identifier(value: str) -> str:
-    sanitized = re.sub(r"[^0-9a-zA-Z_]+", "_", value.strip().lower()).strip("_")
+    sanitized = re.sub(r"[^\w]+", "_", value.strip().lower(), flags=re.UNICODE).strip("_")
     if not sanitized:
         sanitized = "table"
     if sanitized[0].isdigit():

@@ -11,7 +11,11 @@ def run_metric_agent(
     state: dict[str, Any],
     metrics_path: str | Path = DEFAULT_METRICS_PATH,
 ) -> dict[str, Any]:
-    result = retrieve_metric_definition(state.get("user_question", ""), metrics_path)
+    result = retrieve_metric_definition(
+        state.get("user_question", ""),
+        metrics_path,
+        semantic_layer_path=state.get("semantic_layer_path") if state.get("workspace_id") else None,
+    )
     updated = {
         **state,
         "metric_context": result,

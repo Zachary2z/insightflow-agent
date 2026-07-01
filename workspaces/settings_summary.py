@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from llm_ops.deepseek_provider import load_deepseek_config
 from llm_ops.runtime_provider import (
     product_live_mode_enabled,
@@ -18,6 +16,7 @@ from llm_ops.runtime_provider import (
     provider_sql_planning_enabled,
     provider_visualization_agent_enabled,
 )
+from semantic_layer.loader import load_workspace_semantic_layer
 from workspaces.store import WorkspaceStore
 
 
@@ -30,14 +29,6 @@ def _read_json(path: str | Path) -> dict[str, Any] | None:
     if not candidate.exists() or not candidate.is_file():
         return None
     return json.loads(candidate.read_text(encoding="utf-8"))
-
-
-def _read_yaml(path: str | Path) -> dict[str, Any] | None:
-    candidate = Path(path)
-    if not candidate.exists() or not candidate.is_file():
-        return None
-    data = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
-    return data if isinstance(data, dict) else {}
 
 
 def _profile_status(profile_path: str | Path) -> dict[str, Any]:
@@ -58,8 +49,8 @@ def _profile_status(profile_path: str | Path) -> dict[str, Any]:
 
 
 def _semantic_layer_status(semantic_layer_path: str | Path) -> dict[str, Any]:
-    semantic_layer = _read_yaml(semantic_layer_path)
-    if semantic_layer is None:
+    loaded = load_workspace_semantic_layer(semantic_layer_path)
+    if not loaded.get("success"):
         return {
             "status": "missing",
             "metrics": [],
@@ -67,6 +58,7 @@ def _semantic_layer_status(semantic_layer_path: str | Path) -> dict[str, Any]:
             "entities": [],
             "time_fields": [],
         }
+    semantic_layer = loaded["semantic_layer"]
 
     return {
         "status": "ready",

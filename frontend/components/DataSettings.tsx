@@ -25,10 +25,14 @@ const FEATURE_LABELS: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = {
   measure: "指标",
+  metric: "指标",
   dimension: "维度",
   entity: "实体",
   time: "时间字段",
+  id: "标识字段",
   identifier: "标识字段",
+  status: "状态字段",
+  text: "文本字段",
 };
 
 function readinessLabel(status?: string) {

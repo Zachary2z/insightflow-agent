@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import yaml
+from semantic_layer.loader import load_workspace_semantic_layer
 
 
 def _read_json(path: str | Path | None) -> dict[str, Any]:
@@ -14,15 +14,6 @@ def _read_json(path: str | Path | None) -> dict[str, Any]:
     if not file_path.exists():
         return {}
     return json.loads(file_path.read_text(encoding="utf-8"))
-
-
-def _read_yaml(path: str | Path | None) -> dict[str, Any]:
-    if not path:
-        return {}
-    file_path = Path(path)
-    if not file_path.exists():
-        return {}
-    return yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
 
 
 def _compact_column(column: dict[str, Any]) -> dict[str, Any]:
@@ -49,7 +40,8 @@ def build_workspace_context_summary(
     semantic_layer_path: str | Path | None,
 ) -> dict[str, Any]:
     profile = _read_json(profile_path)
-    semantic_layer = _read_yaml(semantic_layer_path)
+    loaded_semantic_layer = load_workspace_semantic_layer(semantic_layer_path)
+    semantic_layer = loaded_semantic_layer.get("semantic_layer", {}) if loaded_semantic_layer.get("success") else {}
     tables = [
         {
             "table_name": table.get("table_name", ""),

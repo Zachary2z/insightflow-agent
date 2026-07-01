@@ -129,3 +129,60 @@ def test_business_context_includes_semantic_context_without_replacing_markdown_m
     assert "traffic_sessions_by_city_channel_category" in result["semantic_context"]["matched_join_paths"]
     assert result["matched_rules"]
     assert result["matched_table_docs"]
+
+
+def test_workspace_semantic_layer_loader_reads_yaml_and_json_single_file(tmp_path):
+    import json
+
+    from semantic_layer.loader import load_workspace_semantic_layer
+
+    payload = {
+        "workspace_id": "workspace-1",
+        "metrics": [{"name": "sum_sales_amount", "field": "store.sales_amount"}],
+        "dimensions": [{"name": "store_name", "field": "store.store_name"}],
+        "time_fields": [{"name": "business_date", "field": "store.business_date"}],
+        "entities": [{"name": "store_id", "field": "store.store_id"}],
+        "tables": [{"table_name": "store"}],
+    }
+    yaml_path = tmp_path / "semantic_layer.yaml"
+    json_path = tmp_path / "semantic_layer.json"
+    yaml_path.write_text(
+        """
+workspace_id: workspace-1
+metrics:
+  - name: sum_sales_amount
+    field: store.sales_amount
+dimensions:
+  - name: store_name
+    field: store.store_name
+time_fields:
+  - name: business_date
+    field: store.business_date
+entities:
+  - name: store_id
+    field: store.store_id
+tables:
+  - table_name: store
+""",
+        encoding="utf-8",
+    )
+    json_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    yaml_result = load_workspace_semantic_layer(yaml_path)
+    json_result = load_workspace_semantic_layer(json_path)
+
+    assert yaml_result["success"] is True
+    assert json_result["success"] is True
+    assert yaml_result["semantic_layer"]["metrics"][0]["name"] == "sum_sales_amount"
+    assert json_result["semantic_layer"]["dimensions"][0]["field"] == "store.store_name"
+    assert yaml_result["metric_map"]["sum_sales_amount"]["field"] == "store.sales_amount"
+    assert json_result["dimension_map"]["store_name"]["field"] == "store.store_name"
+
+
+def test_workspace_semantic_layer_loader_rejects_missing_file(tmp_path):
+    from semantic_layer.loader import load_workspace_semantic_layer
+
+    result = load_workspace_semantic_layer(tmp_path / "missing.yaml")
+
+    assert result["success"] is False
+    assert "not found" in result["error"]

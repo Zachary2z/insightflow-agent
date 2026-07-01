@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 import yaml
 
 from semantic_layer.loader import DEFAULT_SEMANTIC_PATHS
+from semantic_layer.loader import load_workspace_semantic_layer
 from semantic_layer.retriever import retrieve_semantic_context
 
 
@@ -73,7 +75,7 @@ def load_metric_definitions(metrics_path: str | Path = DEFAULT_METRICS_PATH) -> 
 
 
 def _normalize(text: str) -> str:
-    return text.lower().replace(" ", "")
+    return re.sub(r"[\s_\-]+", "", str(text).lower())
 
 
 def _metric_matches(question: str, metric_id: str, definition: dict[str, Any]) -> bool:
@@ -90,7 +92,7 @@ def _ordered_matches(question: str, metrics: dict[str, Any]) -> list[str]:
         if isinstance(definition, dict) and _metric_matches(question, metric_id, definition)
     ]
 
-    # Product/category questions often still require GMV context for sales amount semantics.
+    # Keep the base sales-amount metric first when legacy definitions match multiple sales metrics.
     if "gmv" in matched:
         matched.remove("gmv")
         matched.insert(0, "gmv")
@@ -98,11 +100,94 @@ def _ordered_matches(question: str, metrics: dict[str, Any]) -> list[str]:
     return matched
 
 
+def _workspace_candidates(item: dict[str, Any]) -> list[str]:
+    aliases = item.get("aliases", [])
+    return [
+        str(item.get("name", "")),
+        str(item.get("label", "")),
+        str(item.get("field", "")).split(".")[-1],
+        *[str(alias) for alias in aliases],
+    ]
+
+
+def _workspace_matches(question: str, item: dict[str, Any]) -> bool:
+    normalized_question = _normalize(question)
+    return any(_normalize(candidate) in normalized_question for candidate in _workspace_candidates(item) if candidate)
+
+
+def _workspace_semantic_context(question: str, semantic_layer: dict[str, Any]) -> dict[str, Any]:
+    metrics = [item for item in semantic_layer.get("metrics", []) if isinstance(item, dict)]
+    dimensions = [item for item in semantic_layer.get("dimensions", []) if isinstance(item, dict)]
+    entities = [item for item in semantic_layer.get("entities", []) if isinstance(item, dict)]
+    time_fields = [item for item in semantic_layer.get("time_fields", []) if isinstance(item, dict)]
+    matched_metrics = [str(item.get("name")) for item in metrics if item.get("name") and _workspace_matches(question, item)]
+    matched_dimensions = [
+        str(item.get("name")) for item in dimensions if item.get("name") and _workspace_matches(question, item)
+    ]
+    matched_entities = [str(item.get("name")) for item in entities if item.get("name") and _workspace_matches(question, item)]
+    matched_time_fields = [
+        str(item.get("name")) for item in time_fields if item.get("name") and _workspace_matches(question, item)
+    ]
+    return {
+        "success": True,
+        "source": "workspace_semantic_layer",
+        "matched_metrics": matched_metrics,
+        "matched_dimensions": matched_dimensions,
+        "matched_entities": matched_entities,
+        "matched_time_fields": matched_time_fields,
+        "metrics": {str(item["name"]): item for item in metrics if item.get("name") in matched_metrics},
+        "dimensions": {str(item["name"]): item for item in dimensions if item.get("name") in matched_dimensions},
+        "entities": {str(item["name"]): item for item in entities if item.get("name") in matched_entities},
+        "time_fields": {str(item["name"]): item for item in time_fields if item.get("name") in matched_time_fields},
+    }
+
+
 def retrieve_metric_definition(
     question: str,
     metrics_path: str | Path = DEFAULT_METRICS_PATH,
+    semantic_layer_path: str | Path | None = None,
 ) -> dict[str, Any]:
     started_at = perf_counter()
+    if semantic_layer_path:
+        loaded_semantic_layer = load_workspace_semantic_layer(semantic_layer_path)
+        latency_ms = int((perf_counter() - started_at) * 1000)
+        if not loaded_semantic_layer.get("success"):
+            error = loaded_semantic_layer.get("error", "Failed to load workspace semantic layer.")
+            return {
+                "success": False,
+                "source": "workspace_semantic_layer",
+                "question": question,
+                "matched_metrics": [],
+                "metrics": {},
+                "error": error,
+                "trace_event": _trace_event(question, [], "error", latency_ms, error),
+            }
+        semantic_context = _workspace_semantic_context(question, loaded_semantic_layer["semantic_layer"])
+        matched_metrics = semantic_context["matched_metrics"]
+        if not matched_metrics:
+            error = f"No metric definition matched question: {question}"
+            return {
+                "success": False,
+                "source": "workspace_semantic_layer",
+                "question": question,
+                "matched_metrics": [],
+                "metrics": {},
+                "semantic_context": semantic_context,
+                "semantic_layer_path": str(semantic_layer_path),
+                "error": error,
+                "trace_event": _trace_event(question, [], "error", latency_ms, error),
+            }
+        return {
+            "success": True,
+            "source": "workspace_semantic_layer",
+            "question": question,
+            "matched_metrics": matched_metrics,
+            "metrics": semantic_context["metrics"],
+            "semantic_context": semantic_context,
+            "semantic_layer_path": str(semantic_layer_path),
+            "trace_event": _trace_event(question, matched_metrics, "success", latency_ms),
+        }
+
     path = Path(metrics_path)
     use_semantic_layer = path.resolve() == DEFAULT_METRICS_PATH.resolve()
     if use_semantic_layer:

@@ -35,7 +35,7 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P19 report and chart synthesis | Complete | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, technical appendix, and H5 live acceptance |
 | P20 general business analysis foundation | In progress | `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md` |
 
-P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0 is complete. P20 is the current foundation phase: clean old/conflicting paths, generalize data profiling and semantic context, introduce a reusable analysis task contract, stabilize factual evidence and metric formulas, and make answers/reports use validated evidence without fixed demo templates. Real external business tool calling remains a later product phase after the generalized analysis foundation and responsiveness work are stable.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0 and P20-H1 are complete. P20 is the current foundation phase: clean old/conflicting paths, generalize data profiling and semantic context, introduce a reusable analysis task contract, stabilize factual evidence and metric formulas, and make answers/reports use validated evidence without fixed demo templates. Real external business tool calling remains a later product phase after the generalized analysis foundation and responsiveness work are stable.
 
 ## Quickstart
 
@@ -153,6 +153,8 @@ P20 should keep this product recognizably multi-agent and tool-calling, but with
 - validators check factual numbers, rankings, fields, and metric formulas without blocking reasonable evidence-backed business judgment.
 
 P20-H0 cleanup note: the old trace-driven SQL template-mining/eval helper path was removed from active code (`sql_planning.feedback`, `tests/test_llm_template_mining_eval_suite.py`, and `template_mining_event` trace payloads). Current provider smoke validation remains in `tests/test_llm_smoke_eval.py`.
+
+P20-H1 semantic foundation note: workspace profiling now emits generalized field roles, inferred types, business-meaning candidates, group-by suitability, and aggregation suitability for imported business data, including Chinese field names. Workspace semantic drafts are generated from actual tables/columns into metrics, dimensions, time fields, entities, field roles, aliases, relationship candidates, and available analysis capabilities without inventing missing `channel` or `revenue` fields. Workspace semantic-layer YAML/JSON loading is unified for settings, context summaries, metric lookup, and schema repair.
 
 ## Verification
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
+from semantic_layer.loader import load_workspace_semantic_layer
 from tools.trace_logger import append_trace
 
 
@@ -169,18 +169,16 @@ def _semantic_layer_hints(state: dict[str, Any]) -> dict[str, Any]:
     }
     path_text = state.get("semantic_layer_path")
     if isinstance(path_text, str) and path_text:
-        path = Path(path_text)
-        if path.exists():
-            try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(payload, dict):
-                    hints["semantic_layer"] = {
-                        key: payload.get(key)
-                        for key in ("metrics", "dimensions", "entities", "tables")
-                        if key in payload
-                    }
-            except (OSError, json.JSONDecodeError):
-                hints["semantic_layer_error"] = "semantic layer could not be read"
+        loaded = load_workspace_semantic_layer(path_text)
+        if loaded.get("success"):
+            payload = loaded["semantic_layer"]
+            hints["semantic_layer"] = {
+                key: payload.get(key)
+                for key in ("metrics", "dimensions", "entities", "time_fields", "tables", "relationships")
+                if key in payload
+            }
+        else:
+            hints["semantic_layer_error"] = loaded.get("error", "semantic layer could not be read")
         hints["semantic_layer_path"] = path_text
     return hints
 

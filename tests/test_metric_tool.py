@@ -59,3 +59,47 @@ def test_load_metric_definitions_handles_missing_file(tmp_path):
     assert result["success"] is False
     assert result["metrics"] == {}
     assert "not found" in result["error"]
+
+
+def test_retrieve_metric_definition_can_use_workspace_semantic_layer(tmp_path):
+    import yaml
+
+    from tools.metric_tool import retrieve_metric_definition
+
+    semantic_layer_path = tmp_path / "semantic_layer.yaml"
+    semantic_layer_path.write_text(
+        yaml.safe_dump(
+            {
+                "workspace_id": "store-workspace",
+                "metrics": [
+                    {
+                        "name": "sum_sales_amount",
+                        "label": "SUM Sales Amount",
+                        "field": "store_operations.sales_amount",
+                        "formula": "SUM(store_operations.sales_amount)",
+                        "aliases": ["sales amount", "营业额"],
+                    }
+                ],
+                "dimensions": [
+                    {
+                        "name": "store_name",
+                        "field": "store_operations.store_name",
+                        "aliases": ["store name", "门店"],
+                    }
+                ],
+                "time_fields": [],
+                "entities": [],
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = retrieve_metric_definition("按门店看营业额", semantic_layer_path=semantic_layer_path)
+
+    assert result["success"] is True
+    assert result["source"] == "workspace_semantic_layer"
+    assert result["matched_metrics"] == ["sum_sales_amount"]
+    assert result["metrics"]["sum_sales_amount"]["field"] == "store_operations.sales_amount"
+    assert result["semantic_context"]["matched_dimensions"] == ["store_name"]

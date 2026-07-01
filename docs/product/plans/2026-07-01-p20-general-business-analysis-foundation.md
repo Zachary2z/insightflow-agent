@@ -167,16 +167,25 @@ Expected capabilities:
 - Infer safe aliases from actual column names and headers, including Chinese fields.
 - Store a workspace-level semantic layer that can be read by question understanding, SQL planning, schema repair, answer writing, report writing, and frontend settings.
 
-- [ ] Add failing tests using at least two different fixture shapes: the Chinese channel sample and one non-channel business dataset.
-- [ ] Implement profile/semantic output that describes dimensions, metrics, time fields, and candidate relationships without hardcoding current table names.
-- [ ] Fix semantic-layer reading so YAML and JSON are both handled where current code expects semantic context.
-- [ ] Ensure schema repair uses the same semantic context as SQL planning.
-- [ ] Update Data Settings UI only if required to show the generalized semantic layer clearly.
+- [x] Add failing tests using at least two different fixture shapes: the Chinese channel sample and one non-channel business dataset.
+- [x] Implement profile/semantic output that describes dimensions, metrics, time fields, and candidate relationships without hardcoding current table names.
+- [x] Fix semantic-layer reading so YAML and JSON are both handled where current code expects semantic context.
+- [x] Ensure schema repair uses the same semantic context as SQL planning.
+- [x] Update Data Settings UI only if required to show the generalized semantic layer clearly.
 
 Acceptance:
 
 - A new workspace can expose available dimensions, metrics, and time fields regardless of whether it contains channel/marketing data.
 - Schema repair must not fall back to old ecommerce tables when the current workspace has a valid semantic layer.
+
+P20-H1 completion note on 2026-07-01:
+
+- Added RED coverage for Unicode CSV headers, Chinese store-operation fields, non-channel store/inventory semantic drafts, Chinese relationship candidates, workspace YAML/JSON semantic loading, workspace metric lookup, settings loading, and schema repair semantic hints.
+- Workspace profiling now emits generalized field metadata: table/column names, original SQL type, inferred type, `field_role`, business-meaning candidates such as `revenue_like`, `cost_like`, `amount_like`, `count_like`, `rating_like`, and `date_like`, plus group-by and aggregation suitability.
+- Semantic drafts now derive `tables`, `metrics`, `dimensions`, `time_fields`, `entities`, `field_roles`, `semantic_aliases`, `relationships`, and `available_analysis_capabilities` from the actual workspace profile. They support Chinese field names and English snake_case fields, and do not invent missing `channel` or `revenue` metrics.
+- Added `load_workspace_semantic_layer()` as a shared single-file YAML/JSON reader and wired it into settings summary, workspace context summary, metric lookup, and schema repair; schema repair no longer emits the old JSON-only semantic-layer read error for YAML workspaces.
+- Data Settings received only a small role-label update for the generalized profile roles.
+- Verification passed: profiler/semantic focused `15 passed`, schema/metric/settings/P20 focused `17 passed`, workspace analysis/product-result regression `27 passed`, and combined P20-H1 backend set `36 passed`.
 
 ### P20-H2: General Analysis Task Contract And Clarification
 

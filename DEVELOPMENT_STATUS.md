@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P20 General Business Analysis Foundation |
-| Current task | P20-H0 architecture cleanup complete; next is P20-H1 generalized profiling and semantic layer |
-| Next planned task | P20-H1 general data profiling and semantic layer for arbitrary uploaded business datasets |
-| Last completed task | P20-H0 architecture cleanup and main path inventory |
+| Current task | P20-H1 generalized profiling and semantic layer complete; next is P20-H2 analysis task contract |
+| Next planned task | P20-H2 general analysis task contract and clarification continuation |
+| Last completed task | P20-H1 general data profiling and semantic layer |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -43,7 +43,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Task | Status | Notes |
 |---|---|---|
 | P20-H0 | `[x]` Complete | Architecture cleanup and main path inventory; removed stale template-mining eval/helper path and clarified current product chain |
-| P20-H1 | `[ ]` Planned | General data profiling and semantic layer for arbitrary uploaded business datasets |
+| P20-H1 | `[x]` Complete | General data profiling and semantic layer for arbitrary uploaded business datasets |
 | P20-H2 | `[ ]` Planned | General analysis task contract and clarification continuation |
 | P20-H3 | `[ ]` Planned | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope |
 | P20-H4 | `[ ]` Planned | Business insight, answer, chart, and report generation from validated evidence |
@@ -101,6 +101,16 @@ workspace import
 ```
 
 ## Latest Verified Baseline
+
+Latest P20-H1 generalized semantic-layer result on 2026-07-01:
+
+- CSV/Excel import identifier sanitization now preserves Unicode business headers, so Chinese field names remain available for profiling instead of collapsing to duplicate placeholder names.
+- Workspace profiling now emits generalized `original_type`, `inferred_type`, `field_role`, `business_meaning_candidates`, `suitable_group_by`, and `suitable_aggregations` fields while preserving legacy `role_candidates`.
+- Semantic-layer drafts are generated from actual workspace fields into `tables`, `metrics`, `dimensions`, `time_fields`, `entities`, `field_roles`, `semantic_aliases`, `relationships`, and `available_analysis_capabilities`; missing `channel` or `revenue` fields are not invented.
+- Added `load_workspace_semantic_layer()` as the shared YAML/JSON workspace semantic-layer reader and wired it into settings summary, workspace context summary, metric lookup, and schema repair.
+- Schema repair now reads workspace YAML semantic layers without the previous JSON-only “semantic layer could not be read” failure.
+- Data Settings recognizes the generalized `metric`, `id`, `status`, and `text` field-role labels.
+- Verification passed: `python3 -m pytest tests/test_workspace_profiler.py tests/test_workspace_semantic_draft.py tests/test_semantic_layer.py -q` (`15 passed`), `python3 -m pytest tests/test_schema_tool.py tests/test_metric_tool.py tests/test_workspace_settings_api.py tests/test_p20_general_semantic_layer.py -q` (`17 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`27 passed`), combined P20-H1 backend set (`36 passed`), frontend workspace-flow Vitest (`49 passed`), frontend production build passed, and full backend regression passed (`401 passed, 13 skipped`).
 
 Latest P20-H0 cleanup result on 2026-07-01:
 

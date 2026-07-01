@@ -26,6 +26,25 @@ def test_import_csv_creates_table_and_source_metadata(tmp_path):
     assert rows == [(1, 120.5), (2, 98.0)]
 
 
+def test_import_csv_preserves_chinese_business_headers_for_profiling(tmp_path):
+    csv_path = tmp_path / "门店经营.csv"
+    csv_path.write_text(
+        "日期,门店,营业额,客诉数量,满意度评分,工单状态\n"
+        "2026-01-01,上海一店,1200.5,3,4.6,已关闭\n",
+        encoding="utf-8",
+    )
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Chinese CSV Workspace")
+
+    result = import_csv(store, workspace["workspace_id"], csv_path)
+
+    assert result["success"] is True
+    table_name = result["imported_tables"][0]
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        columns = [row[1] for row in conn.execute(f'PRAGMA table_info("{table_name}")').fetchall()]
+    assert columns == ["日期", "门店", "营业额", "客诉数量", "满意度评分", "工单状态"]
+
+
 def test_import_excel_creates_one_table_per_sheet(tmp_path):
     excel_path = tmp_path / "ops.xlsx"
     with pd.ExcelWriter(excel_path) as writer:

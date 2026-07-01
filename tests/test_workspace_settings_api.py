@@ -86,6 +86,36 @@ def test_workspace_settings_handles_missing_profile_and_semantic_layer(tmp_path)
     assert settings["semantic_layer"]["status"] == "missing"
 
 
+def test_workspace_settings_reads_json_semantic_layer_through_shared_loader(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("JSON Semantic Settings Workspace")
+    workspace_id = workspace["workspace_id"]
+    workspace["semantic_layer_path"] = str(tmp_path / "workspaces" / workspace_id / "semantic_layer.json")
+    store.save_workspace(workspace)
+    (tmp_path / "workspaces" / workspace_id / "semantic_layer.json").write_text(
+        json.dumps(
+            {
+                "workspace_id": workspace_id,
+                "metrics": [{"name": "sum_sales_amount"}],
+                "dimensions": [{"name": "store_name"}],
+                "entities": [],
+                "time_fields": [{"name": "business_date"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    client = TestClient(create_app(workspace_store=store))
+
+    response = client.get(f"/api/workspaces/{workspace_id}/settings")
+
+    assert response.status_code == 200
+    semantic_layer = response.json()["semantic_layer"]
+    assert semantic_layer["status"] == "ready"
+    assert semantic_layer["metrics"][0]["name"] == "sum_sales_amount"
+    assert semantic_layer["time_fields"][0]["name"] == "business_date"
+
+
 def test_workspace_settings_returns_404_for_unknown_workspace(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     client = TestClient(create_app(workspace_store=store))
