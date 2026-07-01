@@ -306,6 +306,101 @@ def test_why_and_evidence_entities_are_aligned_with_supported_decision_entity():
         assert not answer["recommendations"] or all("北区" not in item and "南区" not in item for item in answer["recommendations"])
 
 
+def test_plain_why_and_evidence_entity_conflict_is_corrected_or_downgraded():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["market", "score_value"],
+        "rows": [
+            ["北区", 91.0],
+            ["南区", 72.0],
+        ],
+    }
+    provider_answer = {
+        "headline": "建议优先投入北区",
+        "direct_answer": "建议优先投入北区，因为它在当前结果中表现最好。",
+        "why": "证据表第一行显示：market 为 南区，score_value 为 72.0。",
+        "evidence_bullets": ["南区 score_value 为 72.0。"],
+        "recommendations": ["把下一轮资源优先给北区。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近 90 天哪个市场最值得加资源？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    text = _answer_text(answer)
+    if "当前证据不足以支持该结论" in text:
+        assert answer["confidence"] == "low"
+    else:
+        assert "北区" in answer["why"]
+        assert "北区" in " ".join(answer["evidence_bullets"])
+        assert "北区" in " ".join(answer["recommendations"])
+    assert answer["why"] != provider_answer["why"]
+    assert answer["evidence_bullets"] != provider_answer["evidence_bullets"]
+    assert not (
+        "建议优先投入北区" in " ".join([answer["headline"], answer["direct_answer"], *answer["recommendations"]])
+        and answer["why"] == provider_answer["why"]
+        and answer["evidence_bullets"] == provider_answer["evidence_bullets"]
+    )
+
+
+def test_plain_english_why_and_evidence_entity_conflict_is_corrected_or_downgraded():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["market", "score_value"],
+        "rows": [
+            ["North", 91.0],
+            ["South", 72.0],
+        ],
+    }
+    provider_answer = {
+        "headline": "Recommend prioritizing North",
+        "direct_answer": "Recommend prioritizing North because it performs best in the current result.",
+        "why": "The first evidence row shows: market is South and score_value is 72.0.",
+        "evidence_bullets": ["South score_value is 72.0."],
+        "recommendations": ["Prioritize North for the next resource decision."],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "Which market is worth prioritizing for the next resource decision?",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    text = _answer_text(answer)
+    assert not _contains_cjk(text)
+    if "Current evidence is insufficient for that conclusion" in text:
+        assert answer["confidence"] == "low"
+    else:
+        assert "North" in answer["why"]
+        assert "North" in " ".join(answer["evidence_bullets"])
+        assert "North" in " ".join(answer["recommendations"])
+    assert answer["why"] != provider_answer["why"]
+    assert answer["evidence_bullets"] != provider_answer["evidence_bullets"]
+    assert not (
+        "North" in " ".join([answer["headline"], answer["direct_answer"], *answer["recommendations"]])
+        and answer["why"] == provider_answer["why"]
+        and answer["evidence_bullets"] == provider_answer["evidence_bullets"]
+    )
+
+
 def test_unsupported_decision_entity_not_in_execution_result_is_downgraded_even_when_wording_varies():
     from workspaces.product_result_builder import build_business_answer
 

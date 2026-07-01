@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H1 complete / ready for H2 planning |
-| Next planned task | P19-H2 business vocabulary and unit normalization |
+| Current task | P19-H1 complete / ready for H2 reviewer-composer planning |
+| Next planned task | P19-H2 Answer Reviewer Agent and Final Answer Composer contract |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -33,19 +33,19 @@ This is the concise current status surface for InsightFlow Agent.
 | P16 | `[x]` Complete | Single clean `business_answer` contract across analysis, reports, Markdown, frontend rendering, and run restoration |
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
 | P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
-| P19 | `[ ]` Planned | Business-ready analysis replies and management-ready reports: evidence alignment, Chinese vocabulary, decision-ready recommendations, report synthesis, chart narrative, and live acceptance |
+| P19 | `[ ]` Planned | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, and live acceptance |
+| P20 | `[ ]` Future | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background work |
+| P21 | `[ ]` Future | Real business tool calling and exports after quality and responsiveness are stable |
 
 ## P19 Task Status
 
 | Task | Status | Notes |
 |---|---|---|
-| P19-H1 | `[x]` Complete | Added final answer/evidence alignment before business answers reach analysis, reports, charts, or history |
-| P19-H2 | `[ ]` Planned | Normalize user-facing business vocabulary and units; keep raw technical fields in technical details only |
-| P19-H3 | `[ ]` Planned | Upgrade analysis replies into decision-ready Chinese answers with conclusion, basis, action, tradeoff, caveat, and next-step structure |
-| P19-H4 | `[ ]` Planned | Add report synthesis so reports read like management documents instead of concatenated sections |
-| P19-H5 | `[ ]` Planned | Integrate chart narrative and handle provider chart-spec fallback without exposing validation internals |
-| P19-H6 | `[ ]` Planned | Polish report Markdown and frontend reader around Chinese-first business report structure |
-| P19-H7 | `[ ]` Planned | Run deterministic regression plus opt-in real DeepSeek acceptance on current Chinese business data |
+| P19-H1 | `[x]` Complete | Plain why/evidence entity conflicts are now corrected or downgraded by the small deterministic guard |
+| P19-H2 | `[ ]` Planned | Add reviewer/composer foundation with structured contracts and deterministic tests |
+| P19-H3 | `[ ]` Planned | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers |
+| P19-H4 | `[ ]` Planned | Synthesize reports and chart narrative from reviewed business answers |
+| P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
 
 ## P18 Task Status
 
@@ -105,6 +105,10 @@ P19 planning note on 2026-07-01:
 - A real channel budget question produced provider-backed analysis (`provider_called: true` across question understanding, SQL planning/candidate, insight drafting, and claim typing), proving the live path works.
 - The output quality review found remaining product gaps: recommendations can cite a different entity than their evidence, raw metric names can leak into business copy, recommendations can be empty or repetitive, and reports read like stitched section output rather than synthesized management reports.
 - P19 is therefore focused on business-output/report quality before external publishing integrations.
+- Direction update: P19 should not become an expanding deterministic patch list for every possible model mistake. The next design direction is an Answer Reviewer Agent plus Final Answer Composer, with small deterministic checks as the last safety guardrail.
+- Planning update: P19 is intentionally compacted into five H tasks so development is easier to steer, but each H task still requires tests, code cleanup, artifact hygiene, and focused/full verification.
+- Cleanup policy update: P19 should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
+- Future notes: P20 should optimize responsiveness with route classification, fast factual path, progress states, caching, and background work. P21 should add real business tool calling/export after P19/P20 are stable.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

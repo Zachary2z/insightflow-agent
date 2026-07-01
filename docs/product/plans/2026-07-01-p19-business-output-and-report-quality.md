@@ -2,6 +2,24 @@
 
 P19 turns the now-live DeepSeek analysis chain into output that business users can trust, read quickly, and act on. P18 made conclusions, evidence, recommendations, charts, and reports more consistent; P19 raises the product bar from "technically valid answer" to "business-ready answer and management-ready report."
 
+## Direction Update
+
+P19 should not continue as an expanding list of one-off deterministic patches for every observed model mistake. That path would make the product brittle: unanticipated wording could bypass the checks, and the code would slowly become a keyword-heavy rule tree.
+
+The improved direction is a small review-and-revision loop:
+
+```text
+SQL execution result
+-> evidence validation
+-> insight drafting agent
+-> answer reviewer agent
+-> final answer composer
+-> minimal deterministic safety check
+-> product UI / report
+```
+
+The model should still do the language-heavy work: understanding the question, drafting the answer, reviewing whether the answer is supported, and rewriting the final business copy. Deterministic code should verify structure, entity/metric existence, schema safety, and no-obvious-contradiction constraints. If the reviewer or final safety check cannot support the answer, the product should downgrade to a clear evidence-insufficient answer instead of fabricating certainty.
+
 ## Why P19 Exists
 
 Recent real runs show the product can call DeepSeek and generate guarded SQL, but the final business surface still has quality gaps:
@@ -24,6 +42,7 @@ Make analysis replies and reports feel like a real Chinese business analysis pro
 - Evidence should support the recommended entity and metric.
 - Reports should be management-facing, Chinese-first, and directly readable without technical appendix expansion.
 - Technical details should remain available for audit, but not pollute the main business surface.
+- P19 should use an Answer Reviewer Agent and Final Answer Composer to improve generality, instead of relying on a growing list of predicted failure cases.
 
 ## Non-Goals
 
@@ -33,6 +52,7 @@ P19 does not:
 - Add RBAC, deployment, Docker, scheduling, vector search, or external SaaS publishing.
 - Restore old Streamlit/eval/demo/action/mock paths.
 - Introduce hardcoded table-specific business rule trees.
+- Turn `answer_consistency.py` into a large business-rule engine.
 - Hide failures by fabricating unsupported recommendations.
 - Remove technical details entirely; it only keeps them out of the default business reading path.
 
@@ -44,6 +64,89 @@ P19 does not:
 4. **No fake certainty.** If data is insufficient, say what is missing and suggest the next query instead of forcing an action.
 5. **Reports are synthesized, not concatenated.** The report runner should produce a coherent executive summary and action plan from section outputs.
 6. **Charts explain the point.** Charts should appear with title, unit, and one business annotation tied to the same conclusion.
+7. **Reviewer before rules.** Complex semantic checks should be handled by a structured reviewer agent; deterministic checks are the final guardrail, not the main answer-writing system.
+8. **Clean code over accumulated patches.** If a fix only adds another narrow keyword branch, prefer redesigning the reviewer/composer boundary.
+
+## Quality Bar
+
+Reducing the number of H tasks must not reduce engineering quality. Each P19 task must meet these standards:
+
+- Start with tests for the product behavior being changed.
+- Keep ordinary tests deterministic; live DeepSeek tests remain explicit and opt-in.
+- Preserve the P16 `business_answer` public shape unless a later phase explicitly replaces it.
+- Keep modules small and single-purpose. Avoid growing `answer_consistency.py`, report runner, or frontend renderers into large catch-all files.
+- Prefer structured contracts over parsing prose.
+- Remove unused code, obsolete tests, and old fallback paths touched by the task.
+- Do not preserve compatibility for old product directions. If an old path conflicts with the current reviewer/composer product direction and is not required by the active FastAPI/Next.js workspace product, delete it.
+- Do not commit `.env`, generated workspaces, reports, traces, charts, `.next`, databases, or caches.
+- Run focused tests for the changed area and full backend/frontend regression at closeout.
+
+## Cleanup Policy
+
+P19 prioritizes a clean, current product codebase over preserving historical paths. The following should be removed when encountered in touched areas:
+
+- Unused functions, modules, components, fixtures, and tests.
+- Old deterministic answer templates that duplicate reviewer/composer responsibilities.
+- Legacy fallback paths that only exist to keep old demo behavior alive.
+- Mock SaaS/tool placeholders that are not part of the current product.
+- Historical entry points, docs, or UI paths that conflict with the current FastAPI/Next.js workspace product.
+
+Do not delete files merely because their names contain "fallback" or "mock"; some deterministic unit-test doubles and safety fallbacks are still valid. Delete only when the code is unused, protects obsolete behavior, or conflicts with the current product direction. If a file is retained for tests or safety, make that purpose obvious.
+
+## Reviewer/Composer Architecture
+
+P19 should introduce two focused product-facing components:
+
+1. **Answer Reviewer Agent**
+   - Input: user question, resolved question, execution result, evidence result, semantic/profile context, draft `business_answer`, and chart/report context when available.
+   - Output: structured review JSON, not user-facing prose.
+   - Responsibilities:
+     - Identify whether the conclusion is supported by returned rows.
+     - Check whether recommended entities and metrics appear in evidence.
+     - Detect unsupported claims such as "significant growth" without trend evidence.
+     - Detect metric mismatch, for example asking profit but answering revenue.
+     - Detect multi-metric tradeoffs and missing decision criteria.
+     - Recommend one of: `accept`, `revise`, `downgrade_to_insufficient_evidence`.
+
+2. **Final Answer Composer**
+   - Input: draft answer, reviewer result, user question, evidence rows, and existing P16 shape.
+   - Output: final P16 `business_answer`.
+   - Responsibilities:
+     - Rewrite the answer in the user's language.
+     - Keep conclusion, why, evidence bullets, recommendations, and caveats aligned.
+     - Preserve a concise business tone.
+     - Avoid raw SQL, trace IDs, provider metadata, and raw row dumps.
+
+The deterministic consistency layer remains small and generic:
+
+- Validate the P16 shape.
+- Confirm that final answer entities and metrics exist in execution rows or evidence.
+- Remove or downgrade obvious unsupported claims.
+- Avoid table-specific business logic and broad keyword trees.
+
+This means H tasks after H1 should favor a reviewer/composer pipeline over adding more one-off checks.
+
+Suggested reviewer output shape:
+
+```json
+{
+  "status": "accept | revise | downgrade_to_insufficient_evidence",
+  "language": "zh | en",
+  "supported_entities": [],
+  "unsupported_entities": [],
+  "supported_metrics": [],
+  "unsupported_metrics": [],
+  "issues": [
+    {
+      "type": "entity_mismatch | metric_mismatch | insufficient_evidence | tradeoff_missing | unsupported_claim",
+      "message": "",
+      "affected_fields": []
+    }
+  ],
+  "revision_instructions": [],
+  "confidence": "low | medium | high"
+}
+```
 
 ## Current Hotspots
 
@@ -133,146 +236,139 @@ Suggested action table columns:
 
 ## H-Task Plan
 
-### P19-H1: Answer Evidence Alignment
+P19 should stay compact. Each H task can contain several small commits, but the product should not split into many narrow planning slices.
 
-Goal: Prevent conclusions and `why`/evidence bullets from naming different winning entities.
+### P19-H1: Close Current Alignment Hole
+
+Goal: Finish the current deterministic guard so obviously contradictory answers do not ship while the reviewer/composer architecture is being built.
 
 Scope:
 
-- Add tests for channel and segment examples where the recommended entity must match supporting evidence.
-- Extend `workspaces/answer_consistency.py` with entity/metric alignment checks.
-- Ensure `headline`, `direct_answer`, `why`, `evidence_bullets`, and `recommendations` do not contradict each other.
+- Fix the remaining plain `why` / `evidence_bullets` entity conflict case.
+- Keep this guard small and generic.
+- Do not add more broad keyword branches unless they are necessary for final safety.
 
 Acceptance:
 
-- A recommendation naming `微信私域` cannot cite `自然流量` as the primary reason unless it explicitly explains the tradeoff.
-- Multi-metric answers must distinguish "收入最高", "ROI 最高", "订单数最高", and "综合建议".
+- A recommendation naming one entity cannot leave `why` or evidence bullets focused only on another entity.
+- Unsupported entities downgrade to insufficient evidence.
+- Tradeoff answers are not forced into a single winner.
 - Existing P16 `business_answer` shape is unchanged.
 
-### P19-H2: Business Vocabulary And Unit Normalization
+### P19-H2: Reviewer And Composer Foundation
 
-Goal: Remove raw technical field names from user-facing copy.
-
-Scope:
-
-- Add a small, generic vocabulary layer for common analytical fields:
-  - `total_revenue` -> `总收入`
-  - `order_count` -> `订单数`
-  - `avg_order_value` / `avg_revenue` -> `客单价`
-  - `total_spend` -> `投放成本`
-  - `roi` -> `ROI`
-  - `channel` -> `渠道`
-  - `segment` -> `客户分群`
-- Format values with Chinese units where helpful: 万元, 元, 单, 百分比/倍数.
-- Keep raw names available in technical details only.
-
-Acceptance:
-
-- Main answer and report section body do not show raw column names unless the user explicitly asks for technical detail.
-- Evidence bullets include readable metric names and rounded values.
-- No table-specific business rule tree is introduced; mapping is generic and small.
-
-### P19-H3: Decision-Ready Answer Structure
-
-Goal: Make each answer useful to a business user in one screen.
+Goal: Add the core review-and-revision loop with structured contracts.
 
 Scope:
 
-- Improve `business_answer` building so `direct_answer` includes:
-  - the answer,
-  - the main reason,
-  - the tradeoff when metrics disagree.
-- Ensure recommendations are concrete and not duplicates of the direct answer.
-- Add caveats when data is insufficient, only one comparison row exists, or required cost/ROI fields are missing.
+- Add Answer Reviewer Agent contract and structured validation.
+- Add Final Answer Composer contract that preserves P16 output.
+- Integrate them after insight drafting and before product UI/report surfaces.
+- Keep deterministic `answer_consistency` as a final guardrail, not the main writer.
+- Add deterministic tests using local provider fixtures and at least one opt-in live DeepSeek test path.
 
 Acceptance:
 
-- For "哪个渠道最值得加预算", answer includes recommendation, evidence, and next action.
-- For "哪个分群最值得重点运营", answer handles revenue/order/AOV tradeoff instead of forcing a single winner without口径.
-- Empty `recommendations` are allowed only when the answer is descriptive and no action is requested.
+- Reviewer returns `accept`, `revise`, or `downgrade_to_insufficient_evidence`.
+- Composer rewrites unsupported draft answers or downgrades when evidence is insufficient.
+- Recommendation freedom is preserved: the model may make business suggestions, but facts, entities, metrics, and risks must be evidence-grounded or explicitly marked as hypotheses.
+- Main answer fields do not expose reviewer internals.
 
-### P19-H4: Report Synthesis Layer
+### P19-H3: Business Answer Quality Polish
 
-Goal: Stop reports from being a raw concatenation of section outputs.
+Goal: Make analysis replies useful to real business users without turning them into rigid templates.
 
 Scope:
 
-- Add a report synthesis step in `workspaces/report_runner.py`.
-- Generate Chinese management-facing report fields from section `business_answer`s:
-  - executive_summary,
-  - key_findings,
-  - action_plan,
-  - risk_and_limits.
-- Keep technical appendices unchanged but remove technical labels from default Markdown/body sections.
+- Normalize common metric vocabulary and units in main answer fields.
+- Improve decision-ready answer structure: conclusion, basis, tradeoff, recommendation, caveat, next step.
+- Remove raw field names from the main answer unless the user asks for technical detail.
+- Ensure recommendations are not duplicates of the conclusion and include evidence/risk/verification when action-oriented.
 
 Acceptance:
 
-- Executive summary is short, non-repetitive, and action-oriented.
-- Report headings are Chinese-first.
-- `_No recommendations recorded_` no longer appears in business-facing Markdown; use a Chinese empty-state sentence only when needed.
+- Advice questions receive a grounded recommendation, not just a data restatement.
+- Hypotheses are labeled as hypotheses or next-step validation, not facts.
+- Multi-metric questions state the decision basis.
+- Answers remain concise enough for one-screen reading.
 
-### P19-H5: Chart Narrative Integration
+### P19-H4: Report And Chart Synthesis
 
-Goal: Make charts explain the business point instead of appearing as detached artifacts.
+Goal: Make reports read like management documents and make charts support the same story.
 
 Scope:
 
-- Align chart annotations with the final answer entity and metric.
-- If provider chart spec references missing columns, fall back to validated existing execution columns without surfacing internal validation text to the user.
-- Ensure report UI displays chart image, title, unit, and business annotation together.
+- Synthesize report output from reviewed business answers instead of concatenating sections.
+- Add Chinese-first report structure: management summary, key findings, action priorities, chart/evidence, risks/limits, technical appendix.
+- Integrate chart titles, units, inline images, and business annotations into report body.
+- Keep technical errors and trace metadata in technical details.
 
 Acceptance:
 
-- Chart annotation does not contradict the business answer.
-- Report center shows generated charts inline, not only as artifact paths.
-- Technical chart validation errors remain in technical details, not the business body.
+- Reports have a coherent executive summary and action plan.
+- Chart narrative does not contradict the final answer.
+- Report Markdown and frontend reader show Chinese business-facing content first.
 
-### P19-H6: Report Markdown And Frontend Reader Polish
+### P19-H5: Quality Closeout And Live Acceptance
 
-Goal: Make report output readable as a real management document.
+Goal: Prove P19 works end to end and keep the codebase clean.
 
 Scope:
 
-- Update `workspaces/report_markdown.py` to render the new synthesized report structure.
-- Update `ReportViewer` / `ReportSection` only where needed to match the same structure.
-- Keep SQL, trace paths, provider metadata, and raw rows behind collapsed technical details.
+- Run focused and full backend tests.
+- Run frontend tests and build.
+- Run opt-in real DeepSeek acceptance on representative Chinese business data.
+- Audit unused code, old fallback/mock/template paths, generated artifacts, and docs consistency.
+- Commit only source, tests, and necessary docs.
+- Delete obsolete code and tests discovered during the audit instead of documenting them as future cleanup, unless deletion would break an active product path.
 
 Acceptance:
 
-- Markdown report starts with Chinese title and management summary.
-- Section titles are Chinese and business-facing.
-- Report body can be read without opening technical appendix.
-
-### P19-H7: Real DeepSeek Acceptance And Regression
-
-Goal: Verify the improved output with real model calls and current Chinese business data.
-
-Scope:
-
-- Add or update opt-in live tests for:
-  - channel budget question,
-  - customer segment priority question,
-  - management report generation.
-- Run deterministic full regression and frontend tests.
-- Run one real DeepSeek acceptance manually or through opt-in tests.
-
-Acceptance:
-
-- `python3 -m pytest` passes.
-- `cd frontend && npm test` passes.
-- `cd frontend && npm run build` passes.
-- Real live run contains `provider_called: true` for question understanding, SQL planning/candidate, insight drafting, and claim typing.
-- Business answer and report output do not show raw technical fields in the main body.
+- Full backend/frontend regression passes.
+- Live run shows model participation in the intended reviewer/composer path when live mode is enabled.
+- Generated artifacts and local secrets are not committed.
+- No old product direction or unused code remains in touched areas.
+- The final diff does not keep compatibility code for deleted or superseded product directions.
 
 ## Suggested Execution Order
 
-1. P19-H1: alignment correctness first.
-2. P19-H2: vocabulary/unit cleanup.
-3. P19-H3: decision-ready answer structure.
-4. P19-H4: report synthesis.
-5. P19-H5: chart narrative.
-6. P19-H6: report/frontend polish.
-7. P19-H7: live acceptance and closeout.
+1. P19-H1: close the current deterministic alignment hole.
+2. P19-H2: add reviewer/composer foundation.
+3. P19-H3: polish business answer quality.
+4. P19-H4: synthesize reports and chart narrative.
+5. P19-H5: live acceptance, regression, cleanup, and closeout.
+
+## Future Phase Notes
+
+P20 and P21 are intentionally recorded here only as future direction. They should not distract from P19 quality work.
+
+### P20: Responsive Analysis Experience
+
+Goal: Shorten perceived and actual waiting time after the analysis quality loop is reliable.
+
+Likely scope:
+
+- Add Route Classifier Agent to choose `fast_fact`, `standard_analysis`, `report_generation`, or `clarification`.
+- Add safe fast path for low-risk factual questions.
+- Add progress states for analysis steps.
+- Return core answer before background chart/report generation where possible.
+- Cache workspace profile and semantic-layer work.
+- Move heavier reports to background tasks.
+
+Quality requirement: fast path must never handle advice, budget, strategy, causal, or report-generation questions unless the router and safety checks classify them as low-risk factual requests.
+
+### P21: Real Business Tool Calling
+
+Goal: Connect useful China-oriented business outputs after quality and responsiveness are stable.
+
+Likely scope:
+
+- Export or publish reviewed reports to practical business artifacts such as Excel, Word/PDF, PowerPoint, or Feishu document-style outputs.
+- Strengthen chart generation/export as a real tool path.
+- Keep external integrations authenticated and explicit.
+- Avoid Google Sheets as the default China-market example.
+
+Quality requirement: external publishing must only use reviewed, evidence-grounded answers and reports.
 
 ## Verification Commands
 
@@ -304,6 +400,7 @@ Live acceptance should remain opt-in and explicit. Do not let ordinary unit test
 - Analysis replies are Chinese, business-readable, and decision-ready.
 - Recommendations are supported by matching evidence.
 - Multi-metric tradeoffs are explicit.
+- Reviewer/composer flow handles unanticipated wording without relying only on predicted failure patches.
 - Reports are synthesized into a coherent management document.
 - Charts are visible and annotated in the report body.
 - Technical detail remains available but not dominant.

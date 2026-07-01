@@ -21,7 +21,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P16 single `business_answer` contract for analysis and report sections.
 - P17 cleanup that removes non-current historical paths while preserving the real multi-agent/tool-calling chain.
 - P18 consistency checks across conclusions, evidence, recommendations, chart annotations, and reports.
-- P19 planned business-output/report quality work that turns valid model results into decision-ready Chinese business answers and management-ready reports.
+- P19 business-output/report quality work that moves from one-off consistency patches toward an Answer Reviewer Agent, Final Answer Composer, and small deterministic safety guardrail.
 
 Current runtime chain:
 
@@ -57,7 +57,9 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P16 | Clean business output model: one `business_answer` shape across backend, frontend, reports, Markdown, and run restoration | Complete |
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
-| P19 | Business output and report quality: decision-ready analysis replies, Chinese business vocabulary, synthesized management reports, chart narrative integration, and live acceptance | Planned |
+| P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, and live acceptance | Planned |
+| P20 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
+| P21 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
 
 ## P16 Business Answer Contract
 
@@ -93,19 +95,19 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P18-H4 | Make report sections and executive summaries reuse consistency-checked answers | Complete |
 | P18-H5 | Tighten provider prompt/validation only where deterministic consistency is insufficient | Complete |
 | P18-H6 | Focused/full regression, real DeepSeek acceptance gating, artifact hygiene, and documentation closeout | Complete |
-| P19-H1 | Answer/evidence alignment so recommendations cite the same entity and metric they recommend | Complete |
-| P19-H2 | Chinese business vocabulary and unit normalization for user-facing answers and reports | Planned |
-| P19-H3 | Decision-ready answer structure with conclusion, basis, actions, tradeoffs, caveats, and next steps | Planned |
-| P19-H4 | Report synthesis layer so reports are management documents, not concatenated section outputs | Planned |
-| P19-H5 | Chart narrative integration and graceful chart fallback when provider specs reference missing columns | Planned |
-| P19-H6 | Report Markdown and frontend reader polish for Chinese-first business reports | Planned |
-| P19-H7 | Real DeepSeek acceptance and full regression for improved analysis/report quality | Planned |
+| P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete |
+| P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Planned |
+| P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Planned |
+| P19-H4 | Synthesize reports and chart narrative from reviewed business answers | Planned |
+| P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Planned |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 is complete. P19 is the next product quality phase. It should improve the business readability, evidence alignment, report synthesis, chart narrative, and live DeepSeek acceptance of the current analysis/report product before adding authenticated external publishing integrations.
+P18 is complete. P19 is the next product quality phase. It should improve the business readability, evidence alignment, report synthesis, chart narrative, and live DeepSeek acceptance of the current analysis/report product before adding authenticated external publishing integrations. P19 should stay compact: close the current alignment hole, add reviewer/composer foundation, polish answer quality, synthesize reports/charts, then do quality closeout. It should not grow into a list of predicted failure patches; deterministic code stays as a small final safety check.
+
+P20 is reserved for responsiveness after P19 quality is stable: Route Classifier Agent, safe fast factual path, progress states, semantic/profile caching, and background chart/report work. P21 is reserved for real business tool calling and exports after quality and responsiveness are stable, with China-oriented tools/artifacts preferred over Google Sheets examples.
 
 ## Current Entry Points
 
@@ -151,7 +153,7 @@ cd frontend && npm test
 cd frontend && npm run build
 ```
 
-P19 should begin from `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`. It must keep the P16 `business_answer` public shape, avoid table-specific rule trees, keep live DeepSeek tests opt-in, and preserve deterministic unit-test stability.
+P19 should begin from `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`. It must keep the P16 `business_answer` public shape, avoid table-specific rule trees, keep live DeepSeek tests opt-in, preserve deterministic unit-test stability, prefer reviewer/composer model feedback over narrow keyword patches, and keep each H task covered by tests, cleanup, and full closeout verification. Old paths and compatibility code that conflict with the current FastAPI/Next.js workspace product should be deleted, not preserved for historical behavior.
 
 ## Historical / Superseded Context
 

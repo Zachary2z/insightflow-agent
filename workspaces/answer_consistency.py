@@ -184,9 +184,9 @@ def _single_row_budget_answer(
 ) -> dict[str, Any]:
     row = rows[0] if rows else {}
     entity_value = _entity_value(row) or "当前对象"
-    row_summary = _row_summary(row)
     caveats = answer["caveats"] + ["仅返回 1 行，比较证据不足，不足以判断哪个对象应该减少或调整预算。"]
     if _contains_cjk(question):
+        row_summary = _row_summary(row, chinese=True)
         answer.update(
             {
                 "headline": f"仅能确认 {entity_value} 的当前结果，不能判断预算减少对象",
@@ -202,6 +202,7 @@ def _single_row_budget_answer(
         )
         return answer
 
+    row_summary = _row_summary(row, chinese=False)
     answer.update(
         {
             "headline": f"Only {entity_value} is shown, so budget reduction is not supported",
@@ -248,12 +249,15 @@ def _answer_evidence_alignment(
     answer: dict[str, Any],
     rows: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    if not rows or not _is_decision_question(question) or _has_tradeoff_language(answer):
+    decision_text = _decision_text(answer)
+    if not rows or _has_tradeoff_language(answer):
+        return None
+    if not (_is_decision_question(question) or _has_decision_language(decision_text)):
         return None
 
     entity_key = _entity_key(rows)
     if not entity_key:
-        if _has_decision_language(_decision_text(answer)):
+        if _has_decision_language(decision_text):
             return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
         return None
 
@@ -271,12 +275,12 @@ def _answer_evidence_alignment(
             return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
         return None
 
-    decision_text = _decision_text(answer)
     if not _has_decision_language(decision_text):
         return None
 
     decision_entities = _mentioned_entities(decision_text, entities)
-    support_entities = _support_decision_entities(answer, entities)
+    support_decision_entities = _support_decision_entities(answer, entities)
+    focused_support_entities = _focused_support_entities(answer, entities)
     if len(decision_entities) == 1 and decision_entities[0] != primary_entity:
         return _ranked_evidence_answer(
             question=question,
@@ -284,7 +288,18 @@ def _answer_evidence_alignment(
             rows=rows,
             primary_entity=primary_entity,
         )
-    if decision_entities and support_entities and set(decision_entities) != set(support_entities):
+    if decision_entities and support_decision_entities and set(decision_entities) != set(support_decision_entities):
+        return _ranked_evidence_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_entity=primary_entity,
+        )
+    if (
+        len(decision_entities) == 1
+        and len(focused_support_entities) == 1
+        and focused_support_entities[0] != decision_entities[0]
+    ):
         return _ranked_evidence_answer(
             question=question,
             answer=answer,
@@ -311,6 +326,15 @@ def _support_decision_entities(answer: dict[str, Any], entities: list[str]) -> l
     return mentions
 
 
+def _focused_support_entities(answer: dict[str, Any], entities: list[str]) -> list[str]:
+    mentions: list[str] = []
+    for sentence in _support_sentences(answer):
+        for entity in _mentioned_entities(sentence, entities):
+            if entity not in mentions:
+                mentions.append(entity)
+    return mentions if len(mentions) == 1 else []
+
+
 def _recommendation_entities(answer: dict[str, Any], entities: list[str]) -> list[str]:
     return _mentioned_entities(" ".join(answer["recommendations"]), entities)
 
@@ -326,7 +350,7 @@ def _support_sentences(answer: dict[str, Any]) -> list[str]:
 
 def _answer_has_entity_conflict(*, answer: dict[str, Any], entities: list[str]) -> bool:
     decision_entities = set(_mentioned_entities(_decision_text(answer), entities))
-    support_entities = set(_support_decision_entities(answer, entities))
+    support_entities = set(_support_decision_entities(answer, entities) or _focused_support_entities(answer, entities))
     return bool(decision_entities and support_entities and decision_entities != support_entities)
 
 
@@ -360,7 +384,7 @@ def _ranked_evidence_answer(
     primary_entity: str,
 ) -> dict[str, Any]:
     chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
-    row_summary = _row_summary(rows[0])
+    row_summary = _row_summary(rows[0], chinese=chinese)
     evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
     caveats = _dedupe(
         answer["caveats"]
@@ -456,7 +480,7 @@ def _insufficient_alignment_answer(
 def _ranked_row_bullets(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) -> list[str]:
     bullets: list[str] = []
     for index, row in enumerate(rows[:limit], start=1):
-        summary = _row_summary(row)
+        summary = _row_summary(row, chinese=chinese)
         if chinese:
             bullets.append(f"第 {index} 行：{summary}。")
         else:
@@ -660,9 +684,13 @@ def _metric_leader(
     return max(candidates, key=lambda item: item[1])
 
 
-def _row_summary(row: dict[str, Any]) -> str:
-    pairs = [f"{key} 为 {value}" for key, value in list(row.items())[:4]]
-    return "，".join(pairs) if pairs else "当前证据没有可展示字段"
+def _row_summary(row: dict[str, Any], *, chinese: bool = True) -> str:
+    relation = " 为 " if chinese else " is "
+    separator = "，" if chinese else ", "
+    pairs = [f"{key}{relation}{value}" for key, value in list(row.items())[:4]]
+    if pairs:
+        return separator.join(pairs)
+    return "当前证据没有可展示字段" if chinese else "the current evidence has no displayable fields"
 
 
 def _has_tradeoff_language(answer: dict[str, Any]) -> bool:
