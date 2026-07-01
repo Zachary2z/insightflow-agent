@@ -24,6 +24,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P18 consistency checks across conclusions, evidence, recommendations, chart annotations, and reports.
 - P19 business-output/report quality work that moves from one-off consistency patches toward an Answer Reviewer Agent, Final Answer Composer, and small deterministic safety guardrail.
 - P20 general business analysis foundation work that cleans old paths and separates factual tools, model judgment, fact validation, and expression/report writing so the product can handle different uploaded business datasets.
+- P20 Chinese-first product scope: product-facing UI copy, clarifications, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers are supported through semantic recognition and Chinese aliases, not bilingual output branches.
 
 Current runtime chain:
 
@@ -60,7 +61,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
 | P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, cleanup, and live acceptance | Complete |
-| P20 | General business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation | Planned |
+| P20 | Chinese-first general business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation | In progress |
 | P21 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
 | P22 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
 
@@ -105,7 +106,7 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete |
 | P20-H0 | Architecture cleanup and main path inventory; remove old paths and conflicting compatibility code | Complete |
 | P20-H1 | General data profiling and semantic layer for arbitrary uploaded business datasets | Complete |
-| P20-H2 | General analysis task contract and clarification continuation | Planned |
+| P20-H2 | General Chinese analysis task contract and clarification continuation | Planned |
 | P20-H3 | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope | Planned |
 | P20-H4 | Business insight, answer, chart, and report generation from validated evidence | Planned |
 | P20-H5 | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled | Planned |
@@ -114,9 +115,9 @@ P17 must keep current workspace analysis, workspace reports, SQL review, SQL exe
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. The H4 repair also keeps English reports fully English in Markdown/frontend labels while Chinese reports remain Chinese, and evidence summaries use shared business field labels instead of raw column names.
+P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. Historical P19 bilingual output support is no longer a P20 product requirement; P20 now targets a Chinese-first business product, while English or mixed raw data headers remain supported through semantic recognition and Chinese labels.
 
-P20 is now reserved for the general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must avoid table-specific rule trees, fixed answer templates, and old compatibility paths. P20-H0 is complete: the active FastAPI/Next.js workspace chain was inventoried, stale P17 status assertions were updated, and the trace-driven SQL template-mining/eval helper path was removed while preserving provider smoke validation. P20-H1 is complete: workspace profiling and semantic drafts now describe actual imported business data with generalized field roles, business-meaning candidates, aliases, relationship candidates, and unified YAML/JSON semantic loading for settings, metric lookup, context summaries, and schema repair. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved. Responsiveness work moves to P21, and real China-oriented external business tool calling/export moves to P22 after the generalized answer/report foundation is stable.
+P20 is now reserved for the Chinese-first general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must avoid table-specific rule trees, fixed answer templates, bilingual output branching, and old compatibility paths. P20-H0 is complete: the active FastAPI/Next.js workspace chain was inventoried, stale P17 status assertions were updated, and the trace-driven SQL template-mining/eval helper path was removed while preserving provider smoke validation. P20-H1 is complete: generated metric formulas safely quote SQL identifiers, and English/mixed raw fields such as `Sales Amount` map to Chinese business aliases such as 销售额. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved. Responsiveness work moves to P21, and real China-oriented external business tool calling/export moves to P22 after the generalized answer/report foundation is stable.
 
 ## Current Entry Points
 

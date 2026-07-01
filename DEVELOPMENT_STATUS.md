@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-01
+Last updated: 2026-07-02
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -9,15 +9,15 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P20 General Business Analysis Foundation |
-| Current task | P20-H1 generalized profiling and semantic layer complete; next is P20-H2 analysis task contract |
-| Next planned task | P20-H2 general analysis task contract and clarification continuation |
-| Last completed task | P20-H1 general data profiling and semantic layer |
+| Current task | P20-H1 Chinese-first semantic alias and formula safety repair complete; next is P20-H2 |
+| Next planned task | P20-H2 Chinese analysis task contract and clarification continuation |
+| Last completed task | P20-H1 Chinese-first semantic alias and formula safety repair |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
-| Main product target | General business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, business answers, and management reports |
+| Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and Chinese management reports |
 | Out of scope for P20 | Real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
 
 ## Phase Overview
@@ -43,8 +43,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Task | Status | Notes |
 |---|---|---|
 | P20-H0 | `[x]` Complete | Architecture cleanup and main path inventory; removed stale template-mining eval/helper path and clarified current product chain |
-| P20-H1 | `[x]` Complete | General data profiling and semantic layer for arbitrary uploaded business datasets |
-| P20-H2 | `[ ]` Planned | General analysis task contract and clarification continuation |
+| P20-H1 | `[x]` Complete | General profiling/semantic baseline plus safe metric formula quoting and Chinese aliases for English/mixed raw fields |
+| P20-H2 | `[ ]` Planned | General Chinese analysis task contract and clarification continuation |
 | P20-H3 | `[ ]` Planned | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope |
 | P20-H4 | `[ ]` Planned | Business insight, answer, chart, and report generation from validated evidence |
 | P20-H5 | `[ ]` Planned | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled |
@@ -112,6 +112,20 @@ Latest P20-H1 generalized semantic-layer result on 2026-07-01:
 - Data Settings recognizes the generalized `metric`, `id`, `status`, and `text` field-role labels.
 - Verification passed: `python3 -m pytest tests/test_workspace_profiler.py tests/test_workspace_semantic_draft.py tests/test_semantic_layer.py -q` (`15 passed`), `python3 -m pytest tests/test_schema_tool.py tests/test_metric_tool.py tests/test_workspace_settings_api.py tests/test_p20_general_semantic_layer.py -q` (`17 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`27 passed`), combined P20-H1 backend set (`36 passed`), frontend workspace-flow Vitest (`49 passed`), frontend production build passed, and full backend regression passed (`401 passed, 13 skipped`).
 
+P20 language-scope update on 2026-07-02:
+
+- P20 now targets a Chinese-first business product: product-facing UI copy, clarifying questions, answers, chart annotations, reports, Markdown exports, and provider prompts should be Chinese.
+- English and mixed raw headers remain supported as imported data reality, but they should be mapped into Chinese business labels and aliases instead of creating bilingual product output branches.
+- Historical P19 English-output behavior is no longer a P20 acceptance requirement. Multilingual output is deferred until after the Chinese business analysis chain is stable.
+- P20-H1 needs a focused repair before H2 because current semantic metric formulas may not safely quote headers with spaces or punctuation, and English raw fields such as `Sales Amount` need Chinese semantic aliases such as 销售额.
+
+P20-H1 repair completion note on 2026-07-02:
+
+- Semantic metric formulas now quote SQLite identifiers safely, including table and column names with spaces, punctuation, parentheses, Chinese characters, and embedded double quotes.
+- Semantic drafts now derive Chinese business aliases and labels from `business_meaning_candidates` and common raw header words, so English/mixed fields such as `Sales Amount`, `Cost Amount`, `Score (NPS)`, and `Store Name` map to 销售额、成本、满意度、门店.
+- Workspace metric lookup can answer Chinese semantic questions such as “按门店看销售额”, “按门店看成本”, and “按门店看满意度” against English/mixed raw headers without inventing channel, orders, or ROI fields.
+- Verification passed: `python3 -m pytest tests/test_workspace_semantic_draft.py tests/test_metric_tool.py tests/test_p20_general_semantic_layer.py -q` (`14 passed`), `python3 -m pytest tests/test_workspace_profiler.py tests/test_semantic_layer.py tests/test_workspace_settings_api.py -q` (`16 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`27 passed`), P17/P20 boundary checks (`18 passed`), and full backend regression `python3 -m pytest` (`403 passed, 13 skipped`).
+
 Latest P20-H0 cleanup result on 2026-07-01:
 
 - Current main path inventory remains: import/profile/semantic layer -> question understanding/clarification -> SQL planning/review/schema repair/execution -> evidence validation -> reviewer/composer/business answer -> visualization/report -> Next.js UI.
@@ -149,28 +163,28 @@ P19-H2 completion note on 2026-07-01:
 - Report sections reuse the reviewed/composed `business_answer`; deterministic `answer_consistency.py` remains the final small guardrail.
 - Focused backend tests, full backend regression, frontend Vitest, and frontend production build passed.
 
-P19-H3 completion note on 2026-07-01:
+Historical P19-H3 completion note on 2026-07-01:
 
-- Added shared language-aware business labels for common metrics and dimensions so Chinese answers prefer 收入、总收入、订单数、客单价、投放成本、ROI、渠道 and 客户分群, while English answers use total revenue, order count, average order value, spend, ROI, channel, and segment.
+- Added shared language-aware business labels for common metrics and dimensions. This included bilingual behavior for P19 acceptance, but P20 supersedes it with Chinese-first product output and English/mixed raw-header recognition only.
 - Final Answer Composer now produces business-readable revise/downgrade answers, removes reviewer/internal wording from caveats, and states revenue-vs-ROI tradeoffs instead of forcing one winner.
 - Product result and report section normalization apply the same field-label cleanup while keeping raw columns, rows, SQL, traces, and provider metadata in technical details.
 - Added focused regression coverage for Chinese output, field-label polish, multi-metric tradeoffs, no invented ROI/profit advice, internal metadata leakage, and report section business answers.
-- Follow-up fix: English questions now keep English fallback wording and English business labels instead of mixing Chinese labels into accepted/composed answers.
+- Follow-up fix at that time: English questions kept English fallback wording and English business labels instead of mixing Chinese labels into accepted/composed answers. This remains historical context, not a P20 product requirement.
 
-P19-H4 completion note on 2026-07-01:
+Historical P19-H4 completion note on 2026-07-01:
 
 - Report records now expose management-facing `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, and `risks_and_limits` synthesized from reviewed/composed section `business_answer` values.
-- Markdown reports use Chinese-first management structure for Chinese goals and English headings/content for English goals, with SQL, trace paths, provider metadata, raw rows, and internal section prompts kept in the technical appendix.
+- Markdown reports used Chinese-first management structure for Chinese goals and English headings/content for English goals in P19. P20 supersedes this with Chinese-first product output while keeping SQL, trace paths, provider metadata, raw rows, and internal prompts in technical appendices.
 - Chart artifacts carry title, unit, safe business annotation, and path/URL into report JSON, Markdown image embeds, and the frontend report detail view.
 - Missing charts render a business-friendly “暂无可展示图表” explanation instead of visualization errors or trace metadata in the main report body.
 - Focused P19-H4 backend regression passed: `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_store.py tests/test_workspace_report_api.py tests/test_report_insight_cleanup.py tests/test_chart_product_quality.py tests/test_product_result_builder.py -q` with `57 passed`.
 - Focused frontend report regression passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `49 passed`.
 
-P19-H4 repair note on 2026-07-01:
+Historical P19-H4 repair note on 2026-07-01:
 
-- English report goals now render English business labels in Markdown and the frontend report reader, including section labels, chart captions, status/progress metadata, and chart download copy; Chinese report goals keep the Chinese reading experience.
+- English report goals rendered English business labels in Markdown and the frontend report reader for P19 acceptance. This is superseded in P20; current product output should stay Chinese.
 - Report-level chart/evidence summaries reuse the shared business field label helper so fields such as `total_revenue`, `order_count`, `avg_order_value`, and `segment` are shown as business-readable labels instead of raw column names.
-- Focused repair regressions cover English Markdown without Chinese labels, Chinese Markdown retention, business-labeled evidence summaries, and frontend English/Chinese report detail rendering.
+- Focused repair regressions covered P19 bilingual Markdown/report detail rendering. P20 should replace or delete those assertions when they conflict with Chinese-first product behavior.
 
 P19-H5 completion note on 2026-07-01:
 

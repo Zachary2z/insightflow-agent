@@ -16,6 +16,14 @@ Real P19 product testing exposed a structural issue: the system can often query 
 
 P20 must remain a general business analysis product direction. The current Chinese marketing-channel dataset is only an acceptance fixture, not a schema to hardcode.
 
+## P20 Language Scope: Chinese Business Product
+
+P20 is now scoped as a Chinese-first business product. Product-facing UI copy, clarifying questions, analysis answers, chart annotations, report sections, Markdown exports, and provider prompts should default to Chinese business language.
+
+English is still supported as raw data reality, not as a product output mode. Many real Chinese business files use English or mixed headers such as `sales_amount`, `store_name`, `customer_id`, `Sales Amount`, or `Score (NPS)`. The semantic layer must recognize these raw fields and map them into Chinese business labels and aliases such as 销售额、门店、客户、满意度. Do not require uploaded datasets to use Chinese column names only.
+
+Do not preserve bilingual output branches as a P20 product requirement. Historical P19 English-answer/report behavior is superseded for the current product direction and can be deleted when it complicates the main path. Multilingual output can be reconsidered in a later phase after the Chinese business analysis chain is stable.
+
 ## Product Target After P20
 
 Users should be able to import different business datasets and ask questions such as:
@@ -35,7 +43,7 @@ The product should:
 5. Use tools to query and calculate facts.
 6. Let the model explain and recommend within the evidence boundary.
 7. Validate factual claims without blocking reasonable evidence-backed business judgment.
-8. Generate natural answers and management-style reports in the user's language.
+8. Generate natural Chinese business answers and management-style Chinese reports.
 
 ## Non-Negotiable Cleanup Policy
 
@@ -164,7 +172,7 @@ Expected capabilities:
 
 - Identify table names and columns from current workspace data.
 - Infer field roles: time, numeric metric, categorical dimension, identifier, text, status, amount, count, cost, revenue-like, rating-like.
-- Infer safe aliases from actual column names and headers, including Chinese fields.
+- Infer safe Chinese business labels and aliases from actual column names and headers, including Chinese, English, and mixed raw fields.
 - Store a workspace-level semantic layer that can be read by question understanding, SQL planning, schema repair, answer writing, report writing, and frontend settings.
 
 - [x] Add failing tests using at least two different fixture shapes: the Chinese channel sample and one non-channel business dataset.
@@ -187,6 +195,21 @@ P20-H1 completion note on 2026-07-01:
 - Data Settings received only a small role-label update for the generalized profile roles.
 - Verification passed: profiler/semantic focused `15 passed`, schema/metric/settings/P20 focused `17 passed`, workspace analysis/product-result regression `27 passed`, and combined P20-H1 backend set `36 passed`.
 
+P20-H1 repair requirement after Chinese-scope decision on 2026-07-02:
+
+- Generated metric formulas must quote SQL identifiers safely, including table names and columns with spaces, parentheses, punctuation, or Chinese characters. For example, prefer `SUM("store_ops"."Sales Amount")` over `SUM(store_ops.Sales Amount)`.
+- English or mixed raw fields must receive Chinese business aliases from `business_meaning_candidates`, so questions like "按门店看销售额" can match fields such as `Sales Amount`, `sales_amount`, or `revenue`.
+- Product-facing semantic labels should prefer Chinese business terms when the field meaning is known; raw English names remain available as technical aliases, not main answer wording.
+- H1 is not considered ready for H2 until these formula-safety and Chinese-alias regressions pass.
+
+P20-H1 repair completion note on 2026-07-02:
+
+- Added RED coverage for mixed English headers (`Store Name`, `Sales Amount`, `Cost Amount`, `Score (NPS)`, `Order Date`) and Chinese semantic questions over those fields.
+- Generated metric formulas now use quoted SQLite identifiers, for example `SUM("store_ops"."Sales Amount")`, `SUM("store_ops"."Cost Amount")`, and `AVG("store_ops"."Score (NPS)")`.
+- Semantic aliases and labels now prefer Chinese business language when field meaning is known: 销售额/收入/营收, 成本/费用/支出, 满意度/评分/得分, 门店/店铺, while preserving raw field names as technical aliases.
+- Workspace metric lookup now matches Chinese questions such as "按门店看销售额", "按门店看成本", and "按门店看满意度" to English/mixed raw headers without inventing channel, orders, or ROI fields.
+- Verification passed: semantic/metric/P20 repair `14 passed`, profiler/semantic/settings `16 passed`, workspace analysis/product-result `27 passed`, P17/P20 boundary checks `18 passed`, and full backend regression `403 passed, 13 skipped`.
+
 ### P20-H2: General Analysis Task Contract And Clarification
 
 Goal: Convert user questions into a reusable task contract before SQL or answer generation.
@@ -202,7 +225,7 @@ Target contract:
   "filters": [],
   "decision_goal": null,
   "missing_slots": [],
-  "language": "zh | en | auto"
+  "output_language": "zh"
 }
 ```
 
@@ -210,7 +233,7 @@ Target contract:
 - [ ] Track missing slots individually; do not continue analysis until required slots are filled or an explicit default is applied.
 - [ ] If a default is used, write it into the resolved question and final answer caveats.
 - [ ] Treat budget, optimization, and recommendation questions as normal analytical tasks, not unsafe requests, unless they ask for actual external execution or sensitive access.
-- [ ] Ensure user language controls answer/report language unless the user explicitly requests another language.
+- [ ] Keep product-facing answers, clarifying questions, chart annotations, and reports in Chinese. Raw English field names may appear only in technical details or when no Chinese semantic label can be inferred.
 
 Acceptance:
 
@@ -253,6 +276,7 @@ Target answer behavior:
 - Give practical next actions when the user asks for advice.
 - Mark assumptions and risks clearly.
 - Avoid fixed wording and raw field names in the main answer.
+- Write product-facing output in Chinese business language; do not keep English answer/report branches as P20 acceptance requirements.
 - Do not downgrade to "证据不足" when the evidence payload supports a useful answer.
 
 Report behavior:
@@ -317,6 +341,7 @@ Deferred:
 - Real China-oriented external tool integrations.
 - Background report/chart jobs.
 - Fast factual route optimization.
+- Multilingual product output.
 - Auth/RBAC.
 - Vector database.
 - Deployment/CI/Docker.
@@ -327,4 +352,4 @@ These can become later phases once P20 produces stable evidence-backed answers a
 
 P20 is complete when InsightFlow can truthfully be described as:
 
-> A general business data analysis multi-agent platform that profiles uploaded datasets, builds a semantic layer, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools to produce evidence, validates factual claims, and writes business-readable answers and management reports in the user's language.
+> A Chinese-first general business data analysis multi-agent platform that profiles uploaded datasets, builds a semantic layer, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools to produce evidence, validates factual claims, and writes Chinese business-readable answers and management reports.

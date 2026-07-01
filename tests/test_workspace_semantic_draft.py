@@ -35,7 +35,7 @@ def test_semantic_draft_generates_metrics_dimensions_and_time_fields(tmp_path):
     draft = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
 
     assert draft["metrics"][0]["name"] == "sum_revenue"
-    assert draft["metrics"][0]["formula"] == "SUM(orders.revenue)"
+    assert draft["metrics"][0]["formula"] == 'SUM("orders"."revenue")'
     assert draft["dimensions"][0]["name"] == "channel"
     assert draft["time_fields"][0]["field"] == "orders.order_date"
 
@@ -149,3 +149,46 @@ def test_semantic_draft_supports_chinese_fields_and_relationship_candidates(tmp_
         relationship["left_field"] == "客户.客户ID" and relationship["right_field"] == "工单.客户ID"
         for relationship in draft["relationships"]
     )
+
+
+def test_semantic_draft_quotes_mixed_identifiers_and_adds_chinese_business_aliases(tmp_path):
+    import sqlite3
+
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Mixed Header Semantic")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            'CREATE TABLE store_ops ('
+            '"Store Name" TEXT, '
+            '"Sales Amount" REAL, '
+            '"Cost Amount" REAL, '
+            '"Score (NPS)" REAL, '
+            '"Order Date" TEXT)'
+        )
+        conn.executemany(
+            'INSERT INTO store_ops VALUES (?, ?, ?, ?, ?)',
+            [
+                ("上海一店", 1200.5, 700.0, 62.0, "2026-01-01"),
+                ("深圳二店", 980.0, 620.0, 55.0, "2026-01-02"),
+            ],
+        )
+
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    draft = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    metrics = {metric["field"]: metric for metric in draft["metrics"]}
+    dimensions = {dimension["field"]: dimension for dimension in draft["dimensions"]}
+    time_fields = {field["field"]: field for field in draft["time_fields"]}
+
+    assert metrics["store_ops.Sales Amount"]["formula"] == 'SUM("store_ops"."Sales Amount")'
+    assert metrics["store_ops.Cost Amount"]["formula"] == 'SUM("store_ops"."Cost Amount")'
+    assert metrics["store_ops.Score (NPS)"]["formula"] == 'AVG("store_ops"."Score (NPS)")'
+    assert time_fields["store_ops.Order Date"]["field"] == "store_ops.Order Date"
+
+    assert {"销售额", "收入", "营收"}.issubset(metrics["store_ops.Sales Amount"]["aliases"])
+    assert {"成本", "费用", "支出"}.issubset(metrics["store_ops.Cost Amount"]["aliases"])
+    assert {"满意度", "评分", "得分"}.issubset(metrics["store_ops.Score (NPS)"]["aliases"])
+    assert {"门店", "店铺"}.issubset(dimensions["store_ops.Store Name"]["aliases"])
+    assert metrics["store_ops.Sales Amount"]["label"] == "销售额"
+    assert metrics["store_ops.Cost Amount"]["label"] == "成本"
+    assert metrics["store_ops.Score (NPS)"]["label"] == "满意度"
+    assert dimensions["store_ops.Store Name"]["label"] == "门店"

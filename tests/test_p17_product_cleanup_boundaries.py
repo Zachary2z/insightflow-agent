@@ -344,9 +344,9 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     )
     assert "P17 is complete. P18 is the next phase" in p17_plan
     assert "Current phase | P20 General Business Analysis Foundation" in status
-    assert "Current task | P20-H1 generalized profiling and semantic layer complete; next is P20-H2 analysis task contract" in status
-    assert "Next planned task | P20-H2 general analysis task contract and clarification continuation" in status
-    assert "Last completed task | P20-H1 general data profiling and semantic layer" in status
+    assert "Current task | P20-H1 Chinese-first semantic alias and formula safety repair complete; next is P20-H2" in status
+    assert "Next planned task | P20-H2 Chinese analysis task contract and clarification continuation" in status
+    assert "Last completed task | P20-H1 Chinese-first semantic alias and formula safety repair" in status
     assert "Latest P17-H6 closeout result on 2026-06-30" in status
     assert "P17/P18/P19/P20 Roadmap" in plan
     assert "P17-H5 | Product docs/status simplification | Complete" in plan
@@ -372,7 +372,7 @@ def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
         "| P17-H4 | Delete obsolete historical eval/demo docs and tests that no longer protect current product behavior | Complete |"
         in p17_plan
     )
-    assert "Last completed task | P20-H1 general data profiling and semantic layer" in status
+    assert "Last completed task | P20-H1 Chinese-first semantic alias and formula safety repair" in status
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 

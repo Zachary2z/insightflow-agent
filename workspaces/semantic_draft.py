@@ -8,6 +8,29 @@ import yaml
 from workspaces.store import WorkspaceStore
 
 
+_CHINESE_ALIASES_BY_MEANING = {
+    "revenue_like": ["销售额", "收入", "营收", "营业额", "成交额"],
+    "cost_like": ["成本", "费用", "支出", "花费", "投放成本"],
+    "amount_like": ["金额", "数值"],
+    "count_like": ["数量", "次数", "单量", "件数"],
+    "rating_like": ["满意度", "评分", "得分"],
+    "date_like": ["日期", "时间"],
+    "status": ["状态", "阶段"],
+}
+
+_CHINESE_ALIASES_BY_NAME = (
+    (("store", "shop", "branch", "门店", "店铺"), ["门店", "店铺"]),
+    (("customer", "client", "user", "客户", "用户"), ["客户", "用户"]),
+    (("product", "sku", "商品", "产品"), ["产品", "商品"]),
+    (("city", "城市"), ["城市"]),
+    (("region", "area", "地区", "区域"), ["区域", "地区"]),
+    (("sales", "revenue", "income", "turnover", "营业额", "营收", "收入", "销售额"), ["销售额", "收入", "营收", "营业额", "成交额"]),
+    (("cost", "expense", "spend", "fee", "成本", "费用", "支出"), ["成本", "费用", "支出", "花费", "投放成本"]),
+    (("score", "rating", "nps", "满意度", "评分", "得分"), ["满意度", "评分", "得分"]),
+    (("date", "time", "日期", "时间"), ["日期", "时间"]),
+)
+
+
 def generate_semantic_layer_draft(
     store: WorkspaceStore,
     workspace_id: str,
@@ -35,14 +58,22 @@ def generate_semantic_layer_draft(
             qualified = f"{table_name}.{name}"
             field_role = column.get("field_role") or _field_role_from_candidates(roles)
             field_roles[qualified] = field_role
-            semantic_aliases[qualified] = _aliases_for_field(name)
+            semantic_aliases[qualified] = _aliases_for_field(
+                name,
+                field_role=field_role,
+                meanings=column.get("business_meaning_candidates", []),
+            )
             if field_role == "metric":
                 metrics.extend(_metric_definitions(table_name, name, qualified, column))
             if field_role in {"dimension", "status"}:
                 dimensions.append(
                     {
                         "name": name,
-                        "label": _label_for_field(name),
+                        "label": _label_for_field(
+                            name,
+                            field_role=field_role,
+                            meanings=column.get("business_meaning_candidates", []),
+                        ),
                         "table": table_name,
                         "field": qualified,
                         "enabled": True,
@@ -113,13 +144,25 @@ def _field_role_from_candidates(roles: dict[str, Any]) -> str:
     return "dimension"
 
 
-def _label_for_field(name: str) -> str:
+def _quote_sql_identifier(value: str) -> str:
+    return '"' + str(value).replace('"', '""') + '"'
+
+
+def _qualified_sql_identifier(table_name: str, column_name: str) -> str:
+    return f"{_quote_sql_identifier(table_name)}.{_quote_sql_identifier(column_name)}"
+
+
+def _label_for_field(name: str, *, field_role: str = "", meanings: list[str] | None = None) -> str:
+    chinese_aliases = _chinese_business_aliases(name, field_role=field_role, meanings=meanings or [])
+    if chinese_aliases:
+        return chinese_aliases[0]
     return str(name).replace("_", " ").strip().title() if str(name).isascii() else str(name)
 
 
-def _aliases_for_field(name: str) -> list[str]:
+def _aliases_for_field(name: str, *, field_role: str = "", meanings: list[str] | None = None) -> list[str]:
     text = str(name)
-    aliases = [text]
+    aliases = _chinese_business_aliases(text, field_role=field_role, meanings=meanings or [])
+    aliases.append(text)
     spaced = text.replace("_", " ").strip()
     if spaced and spaced != text:
         aliases.append(spaced)
@@ -129,10 +172,27 @@ def _aliases_for_field(name: str) -> list[str]:
     return list(dict.fromkeys(alias for alias in aliases if alias))
 
 
+def _chinese_business_aliases(name: str, *, field_role: str, meanings: list[str]) -> list[str]:
+    aliases: list[str] = []
+    for meaning in meanings:
+        aliases.extend(_CHINESE_ALIASES_BY_MEANING.get(str(meaning), []))
+    if field_role == "id":
+        aliases.extend(["编号", "ID"])
+    if field_role == "status":
+        aliases.extend(_CHINESE_ALIASES_BY_MEANING["status"])
+
+    compact_name = str(name).lower().replace("_", "").replace("-", "").replace(" ", "")
+    for tokens, token_aliases in _CHINESE_ALIASES_BY_NAME:
+        if any(str(token).lower().replace("_", "").replace("-", "").replace(" ", "") in compact_name for token in tokens):
+            aliases.extend(token_aliases)
+    return list(dict.fromkeys(alias for alias in aliases if alias))
+
+
 def _metric_definitions(table_name: str, name: str, qualified: str, column: dict[str, Any]) -> list[dict[str, Any]]:
-    meanings = set(column.get("business_meaning_candidates", []))
+    meaning_list = list(column.get("business_meaning_candidates", []))
+    meaning_set = set(meaning_list)
     aggregations = set(column.get("suitable_aggregations", [])) or {"sum", "avg", "count"}
-    if "rating_like" in meanings:
+    if "rating_like" in meaning_set:
         selected_aggregations = ["avg"]
     elif "sum" in aggregations:
         selected_aggregations = ["sum"]
@@ -144,17 +204,22 @@ def _metric_definitions(table_name: str, name: str, qualified: str, column: dict
     definitions = []
     for aggregation in selected_aggregations:
         metric_name = f"{aggregation}_{name}"
+        aliases = _aliases_for_field(name, field_role="metric", meanings=meaning_list) + _aliases_for_field(
+            metric_name,
+            field_role="metric",
+            meanings=meaning_list,
+        )
         definitions.append(
             {
                 "name": metric_name,
-                "label": f"{aggregation.upper()} {_label_for_field(name)}",
+                "label": _label_for_field(name, field_role="metric", meanings=meaning_list),
                 "table": table_name,
                 "field": qualified,
-                "formula": f"{aggregation.upper()}({qualified})",
+                "formula": f"{aggregation.upper()}({_qualified_sql_identifier(table_name, name)})",
                 "aggregation": aggregation,
                 "enabled": True,
-                "business_meaning_candidates": list(meanings),
-                "aliases": _aliases_for_field(name) + _aliases_for_field(metric_name),
+                "business_meaning_candidates": meaning_list,
+                "aliases": list(dict.fromkeys(aliases)),
                 "description": f"Auto-detected {aggregation} metric from {qualified}.",
             }
         )
