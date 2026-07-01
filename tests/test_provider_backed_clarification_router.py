@@ -124,7 +124,7 @@ def test_core_workflow_stops_for_provider_backed_clarification_before_sql(tmp_pa
     assert Path(result["trace_path"]).is_file()
 
 
-def test_core_workflow_clarification_no_key_baseline_preserves_sql_workflow(tmp_path, monkeypatch):
+def test_core_workflow_clarification_no_key_baseline_still_requires_missing_slots(tmp_path, monkeypatch):
     from graph.workflow import run_workflow
 
     monkeypatch.setenv("INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER", "1")
@@ -138,12 +138,12 @@ def test_core_workflow_clarification_no_key_baseline_preserves_sql_workflow(tmp_
         session_id="session_no_key_clarification_runtime",
     )
 
-    assert result["status"] == "completed"
+    assert result["status"] == "waiting_for_clarification"
     assert result["clarification_result"]["source"] == "deterministic"
     assert result["clarification_result"]["provider_called"] is False
     assert result["clarification_questions"]
-    assert result["generated_sql"].lower().startswith("select")
-    assert result["execution_result"]["success"] is True
+    assert "generated_sql" not in result
+    assert result["execution_result"] == {}
     assert [event["node"] for event in result["trace"]].count("clarification_router_agent") == 1
 
 

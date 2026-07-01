@@ -772,11 +772,17 @@ def _validate_question_understanding(content: Any) -> dict[str, Any]:
         "limit": limit,
         "risk_flags": normalized_risk_flags,
     }
+    analysis_task = content.get("analysis_task", {})
+    if analysis_task is None:
+        analysis_task = {}
+    if analysis_task and not isinstance(analysis_task, dict):
+        return _error(prompt_id, "analysis_task must be an object or null")
     return _ok(
         prompt_id,
         {
             "strategy": strategy,
             "intent": normalized_intent,
+            "analysis_task": analysis_task,
             "missing_slots": missing_slots,
             "clarification_questions": clarification_questions,
             "risk_flags": normalized_risk_flags,

@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P20 General Business Analysis Foundation |
-| Current task | P20-H1 Chinese-first semantic alias and formula safety repair complete; next is P20-H2 |
-| Next planned task | P20-H2 Chinese analysis task contract and clarification continuation |
-| Last completed task | P20-H1 Chinese-first semantic alias and formula safety repair |
+| Current task | P20-H2 Chinese analysis task contract and clarification continuation complete; next is P20-H3 |
+| Next planned task | P20-H3 Fact layer, metric registry, and evidence payload |
+| Last completed task | P20-H2 Chinese analysis task contract and clarification continuation |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -44,7 +44,7 @@ This is the concise current status surface for InsightFlow Agent.
 |---|---|---|
 | P20-H0 | `[x]` Complete | Architecture cleanup and main path inventory; removed stale template-mining eval/helper path and clarified current product chain |
 | P20-H1 | `[x]` Complete | General profiling/semantic baseline plus safe metric formula quoting and Chinese aliases for English/mixed raw fields |
-| P20-H2 | `[ ]` Planned | General Chinese analysis task contract and clarification continuation |
+| P20-H2 | `[x]` Complete | Normalized Chinese `analysis_task` contract, slot-level clarification, partial continuation stays pending, provider output normalized to Chinese |
 | P20-H3 | `[ ]` Planned | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope |
 | P20-H4 | `[ ]` Planned | Business insight, answer, chart, and report generation from validated evidence |
 | P20-H5 | `[ ]` Planned | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled |
@@ -101,6 +101,15 @@ workspace import
 ```
 
 ## Latest Verified Baseline
+
+Latest P20-H2 task-contract result on 2026-07-02:
+
+- Question understanding now emits a normalized `analysis_task` contract with `task_type`, Chinese `dimensions` and `metrics`, `time_range`, `filters`, `decision_goal`, `missing_slots`, `defaults_applied`, `resolved_question`, fixed `output_language: "zh"`, and confidence.
+- Complete Chinese analysis questions such as “最近90天按门店比较销售额” proceed without clarification, while incomplete recommendation questions such as “帮我分析渠道表现，看看哪个渠道该加预算” ask concise Chinese follow-ups for missing metric and time range instead of being rejected or sent to SQL.
+- English or mixed raw headers in semantic context, such as `Sales Amount` and `Store Name`, normalize to Chinese business slots such as 销售额 and 门店; English user questions still produce `output_language: "zh"`.
+- Clarification continuation now merges the original question with the user's short supplement. A partial answer such as “花费” fills only the metric and keeps the pending run waiting for `time_range`; a completed supplement can continue through the normal analysis path.
+- Provider-backed question understanding can return optional `analysis_task`, but local normalization applies defaults, forces Chinese output language, maps workspace semantic aliases, and recomputes missing slots so provider output cannot bypass clarification rules.
+- Verification passed: `python3 -m pytest tests/test_question_understanding_router.py tests/test_clarification_routing.py tests/test_pending_clarification_store.py -q` (`20 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workflow.py -q` (`16 passed`), `python3 -m pytest tests/test_provider_backed_question_understanding.py tests/test_provider_backed_clarification_router.py tests/test_deepseek_provider_structured_output.py -q` (`44 passed`), `python3 -m pytest tests/test_p20_general_semantic_layer.py tests/test_metric_tool.py -q` (`8 passed`), and full backend regression `python3 -m pytest` (`412 passed, 13 skipped`).
 
 Latest P20-H1 generalized semantic-layer result on 2026-07-01:
 

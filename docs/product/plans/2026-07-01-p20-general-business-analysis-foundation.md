@@ -229,16 +229,25 @@ Target contract:
 }
 ```
 
-- [ ] Add tests for complete questions, incomplete questions, follow-up answers, and ambiguous metric/time requests.
-- [ ] Track missing slots individually; do not continue analysis until required slots are filled or an explicit default is applied.
-- [ ] If a default is used, write it into the resolved question and final answer caveats.
-- [ ] Treat budget, optimization, and recommendation questions as normal analytical tasks, not unsafe requests, unless they ask for actual external execution or sensitive access.
-- [ ] Keep product-facing answers, clarifying questions, chart annotations, and reports in Chinese. Raw English field names may appear only in technical details or when no Chinese semantic label can be inferred.
+- [x] Add tests for complete questions, incomplete questions, follow-up answers, and ambiguous metric/time requests.
+- [x] Track missing slots individually; do not continue analysis until required slots are filled or an explicit default is applied.
+- [x] If a default is used, write it into the resolved question and final answer caveats.
+- [x] Treat budget, optimization, and recommendation questions as normal analytical tasks, not unsafe requests, unless they ask for actual external execution or sensitive access.
+- [x] Keep product-facing answers, clarifying questions, chart annotations, and reports in Chinese. Raw English field names may appear only in technical details or when no Chinese semantic label can be inferred.
 
 Acceptance:
 
 - A partial follow-up such as "花费" does not silently proceed if time range is still required.
 - "加预算", "减少预算", "优化产品", and "关注异常门店" are recommendation tasks, not blanket rejections.
+
+P20-H2 completion note on 2026-07-02:
+
+- Added `question_understanding/task_contract.py` as the shared normalization point for deterministic and provider-backed question understanding. It emits `task_type`, Chinese metrics/dimensions, `time_range`, filters, decision goal, missing slots, defaults, resolved question, fixed `output_language: "zh"`, and confidence.
+- Deterministic question understanding now recognizes complete Chinese business tasks such as “最近90天按门店比较销售额”, incomplete recommendation tasks such as “帮我分析渠道表现，看看哪个渠道该加预算”, and English/mixed raw headers through workspace semantic aliases such as `Sales Amount` -> 销售额 and `Store Name` -> 门店.
+- Clarification routing now asks concise Chinese slot-level follow-ups. Partial continuation answers such as “花费” fill only the metric and keep the pending run waiting for `time_range`; completed continuations merge the original question and supplemental answer before resuming analysis.
+- Provider-backed question understanding can include optional `analysis_task`, but local normalization still applies defaults, forces Chinese output language, maps semantic aliases, and recomputes missing slots so provider output cannot bypass clarification rules.
+- No P20-H3 fact layer, metric registry, evidence payload, or P20-H4 final answer/report rewrite was added in H2.
+- Verification passed: question/clarification/pending focused `20 passed`, workspace/workflow focused `16 passed`, provider/structured-output focused `44 passed`, P20 semantic/metric focused `8 passed`, and full backend regression `412 passed, 13 skipped`.
 
 ### P20-H3: Fact Layer, Metric Registry, And Evidence Payload
 

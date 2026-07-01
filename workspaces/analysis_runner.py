@@ -183,6 +183,20 @@ def run_workspace_analysis_continuation(
             clarification_answer=clarification_answer,
             resolved_question=resolved_question,
         )
+    elif result.get("status") == "waiting_for_clarification":
+        clarification_question = _first_text(result.get("clarification_questions"))
+        pending_store.mark_pending_for_more_info(
+            workspace_id=workspace_id,
+            pending_run_id=pending_run_id,
+            clarification_answer=clarification_answer,
+            resolved_question=resolved_question,
+            question_understanding=result.get("question_understanding") or {},
+            clarification_question=clarification_question,
+            raw_result=result,
+            missing_fields=(result.get("clarification_result") or {}).get("missing_slots")
+            or (result.get("question_understanding") or {}).get("missing_slots")
+            or [],
+        )
     else:
         pending_store.mark_failed(
             workspace_id=workspace_id,
@@ -194,7 +208,10 @@ def run_workspace_analysis_continuation(
     result["original_question"] = pending.get("original_question", "")
     result["system_understanding"] = pending.get("system_understanding", "")
     result["pending_question_understanding"] = pending.get("question_understanding") or {}
-    result["clarification_question"] = pending.get("clarification_question", "")
+    result["clarification_question"] = _first_text(result.get("clarification_questions")) or pending.get(
+        "clarification_question",
+        "",
+    )
     result["clarification_answer"] = clarification_answer
     result["resolved_question"] = resolved_question
     result["pending_run_id"] = pending_run_id

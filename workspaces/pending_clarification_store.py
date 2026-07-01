@@ -99,6 +99,36 @@ class PendingClarificationStore:
         self._write(workspace_id, pending_run_id, record)
         return record
 
+    def mark_pending_for_more_info(
+        self,
+        *,
+        workspace_id: str,
+        pending_run_id: str,
+        clarification_answer: str,
+        resolved_question: str,
+        question_understanding: dict[str, Any],
+        clarification_question: str,
+        raw_result: dict[str, Any],
+        missing_fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        record = self.load_pending_run(workspace_id, pending_run_id)
+        record.update(
+            {
+                "status": "pending",
+                "clarification_answer": clarification_answer,
+                "resolved_question": resolved_question,
+                "question_understanding": question_understanding,
+                "system_understanding": _system_understanding(question_understanding),
+                "clarification_question": clarification_question,
+                "missing_fields": list(missing_fields or question_understanding.get("missing_slots") or []),
+                "raw_result": _json_safe(raw_result),
+                "error": "",
+                "updated_at": utc_now_iso(),
+            }
+        )
+        self._write(workspace_id, pending_run_id, record)
+        return record
+
     def mark_failed(
         self,
         *,

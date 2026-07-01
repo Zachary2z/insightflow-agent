@@ -311,7 +311,16 @@ def route_after_clarification(state: AgentState) -> str:
         return "schema"
     if state.get("routing_strategy") == "reject":
         return "early_response"
-    if state.get("routing_strategy") == "clarify" and _has_continuation_context(state):
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("clarification_result", {}).get("requires_clarification") is True
+    ):
+        return "early_response"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and _has_continuation_context(state)
+        and not state.get("clarification_result", {}).get("missing_slots")
+    ):
         return "schema"
     if (
         state.get("routing_strategy") == "clarify"

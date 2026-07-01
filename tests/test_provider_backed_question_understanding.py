@@ -229,6 +229,102 @@ def test_provider_backed_question_understanding_accepts_live_multi_metric_shape(
     assert result["missing_slots"] == []
 
 
+def test_provider_backed_question_understanding_normalizes_analysis_task_defaults_and_language():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        "metric": "Sales Amount",
+        "dimension": "Store Name",
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "last 90 days"},
+        "filters": None,
+        "operation": "comparison",
+        "limit": None,
+        "risk_flags": None,
+    }
+    payload["analysis_task"] = {
+        "task_type": "compare",
+        "dimensions": None,
+        "metrics": None,
+        "time_range": None,
+        "filters": None,
+        "decision_goal": None,
+        "missing_slots": None,
+        "defaults_applied": None,
+        "resolved_question": None,
+        "output_language": "en",
+        "confidence": None,
+    }
+
+    result = understand_question_with_provider(
+        "Compare Sales Amount by Store Name in last 90 days",
+        provider=MockLLMProvider(payload),
+        workspace_context={
+            "semantic_metrics": [
+                {
+                    "name": "sum_Sales Amount",
+                    "label": "销售额",
+                    "field": "store_ops.Sales Amount",
+                    "aliases": ["Sales Amount", "sales amount", "销售额"],
+                }
+            ],
+            "semantic_dimensions": [
+                {
+                    "name": "Store Name",
+                    "label": "门店",
+                    "field": "store_ops.Store Name",
+                    "aliases": ["Store Name", "store name", "门店"],
+                }
+            ],
+        },
+    )
+
+    assert result["source"] == "provider"
+    assert result["analysis_task"]["metrics"] == ["销售额"]
+    assert result["analysis_task"]["dimensions"] == ["门店"]
+    assert result["analysis_task"]["filters"] == []
+    assert result["analysis_task"]["missing_slots"] == []
+    assert result["analysis_task"]["defaults_applied"] == []
+    assert result["analysis_task"]["resolved_question"] == "Compare Sales Amount by Store Name in last 90 days"
+    assert result["analysis_task"]["output_language"] == "zh"
+    assert result["analysis_task"]["confidence"] == "high"
+
+
+def test_provider_backed_question_understanding_cannot_bypass_missing_slot_rules():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        "metric": "",
+        "dimension": "渠道",
+        "time_range": None,
+        "filters": [],
+        "operation": "比较",
+        "limit": None,
+        "risk_flags": [],
+    }
+    payload["missing_slots"] = []
+    payload["clarification_questions"] = []
+
+    result = understand_question_with_provider(
+        "帮我分析渠道表现，看看哪个渠道该加预算",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["strategy"] == "clarify"
+    assert set(result["missing_slots"]) == {"metric", "time_range"}
+    assert result["analysis_task"]["task_type"] == "recommendation"
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["metrics"] == []
+    assert set(result["analysis_task"]["missing_slots"]) == {"metric", "time_range"}
+    assert result["clarification_questions"] == ["请补充要分析的指标和时间范围，例如：最近90天看销售额。"]
+
+
 def test_provider_backed_question_understanding_includes_workspace_context_in_prompt():
     from question_understanding.provider_backed import understand_question_with_provider
 

@@ -6,6 +6,7 @@ from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
 from question_understanding.router import understand_question
+from question_understanding.task_contract import build_clarification_questions, normalize_analysis_task, strategy_for_task
 
 
 _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "selected_tables"}
@@ -18,6 +19,7 @@ _METRIC_ALIASES = {
     "收入": "gmv",
     "gmv": "gmv",
     "sales": "gmv",
+    "sales amount": "gmv",
     "revenue": "gmv",
     "sales_amount": "gmv",
     "gross_merchandise_value": "gmv",
@@ -49,6 +51,10 @@ _DIMENSION_ALIASES = {
     "user": "user",
     "渠道": "channel",
     "channel": "channel",
+    "门店": "store",
+    "店铺": "store",
+    "store": "store",
+    "store name": "store",
 }
 _OPERATION_ALIASES = {
     "最高": "top_n",
@@ -94,13 +100,33 @@ def _normalize_slot(value: Any, aliases: dict[str, str]) -> str:
     return aliases.get(text.lower(), aliases.get(text, text))
 
 
-def _normalize_provider_content(content: dict[str, Any]) -> dict[str, Any]:
+def _normalize_provider_content(
+    content: dict[str, Any],
+    *,
+    question: str,
+    workspace_context: dict[str, Any] | None,
+) -> dict[str, Any]:
     normalized = dict(content)
     intent = dict(normalized.get("intent", {}))
     intent["metric"] = _normalize_slot(intent.get("metric"), _METRIC_ALIASES)
     intent["dimension"] = _normalize_slot(intent.get("dimension"), _DIMENSION_ALIASES)
     intent["operation"] = _normalize_slot(intent.get("operation"), _OPERATION_ALIASES)
+    if "risk_flags" not in intent or intent.get("risk_flags") is None:
+        intent["risk_flags"] = []
     normalized["intent"] = intent
+    provider_task = normalized.get("analysis_task") if isinstance(normalized.get("analysis_task"), dict) else {}
+    task = normalize_analysis_task(
+        question,
+        intent=intent,
+        workspace_context=workspace_context,
+        provider_task=provider_task,
+    )
+    risk_flags = list(normalized.get("risk_flags") or intent.get("risk_flags") or [])
+    normalized["analysis_task"] = task
+    normalized["missing_slots"] = list(task.get("missing_slots", []))
+    normalized["clarification_questions"] = build_clarification_questions(normalized["missing_slots"])
+    normalized["strategy"] = strategy_for_task(task, risk_flags=risk_flags)
+    normalized["risk_flags"] = risk_flags
     return normalized
 
 
@@ -194,8 +220,16 @@ def _provider_unavailable_result(
     }
 
 
-def _provider_result(content: dict[str, Any], provider_response: dict[str, Any]) -> dict[str, Any]:
-    normalized = _strip_forbidden_fields(_normalize_provider_content(content))
+def _provider_result(
+    content: dict[str, Any],
+    provider_response: dict[str, Any],
+    *,
+    question: str,
+    workspace_context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    normalized = _strip_forbidden_fields(
+        _normalize_provider_content(content, question=question, workspace_context=workspace_context)
+    )
     risk_flags = normalized.get("risk_flags", [])
     if risk_flags:
         normalized["strategy"] = "reject"
@@ -261,7 +295,12 @@ def understand_question_with_provider(
     )
     provider_response = run_validated_llm_request(provider, request)
     if provider_response.get("success"):
-        return _provider_result(provider_response.get("content", {}), provider_response)
+        return _provider_result(
+            provider_response.get("content", {}),
+            provider_response,
+            question=question,
+            workspace_context=workspace_context,
+        )
 
     error = provider_response.get("error", "")
     error_type = provider_response.get("error_type", "")

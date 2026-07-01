@@ -18,12 +18,13 @@ def run_question_understanding_agent(state: dict[str, Any], provider: LLMProvide
     result = (
         understand_question_with_provider(question, provider=provider, workspace_context=workspace_context)
         if provider is not None
-        else understand_question(question)
+        else understand_question(question, workspace_context=workspace_context)
     )
     updated = {
         **state,
         "workspace_context": workspace_context,
         "question_understanding": result,
+        "analysis_task": result.get("analysis_task", {}),
         "intent_slots": result.get("intent", {}),
         "routing_strategy": result.get("strategy", ""),
     }

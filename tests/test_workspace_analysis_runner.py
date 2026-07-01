@@ -304,6 +304,95 @@ def test_workspace_analysis_continuation_resolves_question_and_calls_workflow(tm
     assert "商品" in thread["resolved_question"]
 
 
+def test_workspace_analysis_partial_continuation_remains_waiting_for_clarification(tmp_path, monkeypatch):
+    from workspaces.analysis_runner import run_workspace_analysis_continuation
+    from workspaces.pending_clarification_store import PendingClarificationStore
+
+    store, workspace = _create_ecommerce_workspace(tmp_path)
+    pending_store = PendingClarificationStore(store)
+    pending = pending_store.create_pending_run(
+        workspace_id=workspace["workspace_id"],
+        run_id="run_pending",
+        original_question="帮我分析渠道表现，看看哪个渠道该加预算",
+        question_understanding={
+            "strategy": "clarify",
+            "analysis_task": {
+                "task_type": "recommendation",
+                "dimensions": ["渠道"],
+                "metrics": [],
+                "time_range": None,
+                "filters": [],
+                "decision_goal": "判断哪个渠道该加预算",
+                "missing_slots": ["metric", "time_range"],
+                "defaults_applied": [],
+                "resolved_question": "帮我分析渠道表现，看看哪个渠道该加预算",
+                "output_language": "zh",
+                "confidence": "medium",
+            },
+            "missing_slots": ["metric", "time_range"],
+        },
+        clarification_question="请补充要分析的指标和时间范围，例如：最近90天看销售额。",
+        raw_result={"status": "waiting_for_clarification"},
+        missing_fields=["metric", "time_range"],
+    )
+
+    def wait_for_more_info(*, user_question, **kwargs):
+        assert "帮我分析渠道表现" in user_question
+        assert "花费" in user_question
+        return {
+            "status": "waiting_for_clarification",
+            "run_id": kwargs["run_id"],
+            "workspace_root": workspace["root_path"],
+            "trace_path": "",
+            "question_understanding": {
+                "strategy": "clarify",
+                "analysis_task": {
+                    "task_type": "recommendation",
+                    "dimensions": ["渠道"],
+                    "metrics": ["花费"],
+                    "time_range": None,
+                    "filters": [],
+                    "decision_goal": "判断哪个渠道该加预算",
+                    "missing_slots": ["time_range"],
+                    "defaults_applied": [],
+                    "resolved_question": user_question,
+                    "output_language": "zh",
+                    "confidence": "medium",
+                },
+                "missing_slots": ["time_range"],
+                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+            },
+            "clarification_result": {
+                "requires_clarification": True,
+                "missing_slots": ["time_range"],
+                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+            },
+            "clarification_questions": ["请补充时间范围，例如最近90天。"],
+            "final_answer": "需要补充信息后才能继续分析：请补充时间范围，例如最近90天。",
+            "execution_result": {},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", wait_for_more_info)
+
+    result = run_workspace_analysis_continuation(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        pending_run_id=pending["pending_run_id"],
+        clarification_answer="花费",
+    )
+
+    assert result["status"] == "waiting_for_clarification"
+    assert result["pending_run_id"] == pending["pending_run_id"]
+    assert result["clarification_question"] == "请补充时间范围，例如最近90天。"
+    assert "花费" in result["resolved_question"]
+    stored = pending_store.load_pending_run(workspace["workspace_id"], pending["pending_run_id"])
+    assert stored["status"] == "pending"
+    assert stored["missing_fields"] == ["time_range"]
+    assert stored["clarification_answer"] == "花费"
+    assert "花费" in stored["resolved_question"]
+
+
 def test_resolved_question_uses_generic_context_merge_without_channel_budget_template():
     from question_understanding.resolved_question import build_resolved_question
 
