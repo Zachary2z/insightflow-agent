@@ -262,3 +262,109 @@ def test_composer_output_does_not_leak_reviewer_prompt_trace_or_sql():
     assert "trace_path" not in text
     assert "SELECT" not in text
     assert "reviewer_result" not in text
+
+
+def test_composer_revise_localizes_common_business_fields_for_chinese_question():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="哪个渠道收入最高？请说明收入、订单数和客单价。",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "total_revenue", "order_count", "avg_order_value"],
+            "rows": [["email", 44548.53, 120, 371.24], ["paid_search", 22109.0, 80, 276.36]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(
+            headline="email leads on total_revenue",
+            direct_answer="email has the highest total_revenue.",
+            why="email total_revenue is 44548.53.",
+            evidence_bullets=["email total_revenue is 44548.53."],
+            recommendations=["Review email."],
+        ),
+        reviewer_result=_review(
+            "revise",
+            language="zh",
+            supported_entities=["email", "paid_search"],
+            supported_metrics=["total_revenue", "order_count", "avg_order_value"],
+            issues=[{"type": "unsupported_claim", "message": "Use Chinese business wording.", "affected_fields": ["direct_answer"]}],
+            confidence="medium",
+        ),
+    )
+
+    _assert_shape(answer)
+    text = _answer_text(answer)
+    assert "收入" in text
+    assert "订单数" in text
+    assert "客单价" in text
+    assert "total_revenue" not in text
+    assert "order_count" not in text
+    assert "avg_order_value" not in text
+    assert "Reviewer" not in text
+
+
+def test_composer_tradeoff_when_revenue_and_roi_leaders_differ():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="哪个渠道应该加预算？同时看收入、投放成本和 ROI。",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue", "spend", "roi"],
+            "rows": [
+                ["paid_search", 34848.0, 9703.5, 3.59],
+                ["email", 23534.0, 2290.5, 10.27],
+            ],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "revise",
+            language="zh",
+            supported_entities=["paid_search", "email"],
+            supported_metrics=["revenue", "spend", "roi"],
+            issues=[{"type": "tradeoff_missing", "message": "Revenue and ROI point to different channels.", "affected_fields": ["direct_answer"]}],
+            revision_instructions=["State the tradeoff instead of forcing one winner."],
+            confidence="medium",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "收入" in text
+    assert "ROI" in text
+    assert "paid_search" in text
+    assert "email" in text
+    assert any(marker in text for marker in ("如果目标", "权衡", "取舍", "口径"))
+    assert "投放成本" in text
+    assert answer["recommendations"]
+    assert answer["caveats"]
+
+
+def test_composer_does_not_invent_roi_or_profit_when_missing_from_evidence():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="哪个渠道应该加预算？",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue", "order_count"],
+            "rows": [["paid_search", 34848.0, 140], ["email", 23534.0, 120]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "revise",
+            language="zh",
+            supported_entities=["paid_search", "email"],
+            supported_metrics=["revenue", "order_count"],
+            issues=[{"type": "metric_mismatch", "message": "ROI is unavailable.", "affected_fields": ["recommendations"]}],
+            unsupported_metrics=["roi", "profit"],
+            confidence="medium",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "ROI" not in answer["headline"] + answer["direct_answer"] + answer["why"] + " ".join(answer["recommendations"])
+    assert "利润" not in text
+    assert "收入" in text
+    assert any("缺少" in caveat or "未包含" in caveat for caveat in answer["caveats"])

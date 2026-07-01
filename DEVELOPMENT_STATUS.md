@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H2 complete / ready for H3 business answer quality polish |
-| Next planned task | P19-H3 Business answer quality polish |
+| Current task | P19-H3 complete / ready for H4 report and chart synthesis |
+| Next planned task | P19-H4 Report and chart synthesis |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -43,7 +43,7 @@ This is the concise current status surface for InsightFlow Agent.
 |---|---|---|
 | P19-H1 | `[x]` Complete | Plain why/evidence entity conflicts are now corrected or downgraded by the small deterministic guard |
 | P19-H2 | `[x]` Complete | Added Answer Reviewer Agent and Final Answer Composer contracts, deterministic/provider tests, and product/report integration |
-| P19-H3 | `[ ]` Planned | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers |
+| P19-H3 | `[x]` Complete | Polished business answer quality: vocabulary, units, grounded recommendations, tradeoffs, caveats, and report-section reuse |
 | P19-H4 | `[ ]` Planned | Synthesize reports and chart narrative from reviewed business answers |
 | P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
 
@@ -116,6 +116,13 @@ P19-H2 completion note on 2026-07-01:
 - Integrated reviewer/composer after insight drafting and before final P16 business answer normalization.
 - Report sections reuse the reviewed/composed `business_answer`; deterministic `answer_consistency.py` remains the final small guardrail.
 - Focused backend tests, full backend regression, frontend Vitest, and frontend production build passed.
+
+P19-H3 completion note on 2026-07-01:
+
+- Added shared business labels for common metrics and dimensions so main answers prefer 收入、总收入、订单数、客单价、投放成本、ROI、渠道 and 客户分群 over raw field names.
+- Final Answer Composer now produces business-readable revise/downgrade answers, removes reviewer/internal wording from caveats, and states revenue-vs-ROI tradeoffs instead of forcing one winner.
+- Product result and report section normalization apply the same field-label cleanup while keeping raw columns, rows, SQL, traces, and provider metadata in technical details.
+- Added focused regression coverage for Chinese output, field-label polish, multi-metric tradeoffs, no invented ROI/profit advice, internal metadata leakage, and report section business answers.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

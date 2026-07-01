@@ -3,6 +3,42 @@ from __future__ import annotations
 from typing import Any
 
 
+BUSINESS_FIELD_LABELS_ZH = {
+    "total_revenue": "总收入",
+    "sum_revenue": "总收入",
+    "revenue": "收入",
+    "gmv": "销售额",
+    "order_count": "订单数",
+    "orders": "订单数",
+    "avg_order_value": "客单价",
+    "avg_revenue_per_order": "客单价",
+    "average_order_value": "客单价",
+    "total_spend": "投放成本",
+    "marketing_spend": "投放成本",
+    "ad_spend": "投放成本",
+    "spend": "投放成本",
+    "cost": "成本",
+    "roi": "ROI",
+    "roas": "ROAS",
+    "channel": "渠道",
+    "segment": "客户分群",
+    "customer_segment": "客户分群",
+    "product": "商品",
+    "product_name": "商品",
+    "category": "品类",
+    "region": "区域",
+}
+
+
+def business_field_label(key: Any, *, chinese: bool) -> str:
+    text = str(key or "").strip()
+    if not text:
+        return ""
+    if chinese:
+        return BUSINESS_FIELD_LABELS_ZH.get(text.lower(), text)
+    return text
+
+
 def rows_as_dicts(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
     columns = [str(column) for column in execution_result.get("columns") or []]
     rows: list[dict[str, Any]] = []
@@ -79,7 +115,7 @@ def row_bullets(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) ->
 def row_summary(row: dict[str, Any], *, chinese: bool) -> str:
     relation = " 为 " if chinese else " is "
     separator = "，" if chinese else ", "
-    pairs = [f"{key}{relation}{value}" for key, value in list(row.items())[:4]]
+    pairs = [f"{business_field_label(key, chinese=chinese)}{relation}{value}" for key, value in list(row.items())[:5]]
     return separator.join(pairs) if pairs else ("当前证据没有可展示字段" if chinese else "no displayable fields")
 
 

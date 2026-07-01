@@ -341,6 +341,53 @@ def test_report_section_reuses_reviewed_composed_business_answer(tmp_path):
     assert "Old draft" not in answer_text
 
 
+def test_report_section_business_answer_uses_business_field_labels(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def localized_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": {
+                    "headline": "email 渠道收入最高",
+                    "direct_answer": "email 渠道收入最高。",
+                    "why": "证据显示 email 的 total_revenue 为 44548.53。",
+                    "evidence_bullets": ["email total_revenue 为 44548.53，order_count 为 120，avg_order_value 为 371.24。"],
+                    "recommendations": ["继续复盘 email。"],
+                    "caveats": ["当前只基于本次查询结果。"],
+                    "confidence": "high",
+                },
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "order_count", "avg_order_value"],
+                "rows": [["email", 44548.53, 120, 371.24]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "trace": [{"node": "final_answer_composer"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "生成收入趋势报告。",
+        section_runner=localized_runner,
+    )
+
+    answer = result["report"]["sections"][0]["business_answer"]
+    answer_text = json.dumps(answer, ensure_ascii=False)
+    assert result["report"]["sections"][0]["status"] == "completed"
+    assert "收入" in answer_text
+    assert "订单数" in answer_text
+    assert "客单价" in answer_text
+    assert "total_revenue" not in answer_text
+    assert "order_count" not in answer_text
+    assert "avg_order_value" not in answer_text
+    assert answer["headline"] != "completed"
+
+
 def test_business_review_section_questions_are_specific_internal_analysis_prompts():
     report_goal = "基于最近 90 天的订单、客户和营销数据，生成面向管理层的收入复盘报告。"
     sections = {

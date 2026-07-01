@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from workspaces.answer_evidence import BUSINESS_FIELD_LABELS_ZH, business_field_label
 from workspaces.answer_consistency import apply_answer_consistency, safe_chart_annotation
 from workspaces.product_models import (
     PRODUCT_RESULT_VERSION,
@@ -307,7 +308,7 @@ def _evidence_bullets_from_rows(execution_result: dict[str, Any], limit: int = 4
     for index, row in enumerate(rows, start=1):
         pairs = _row_pairs(row, columns)
         if pairs:
-            bullets.append(f"第 {index} 行：" + "，".join(f"{key} 为 {value}" for key, value in pairs[:4]) + "。")
+            bullets.append(f"第 {index} 行：" + "，".join(_business_pair_text(key, value) for key, value in pairs[:5]) + "。")
     return bullets
 
 
@@ -353,7 +354,7 @@ def _supported_budget_recommendation(user_question: str, execution_result: dict[
     channel = _first_matching_pair_value(pairs, ("channel", "渠道"))
     if not channel:
         return ""
-    evidence = "，".join(f"{key} 为 {value}" for key, value in pairs[:4])
+    evidence = "，".join(_business_pair_text(key, value) for key, value in pairs[:5])
     if _needs_chinese_response(user_question):
         return f"建议优先评估增加 {channel} 的预算，因为证据表第一行显示：{evidence}。"
     return f"Consider increasing budget for {channel}, supported by the first evidence row: {evidence}."
@@ -427,7 +428,7 @@ def _evidence_anchor_sentence(execution_result: dict[str, Any]) -> str:
     pairs = _row_pairs(rows[0], columns)
     if not pairs:
         return ""
-    return "证据表第一行显示：" + "，".join(f"{key} 为 {value}" for key, value in pairs[:4]) + "。"
+    return "证据表第一行显示：" + "，".join(_business_pair_text(key, value) for key, value in pairs[:5]) + "。"
 
 
 def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
@@ -442,6 +443,10 @@ def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
     return []
 
 
+def _business_pair_text(key: Any, value: Any) -> str:
+    return f"{business_field_label(key, chinese=True)} 为 {value}"
+
+
 def _clean_business_text(text: Any) -> str:
     value = str(text or "").strip()
     if not value:
@@ -449,7 +454,15 @@ def _clean_business_text(text: Any) -> str:
     value = re.sub(r"```sql\s*.*?```", "", value, flags=re.IGNORECASE | re.DOTALL).strip()
     value = re.sub(r"\b(?:SELECT|WITH)\b.+", "", value, flags=re.IGNORECASE | re.DOTALL).strip()
     value = re.sub(r"\b[A-Za-z_][\w. -]*\s*=\s*[^，,。\n]+(?:[,，]\s*)?", "", value).strip()
+    value = _localize_common_field_names(value)
     return " ".join(value.split())
+
+
+def _localize_common_field_names(text: str) -> str:
+    localized = text
+    for raw_key, label in sorted(BUSINESS_FIELD_LABELS_ZH.items(), key=lambda item: len(item[0]), reverse=True):
+        localized = re.sub(rf"\b{re.escape(raw_key)}\b", label, localized, flags=re.IGNORECASE)
+    return localized
 
 
 def _is_sql_review_failure(raw: dict[str, Any]) -> bool:
@@ -630,7 +643,7 @@ def _answer_from_evidence(question: str, execution_result: dict[str, Any]) -> st
         pairs = list(zip(columns, first_row, strict=False))
     else:
         pairs = []
-    evidence = [f"{column} 为 {value}" for column, value in pairs[:4] if str(column).strip()]
+    evidence = [_business_pair_text(column, value) for column, value in pairs[:5] if str(column).strip()]
     if evidence:
         summary += "证据表第一行显示：" + "，".join(evidence) + "。"
     if safe_question:

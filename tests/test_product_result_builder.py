@@ -101,7 +101,7 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert answer["headline"]
     assert answer["direct_answer"] == raw["final_answer"]
     assert "paid_search" in answer["why"]
-    assert answer["evidence_bullets"] == ["第 1 行：channel 为 paid_search，revenue 为 200.0。"]
+    assert answer["evidence_bullets"] == ["第 1 行：渠道 为 paid_search，收入 为 200.0。"]
     assert answer["recommendations"] == [raw["final_answer"]]
     assert "raw_rows" not in product["business_answer"]
     assert "summary" not in answer
@@ -187,7 +187,7 @@ def test_chinese_business_answer_rebuilds_english_evidence_notes_from_rows():
 
     answer = build_business_answer(raw)
 
-    assert answer["evidence_bullets"] == ["第 1 行：channel 为 email，total_revenue 为 44548.53。"]
+    assert answer["evidence_bullets"] == ["第 1 行：渠道 为 email，总收入 为 44548.53。"]
     assert "total revenue is" not in _business_answer_text(answer)
 
 
@@ -456,3 +456,31 @@ def test_budget_question_evidence_fallback_does_not_force_first_row_when_metrics
     assert "email" not in " ".join(answer["recommendations"])
     assert answer["confidence"] == "low"
     assert any("证据" in caveat or "口径" in caveat for caveat in answer["caveats"])
+
+
+def test_product_result_builder_localizes_common_metric_fields_in_main_answer():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近 90 天哪个渠道收入最高？请带上订单数、客单价和投放成本。",
+            "final_answer": "已完成本轮查询。",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "order_count", "avg_order_value", "total_spend"],
+                "rows": [["email", 44548.53, 120, 371.24, 2290.5]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    text = _business_answer_text(answer)
+    assert "渠道 为 email" in text
+    assert "总收入 为 44548.53" in text
+    assert "订单数 为 120" in text
+    assert "客单价 为 371.24" in text
+    assert "投放成本 为 2290.5" in text
+    assert "total_revenue" not in text
+    assert "order_count" not in text
+    assert "avg_order_value" not in text
+    assert "total_spend" not in text

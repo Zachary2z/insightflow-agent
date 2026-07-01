@@ -344,8 +344,8 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     )
     assert "P17 is complete. P18 is the next phase" in p17_plan
     assert "Current phase | P19 Business Output And Report Quality" in status
-    assert "Current task | P19-H2 complete / ready for H3 business answer quality polish" in status
-    assert "Next planned task | P19-H3 Business answer quality polish" in status
+    assert "Current task | P19-H3 complete / ready for H4 report and chart synthesis" in status
+    assert "Next planned task | P19-H4 Report and chart synthesis" in status
     assert "Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout" in status
     assert "Latest P17-H6 closeout result on 2026-06-30" in status
     assert "P17/P18/P19 Roadmap" in plan
@@ -353,6 +353,7 @@ def test_p17_h6_status_surfaces_are_current_and_consistent():
     assert "P17-H6 | Final artifact hygiene, legacy audit, backend/frontend regression, and real DeepSeek acceptance | Complete" in plan
     assert "P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete" in plan
     assert "P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete" in plan
+    assert "P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete" in plan
     assert "P17 progress summary: H1-H6 are complete" in plan
 
 

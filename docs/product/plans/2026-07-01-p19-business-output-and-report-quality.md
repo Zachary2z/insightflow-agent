@@ -280,6 +280,8 @@ Acceptance:
 
 Goal: Make analysis replies useful to real business users without turning them into rigid templates.
 
+Status: Complete as of 2026-07-01.
+
 Scope:
 
 - Normalize common metric vocabulary and units in main answer fields.
@@ -293,6 +295,13 @@ Acceptance:
 - Hypotheses are labeled as hypotheses or next-step validation, not facts.
 - Multi-metric questions state the decision basis.
 - Answers remain concise enough for one-screen reading.
+
+Completion notes:
+
+- Added a small shared business-field label map for common metrics and dimensions such as revenue, order count, AOV, spend, ROI, channel, and segment.
+- Final Answer Composer now rewrites reviewer-driven revisions with business-readable evidence, non-technical caveats, and explicit revenue-vs-ROI tradeoffs when returned metrics point to different leaders.
+- Product result and report section normalization replace common raw field names in main business fields while leaving technical details and table previews intact.
+- Added regression tests for Chinese answer language, business-field vocabulary, tradeoffs, grounded caveats, no invented ROI/profit advice, internal metadata leakage, and report section reuse.
 
 ### P19-H4: Report And Chart Synthesis
 
@@ -336,7 +345,7 @@ Acceptance:
 
 1. P19-H1: close the current deterministic alignment hole.
 2. P19-H2: add reviewer/composer foundation.
-3. P19-H3: polish business answer quality.
+3. P19-H3: polish business answer quality. Complete.
 4. P19-H4: synthesize reports and chart narrative.
 5. P19-H5: live acceptance, regression, cleanup, and closeout.
 
