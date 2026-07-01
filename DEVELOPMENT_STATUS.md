@@ -119,10 +119,11 @@ P19-H2 completion note on 2026-07-01:
 
 P19-H3 completion note on 2026-07-01:
 
-- Added shared business labels for common metrics and dimensions so main answers prefer 收入、总收入、订单数、客单价、投放成本、ROI、渠道 and 客户分群 over raw field names.
+- Added shared language-aware business labels for common metrics and dimensions so Chinese answers prefer 收入、总收入、订单数、客单价、投放成本、ROI、渠道 and 客户分群, while English answers use total revenue, order count, average order value, spend, ROI, channel, and segment.
 - Final Answer Composer now produces business-readable revise/downgrade answers, removes reviewer/internal wording from caveats, and states revenue-vs-ROI tradeoffs instead of forcing one winner.
 - Product result and report section normalization apply the same field-label cleanup while keeping raw columns, rows, SQL, traces, and provider metadata in technical details.
 - Added focused regression coverage for Chinese output, field-label polish, multi-metric tradeoffs, no invented ROI/profit advice, internal metadata leakage, and report section business answers.
+- Follow-up fix: English questions now keep English fallback wording and English business labels instead of mixing Chinese labels into accepted/composed answers.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

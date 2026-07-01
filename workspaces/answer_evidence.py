@@ -29,14 +29,42 @@ BUSINESS_FIELD_LABELS_ZH = {
     "region": "区域",
 }
 
+BUSINESS_FIELD_LABELS_EN = {
+    "total_revenue": "total revenue",
+    "sum_revenue": "total revenue",
+    "revenue": "revenue",
+    "gmv": "GMV",
+    "order_count": "order count",
+    "orders": "orders",
+    "avg_order_value": "average order value",
+    "avg_revenue_per_order": "average order value",
+    "average_order_value": "average order value",
+    "total_spend": "spend",
+    "marketing_spend": "spend",
+    "ad_spend": "spend",
+    "spend": "spend",
+    "cost": "cost",
+    "roi": "ROI",
+    "roas": "ROAS",
+    "channel": "channel",
+    "segment": "segment",
+    "customer_segment": "segment",
+    "product": "product",
+    "product_name": "product",
+    "category": "category",
+    "region": "region",
+}
+
+
+def business_field_labels(*, chinese: bool) -> dict[str, str]:
+    return BUSINESS_FIELD_LABELS_ZH if chinese else BUSINESS_FIELD_LABELS_EN
+
 
 def business_field_label(key: Any, *, chinese: bool) -> str:
     text = str(key or "").strip()
     if not text:
         return ""
-    if chinese:
-        return BUSINESS_FIELD_LABELS_ZH.get(text.lower(), text)
-    return text
+    return business_field_labels(chinese=chinese).get(text.lower(), text)
 
 
 def rows_as_dicts(execution_result: dict[str, Any]) -> list[dict[str, Any]]:

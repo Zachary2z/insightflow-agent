@@ -298,10 +298,11 @@ Acceptance:
 
 Completion notes:
 
-- Added a small shared business-field label map for common metrics and dimensions such as revenue, order count, AOV, spend, ROI, channel, and segment.
+- Added a small shared language-aware business-field label map for common metrics and dimensions such as revenue, order count, AOV, spend, ROI, channel, and segment.
 - Final Answer Composer now rewrites reviewer-driven revisions with business-readable evidence, non-technical caveats, and explicit revenue-vs-ROI tradeoffs when returned metrics point to different leaders.
 - Product result and report section normalization replace common raw field names in main business fields while leaving technical details and table previews intact.
 - Added regression tests for Chinese answer language, business-field vocabulary, tradeoffs, grounded caveats, no invented ROI/profit advice, internal metadata leakage, and report section reuse.
+- Follow-up fix: English questions now use English labels and fallback evidence wording, while Chinese questions still convert raw field names into Chinese business labels.
 
 ### P19-H4: Report And Chart Synthesis
 

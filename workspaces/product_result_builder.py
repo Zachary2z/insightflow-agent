@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from workspaces.answer_evidence import BUSINESS_FIELD_LABELS_ZH, business_field_label
+from workspaces.answer_evidence import business_field_label, business_field_labels
 from workspaces.answer_consistency import apply_answer_consistency, safe_chart_annotation
 from workspaces.product_models import (
     PRODUCT_RESULT_VERSION,
@@ -87,44 +87,49 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
 
     existing = raw.get("business_answer") if isinstance(raw.get("business_answer"), dict) else {}
     user_question = str(raw.get("original_question") or raw.get("user_question") or raw.get("question") or "")
+    chinese = _uses_chinese_business_answer(user_question)
     execution_result = raw.get("execution_result") if isinstance(raw.get("execution_result"), dict) else {}
     evidence_result = raw.get("evidence_result") if isinstance(raw.get("evidence_result"), dict) else {}
 
     if business_answer_is_usable(existing, user_question, execution_result, evidence_result):
         return apply_answer_consistency(
             user_question=user_question,
-            business_answer=_normalize_business_answer(existing),
+            business_answer=_normalize_business_answer(existing, chinese=chinese),
             execution_result=execution_result,
             evidence_result=evidence_result,
         )
 
-    direct_answer, fallback_reason = _safe_direct_answer(raw, user_question, execution_result)
+    direct_answer, fallback_reason = _safe_direct_answer(raw, user_question, execution_result, chinese=chinese)
     weak_evidence = _has_weak_evidence(execution_result, evidence_result)
     unsafe_fallback = fallback_reason in {"unsafe_text", "language_mismatch"}
     evidence_bullets = _business_evidence_bullets(
         execution_result,
         evidence_result,
         user_question=user_question,
+        chinese=chinese,
     )
     caveats = _business_caveats(
         [],
         fallback_reason=fallback_reason,
         weak_evidence=weak_evidence,
         execution_result=execution_result,
+        chinese=chinese,
     )
 
     answer = _business_answer(
         headline=_headline_from(direct_answer),
         direct_answer=direct_answer,
-        why=_business_why(direct_answer, evidence_bullets, execution_result),
+        why=_business_why(direct_answer, evidence_bullets, execution_result, chinese=chinese),
         evidence_bullets=evidence_bullets,
         recommendations=[] if weak_evidence or unsafe_fallback else _business_recommendations(
             direct_answer,
             user_question=user_question,
             execution_result=execution_result,
+            chinese=chinese,
         ),
         caveats=caveats,
         confidence="low" if weak_evidence or unsafe_fallback else "medium",
+        chinese=chinese,
     )
     return apply_answer_consistency(
         user_question=user_question,
@@ -170,16 +175,29 @@ def _business_answer(
     recommendations: list[str],
     caveats: list[str],
     confidence: str,
+    chinese: bool = True,
 ) -> dict[str, Any]:
     answer = empty_business_answer()
     answer.update(
         {
-            "headline": _clean_business_text(headline),
-            "direct_answer": _clean_business_text(direct_answer),
-            "why": _clean_business_text(why),
-            "evidence_bullets": [_clean_business_text(item) for item in evidence_bullets if _clean_business_text(item)],
-            "recommendations": [_clean_business_text(item) for item in recommendations if _clean_business_text(item)],
-            "caveats": [_clean_business_text(item) for item in caveats if _clean_business_text(item)],
+            "headline": _clean_business_text(headline, chinese=chinese),
+            "direct_answer": _clean_business_text(direct_answer, chinese=chinese),
+            "why": _clean_business_text(why, chinese=chinese),
+            "evidence_bullets": [
+                _clean_business_text(item, chinese=chinese)
+                for item in evidence_bullets
+                if _clean_business_text(item, chinese=chinese)
+            ],
+            "recommendations": [
+                _clean_business_text(item, chinese=chinese)
+                for item in recommendations
+                if _clean_business_text(item, chinese=chinese)
+            ],
+            "caveats": [
+                _clean_business_text(item, chinese=chinese)
+                for item in caveats
+                if _clean_business_text(item, chinese=chinese)
+            ],
             "confidence": confidence if confidence in {"low", "medium", "high"} else "medium",
         }
     )
@@ -219,7 +237,7 @@ def business_answer_is_usable(
     return True
 
 
-def _normalize_business_answer(existing: dict[str, Any]) -> dict[str, Any]:
+def _normalize_business_answer(existing: dict[str, Any], *, chinese: bool) -> dict[str, Any]:
     return _business_answer(
         headline=str(existing.get("headline") or ""),
         direct_answer=str(existing.get("direct_answer") or ""),
@@ -228,6 +246,7 @@ def _normalize_business_answer(existing: dict[str, Any]) -> dict[str, Any]:
         recommendations=_list_of_text(existing.get("recommendations")),
         caveats=_list_of_text(existing.get("caveats")),
         confidence=str(existing.get("confidence") or "medium"),
+        chinese=chinese,
     )
 
 
@@ -257,20 +276,24 @@ def _safe_direct_answer(
     raw: dict[str, Any],
     user_question: str,
     execution_result: dict[str, Any],
+    *,
+    chinese: bool,
 ) -> tuple[str, str]:
     direct_answer = _candidate_direct_answer(raw)
     if not direct_answer and execution_result.get("success"):
-        return _answer_from_evidence(user_question, execution_result), "missing_direct_answer"
+        return _answer_from_evidence(user_question, execution_result, chinese=chinese), "missing_direct_answer"
     if _looks_like_raw_parameter_dump(direct_answer) or _contains_technical_leak(direct_answer):
-        return _fallback_direct_answer(user_question, execution_result), "unsafe_text"
+        return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "unsafe_text"
     if _needs_chinese_response(user_question) and direct_answer.strip() and not _contains_cjk(direct_answer):
-        return _fallback_direct_answer(user_question, execution_result), "language_mismatch"
+        return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "language_mismatch"
     return direct_answer, ""
 
 
-def _fallback_direct_answer(user_question: str, execution_result: dict[str, Any]) -> str:
+def _fallback_direct_answer(user_question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
     if execution_result.get("success"):
-        return _answer_from_evidence(user_question, execution_result)
+        return _answer_from_evidence(user_question, execution_result, chinese=chinese)
+    if not chinese:
+        return "The query completed, but the model returned technical parameter-style content; use the evidence table and charts for this result."
     return "已完成查询，但模型返回了技术参数格式内容；请以证据表和图表为准查看本轮结果。"
 
 
@@ -289,26 +312,28 @@ def _business_evidence_bullets(
     evidence_result: dict[str, Any],
     *,
     user_question: str = "",
+    chinese: bool = True,
     limit: int = 4,
 ) -> list[str]:
     notes = _evidence_notes(evidence_result)
     if notes and not _list_language_mismatches_question(notes, user_question):
         return notes[:limit]
-    return _evidence_bullets_from_rows(execution_result, limit=limit)
+    return _evidence_bullets_from_rows(execution_result, chinese=chinese, limit=limit)
 
 
 def _list_language_mismatches_question(items: list[str], question: str) -> bool:
     return _needs_chinese_response(question) and any(not _contains_cjk(item) for item in items)
 
 
-def _evidence_bullets_from_rows(execution_result: dict[str, Any], limit: int = 4) -> list[str]:
+def _evidence_bullets_from_rows(execution_result: dict[str, Any], *, chinese: bool, limit: int = 4) -> list[str]:
     rows = list(execution_result.get("rows") or [])[:limit]
     columns = [str(column) for column in execution_result.get("columns") or []]
     bullets: list[str] = []
     for index, row in enumerate(rows, start=1):
         pairs = _row_pairs(row, columns)
         if pairs:
-            bullets.append(f"第 {index} 行：" + "，".join(_business_pair_text(key, value) for key, value in pairs[:5]) + "。")
+            summary = _business_pairs_text(pairs[:5], chinese=chinese)
+            bullets.append(f"第 {index} 行：{summary}。" if chinese else f"Row {index}: {summary}.")
     return bullets
 
 
@@ -316,14 +341,16 @@ def _business_why(
     direct_answer: str,
     evidence_bullets: list[str],
     execution_result: dict[str, Any],
+    *,
+    chinese: bool,
 ) -> str:
-    anchor = _evidence_anchor_sentence(execution_result)
+    anchor = _evidence_anchor_sentence(execution_result, chinese=chinese)
     if anchor:
         return anchor
     if evidence_bullets:
-        return "；".join(evidence_bullets[:2])
+        return "；".join(evidence_bullets[:2]) if chinese else " ".join(evidence_bullets[:2])
     if direct_answer:
-        return "该结论来自本轮已通过校验的数据查询结果。"
+        return "该结论来自本轮已通过校验的数据查询结果。" if chinese else "This conclusion comes from the validated query result."
     return ""
 
 
@@ -332,16 +359,17 @@ def _business_recommendations(
     *,
     user_question: str = "",
     execution_result: dict[str, Any] | None = None,
+    chinese: bool,
 ) -> list[str]:
     if _looks_recommendation_like(direct_answer):
         return [direct_answer]
-    supported = _supported_budget_recommendation(user_question, execution_result or {})
+    supported = _supported_budget_recommendation(user_question, execution_result or {}, chinese=chinese)
     if supported:
         return [supported]
     return []
 
 
-def _supported_budget_recommendation(user_question: str, execution_result: dict[str, Any]) -> str:
+def _supported_budget_recommendation(user_question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
     if not _asks_for_budget_recommendation(user_question):
         return ""
     rows = execution_result.get("rows") or []
@@ -354,8 +382,8 @@ def _supported_budget_recommendation(user_question: str, execution_result: dict[
     channel = _first_matching_pair_value(pairs, ("channel", "渠道"))
     if not channel:
         return ""
-    evidence = "，".join(_business_pair_text(key, value) for key, value in pairs[:5])
-    if _needs_chinese_response(user_question):
+    evidence = _business_pairs_text(pairs[:5], chinese=chinese)
+    if chinese:
         return f"建议优先评估增加 {channel} 的预算，因为证据表第一行显示：{evidence}。"
     return f"Consider increasing budget for {channel}, supported by the first evidence row: {evidence}."
 
@@ -392,14 +420,23 @@ def _business_caveats(
     fallback_reason: str,
     weak_evidence: bool,
     execution_result: dict[str, Any],
+    chinese: bool,
 ) -> list[str]:
     caveats = _list_of_text(existing_caveats)
     if fallback_reason in {"unsafe_text", "language_mismatch"}:
-        caveats.append("模型原始回答包含参数格式内容，已从业务结论中移除。")
+        caveats.append(
+            "模型原始回答包含参数格式内容，已从业务结论中移除。"
+            if chinese
+            else "The original model answer contained technical parameter-style content and was removed from the business answer."
+        )
     elif fallback_reason == "missing_direct_answer":
-        caveats.append("模型未提供可直接展示的业务回答，已根据证据表重建。")
+        caveats.append(
+            "模型未提供可直接展示的业务回答，已根据证据表重建。"
+            if chinese
+            else "The model did not provide a displayable business answer, so this was rebuilt from the evidence rows."
+        )
     if weak_evidence:
-        caveats.append(_weak_evidence_caveat(execution_result))
+        caveats.append(_weak_evidence_caveat(execution_result, chinese=chinese))
     return list(dict.fromkeys(caveats))
 
 
@@ -414,13 +451,21 @@ def _has_weak_evidence(execution_result: dict[str, Any], evidence_result: dict[s
     return False
 
 
-def _weak_evidence_caveat(execution_result: dict[str, Any]) -> str:
+def _weak_evidence_caveat(execution_result: dict[str, Any], *, chinese: bool) -> str:
     if not execution_result.get("rows"):
-        return "当前查询没有返回可验证的数据行，不能据此给出确定建议。"
-    return "当前证据未通过充分校验，建议只把本轮结果作为低置信度参考。"
+        return (
+            "当前查询没有返回可验证的数据行，不能据此给出确定建议。"
+            if chinese
+            else "The query returned no verifiable data rows, so it cannot support a firm recommendation."
+        )
+    return (
+        "当前证据未通过充分校验，建议只把本轮结果作为低置信度参考。"
+        if chinese
+        else "The current evidence was not fully validated, so treat this result as low-confidence context."
+    )
 
 
-def _evidence_anchor_sentence(execution_result: dict[str, Any]) -> str:
+def _evidence_anchor_sentence(execution_result: dict[str, Any], *, chinese: bool) -> str:
     rows = execution_result.get("rows") or []
     if not rows:
         return ""
@@ -428,7 +473,8 @@ def _evidence_anchor_sentence(execution_result: dict[str, Any]) -> str:
     pairs = _row_pairs(rows[0], columns)
     if not pairs:
         return ""
-    return "证据表第一行显示：" + "，".join(_business_pair_text(key, value) for key, value in pairs[:5]) + "。"
+    summary = _business_pairs_text(pairs[:5], chinese=chinese)
+    return f"证据表第一行显示：{summary}。" if chinese else f"The first evidence row shows: {summary}."
 
 
 def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
@@ -443,25 +489,40 @@ def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
     return []
 
 
-def _business_pair_text(key: Any, value: Any) -> str:
-    return f"{business_field_label(key, chinese=True)} 为 {value}"
+def _business_pairs_text(pairs: list[tuple[str, Any]], *, chinese: bool) -> str:
+    separator = "，" if chinese else ", "
+    return separator.join(_business_pair_text(key, value, chinese=chinese) for key, value in pairs)
 
 
-def _clean_business_text(text: Any) -> str:
+def _business_pair_text(key: Any, value: Any, *, chinese: bool) -> str:
+    relation = " 为 " if chinese else " is "
+    return f"{business_field_label(key, chinese=chinese)}{relation}{value}"
+
+
+def _clean_business_text(text: Any, *, chinese: bool) -> str:
     value = str(text or "").strip()
     if not value:
         return ""
     value = re.sub(r"```sql\s*.*?```", "", value, flags=re.IGNORECASE | re.DOTALL).strip()
     value = re.sub(r"\b(?:SELECT|WITH)\b.+", "", value, flags=re.IGNORECASE | re.DOTALL).strip()
     value = re.sub(r"\b[A-Za-z_][\w. -]*\s*=\s*[^，,。\n]+(?:[,，]\s*)?", "", value).strip()
-    value = _localize_common_field_names(value)
+    value = _localize_common_field_names(value, chinese=chinese)
     return " ".join(value.split())
 
 
-def _localize_common_field_names(text: str) -> str:
+def _localize_common_field_names(text: str, *, chinese: bool) -> str:
     localized = text
-    for raw_key, label in sorted(BUSINESS_FIELD_LABELS_ZH.items(), key=lambda item: len(item[0]), reverse=True):
+    labels = business_field_labels(chinese=chinese)
+    for raw_key, label in sorted(labels.items(), key=lambda item: len(item[0]), reverse=True):
         localized = re.sub(rf"\b{re.escape(raw_key)}\b", label, localized, flags=re.IGNORECASE)
+    if not chinese:
+        zh_to_en = {
+            zh_label: labels[raw_key]
+            for raw_key, zh_label in business_field_labels(chinese=True).items()
+            if raw_key in labels
+        }
+        for zh_label, en_label in sorted(zh_to_en.items(), key=lambda item: len(item[0]), reverse=True):
+            localized = localized.replace(zh_label, en_label)
     return localized
 
 
@@ -628,14 +689,23 @@ def _needs_chinese_response(question: str) -> bool:
     return not any(marker in lowered for marker in ("用英文", "英文回答", "answer in english", "in english"))
 
 
-def _answer_from_evidence(question: str, execution_result: dict[str, Any]) -> str:
+def _uses_chinese_business_answer(question: str) -> bool:
+    if not str(question or "").strip():
+        return True
+    return _needs_chinese_response(question)
+
+
+def _answer_from_evidence(question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
     rows = execution_result.get("rows") or []
     safe_question = "" if _contains_technical_leak(question) else question
     if not rows:
-        suffix = f"原问题：{safe_question}" if safe_question else ""
-        return f"已完成本轮查询，但证据表没有返回数据行。{suffix}"
+        if chinese:
+            suffix = f"原问题：{safe_question}" if safe_question else ""
+            return f"已完成本轮查询，但证据表没有返回数据行。{suffix}"
+        suffix = f" Original question: {safe_question}" if safe_question else ""
+        return f"The query completed, but the evidence table returned no data rows.{suffix}"
     columns = list(execution_result.get("columns") or [])
-    summary = f"已完成本轮查询，共返回 {len(rows)} 行结果。"
+    summary = f"已完成本轮查询，共返回 {len(rows)} 行结果。" if chinese else f"The query returned {len(rows)} row{'s' if len(rows) != 1 else ''}."
     first_row = rows[0]
     if isinstance(first_row, dict):
         pairs = list(first_row.items())
@@ -643,11 +713,18 @@ def _answer_from_evidence(question: str, execution_result: dict[str, Any]) -> st
         pairs = list(zip(columns, first_row, strict=False))
     else:
         pairs = []
-    evidence = [_business_pair_text(column, value) for column, value in pairs[:5] if str(column).strip()]
+    evidence = [
+        _business_pair_text(column, value, chinese=chinese)
+        for column, value in pairs[:5]
+        if str(column).strip()
+    ]
     if evidence:
-        summary += "证据表第一行显示：" + "，".join(evidence) + "。"
+        if chinese:
+            summary += "证据表第一行显示：" + "，".join(evidence) + "。"
+        else:
+            summary += " The first evidence row shows: " + ", ".join(evidence) + "."
     if safe_question:
-        summary += f"原问题：{safe_question}"
+        summary += f"原问题：{safe_question}" if chinese else f" Original question: {safe_question}"
     return summary
 
 
@@ -672,19 +749,10 @@ def _localized_system_understanding(intent: dict[str, Any]) -> str:
 
 def _localized_intent_value(value: Any) -> str:
     text = str(value or "").strip()
+    field_label = business_field_label(text, chinese=True)
+    if field_label != text:
+        return field_label
     mapping = {
-        "revenue": "收入",
-        "sum_revenue": "收入",
-        "total_revenue": "收入",
-        "gmv": "销售额",
-        "spend": "投放成本",
-        "marketing_spend": "投放成本",
-        "roi": "ROI",
-        "order_count": "订单数",
-        "orders": "订单数",
-        "channel": "渠道",
-        "product": "商品",
-        "customer": "客户",
         "comparison": "对比分析",
         "top_n": "排序分析",
         "summary": "汇总分析",

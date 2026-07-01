@@ -484,3 +484,34 @@ def test_product_result_builder_localizes_common_metric_fields_in_main_answer():
     assert "order_count" not in text
     assert "avg_order_value" not in text
     assert "total_spend" not in text
+
+
+def test_product_result_builder_uses_english_fallback_for_english_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "Which channel has the highest total_revenue?",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "order_count", "avg_order_value"],
+                "rows": [["email", 44548.53, 120, 371.24]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    text = _business_answer_text(answer)
+    assert answer["direct_answer"].startswith("The query returned 1 row")
+    assert "The first evidence row shows:" in answer["why"]
+    assert answer["evidence_bullets"] == [
+        "Row 1: channel is email, total revenue is 44548.53, order count is 120, average order value is 371.24."
+    ]
+    assert "total revenue" in text
+    assert "order count" in text
+    assert "average order value" in text
+    assert "证据表第一行显示" not in text
+    assert "第 1 行" not in text
+    assert "总收入" not in text
+    assert "订单数" not in text
+    assert "客单价" not in text

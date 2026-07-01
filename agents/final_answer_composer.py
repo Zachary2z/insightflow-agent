@@ -7,8 +7,8 @@ from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request, validate_prompt_output
 from workspaces.answer_evidence import (
-    BUSINESS_FIELD_LABELS_ZH,
     business_field_label,
+    business_field_labels,
     contains_cjk,
     entity_key,
     metric_keys,
@@ -127,7 +127,7 @@ def _deterministic_compose(
 ) -> dict[str, Any]:
     language = str(reviewer_result.get("language") or "")
     chinese = language == "zh" or _needs_chinese_response(user_question)
-    normalized = _normalize_answer(draft_business_answer)
+    normalized = _normalize_answer(draft_business_answer, chinese=chinese)
     status = str(reviewer_result.get("status") or "downgrade_to_insufficient_evidence")
     unsupported_values = [
         *[str(item) for item in reviewer_result.get("unsupported_entities") or []],
@@ -420,16 +420,28 @@ def _composer_caveats(reviewer_result: dict[str, Any], *, chinese: bool) -> list
     return _dedupe(caveats)
 
 
-def _normalize_answer(answer: dict[str, Any]) -> dict[str, Any]:
+def _normalize_answer(answer: dict[str, Any], *, chinese: bool) -> dict[str, Any]:
     normalized = empty_business_answer()
     normalized.update(
         {
-            "headline": _clean_text(answer.get("headline")),
-            "direct_answer": _clean_text(answer.get("direct_answer")),
-            "why": _clean_text(answer.get("why")),
-            "evidence_bullets": [_clean_text(item) for item in answer.get("evidence_bullets") or [] if _clean_text(item)],
-            "recommendations": [_clean_text(item) for item in answer.get("recommendations") or [] if _clean_text(item)],
-            "caveats": [_clean_text(item) for item in answer.get("caveats") or [] if _clean_text(item)],
+            "headline": _clean_text(answer.get("headline"), chinese=chinese),
+            "direct_answer": _clean_text(answer.get("direct_answer"), chinese=chinese),
+            "why": _clean_text(answer.get("why"), chinese=chinese),
+            "evidence_bullets": [
+                _clean_text(item, chinese=chinese)
+                for item in answer.get("evidence_bullets") or []
+                if _clean_text(item, chinese=chinese)
+            ],
+            "recommendations": [
+                _clean_text(item, chinese=chinese)
+                for item in answer.get("recommendations") or []
+                if _clean_text(item, chinese=chinese)
+            ],
+            "caveats": [
+                _clean_text(item, chinese=chinese)
+                for item in answer.get("caveats") or []
+                if _clean_text(item, chinese=chinese)
+            ],
             "confidence": str(answer.get("confidence") or "medium"),
         }
     )
@@ -480,12 +492,12 @@ def _answer_text(answer: dict[str, Any]) -> str:
     )
 
 
-def _clean_text(value: Any) -> str:
+def _clean_text(value: Any, *, chinese: bool) -> str:
     text = str(value or "").strip()
     text = re.sub(r"```sql\s*.*?```", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"\b(?:SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA)\b.+", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"\b(?:trace_id|trace_path|prompt_id|provider_metadata)\s*=\s*\S+", "", text, flags=re.IGNORECASE)
-    for raw_key, label in sorted(BUSINESS_FIELD_LABELS_ZH.items(), key=lambda item: len(item[0]), reverse=True):
+    for raw_key, label in sorted(business_field_labels(chinese=chinese).items(), key=lambda item: len(item[0]), reverse=True):
         text = re.sub(rf"\b{re.escape(raw_key)}\b", label, text, flags=re.IGNORECASE)
     return " ".join(text.split())
 

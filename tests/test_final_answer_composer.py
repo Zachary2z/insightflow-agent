@@ -140,6 +140,43 @@ def test_composer_accept_keeps_usable_draft_and_normalizes_shape():
     assert "Alpha" in _answer_text(answer)
 
 
+def test_composer_accept_keeps_english_business_labels_for_english_question():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="Which channel has the highest total_revenue?",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "total_revenue", "order_count", "avg_order_value"],
+            "rows": [["email", 44548.53, 120, 371.24]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer={
+            "headline": "email leads on total_revenue",
+            "direct_answer": "email has the highest total_revenue with 44548.53, 120 order_count, and 371.24 avg_order_value.",
+            "why": "The returned row shows email total_revenue is 44548.53.",
+            "evidence_bullets": ["email total_revenue is 44548.53.", "email order_count is 120.", "email avg_order_value is 371.24."],
+            "recommendations": ["Use email as the next review focus."],
+            "caveats": ["This uses the current query result."],
+            "confidence": "high",
+        },
+        reviewer_result=_review(
+            "accept",
+            language="en",
+            supported_entities=["email"],
+            supported_metrics=["total_revenue", "order_count", "avg_order_value"],
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "total revenue" in text
+    assert "order count" in text
+    assert "average order value" in text
+    assert "总收入" not in text
+    assert "订单数" not in text
+    assert "客单价" not in text
+
+
 def test_composer_revise_removes_unsupported_entity_and_metric():
     from agents.final_answer_composer import compose_final_answer
 
