@@ -331,6 +331,7 @@ Completion notes:
 - Frontend report detail renders the same management sections and chart unit/annotation in the main report body, while SQL, trace paths, provider metadata, raw rows, and internal section prompts remain in the collapsed technical appendix.
 - Missing chart output uses a business-friendly no-chart explanation and does not expose visualization errors or internal trace paths in the main report.
 - Added focused coverage for synthesized summaries, language consistency, metric tradeoffs, chart metadata, no-chart fallback copy, technical leakage boundaries, Markdown rendering, API payloads, and frontend report detail rendering.
+- Repair follow-up: English report goals now keep English Markdown/frontend business labels and chart captions, Chinese report goals keep Chinese labels, and chart/evidence row summaries reuse shared business field labels instead of exposing raw column names such as `total_revenue`, `order_count`, `avg_order_value`, or `segment`.
 
 ### P19-H5: Quality Closeout And Live Acceptance
 
@@ -358,7 +359,7 @@ Acceptance:
 1. P19-H1: close the current deterministic alignment hole.
 2. P19-H2: add reviewer/composer foundation.
 3. P19-H3: polish business answer quality. Complete.
-4. P19-H4: synthesize reports and chart narrative. Complete.
+4. P19-H4: synthesize reports and chart narrative, including the language-label and evidence-summary repair. Complete.
 5. P19-H5: live acceptance, regression, cleanup, and closeout.
 
 ## Future Phase Notes

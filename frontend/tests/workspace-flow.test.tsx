@@ -1363,8 +1363,8 @@ describe("workspace product components", () => {
           report_id: "report_1",
           workspace_id: "ws_1",
           report_type: "business_review",
-          report_goal: "Review revenue.",
-          title: "Business Review",
+          report_goal: "生成管理层收入复盘报告",
+          title: "管理层收入复盘报告",
           status: "completed",
           executive_summary: ["Revenue grew."],
           sections: [],
@@ -1379,7 +1379,7 @@ describe("workspace product components", () => {
 
     render(<ReportList workspaceId="ws_1" />);
 
-    expect(await screen.findByText("Business Review")).toBeTruthy();
+    expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("报告列表")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
@@ -1411,8 +1411,8 @@ describe("workspace product components", () => {
         report_id: "report_1",
         workspace_id: "ws_1",
         report_type: "business_review",
-        report_goal: "Review revenue.",
-        title: "Business Review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
         status: "completed",
         executive_summary: ["管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。"],
         key_findings: ["关键发现：付费搜索收入最高，邮件渠道次之。"],
@@ -1472,7 +1472,7 @@ describe("workspace product components", () => {
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
-    expect(await screen.findByText("Business Review")).toBeTruthy();
+    expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
     expect(screen.getByText("管理层摘要")).toBeTruthy();
@@ -1583,6 +1583,83 @@ describe("workspace product components", () => {
     expect(screen.queryByText(/internal-trace/)).toBeNull();
   });
 
+  it("renders English report detail labels without Chinese business labels", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_english/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_english",
+      report: {
+        report_id: "report_english",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "Create an English leadership report about revenue.",
+        title: "Leadership Business Review",
+        status: "completed",
+        executive_summary: ["Executive summary: Paid search is the revenue lead."],
+        key_findings: ["Key findings: Paid search has the highest revenue."],
+        action_priorities: ["Action priorities: Review paid search efficiency."],
+        chart_and_evidence: ["Chart: Revenue by channel; unit: USD; annotation: Paid search leads revenue."],
+        risks_and_limits: ["Risks and limits: ROI and profit are not available."],
+        sections: [
+          {
+            section_id: "revenue",
+            title: "Revenue by Channel",
+            status: "completed",
+            business_answer: {
+              headline: "Paid search leads revenue",
+              direct_answer: "Paid search has the highest revenue in this section.",
+              why: "The evidence table shows paid_search revenue is 200.",
+              evidence_bullets: ["paid_search revenue is 200."],
+              recommendations: ["Review paid search efficiency before increasing spend."],
+              caveats: ["ROI and profit are not available in this section."],
+              confidence: "high",
+            },
+            business_artifacts: [
+              {
+                type: "chart",
+                path: "artifacts/revenue_by_channel.png",
+                title: "Revenue by channel",
+                unit: "USD",
+                business_annotation: "Paid search leads revenue.",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_english" />);
+
+    expect(await screen.findByText("Leadership Business Review")).toBeTruthy();
+    expect(screen.getByText("Status: Completed")).toBeTruthy();
+    expect(screen.getByText("Progress: 1/1 sections complete")).toBeTruthy();
+    expect(screen.getByText("Report type: Business Review")).toBeTruthy();
+    expect(screen.getByText("Report goal: Create an English leadership report about revenue.")).toBeTruthy();
+    expect(screen.getByText("Executive Summary")).toBeTruthy();
+    expect(screen.getByText("Key Findings")).toBeTruthy();
+    expect(screen.getByText("Action Priorities")).toBeTruthy();
+    expect(screen.getByText("Chart And Evidence")).toBeTruthy();
+    expect(screen.getByText("Risks And Limits")).toBeTruthy();
+    expect(screen.getByText("Report Sections")).toBeTruthy();
+    expect(screen.getByText("Section status: Completed")).toBeTruthy();
+    expect(screen.getByText("Conclusion")).toBeTruthy();
+    expect(screen.getByText("Direct Answer")).toBeTruthy();
+    expect(screen.getByText("Why")).toBeTruthy();
+    expect(screen.getByText("Key Evidence")).toBeTruthy();
+    expect(screen.getByText("Recommended Actions")).toBeTruthy();
+    expect(screen.getByText("Limits")).toBeTruthy();
+    expect(screen.getByText("Confidence high")).toBeTruthy();
+    expect(screen.getByText("Charts And Evidence")).toBeTruthy();
+    expect(screen.getByText("Unit: USD")).toBeTruthy();
+    expect(screen.getByText("Paid search leads revenue.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Download chart" })).toBeTruthy();
+    for (const chineseLabel of ["管理层摘要", "关键发现", "图表与证据", "报告章节", "结论", "直接回答", "建议动作", "限制说明", "置信度 high", "单位：USD", "下载图表"]) {
+      expect(screen.queryByText(chineseLabel)).toBeNull();
+    }
+  });
+
   it("rejects malformed report business_answer instead of rendering legacy report body", () => {
     render(
       <ReportSection
@@ -1686,8 +1763,8 @@ describe("workspace product components", () => {
         report_id: "report_1",
         workspace_id: "ws_1",
         report_type: "business_review",
-        report_goal: "Review revenue.",
-        title: "Business Review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
         status,
         executive_summary: [],
         sections:

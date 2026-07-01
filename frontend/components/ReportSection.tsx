@@ -7,6 +7,7 @@ type ReportSectionProps = {
   section: WorkspaceReportSection;
   workspaceId: string;
   reportId: string;
+  language?: "zh" | "en";
 };
 
 type ReportBusinessArtifact = NonNullable<WorkspaceReportSection["business_artifacts"]>[number];
@@ -47,6 +48,62 @@ function isBusinessAnswer(value: unknown): value is WorkspaceReportSection["busi
   );
 }
 
+const SECTION_LABELS = {
+  zh: {
+    sectionStatus: "章节状态",
+    conclusion: "结论",
+    directAnswer: "直接回答",
+    why: "为什么",
+    keyEvidence: "关键证据",
+    recommendedActions: "建议动作",
+    limits: "限制说明",
+    confidence: "置信度",
+    confidencePrefix: "置信度",
+    malformedTitle: "报告章节结构异常",
+    malformedBody: "后端没有返回完整的 P16 business_answer，请重新生成报告。",
+    chartsAndEvidence: "图表或附件",
+    chartAlt: "报告图表",
+    unit: "单位",
+    downloadChart: "下载图表",
+    chartGenerated: "图表已生成",
+  },
+  en: {
+    sectionStatus: "Section status",
+    conclusion: "Conclusion",
+    directAnswer: "Direct Answer",
+    why: "Why",
+    keyEvidence: "Key Evidence",
+    recommendedActions: "Recommended Actions",
+    limits: "Limits",
+    confidence: "Confidence",
+    confidencePrefix: "Confidence",
+    malformedTitle: "Report section structure error",
+    malformedBody: "The backend did not return a complete P16 business_answer. Regenerate the report.",
+    chartsAndEvidence: "Charts And Evidence",
+    chartAlt: "Report chart",
+    unit: "Unit",
+    downloadChart: "Download chart",
+    chartGenerated: "chart generated",
+  },
+} as const;
+
+const SECTION_STATUS_LABELS: Record<"zh" | "en", Record<string, string>> = {
+  zh: {
+    completed: "已完成",
+    partial: "部分完成",
+    failed: "失败",
+    running: "生成中",
+    draft: "草稿",
+  },
+  en: {
+    completed: "Completed",
+    partial: "Partial",
+    failed: "Failed",
+    running: "Running",
+    draft: "Draft",
+  },
+};
+
 function TextList({ title, items, emptyText }: { title: string; items?: string[]; emptyText?: string }) {
   const visibleItems = items?.filter((item) => item.trim()) ?? [];
   return (
@@ -65,15 +122,8 @@ function TextList({ title, items, emptyText }: { title: string; items?: string[]
   );
 }
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    completed: "已完成",
-    partial: "部分完成",
-    failed: "失败",
-    running: "生成中",
-    draft: "草稿",
-  };
-  return labels[status] ?? status;
+function statusLabel(status: string, language: "zh" | "en") {
+  return SECTION_STATUS_LABELS[language][status] ?? status;
 }
 
 function businessArtifacts(section: WorkspaceReportSection): ReportBusinessArtifact[] {
@@ -119,9 +169,11 @@ function artifactUrl(artifact: ReportBusinessArtifact, workspaceId: string, repo
   return getWorkspaceArtifactUrl(workspaceId, path);
 }
 
-export default function ReportSection({ section, workspaceId, reportId }: ReportSectionProps) {
+export default function ReportSection({ section, workspaceId, reportId, language = "zh" }: ReportSectionProps) {
   const answer = isBusinessAnswer(section.business_answer) ? section.business_answer : null;
   const artifacts = answer ? businessArtifacts(section) : [];
+  const labels = SECTION_LABELS[language];
+  const separator = language === "zh" ? "：" : ": ";
 
   return (
     <ProductCard className="report-section-card">
@@ -130,56 +182,58 @@ export default function ReportSection({ section, workspaceId, reportId }: Report
         <StatusPill
           tone={section.status === "completed" ? "green" : section.status === "running" ? "blue" : "orange"}
         >
-          章节状态：{statusLabel(section.status)}
+          {labels.sectionStatus}
+          {separator}
+          {statusLabel(section.status, language)}
         </StatusPill>
       </header>
       {answer ? (
         <div className="report-business-answer">
           <section>
-            <h4>结论</h4>
+            <h4>{labels.conclusion}</h4>
             <p className="answer-headline">{answer.headline}</p>
           </section>
           <section>
-            <h4>直接回答</h4>
+            <h4>{labels.directAnswer}</h4>
             <p className="answer-summary">{answer.direct_answer}</p>
           </section>
           <section>
-            <h4>为什么</h4>
+            <h4>{labels.why}</h4>
             <p>{answer.why}</p>
           </section>
-          <TextList title="关键证据" items={answer.evidence_bullets} />
-          <TextList title="建议动作" items={answer.recommendations} />
-          <TextList title="限制说明" items={answer.caveats} />
+          <TextList title={labels.keyEvidence} items={answer.evidence_bullets} />
+          <TextList title={labels.recommendedActions} items={answer.recommendations} />
+          <TextList title={labels.limits} items={answer.caveats} />
           <section>
-            <h4>置信度</h4>
-            <p>置信度 {answer.confidence}</p>
+            <h4>{labels.confidence}</h4>
+            <p>{labels.confidencePrefix} {answer.confidence}</p>
           </section>
         </div>
       ) : (
         <section role="alert">
-          <h4>报告章节结构异常</h4>
-          <p>后端没有返回完整的 P16 business_answer，请重新生成报告。</p>
+          <h4>{labels.malformedTitle}</h4>
+          <p>{labels.malformedBody}</p>
         </section>
       )}
       {artifacts.length ? (
         <section>
-          <h4>图表或附件</h4>
+          <h4>{labels.chartsAndEvidence}</h4>
           <div className="chart-list">
             {artifacts.map((artifact, index) => {
               const url = artifactUrl(artifact, workspaceId, reportId);
               return (
                 <figure key={`${artifact.url || artifact.path || artifact.title}-${index}`} className="chart-artifact">
-                  {url ? <img src={url} alt={artifact.title || section.title || "报告图表"} /> : null}
+                  {url ? <img src={url} alt={artifact.title || section.title || labels.chartAlt} /> : null}
                   <figcaption>
-                    <strong>{artifact.title || section.title || "报告图表"}</strong>
-                    {artifact.unit ? <span>单位：{artifact.unit}</span> : null}
+                    <strong>{artifact.title || section.title || labels.chartAlt}</strong>
+                    {artifact.unit ? <span>{labels.unit}{separator}{artifact.unit}</span> : null}
                     {artifact.business_annotation ? <span>{artifact.business_annotation}</span> : null}
                     {url ? (
                       <a href={url} download>
-                        下载图表
+                        {labels.downloadChart}
                       </a>
                     ) : (
-                      <p>{artifact.title || section.title || "报告图表"} 图表已生成</p>
+                      <p>{artifact.title || section.title || labels.chartAlt} {labels.chartGenerated}</p>
                     )}
                   </figcaption>
                 </figure>

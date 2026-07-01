@@ -25,13 +25,13 @@ def render_report_markdown(report: ReportRecord) -> str:
     lines.extend(["", f"## {headings['actions']}", ""])
     lines.extend(_bullet_list(report.action_priorities, "_No action priorities yet._"))
     lines.extend(["", f"## {headings['charts']}", ""])
-    lines.extend(_render_chart_and_evidence(report, empty_message="_No chart or evidence summary yet._"))
+    lines.extend(_render_chart_and_evidence(report, chinese=chinese, empty_message="_No chart or evidence summary yet._"))
     lines.extend(["", f"## {headings['limits']}", ""])
     lines.extend(_bullet_list(report.risks_and_limits, "_No risks or limits recorded._"))
     lines.extend(["", f"## {headings['sections']}", ""])
     if report.sections:
         for section in report.sections:
-            lines.extend(_render_business_section(section))
+            lines.extend(_render_business_section(section, chinese=chinese))
             lines.append("")
     else:
         lines.extend(["_No report sections yet._", ""])
@@ -41,40 +41,41 @@ def render_report_markdown(report: ReportRecord) -> str:
     return "\n".join(lines)
 
 
-def _render_business_section(section: ReportSection) -> list[str]:
+def _render_business_section(section: ReportSection, *, chinese: bool) -> list[str]:
     answer = section.business_answer or {}
+    labels = _business_section_labels(chinese)
     lines = [
         f"### {section.title}",
         "",
-        f"- Status: `{section.status}`",
+        f"- {labels['status']}: `{section.status}`",
         "",
-        "#### 结论",
+        f"#### {labels['conclusion']}",
         "",
         str(answer.get("headline") or "_No headline recorded._"),
         "",
-        "#### 直接回答",
+        f"#### {labels['direct_answer']}",
         "",
         str(answer.get("direct_answer") or "_No direct answer recorded._"),
         "",
-        "#### 为什么",
+        f"#### {labels['why']}",
         "",
         str(answer.get("why") or "_No reasoning recorded._"),
     ]
-    lines.extend(["", "#### 关键证据", ""])
+    lines.extend(["", f"#### {labels['evidence']}", ""])
     lines.extend(_bullet_list(_text_list(answer.get("evidence_bullets")), "_No evidence bullets recorded._"))
-    lines.extend(["", "#### 建议动作", ""])
+    lines.extend(["", f"#### {labels['actions']}", ""])
     lines.extend(_bullet_list(_text_list(answer.get("recommendations")), "_No recommendations recorded._"))
-    lines.extend(["", "#### 限制说明", ""])
+    lines.extend(["", f"#### {labels['limits']}", ""])
     lines.extend(_bullet_list(_text_list(answer.get("caveats")), "_No caveats recorded._"))
-    lines.extend(["", "#### 置信度", "", str(answer.get("confidence") or "medium")])
-    lines.extend(["", "#### 图表与证据", ""])
-    lines.extend(_render_section_artifacts(section))
+    lines.extend(["", f"#### {labels['confidence']}", "", str(answer.get("confidence") or "medium")])
+    lines.extend(["", f"#### {labels['charts']}", ""])
+    lines.extend(_render_section_artifacts(section, chinese=chinese))
     if section.error:
         lines.extend(["", "#### Error", "", section.error])
     return lines
 
 
-def _render_chart_and_evidence(report: ReportRecord, *, empty_message: str) -> list[str]:
+def _render_chart_and_evidence(report: ReportRecord, *, chinese: bool, empty_message: str) -> list[str]:
     lines: list[str] = []
     rendered_paths: set[str] = set()
     for section in report.sections:
@@ -85,13 +86,13 @@ def _render_chart_and_evidence(report: ReportRecord, *, empty_message: str) -> l
                 continue
             rendered_paths.add(path_or_url)
             lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
-            lines.extend(_artifact_caption_lines(artifact, section_title=section.title))
+            lines.extend(_artifact_caption_lines(artifact, section_title=section.title, chinese=chinese))
     if report.chart_and_evidence:
         lines.extend(_bullet_list(report.chart_and_evidence, empty_message))
     return lines or [empty_message]
 
 
-def _render_section_artifacts(section: ReportSection) -> list[str]:
+def _render_section_artifacts(section: ReportSection, *, chinese: bool) -> list[str]:
     artifacts = section.business_artifacts or [
         {"type": "chart", "path": path, "title": section.title}
         for path in section.artifact_paths
@@ -104,22 +105,27 @@ def _render_section_artifacts(section: ReportSection) -> list[str]:
         title = str(artifact.get("title") or section.title or "报告图表").strip()
         if path_or_url:
             lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
-        lines.extend(_artifact_caption_lines(artifact, section_title=section.title))
+        lines.extend(_artifact_caption_lines(artifact, section_title=section.title, chinese=chinese))
     return lines
 
 
-def _artifact_caption_lines(artifact: dict[str, Any], *, section_title: str) -> list[str]:
+def _artifact_caption_lines(artifact: dict[str, Any], *, section_title: str, chinese: bool) -> list[str]:
     title = str(artifact.get("title") or section_title or "报告图表").strip()
     unit = str(artifact.get("unit") or "").strip()
     annotation = str(artifact.get("business_annotation") or "").strip()
-    lines = [f"- 图表标题：{title}"]
+    labels = _artifact_caption_labels(chinese)
+    lines = [f"- {labels['title']}: {title}" if not chinese else f"- {labels['title']}：{title}"]
     if unit:
-        lines.append(f"- 单位：{unit}")
+        lines.append(f"- {labels['unit']}: {unit}" if not chinese else f"- {labels['unit']}：{unit}")
     if annotation:
-        lines.append(f"- 业务注释：{annotation}")
+        lines.append(
+            f"- {labels['annotation']}: {annotation}"
+            if not chinese
+            else f"- {labels['annotation']}：{annotation}"
+        )
     path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
     if path_or_url:
-        lines.append(f"- 图表链接：{path_or_url}")
+        lines.append(f"- {labels['link']}: {path_or_url}" if not chinese else f"- {labels['link']}：{path_or_url}")
     return lines
 
 
@@ -297,6 +303,48 @@ def _headings(chinese: bool) -> dict[str, str]:
         "limits": "Risks And Limits",
         "sections": "Business Sections",
         "appendix": "Technical Appendix",
+    }
+
+
+def _business_section_labels(chinese: bool) -> dict[str, str]:
+    if chinese:
+        return {
+            "status": "章节状态",
+            "conclusion": "结论",
+            "direct_answer": "直接回答",
+            "why": "为什么",
+            "evidence": "关键证据",
+            "actions": "建议动作",
+            "limits": "限制说明",
+            "confidence": "置信度",
+            "charts": "图表与证据",
+        }
+    return {
+        "status": "Status",
+        "conclusion": "Conclusion",
+        "direct_answer": "Direct Answer",
+        "why": "Why",
+        "evidence": "Key Evidence",
+        "actions": "Recommended Actions",
+        "limits": "Limits",
+        "confidence": "Confidence",
+        "charts": "Charts And Evidence",
+    }
+
+
+def _artifact_caption_labels(chinese: bool) -> dict[str, str]:
+    if chinese:
+        return {
+            "title": "图表标题",
+            "unit": "单位",
+            "annotation": "业务注释",
+            "link": "图表链接",
+        }
+    return {
+        "title": "Chart title",
+        "unit": "Unit",
+        "annotation": "Business annotation",
+        "link": "Chart link",
     }
 
 

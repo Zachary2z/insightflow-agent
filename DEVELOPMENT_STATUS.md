@@ -9,7 +9,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P19 Business Output And Report Quality |
-| Current task | P19-H4 complete / ready for H5 quality closeout |
+| Current task | P19-H4 repair complete / ready for H5 quality closeout |
 | Next planned task | P19-H5 Quality closeout and live acceptance |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
@@ -44,7 +44,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P19-H1 | `[x]` Complete | Plain why/evidence entity conflicts are now corrected or downgraded by the small deterministic guard |
 | P19-H2 | `[x]` Complete | Added Answer Reviewer Agent and Final Answer Composer contracts, deterministic/provider tests, and product/report integration |
 | P19-H3 | `[x]` Complete | Polished business answer quality: vocabulary, units, grounded recommendations, tradeoffs, caveats, and report-section reuse |
-| P19-H4 | `[x]` Complete | Reports now synthesize reviewed section answers into management summary, key findings, action priorities, chart/evidence narrative, risks/limits, and technical appendix |
+| P19-H4 | `[x]` Complete | Reports synthesize reviewed answers into management narrative, with language-aware Markdown/frontend labels and business-labeled evidence summaries |
 | P19-H5 | `[ ]` Planned | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene |
 
 ## P18 Task Status
@@ -132,7 +132,13 @@ P19-H4 completion note on 2026-07-01:
 - Chart artifacts carry title, unit, safe business annotation, and path/URL into report JSON, Markdown image embeds, and the frontend report detail view.
 - Missing charts render a business-friendly “暂无可展示图表” explanation instead of visualization errors or trace metadata in the main report body.
 - Focused P19-H4 backend regression passed: `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_store.py tests/test_workspace_report_api.py tests/test_report_insight_cleanup.py tests/test_chart_product_quality.py tests/test_product_result_builder.py -q` with `57 passed`.
-- Focused frontend report regression passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `48 passed`.
+- Focused frontend report regression passed: `cd frontend && npm test -- workspace-flow.test.tsx` with `49 passed`.
+
+P19-H4 repair note on 2026-07-01:
+
+- English report goals now render English business labels in Markdown and the frontend report reader, including section labels, chart captions, status/progress metadata, and chart download copy; Chinese report goals keep the Chinese reading experience.
+- Report-level chart/evidence summaries reuse the shared business field label helper so fields such as `total_revenue`, `order_count`, `avg_order_value`, and `segment` are shown as business-readable labels instead of raw column names.
+- Focused repair regressions cover English Markdown without Chinese labels, Chinese Markdown retention, business-labeled evidence summaries, and frontend English/Chinese report detail rendering.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

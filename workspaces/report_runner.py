@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from workspaces.analysis_runner import run_workspace_analysis
 from workspaces.answer_consistency import safe_chart_annotation
+from workspaces.answer_evidence import row_summary
 from workspaces.models import utc_now_iso
 from workspaces.product_models import PRODUCT_RESULT_VERSION
 from workspaces.product_result_builder import build_business_answer
@@ -878,16 +879,7 @@ def _dedupe_texts(items: list[str]) -> list[str]:
 
 
 def _evidence_row_summary(row: dict[str, Any], *, chinese: bool) -> str:
-    if not row:
-        return ""
-    separator = "，" if chinese else ", "
-    relation = " 为 " if chinese else " is "
-    parts = [
-        f"{key}{relation}{value}"
-        for key, value in list(row.items())[:5]
-        if str(key).strip()
-    ]
-    return separator.join(parts)
+    return row_summary(row, chinese=chinese) if row else ""
 
 
 def _strip_report_prefix(text: str) -> str:

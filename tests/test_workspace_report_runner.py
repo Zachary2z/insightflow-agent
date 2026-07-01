@@ -258,6 +258,65 @@ def test_report_synthesis_respects_english_goal_language(tmp_path):
     assert "建议动作" not in report_text
 
 
+def test_report_chart_evidence_summary_uses_business_field_labels(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def labeled_runner(store, workspace_id, user_question, initial_sql=None, providers=None):
+        workspace = store.get_workspace(workspace_id)
+        run_dir = Path(workspace["root_path"]) / "runs" / "label_run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = run_dir / "segment_chart.png"
+        artifact_path.write_bytes(b"fake-png")
+        return {
+            "status": "completed",
+            "product_result": {
+                "version": "p16.v1",
+                "business_answer": {
+                    "headline": "成长型团队收入领先",
+                    "direct_answer": "成长型团队在收入和订单数上领先。",
+                    "why": "证据表显示成长型团队收入和订单数更高。",
+                    "evidence_bullets": ["成长型团队收入为 2798216.93，订单数为 628，客单价为 4455.76。"],
+                    "recommendations": ["继续复盘成长型团队。"],
+                    "caveats": ["当前只基于本次查询结果。"],
+                    "confidence": "high",
+                },
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["segment", "total_revenue", "order_count", "avg_order_value"],
+                "rows": [["成长型团队", 2798216.93, 628, 4455.76]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "visualization_trace": {
+                "artifact_path": str(artifact_path),
+                "chart_spec": {
+                    "title": "客户分群收入对比",
+                    "unit": "元",
+                    "business_annotation": "成长型团队收入领先。",
+                },
+            },
+            "trace": [{"node": "visualization_agent"}],
+        }
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "revenue_trend",
+        "生成中文客户分群收入报告。",
+        section_runner=labeled_runner,
+    )
+
+    evidence_text = "\n".join(result["report"]["chart_and_evidence"])
+    assert "客户分群 为 成长型团队" in evidence_text
+    assert "总收入 为 2798216.93" in evidence_text
+    assert "订单数 为 628" in evidence_text
+    assert "客单价 为 4455.76" in evidence_text
+    assert "segment" not in evidence_text
+    assert "total_revenue" not in evidence_text
+    assert "order_count" not in evidence_text
+    assert "avg_order_value" not in evidence_text
+
+
 def test_business_review_generates_multiple_sections_and_persists_report_artifacts(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
     calls = []
