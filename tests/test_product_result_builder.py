@@ -430,7 +430,7 @@ def test_business_answer_with_weak_or_missing_evidence_does_not_force_recommenda
     assert any("证据" in caveat or "数据" in caveat for caveat in answer["caveats"])
 
 
-def test_budget_question_evidence_fallback_still_produces_supported_recommendation():
+def test_budget_question_evidence_fallback_does_not_force_first_row_when_metrics_conflict():
     from workspaces.product_result_builder import build_business_answer
 
     answer = build_business_answer(
@@ -451,7 +451,8 @@ def test_budget_question_evidence_fallback_still_produces_supported_recommendati
     )
 
     _assert_new_business_answer_shape(answer)
-    assert answer["recommendations"]
-    assert "email" in " ".join(answer["recommendations"])
-    assert "建议" in " ".join(answer["recommendations"])
-    assert answer["confidence"] == "medium"
+    text = _business_answer_text(answer)
+    assert "当前证据不足以支持该结论" in text
+    assert "email" not in " ".join(answer["recommendations"])
+    assert answer["confidence"] == "low"
+    assert any("证据" in caveat or "口径" in caveat for caveat in answer["caveats"])

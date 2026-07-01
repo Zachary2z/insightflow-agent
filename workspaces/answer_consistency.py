@@ -9,6 +9,8 @@ ADVICE_MARKERS = (
     "应该",
     "建议",
     "最值得",
+    "更值得",
+    "值得",
     "重点",
     "加预算",
     "减少预算",
@@ -259,8 +261,14 @@ def _answer_evidence_alignment(
     if not entities:
         return None
 
-    primary_entity = _entity_value(rows[0])
+    primary_entity = _supported_primary_entity(rows)
     if not primary_entity:
+        if (
+            _answer_has_entity_conflict(answer=answer, entities=entities)
+            or _recommendation_entities(answer, entities)
+            or _unknown_decision_entity_candidate(_decision_text(answer))
+        ):
+            return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
         return None
 
     decision_text = _decision_text(answer)
@@ -268,7 +276,15 @@ def _answer_evidence_alignment(
         return None
 
     decision_entities = _mentioned_entities(decision_text, entities)
+    support_entities = _support_decision_entities(answer, entities)
     if len(decision_entities) == 1 and decision_entities[0] != primary_entity:
+        return _ranked_evidence_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_entity=primary_entity,
+        )
+    if decision_entities and support_entities and set(decision_entities) != set(support_entities):
         return _ranked_evidence_answer(
             question=question,
             answer=answer,
@@ -282,6 +298,53 @@ def _answer_evidence_alignment(
 
 def _decision_text(answer: dict[str, Any]) -> str:
     return " ".join([answer["headline"], answer["direct_answer"], *answer["recommendations"]])
+
+
+def _support_decision_entities(answer: dict[str, Any], entities: list[str]) -> list[str]:
+    mentions: list[str] = []
+    for sentence in _support_sentences(answer):
+        if not _has_decision_language(sentence):
+            continue
+        for entity in _mentioned_entities(sentence, entities):
+            if entity not in mentions:
+                mentions.append(entity)
+    return mentions
+
+
+def _recommendation_entities(answer: dict[str, Any], entities: list[str]) -> list[str]:
+    return _mentioned_entities(" ".join(answer["recommendations"]), entities)
+
+
+def _support_sentences(answer: dict[str, Any]) -> list[str]:
+    texts = [answer["why"], *answer["evidence_bullets"]]
+    sentences: list[str] = []
+    for text in texts:
+        parts = str(text or "").replace("；", "。").replace(";", ".").split("。")
+        sentences.extend(part.strip() for part in parts if part.strip())
+    return sentences
+
+
+def _answer_has_entity_conflict(*, answer: dict[str, Any], entities: list[str]) -> bool:
+    decision_entities = set(_mentioned_entities(_decision_text(answer), entities))
+    support_entities = set(_support_decision_entities(answer, entities))
+    return bool(decision_entities and support_entities and decision_entities != support_entities)
+
+
+def _supported_primary_entity(rows: list[dict[str, Any]]) -> str:
+    entity_key = _entity_key(rows)
+    if not entity_key:
+        return ""
+    metrics = _numeric_metric_keys(rows, exclude=entity_key)
+    if not metrics:
+        return ""
+
+    leaders = []
+    for metric in metrics:
+        leader = _metric_leader(rows, entity_key=entity_key, metric=metric)
+        if leader:
+            leaders.append(leader[0])
+    unique_leaders = list(dict.fromkeys(leaders))
+    return unique_leaders[0] if len(unique_leaders) == 1 else ""
 
 
 def _has_decision_language(text: str) -> bool:

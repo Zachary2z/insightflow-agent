@@ -255,6 +255,134 @@ def test_unsupported_recommendation_entity_is_downgraded_to_insufficient_evidenc
     assert any("证据" in caveat for caveat in answer["caveats"])
 
 
+def test_why_and_evidence_entities_are_aligned_with_supported_decision_entity():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["market", "score_value"],
+        "rows": [
+            ["北区", 91.0],
+            ["南区", 72.0],
+        ],
+    }
+    provider_answer = {
+        "headline": "建议优先投入北区",
+        "direct_answer": "建议优先投入北区，因为它在当前结果中表现最好。",
+        "why": "南区更值得投入，因为它后续增长空间更大。",
+        "evidence_bullets": ["南区 score_value 为 72.0，但更值得追加资源。"],
+        "recommendations": ["把下一轮资源优先给北区。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近 90 天哪个市场最值得加资源？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    aligned_text = " ".join(
+        [
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+        ]
+    )
+    if "当前证据不足以支持该结论" not in _answer_text(answer):
+        assert "北区" in answer["direct_answer"]
+        assert "北区" in answer["why"]
+        assert "北区" in " ".join(answer["evidence_bullets"])
+        assert "北区" in " ".join(answer["recommendations"])
+        assert "南区更值得" not in aligned_text
+        assert "南区 score_value" not in aligned_text
+    else:
+        assert answer["confidence"] == "low"
+        assert not answer["recommendations"] or all("北区" not in item and "南区" not in item for item in answer["recommendations"])
+
+
+def test_unsupported_decision_entity_not_in_execution_result_is_downgraded_even_when_wording_varies():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["region", "score_value"],
+        "rows": [
+            ["华北", 91.0],
+            ["华南", 83.0],
+        ],
+    }
+    provider_answer = {
+        "headline": "华东是唯一应该追加预算的区域",
+        "direct_answer": "华东是唯一应该追加预算的区域，因为它最值得增长投入。",
+        "why": "华东增长质量最好。",
+        "evidence_bullets": ["华东 score_value 为 99.0。"],
+        "recommendations": ["下一轮预算集中投向华东。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "哪个区域最值得加预算？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    assert "当前证据不足以支持该结论" in _answer_text(answer)
+    assert "华东" not in answer["headline"] + answer["direct_answer"] + answer["why"] + " ".join(answer["recommendations"])
+    assert answer["confidence"] == "low"
+
+
+def test_multi_metric_tradeoff_is_not_forced_to_first_row_alignment():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["market", "total_value", "conversion_rate"],
+        "rows": [
+            ["北区", 980000.0, 0.18],
+            ["南区", 420000.0, 0.31],
+        ],
+    }
+    provider_answer = {
+        "headline": "北区收入规模更大，但南区转化率更高",
+        "direct_answer": "如果看收入规模，北区领先；如果看转化率，南区更强，需要按判断口径取舍。",
+        "why": "北区 total_value 为 980000.0，南区 conversion_rate 为 0.31。",
+        "evidence_bullets": [
+            "北区 total_value 为 980000.0。",
+            "南区 conversion_rate 为 0.31。",
+        ],
+        "recommendations": ["先明确是追求规模还是效率，再决定资源倾斜对象。"],
+        "caveats": ["不同指标指向不同对象。"],
+        "confidence": "medium",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近 90 天哪个市场最值得重点投入？请同时看收入和转化率。",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    text = _answer_text(answer)
+    assert "北区" in text
+    assert "南区" in text
+    assert any(marker in text for marker in ("取舍", "口径", "不同指标"))
+    assert "当前证据最支持优先评估 北区" not in text
+
+
 def test_chart_annotation_is_sanitized_when_it_names_a_different_winner():
     from workspaces.product_result_builder import build_product_analysis_result
 
