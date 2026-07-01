@@ -93,3 +93,63 @@ def test_workspace_settings_returns_404_for_unknown_workspace(tmp_path):
     response = client.get("/api/workspaces/missing/settings")
 
     assert response.status_code == 404
+
+
+def test_workspace_settings_key_only_does_not_enable_product_live_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("INSIGHTFLOW_PRODUCT_LIVE_MODE", raising=False)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "DEEPSEEK_API_KEY=sk-test-key-only",
+                "DEEPSEEK_MODEL=deepseek-v4-flash",
+                "INSIGHTFLOW_PRODUCT_LIVE_MODE=0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace_id = store.create_workspace("Key Only Settings Workspace")["workspace_id"]
+    client = TestClient(create_app(workspace_store=store))
+
+    response = client.get(f"/api/workspaces/{workspace_id}/settings")
+
+    assert response.status_code == 200
+    model_mode = response.json()["model_mode"]
+    assert model_mode["product_live_mode"] is False
+    assert model_mode["provider"]["api_key_present"] is True
+    assert model_mode["provider"]["model"] == "deepseek-v4-flash"
+    assert model_mode["coverage"]["enabled"] == 0
+    assert model_mode["coverage"]["total"] == len(model_mode["provider_features"])
+    assert all(enabled is False for enabled in model_mode["provider_features"].values())
+
+
+def test_workspace_settings_live_mode_enables_provider_feature_coverage(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("INSIGHTFLOW_PRODUCT_LIVE_MODE", raising=False)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "DEEPSEEK_API_KEY=sk-test-live",
+                "DEEPSEEK_MODEL=DeepSeekv4pro",
+                "INSIGHTFLOW_PRODUCT_LIVE_MODE=1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace_id = store.create_workspace("Live Mode Settings Workspace")["workspace_id"]
+    client = TestClient(create_app(workspace_store=store))
+
+    response = client.get(f"/api/workspaces/{workspace_id}/settings")
+
+    assert response.status_code == 200
+    model_mode = response.json()["model_mode"]
+    assert model_mode["product_live_mode"] is True
+    assert model_mode["provider"]["api_key_present"] is True
+    assert model_mode["provider"]["model"] == "deepseek-v4-pro"
+    assert model_mode["coverage"]["enabled"] == model_mode["coverage"]["total"]
+    assert model_mode["coverage"]["total"] == len(model_mode["provider_features"])
+    assert all(enabled is True for enabled in model_mode["provider_features"].values())

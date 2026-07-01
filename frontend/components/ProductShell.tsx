@@ -1,6 +1,6 @@
 import Link from "next/link";
 import React from "react";
-import { StatusPill } from "./ProductStatus";
+import ModelModePill from "./ModelModePill";
 
 export type ProductShellActive = "sources" | "analysis" | "reports" | "settings" | "business-qa";
 
@@ -37,7 +37,7 @@ export default function ProductShell({ workspaceId, active, children }: ProductS
           </div>
           <div className="product-topbar-meta">
             <div className="workspace-switcher">{workspaceId}</div>
-            <StatusPill tone="green">真实模型已开启</StatusPill>
+            <ModelModePill workspaceId={workspaceId} />
           </div>
         </div>
       </header>

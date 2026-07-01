@@ -78,17 +78,18 @@ def _semantic_layer_status(semantic_layer_path: str | Path) -> dict[str, Any]:
 
 
 def _model_mode_status() -> dict[str, Any]:
-    config = load_deepseek_config(require_api_key=False)
-    live_mode = product_live_mode_enabled()
+    env_path = Path(".env")
+    config = load_deepseek_config(env_path=env_path, require_api_key=False)
+    live_mode = product_live_mode_enabled(env_path=env_path)
     provider_features = {
-        "question_understanding": provider_question_understanding_enabled(),
-        "clarification": provider_clarification_router_enabled(),
-        "sql_planning": provider_sql_planning_enabled(),
-        "sql_candidate": provider_sql_candidate_enabled(),
-        "insight_drafting": provider_insight_drafting_enabled(),
-        "claim_typing": provider_claim_typing_enabled(),
-        "visualization": provider_visualization_agent_enabled(),
-        "report_writer": provider_report_writer_enabled(),
+        "question_understanding": provider_question_understanding_enabled(env_path=env_path),
+        "clarification": provider_clarification_router_enabled(env_path=env_path),
+        "sql_planning": provider_sql_planning_enabled(env_path=env_path),
+        "sql_candidate": provider_sql_candidate_enabled(env_path=env_path),
+        "insight_drafting": provider_insight_drafting_enabled(env_path=env_path),
+        "claim_typing": provider_claim_typing_enabled(env_path=env_path),
+        "visualization": provider_visualization_agent_enabled(env_path=env_path),
+        "report_writer": provider_report_writer_enabled(env_path=env_path),
     }
     enabled_count = sum(1 for enabled in provider_features.values() if enabled)
     if live_mode:
