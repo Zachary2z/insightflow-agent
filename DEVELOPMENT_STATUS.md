@@ -8,9 +8,9 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P18 Business Answer Consistency |
-| Current task | P18 complete / waiting for next phase planning |
-| Next planned task | P19 or next product phase planning |
+| Current phase | P19 Business Output And Report Quality |
+| Current task | P19-H1 complete / ready for H2 planning |
+| Next planned task | P19-H2 business vocabulary and unit normalization |
 | Last completed task | P18-H6 regression, live acceptance, artifact hygiene, docs closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -33,6 +33,19 @@ This is the concise current status surface for InsightFlow Agent.
 | P16 | `[x]` Complete | Single clean `business_answer` contract across analysis, reports, Markdown, frontend rendering, and run restoration |
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
 | P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
+| P19 | `[ ]` Planned | Business-ready analysis replies and management-ready reports: evidence alignment, Chinese vocabulary, decision-ready recommendations, report synthesis, chart narrative, and live acceptance |
+
+## P19 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P19-H1 | `[x]` Complete | Added final answer/evidence alignment before business answers reach analysis, reports, charts, or history |
+| P19-H2 | `[ ]` Planned | Normalize user-facing business vocabulary and units; keep raw technical fields in technical details only |
+| P19-H3 | `[ ]` Planned | Upgrade analysis replies into decision-ready Chinese answers with conclusion, basis, action, tradeoff, caveat, and next-step structure |
+| P19-H4 | `[ ]` Planned | Add report synthesis so reports read like management documents instead of concatenated sections |
+| P19-H5 | `[ ]` Planned | Integrate chart narrative and handle provider chart-spec fallback without exposing validation internals |
+| P19-H6 | `[ ]` Planned | Polish report Markdown and frontend reader around Chinese-first business report structure |
+| P19-H7 | `[ ]` Planned | Run deterministic regression plus opt-in real DeepSeek acceptance on current Chinese business data |
 
 ## P18 Task Status
 
@@ -85,6 +98,13 @@ Latest P18-H6 closeout result on 2026-07-01:
 - Real DeepSeek acceptance was not run because the current environment has a DeepSeek key but does not have the live opt-in flags configured.
 - Legacy audit found old chart/action/mock/eval/Streamlit terms only in historical/superseded notes and boundary tests, not active product guidance.
 - Generated artifacts, frontend build output, pytest cache, runtime workspace outputs, traces, and sample data remain ignored and must not be committed.
+
+P19 planning note on 2026-07-01:
+
+- Real local DeepSeek product mode was enabled for manual product testing with `INSIGHTFLOW_PRODUCT_LIVE_MODE=1` in the untracked `.env`.
+- A real channel budget question produced provider-backed analysis (`provider_called: true` across question understanding, SQL planning/candidate, insight drafting, and claim typing), proving the live path works.
+- The output quality review found remaining product gaps: recommendations can cite a different entity than their evidence, raw metric names can leak into business copy, recommendations can be empty or repetitive, and reports read like stitched section output rather than synthesized management reports.
+- P19 is therefore focused on business-output/report quality before external publishing integrations.
 
 Latest P17-H6 closeout result on 2026-06-30:
 

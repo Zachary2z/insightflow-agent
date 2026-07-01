@@ -5,6 +5,7 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-06-30-p16-clean-business-output-model.md`
 - `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md`
 - `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`
+- `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`
 
 ## Current Product Direction
 
@@ -19,6 +20,8 @@ InsightFlow is a Chinese business data-analysis product with:
 - P15 analysis history, run restoration, schema repair, and business-friendly failures.
 - P16 single `business_answer` contract for analysis and report sections.
 - P17 cleanup that removes non-current historical paths while preserving the real multi-agent/tool-calling chain.
+- P18 consistency checks across conclusions, evidence, recommendations, chart annotations, and reports.
+- P19 planned business-output/report quality work that turns valid model results into decision-ready Chinese business answers and management-ready reports.
 
 Current runtime chain:
 
@@ -54,6 +57,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P16 | Clean business output model: one `business_answer` shape across backend, frontend, reports, Markdown, and run restoration | Complete |
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
+| P19 | Business output and report quality: decision-ready analysis replies, Chinese business vocabulary, synthesized management reports, chart narrative integration, and live acceptance | Planned |
 
 ## P16 Business Answer Contract
 
@@ -73,7 +77,7 @@ Current analysis results and report sections use:
 
 Report sections reuse this same shape. Main product fields must not contain raw SQL, trace IDs, provider metadata, raw row dumps, internal prompt text, or unsupported claims. Technical details remain available under collapsed UI/appendix sections.
 
-## P17/P18 Roadmap
+## P17/P18/P19 Roadmap
 
 | Task | Scope | Status |
 |---|---|---|
@@ -89,12 +93,19 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P18-H4 | Make report sections and executive summaries reuse consistency-checked answers | Complete |
 | P18-H5 | Tighten provider prompt/validation only where deterministic consistency is insufficient | Complete |
 | P18-H6 | Focused/full regression, real DeepSeek acceptance gating, artifact hygiene, and documentation closeout | Complete |
+| P19-H1 | Answer/evidence alignment so recommendations cite the same entity and metric they recommend | Complete |
+| P19-H2 | Chinese business vocabulary and unit normalization for user-facing answers and reports | Planned |
+| P19-H3 | Decision-ready answer structure with conclusion, basis, actions, tradeoffs, caveats, and next steps | Planned |
+| P19-H4 | Report synthesis layer so reports are management documents, not concatenated section outputs | Planned |
+| P19-H5 | Chart narrative integration and graceful chart fallback when provider specs reference missing columns | Planned |
+| P19-H6 | Report Markdown and frontend reader polish for Chinese-first business reports | Planned |
+| P19-H7 | Real DeepSeek acceptance and full regression for improved analysis/report quality | Planned |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
 P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
 
-P18 is complete. Real authenticated external integrations remain a future P19 or next product phase planning topic, because publishing or exporting inconsistent conclusions would amplify product risk.
+P18 is complete. P19 is the next product quality phase. It should improve the business readability, evidence alignment, report synthesis, chart narrative, and live DeepSeek acceptance of the current analysis/report product before adding authenticated external publishing integrations.
 
 ## Current Entry Points
 
@@ -140,7 +151,7 @@ cd frontend && npm test
 cd frontend && npm run build
 ```
 
-P17-H6 closeout also requires the legacy audit, artifact audit, and real DeepSeek P12/P13/P15 acceptance tests with explicit live/product/provider flags. P18 should begin from the current answer-consistency plan, not by restoring placeholder integrations or adding table-specific business rules.
+P19 should begin from `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`. It must keep the P16 `business_answer` public shape, avoid table-specific rule trees, keep live DeepSeek tests opt-in, and preserve deterministic unit-test stability.
 
 ## Historical / Superseded Context
 

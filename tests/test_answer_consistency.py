@@ -30,6 +30,10 @@ def _assert_business_answer_shape(answer: dict) -> None:
     assert answer["confidence"] in {"low", "medium", "high"}
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in str(text or ""))
+
+
 def test_multi_metric_best_question_returns_tradeoff_instead_of_conflicting_single_winner():
     from workspaces.product_result_builder import build_business_answer
 
@@ -168,6 +172,87 @@ def test_budget_reduction_question_with_single_row_does_not_generate_unsupported
         marker in " ".join(answer["caveats"])
         for marker in ("比较证据不足", "对比证据不足", "只有 1 行", "仅返回 1 行", "不足以判断")
     )
+
+
+def test_recommendation_entity_realigns_to_ranked_evidence_entity_for_chinese_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["market", "total_value", "conversion_rate"],
+        "rows": [
+            ["北区", 980000.0, 0.18],
+            ["南区", 420000.0, 0.11],
+        ],
+    }
+    provider_answer = {
+        "headline": "建议优先投入南区",
+        "direct_answer": "建议优先投入南区，因为它最值得加资源。",
+        "why": "证据表第一行显示：market 为 北区，total_value 为 980000.0，conversion_rate 为 0.18。",
+        "evidence_bullets": [
+            "北区 total_value 为 980000.0，conversion_rate 为 0.18。",
+            "南区 total_value 为 420000.0，conversion_rate 为 0.11。",
+        ],
+        "recommendations": ["把下一轮资源优先给南区。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近 90 天哪个市场最值得加资源？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], answer["why"], *answer["recommendations"]])
+    assert "北区" in answer["direct_answer"]
+    assert "北区" in answer["why"]
+    assert "北区" in " ".join(answer["recommendations"])
+    assert "南区" not in decision_text
+    assert "当前证据不足以支持该结论" not in decision_text
+    assert _contains_cjk(answer["headline"] + answer["direct_answer"] + answer["why"])
+
+
+def test_unsupported_recommendation_entity_is_downgraded_to_insufficient_evidence():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["region", "score_value"],
+        "rows": [
+            ["华北", 91.0],
+            ["华南", 83.0],
+        ],
+    }
+    provider_answer = {
+        "headline": "建议优先投入华东",
+        "direct_answer": "建议优先投入华东，因为它表现最好。",
+        "why": "证据表第一行显示：region 为 华北，score_value 为 91.0。",
+        "evidence_bullets": ["华北 score_value 为 91.0。", "华南 score_value 为 83.0。"],
+        "recommendations": ["把预算加到华东。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "哪个区域最值得加预算？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    text = _answer_text(answer)
+    assert "当前证据不足以支持该结论" in text
+    assert "华东" not in answer["headline"] + answer["direct_answer"] + " ".join(answer["recommendations"])
+    assert answer["confidence"] == "low"
+    assert any("证据" in caveat for caveat in answer["caveats"])
 
 
 def test_chart_annotation_is_sanitized_when_it_names_a_different_winner():

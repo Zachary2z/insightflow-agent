@@ -73,6 +73,10 @@ def apply_answer_consistency(
     if conflict and not _has_tradeoff_language(answer):
         return _tradeoff_answer(answer=answer, conflict=conflict, chinese=_contains_cjk(question))
 
+    alignment = _answer_evidence_alignment(question=question, answer=answer, rows=rows)
+    if alignment:
+        return alignment
+
     return answer
 
 
@@ -234,6 +238,225 @@ def _multi_metric_conflict(question: str, rows: list[dict[str, Any]]) -> dict[st
     if len(leader_names) <= 1:
         return None
     return {"entity_key": entity_key, "leaders": leaders}
+
+
+def _answer_evidence_alignment(
+    *,
+    question: str,
+    answer: dict[str, Any],
+    rows: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if not rows or not _is_decision_question(question) or _has_tradeoff_language(answer):
+        return None
+
+    entity_key = _entity_key(rows)
+    if not entity_key:
+        if _has_decision_language(_decision_text(answer)):
+            return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
+        return None
+
+    entities = _entity_values(rows)
+    if not entities:
+        return None
+
+    primary_entity = _entity_value(rows[0])
+    if not primary_entity:
+        return None
+
+    decision_text = _decision_text(answer)
+    if not _has_decision_language(decision_text):
+        return None
+
+    decision_entities = _mentioned_entities(decision_text, entities)
+    if len(decision_entities) == 1 and decision_entities[0] != primary_entity:
+        return _ranked_evidence_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_entity=primary_entity,
+        )
+    if not decision_entities and _unknown_decision_entity_candidate(decision_text):
+        return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
+    return None
+
+
+def _decision_text(answer: dict[str, Any]) -> str:
+    return " ".join([answer["headline"], answer["direct_answer"], *answer["recommendations"]])
+
+
+def _has_decision_language(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(marker in lowered for marker in CHART_DECISION_MARKERS)
+
+
+def _ranked_evidence_answer(
+    *,
+    question: str,
+    answer: dict[str, Any],
+    rows: list[dict[str, Any]],
+    primary_entity: str,
+) -> dict[str, Any]:
+    chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
+    row_summary = _row_summary(rows[0])
+    evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
+    caveats = _dedupe(
+        answer["caveats"]
+        + [
+            (
+                "原回答的推荐对象与排序证据不一致，已按本轮执行结果校正。"
+                if chinese
+                else "The original recommendation named a different entity than the ranked evidence, so it was corrected from this run."
+            )
+        ]
+    )
+    confidence = "medium" if answer["confidence"] == "high" else answer["confidence"]
+
+    if chinese:
+        answer.update(
+            {
+                "headline": f"当前证据最支持优先评估 {primary_entity}",
+                "direct_answer": f"本轮排序证据中，{primary_entity} 位于第一；{row_summary}。因此本次建议优先评估 {primary_entity}。",
+                "why": f"证据表第一行显示：{row_summary}。",
+                "evidence_bullets": evidence_bullets,
+                "recommendations": [f"围绕 {primary_entity} 做下一步资源评估，并用相同指标继续跟踪。"],
+                "caveats": caveats,
+                "confidence": confidence,
+            }
+        )
+        return answer
+
+    answer.update(
+        {
+            "headline": f"The current evidence most supports prioritizing {primary_entity}",
+            "direct_answer": (
+                f"In the ranked evidence for this run, {primary_entity} is first; {row_summary}. "
+                f"So the recommendation should prioritize {primary_entity}."
+            ),
+            "why": f"The first evidence row shows: {row_summary}.",
+            "evidence_bullets": evidence_bullets,
+            "recommendations": [f"Evaluate the next resource decision around {primary_entity} using the same metrics."],
+            "caveats": caveats,
+            "confidence": confidence,
+        }
+    )
+    return answer
+
+
+def _insufficient_alignment_answer(
+    *,
+    question: str,
+    answer: dict[str, Any],
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
+    evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
+    evidence_scope = _evidence_scope(rows, chinese=chinese)
+    caveat = (
+        "当前证据没有包含可验证的推荐对象，因此不能支持原先的确定性结论。"
+        if chinese
+        else "The current evidence does not include a verifiable recommended entity, so the original conclusion is not supported."
+    )
+
+    if chinese:
+        answer.update(
+            {
+                "headline": "当前证据不足以支持该结论",
+                "direct_answer": "当前证据不足以支持该结论。执行结果没有返回能够支撑原确定性建议的对象记录，需要补充同口径证据后再判断。",
+                "why": f"本轮证据范围为：{evidence_scope}。",
+                "evidence_bullets": evidence_bullets,
+                "recommendations": ["先补充包含推荐对象的同口径数据，或按当前证据表重新排序后再决定。"],
+                "caveats": _dedupe(answer["caveats"] + [caveat]),
+                "confidence": "low",
+            }
+        )
+        return answer
+
+    answer.update(
+        {
+            "headline": "Current evidence is insufficient for that conclusion",
+            "direct_answer": (
+                "The current evidence is insufficient for that conclusion. The executed result does not return "
+                "a verifiable row supporting the original definitive recommendation."
+            ),
+            "why": f"This run only provides evidence for: {evidence_scope}.",
+            "evidence_bullets": evidence_bullets,
+            "recommendations": [
+                "Add comparable evidence for the recommended entity, or rerank using the current evidence before deciding."
+            ],
+            "caveats": _dedupe(answer["caveats"] + [caveat]),
+            "confidence": "low",
+        }
+    )
+    return answer
+
+
+def _ranked_row_bullets(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) -> list[str]:
+    bullets: list[str] = []
+    for index, row in enumerate(rows[:limit], start=1):
+        summary = _row_summary(row)
+        if chinese:
+            bullets.append(f"第 {index} 行：{summary}。")
+        else:
+            bullets.append(f"Row {index}: {summary}.")
+    return bullets
+
+
+def _evidence_scope(rows: list[dict[str, Any]], *, chinese: bool) -> str:
+    entities = _entity_values(rows)
+    if entities:
+        return "、".join(entities[:5]) if chinese else ", ".join(entities[:5])
+    return "没有可识别的维度对象" if chinese else "no identifiable dimension entity"
+
+
+def _unknown_decision_entity_candidate(text: str) -> str:
+    value = str(text or "").strip()
+    if not value:
+        return ""
+    for marker in ("投入", "加码", "加到", "分配给", "给"):
+        candidate = _candidate_after_marker(value, marker)
+        if _looks_like_entity_candidate(candidate):
+            return candidate
+    lowered = value.lower()
+    for marker in ("prioritize", "recommend", "increase", "invest in", "allocate to", "for"):
+        index = lowered.find(marker)
+        if index >= 0:
+            candidate = value[index + len(marker):].strip(" :：,，。.")
+            candidate = candidate.split(",", 1)[0].split(".", 1)[0].strip()
+            if _looks_like_entity_candidate(candidate):
+                return candidate
+    return ""
+
+
+def _candidate_after_marker(text: str, marker: str) -> str:
+    index = text.find(marker)
+    if index < 0:
+        return ""
+    candidate = text[index + len(marker):].strip(" :：,，。.")
+    for stop in ("，", "。", "；", ";", " because ", " 因为", "，因为", "。因为"):
+        if stop in candidate:
+            candidate = candidate.split(stop, 1)[0]
+    return candidate.strip()
+
+
+def _looks_like_entity_candidate(text: str) -> bool:
+    candidate = str(text or "").strip()
+    if not candidate or len(candidate) > 24:
+        return False
+    generic_terms = {
+        "预算",
+        "资源",
+        "加预算",
+        "下一轮资源",
+        "当前对象",
+        "该对象",
+        "the budget",
+        "budget",
+        "resources",
+        "the next step",
+    }
+    if candidate.lower() in generic_terms:
+        return False
+    return any(char.isalpha() or "\u4e00" <= char <= "\u9fff" for char in candidate)
 
 
 def _is_decision_question(question: str) -> bool:
