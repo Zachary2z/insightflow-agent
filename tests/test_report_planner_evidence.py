@@ -185,6 +185,59 @@ def test_evidence_collector_builds_business_readable_pack_from_orders_and_suppor
     assert "SELECT" in json.dumps(evidence_pack.technical_details, ensure_ascii=False).upper()
 
 
+def test_report_evidence_pack_exposes_shared_payloads_for_non_channel_sales(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Store Sales Shared Evidence Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            """
+            CREATE TABLE store_sales (
+                sale_date TEXT,
+                store_name TEXT,
+                sales_amount REAL
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注销售额和门店贡献。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    shared_payloads = evidence_pack.evidence_payloads
+    revenue_table = next(table for table in evidence_pack.tables if table.table_id == "revenue_by_dimension")
+    payload = next(item for item in shared_payloads if item["evidence_ref"] == revenue_table.evidence_payload_ref)
+
+    assert payload["evidence_pack_version"] == "p23.shared.v1"
+    assert payload["dimensions"] == ["门店"]
+    assert payload["metrics"] == ["销售额"]
+    assert payload["time_range"] == {"raw_text": "最近90天"}
+    assert payload["result_rows"][0]["dimensions"][0]["display_value"] == "上海旗舰店"
+    assert payload["result_rows"][0]["metrics"][0]["display_value"] == "30.0 万"
+    share = next(item for item in payload["derived_metrics"] if item["metric_id"].endswith("_share"))
+    assert share["values"][0]["display_value"] == "75.0%"
+    assert revenue_table.rows[0]["门店"] == "上海旗舰店"
+    assert revenue_table.rows[0]["收入"] == "30.0 万"
+    assert revenue_table.evidence_payload_ref
+
+
 def test_evidence_collector_records_data_limit_when_support_data_missing(tmp_path):
     _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
     plan = plan_workspace_report(
@@ -205,6 +258,57 @@ def test_evidence_collector_records_data_limit_when_support_data_missing(tmp_pat
     assert "客服" in limits
     assert "未识别" in limits or "缺少" in limits
     assert not any(table.source_chapter_id == "support_issues" for table in evidence_pack.tables)
+
+
+def test_support_issue_evidence_counts_tickets_instead_of_summing_ticket_ids(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Chinese Support ID Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            """
+            CREATE TABLE customer_support (
+                ticket_id_工单编号 INTEGER,
+                issue_type_问题类型 TEXT,
+                satisfaction_score_满意度 REAL
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO customer_support VALUES (?, ?, ?)",
+            [
+                (1001, "交付延期", 4.1),
+                (1002, "交付延期", 3.9),
+                (1003, "退款投诉", 3.2),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，重点关注客服问题。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    support_table = next(table for table in evidence_pack.tables if table.table_id == "support_issue_summary")
+    technical_sql = "\n".join(
+        str(query.get("sql") or "")
+        for query in evidence_pack.technical_details["queries"]
+        if "support" in str(query.get("sql") or "").lower()
+    )
+
+    assert support_table.rows[0]["问题类型"] == "交付延期"
+    assert support_table.rows[0]["工单量"] == "2"
+    assert max(int(row["工单量"]) for row in support_table.rows) <= 3
+    assert "COUNT(" in technical_sql.upper()
+    assert "SUM(\"ticket_id_工单编号\")" not in technical_sql
 
 
 def test_evidence_collector_filters_recent_90_days_from_table_max_date(tmp_path):

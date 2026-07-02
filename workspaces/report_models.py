@@ -125,6 +125,7 @@ class ReportEvidenceTable:
     source_chapter_id: str = ""
     description: str = ""
     evidence_ref: str = ""
+    evidence_payload_ref: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -143,6 +144,7 @@ class ReportEvidenceTable:
             source_chapter_id=str(data.get("source_chapter_id") or ""),
             description=str(data.get("description") or ""),
             evidence_ref=str(data.get("evidence_ref") or ""),
+            evidence_payload_ref=str(data.get("evidence_payload_ref") or ""),
         )
 
 
@@ -181,6 +183,7 @@ class ReportEvidencePack:
     charts: list[ReportEvidenceChart] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     data_limits: list[str] = field(default_factory=list)
+    evidence_payloads: list[dict[str, Any]] = field(default_factory=list)
     technical_details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -210,6 +213,11 @@ class ReportEvidencePack:
             ],
             warnings=[str(warning) for warning in data.get("warnings", [])],
             data_limits=[str(limit) for limit in data.get("data_limits", [])],
+            evidence_payloads=[
+                dict(payload)
+                for payload in data.get("evidence_payloads", [])
+                if isinstance(payload, dict)
+            ],
             technical_details=dict(data.get("technical_details", {})),
         )
 
@@ -246,7 +254,10 @@ class ReportDocumentSection:
     technical_details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        if not self.technical_details:
+            data.pop("technical_details", None)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ReportDocumentSection":

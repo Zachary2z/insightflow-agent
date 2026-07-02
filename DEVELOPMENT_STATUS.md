@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-02
+Last updated: 2026-07-03
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P22 Evidence-Driven Report Generation in progress |
-| Current task | P22-H2 Chinese report planner and evidence collector complete |
-| Next planned task | P22-H3 model-backed report composer and lightweight fact validator |
-| Last completed task | P22-H2 Chinese report planner and evidence collector |
+| Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
+| Current task | P23-H2 Chinese Business Answer Writer next |
+| Next planned task | P23-H2 Chinese Business Answer Writer |
+| Last completed task | P23-H1 Shared EvidencePack Contract |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -36,8 +36,9 @@ This is the concise current status surface for InsightFlow Agent.
 | P19 | `[x]` Complete | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, cleanup, and live acceptance |
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
-| P22 | `[~]` In progress | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection from workspace profile, semantic layer, and guarded SQL tools |
-| P23 | `[ ]` Future | Real China-oriented business tool calling and exports after the P22 report document contract is stable |
+| P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
+| P23 | `[~]` In progress | H1 complete; core evidence/report tooling readiness continues with natural Chinese business answers, one-pass report hardening, artifact readiness, cleanup, and live acceptance before external tool integrations |
+| P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
 
@@ -67,10 +68,55 @@ This is the concise current status surface for InsightFlow Agent.
 |---|---|---|
 | P22-H1 | `[x]` Complete | Defined new report contracts, cut runner to plan/evidence/document/validation/render/save, deleted fixed English preset and per-section analysis stitching from the report main path, replaced Markdown/frontend report body rendering with `ReportDocument`, and removed old report agent/provider prompt paths |
 | P22-H2 | `[x]` Complete | Added Chinese report planner and evidence collector from workspace profile, semantic layer, metric registry, SQL validator/executor, and evidence payload helpers |
-| P22-H3 | `[ ]` Planned | Add model-backed report composer and lightweight fact validator |
-| P22-H4 | `[ ]` Planned | Replace renderer/frontend report page, collapse technical appendix, run cleanup audit and regressions |
+| P22-H3 | `[x]` Complete | Added model-backed report composer, API/runtime provider wiring, no-key fallback, and lightweight fact validator |
+| P22-H4 | `[x]` Complete | Polished report detail UI and Markdown download into clean Chinese business reports with inline charts, chart-intent placeholders, compact evidence tables, action recommendations, data boundaries, and collapsed non-debug appendices |
 
-P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, old report supervisor/agent/writer/planner files, old provider report writer/planner flags, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. Remaining search hits for those terms are historical/superseded notes, negative tests, contract names, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations; those move to P23 after the new `ReportDocument` contract is stable.
+P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, old report supervisor/agent/writer/planner files, old provider report writer/planner flags, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. H4 completed the renderer/frontend closeout: Report Center now reads as a business report instead of a debugging page, chart artifacts render inline with download links, chart intents are clearly labeled as待生成图表, Markdown downloads avoid internal dumps, and the appendix stays collapsed with business-readable validation/evidence counts. Remaining search hits for old report terms are historical/superseded notes, negative tests, contract names, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations.
+
+P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`. P23 keeps Analysis Workbench and Report Center separate at the product layer, but makes them share factual evidence, metric, chart artifact, and validation standards. Report Center may collect chapter-level evidence, but it must write the final report once instead of stitching analysis answers together. Model-written explanations and recommendations should be preserved as business judgment; only hard facts such as amounts, dates, rankings, percentages, chart values, and report title/time range are strictly evidence-bound. P23 may delete old templates, stitched report paths, duplicate evidence contracts, stale bilingual branches, mock/demo tests, unused adapters, dead imports, and unreachable compatibility code that conflict with the Chinese-first product path. Real Word/PPT/PDF/飞书/企业微信/钉钉/腾讯文档 integrations move to P24 after P23 passes live Chinese analysis/report acceptance.
+
+## P23 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P23-H1 | `[x]` Complete | Shared EvidencePack foundation: analysis `fact_payload` and report `ReportEvidencePack.evidence_payloads` now share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references |
+| P23-H2 | `[ ]` Next | Chinese Business Answer Writer: keep natural model explanations/recommendations while binding hard facts to shared evidence |
+| P23-H3 | `[ ]` Planned | One-Pass Report Center With Shared Evidence |
+| P23-H4 | `[ ]` Planned | Artifact And Tool-Calling Readiness |
+| P23-H5 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance |
+
+## Latest P23-H1 Result
+
+P23-H1 Shared EvidencePack Contract completed on 2026-07-03:
+
+- Extended `tools/evidence_tool.build_evidence_payload()` into the shared P23 factual payload (`p23.shared.v1`) while preserving existing Analysis Workbench `fact_payload` consumers.
+- The shared payload now includes intent, `time_range`, metrics, dimensions, structured result rows, derived share/rank/trend metrics, formula metadata with source columns, chart-ready data, warnings/data limits, display values, and references to technical details.
+- Unsupported requested metrics such as ROI are recorded as data limits when the current evidence fields/metric registry cannot compute them, instead of allowing model output to invent the metric.
+- Report Center now exposes the same payloads through `ReportEvidencePack.evidence_payloads`; evidence tables can point back through `evidence_payload_ref`. SQL/raw rows stay in report technical details/appendix and do not enter the report body.
+- Added non-channel store-sales coverage proving the shared contract does not assume `orders`, `marketing_spend`, `channel`, revenue-only demo tables, or ROI-only channel analysis.
+- Cleanup audit found stitched/fixed-template/legacy chart/mock terms only in historical/superseded docs, negative boundary tests, and P23 follow-up cleanup wording; no active product-code path needed migration for H1.
+- Focused verification passed: evidence/metric/product-result/report-planner set (`51 passed`), workspace analysis/report runner set (`32 passed`), report composer/API/store set (`25 passed`), and frontend workspace-flow Vitest (`54 passed`).
+
+## Latest P22-H4 Result
+
+P22-H4 Report Center UI and Markdown rendering polish completed on 2026-07-02:
+
+- Updated `workspaces/report_markdown.py` so Markdown downloads render a clean Chinese report: title, generated status/time, time range, data sources, opening summary, chapters, inline chart artifacts or待生成图表 prompts, compact evidence tables, action recommendations, data boundaries, and a collapsed technical appendix with only validation/evidence counts.
+- Updated `frontend/components/ReportViewer.tsx` so the report detail page no longer presents the report goal as a debug field. It shows report metadata, body chapters, real chart images with “下载图表”, chart-intent placeholders when no artifact exists, evidence tables, action recommendations, and data boundaries in report-reading order.
+- Updated `frontend/components/ReportTechnicalAppendix.tsx` so expanding the appendix shows only business-readable evidence and validation summaries instead of JSON dumps, SQL, raw rows, query ids, provider metadata, trace paths, or report contract internals.
+- Added/updated backend and frontend tests to cover clean Markdown downloads, chart artifact display, no-artifact chart-intent copy, collapsed appendix behavior, and hiding old report/debug fields from the main reader.
+- Focused verification passed: report API/runner/store/composer-validator regression (`33 passed`) and focused frontend Vitest (`63 passed`).
+
+## Latest P22-H3 Result
+
+P22-H3 model-backed report composer and lightweight fact validator completed on 2026-07-02:
+
+- Added `workspaces/report_composer.py` for `ReportPlan + ReportEvidencePack -> ReportDocument`. It asks a provider for structured Chinese JSON when available, keeps the prompt inside the evidence boundary, filters unsupported refs, blocks SQL/raw-row/provider/trace leakage from the main body, and falls back to deterministic Chinese composition when no provider or invalid provider output is available.
+- Added `workspaces/report_validator.py` for lightweight key-fact checks: title/time range alignment, evidence refs, key numbers, data sources, and top-ranked entity conflicts within the relevant chapter. Reasonable qualitative recommendations remain allowed when grounded in evidence.
+- `workspaces/report_runner.py` now delegates composition and validation to those modules, preserving the clean `plan -> evidence -> compose -> validate -> save/render` path without per-section analysis runs.
+- `llm_ops/runtime_provider.py` now supports `INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER`, and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1` also enables the current report composer provider. `api/app.py` passes `providers={"report_composer": provider}` into `run_workspace_report()` when the provider can be built; no-key mode still passes no provider and uses fallback.
+- Workspace settings now include the `report_composer` provider feature with the Chinese label `报告撰写`.
+- Verification passed: focused report composer/planner/runner/API/store regression (`40 passed`), focused P20/project/P17/P20 boundary regression (`26 passed`), and focused frontend Vitest (`63 passed`).
 
 ## Latest P22-H2 Result
 
@@ -233,7 +279,7 @@ Latest P20-H5 closeout result on 2026-07-02:
 - Cleanup audit for old action/chart/mock/eval/Streamlit terms found matches only in historical/superseded notes, cleanup/boundary tests, negative mock-tool tests, and the audit command in the P20 plan; no active product import or main path was restored.
 - Verification passed: question-understanding/P17/P20/project/P20 acceptance boundary set `45 passed, 1 skipped`; metric/evidence/workspace-analysis/product-result focused set `49 passed`; report/composer/visualization focused set `36 passed`; full backend regression `python3 -m pytest` (`434 passed, 13 skipped`); frontend Vitest `npm test` (`62 passed`); frontend production build passed.
 
-P20 completion definition is now satisfied: InsightFlow is a Chinese-first general business data-analysis multi-agent product foundation that profiles uploaded datasets, builds semantic layers, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools, validates factual claims, and writes Chinese business-readable answers and reports. P21 responsiveness and fast-path work is complete; P22 is evidence-driven report generation, and China-oriented external tool calling/export moves to P23.
+P20 completion definition is now satisfied: InsightFlow is a Chinese-first general business data-analysis multi-agent product foundation that profiles uploaded datasets, builds semantic layers, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools, validates factual claims, and writes Chinese business-readable answers and reports. P21 responsiveness and fast-path work is complete; P22 evidence-driven report generation is complete; P23 is core evidence/report tooling readiness; China-oriented external tool calling/export moves to P24.
 
 Latest P20-H4 answer/report generation result on 2026-07-02:
 
@@ -329,7 +375,7 @@ P19 planning note on 2026-07-01:
 - Direction update: P19 should not become an expanding deterministic patch list for every possible model mistake. The next design direction is an Answer Reviewer Agent plus Final Answer Composer, with small deterministic checks as the last safety guardrail.
 - Planning update: P19 is intentionally compacted into five H tasks so development is easier to steer, but each H task still requires tests, code cleanup, artifact hygiene, and focused/full verification.
 - Cleanup policy update: P19 should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
-- Future notes at the time of P19 planning originally pointed P20 toward responsiveness, but real product testing later re-scoped P20 into the general business analysis foundation. Responsiveness is now P21 and real business tool calling/export is now P22.
+- Future notes at the time of P19 planning originally pointed P20 toward responsiveness, but real product testing later re-scoped P20 into the general business analysis foundation. Responsiveness became P21. Later live report testing re-scoped P23 into core evidence/report readiness, so real business tool calling/export is now P24.
 
 P19-H2 completion note on 2026-07-01:
 
@@ -372,7 +418,7 @@ P19-H5 completion note on 2026-07-01:
 - H5 fixed a live acceptance quality gap where a clean provider factual answer could omit recommendations and caveats; the product result builder now fills only minimal evidence-based next-step guidance and query-scope caveats for sufficiently supported answers.
 - Artifact hygiene was rechecked: generated databases, reports, report Markdown, chart artifacts, traces, `.env`, frontend build output, `.superpowers`, and real DeepSeek temporary artifacts remain untracked/ignored and were not staged.
 - Cleanup audit found old action/chart/mock/template terms only in historical notes, deleted-file assertions, ignored generated artifacts, or necessary test doubles; no current product entry point was restored or duplicated.
-- This older closeout note has been superseded by the P20 planning note below: P20 is now the general business analysis foundation, while responsiveness moves to P21 and real business tool calling moves to P22.
+- This older closeout note has been superseded by later planning: P20 became the general business analysis foundation, P21 handled responsiveness, P22 rebuilt evidence-driven reports, P23 now handles core evidence/report readiness, and real business tool calling moves to P24.
 
 P19 closeout fix note on 2026-07-01:
 
@@ -381,7 +427,7 @@ P19 closeout fix note on 2026-07-01:
 - Workspace settings model-mode summary reads the merged local `.env` and process environment, so provider key presence and product live mode remain separate states.
 - Frontend coverage now includes loading, key-only, live-mode-on, and fetch-failure model status states without relying on a real backend.
 - Local ignored generated artifacts were cleaned from `.superpowers`, chart PNG outputs, run workspaces, pytest/cache directories, `__pycache__`, and frontend build output; retained `.env`, tracked placeholders, and the historical `data/ecommerce.db` fixture were not removed or staged.
-- P20 has been re-scoped after real product testing: it is now the general business analysis foundation phase, not responsiveness work. Responsiveness moves to P21 and real business tool calling moves to P22.
+- P20 has been re-scoped after real product testing: it is now the general business analysis foundation phase, not responsiveness work. Responsiveness moved to P21; later report testing moved real business tool calling to P24 after P23 core evidence/report readiness.
 
 P20 planning note on 2026-07-01:
 
@@ -411,4 +457,4 @@ This section is historical cleanup context only, not current product guidance.
 - Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old cleanup terms.
 - Historical retained fixture: `data/ecommerce.db` remains for low-level tests that directly exercise schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is not the current product database.
 - Historical P11/P12/P13 specs under `docs/superpowers/specs/` must be treated as snapshots. Current guidance is `docs/product/plans/`, the P16 `business_answer` contract, and P17 cleanup.
-- Real China-oriented external tool calling is deferred until after P18 answer consistency, so external publishing/exporting does not amplify inconsistent conclusions.
+- Real China-oriented external tool calling remains deferred until the core answer/report chain is stable. Current guidance is P23 for evidence/report readiness, then P24 for real external tools and exports.

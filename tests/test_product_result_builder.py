@@ -128,6 +128,412 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert "provider_metadata" not in product["business_answer"]
 
 
+def test_product_result_builder_exposes_fact_payload_only_outside_main_answer():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_fact_payload",
+        "status": "completed",
+        "workspace_root": "/tmp/ws",
+        "user_question": "最近90天哪个门店销售额最高？",
+        "analysis_task": {
+            "task_type": "rank",
+            "dimensions": ["门店"],
+            "metrics": ["销售额"],
+            "time_range": {"raw_text": "最近 90 天"},
+            "filters": [],
+            "decision_goal": None,
+        },
+        "question_understanding": {
+            "analysis_task": {
+                "task_type": "rank",
+                "dimensions": ["门店"],
+                "metrics": ["销售额"],
+                "time_range": {"raw_text": "最近 90 天"},
+                "filters": [],
+            }
+        },
+        "generated_sql": "SELECT store_name, SUM(sales_amount) AS total_revenue FROM store_sales GROUP BY store_name ORDER BY total_revenue DESC LIMIT 3",
+        "execution_result": {
+            "success": True,
+            "columns": ["store_name", "total_revenue"],
+            "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0], ["深圳湾店", 12000.0]],
+            "row_count": 3,
+        },
+        "metric_registry": {
+            "metrics": {
+                "sum_sales_amount": {
+                    "business_label": "销售额",
+                    "formula": "SUM(sales_amount)",
+                    "unit": "currency",
+                }
+            },
+            "formulas": {"sum_sales_amount": "SUM(sales_amount)"},
+            "warnings": [],
+        },
+        "evidence_result": {"validation_status": "validated"},
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_fact")
+
+    business_text = _business_answer_text(product["business_answer"])
+    assert product["analysis_route"]["route"] == "fast_fact"
+    assert product["analysis_route"]["fast_path_eligible"] is True
+    assert product["analysis_route"]["requires_full_chain"] is False
+    assert product["analysis_route"]["disqualifiers"] == []
+    assert "SELECT store_name" not in business_text
+    assert "raw_rows" not in business_text
+    assert "[[" not in business_text
+    assert product["evidence"]["fact_payload"]["comparison_scope"]["row_count"] == 3
+    assert product["evidence"]["fact_payload"]["display_values"][0]["总收入"] == "2.6 万"
+    assert product["evidence"]["fact_payload"]["formulas"]["sum_sales_amount"] == "SUM(sales_amount)"
+    assert product["technical_details"]["fact_payload"]["technical_sql"].startswith("SELECT store_name")
+    assert product["technical_details"]["raw_rows"] == raw["execution_result"]["rows"]
+
+
+def test_product_result_builder_exposes_shared_evidence_pack_without_main_answer_leaks():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_shared_pack",
+        "status": "completed",
+        "workspace_root": "/tmp/ws",
+        "user_question": "最近90天按门店比较销售额和 ROI，哪个门店最值得关注？",
+        "analysis_task": {
+            "task_type": "recommendation",
+            "dimensions": ["门店"],
+            "metrics": ["销售额", "ROI"],
+            "time_range": {"raw_text": "最近 90 天"},
+            "filters": [],
+            "decision_goal": "比较门店销售贡献和投资回报",
+        },
+        "business_answer": {
+            "headline": "上海旗舰店销售额最高，但 ROI 暂缺证据",
+            "direct_answer": "最近 90 天上海旗舰店销售额最高，达到 300000.0；当前结果没有成本字段，不能计算 ROI。",
+            "why": "证据显示上海旗舰店销售额为 300000.0，北京国贸店为 100000.0。",
+            "evidence_bullets": ["上海旗舰店销售额为 300000.0。", "北京国贸店销售额为 100000.0。"],
+            "recommendations": ["先围绕上海旗舰店复盘销售贡献，同时补齐成本字段后再评估 ROI。"],
+            "caveats": ["当前没有成本字段，ROI 未计算。"],
+            "confidence": "medium",
+        },
+        "generated_sql": 'SELECT "store_name", SUM("sales_amount") AS sales_amount FROM "store_sales" GROUP BY "store_name"',
+        "execution_result": {
+            "success": True,
+            "columns": ["store_name", "sales_amount"],
+            "rows": [["上海旗舰店", 300000.0], ["北京国贸店", 100000.0]],
+        },
+        "metric_registry": {
+            "metrics": {
+                "sum_sales_amount": {
+                    "business_label": "销售额",
+                    "formula": 'SUM("store_sales"."sales_amount")',
+                    "unit": "currency",
+                    "source_fields": ["store_sales.sales_amount"],
+                }
+            },
+            "formulas": {"sum_sales_amount": 'SUM("store_sales"."sales_amount")'},
+            "warnings": [],
+        },
+        "semantic_context": {
+            "metrics": [{"name": "sum_sales_amount", "label": "销售额", "field": "store_sales.sales_amount"}],
+            "dimensions": [{"name": "store_name", "label": "门店", "field": "store_sales.store_name"}],
+        },
+        "evidence_result": {"validation_status": "validated"},
+        "trace_path": "/tmp/ws/runs/run_shared_pack/trace.json",
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_shared")
+    payload = product["evidence"]["fact_payload"]
+    business_text = _business_answer_text(product["business_answer"])
+
+    assert payload["evidence_pack_version"] == "p23.shared.v1"
+    assert payload["time_range"] == {"raw_text": "最近 90 天"}
+    assert payload["metrics"] == ["销售额", "ROI"]
+    assert payload["dimensions"] == ["门店"]
+    assert payload["result_rows"][0]["dimensions"][0]["label"] == "门店"
+    assert payload["result_rows"][0]["metrics"][0]["display_value"] == "30.0 万"
+    assert payload["derived_metrics"][0]["metric_id"] == "sales_amount_share"
+    assert payload["derived_metrics"][0]["values"][0]["display_value"] == "75.0%"
+    assert any("ROI" in limit and "未计算" in limit for limit in payload["data_limits"])
+    assert payload["technical_refs"]["sql"] == "technical_details.sql"
+    assert "SELECT" not in business_text.upper()
+    assert "raw_rows" not in business_text
+    assert "trace_path" not in business_text
+    assert "provider_metadata" not in business_text
+
+
+def test_product_result_builder_exposes_fast_fact_context_pack_only_in_technical_details():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_fast_pack",
+        "status": "completed",
+        "workspace_root": "/tmp/ws",
+        "user_question": "最近90天哪个门店销售额最高？",
+        "analysis_route": {
+            "route": "fast_fact",
+            "reason": "低风险事实型问题",
+            "confidence": "high",
+            "requires_full_chain": False,
+            "fast_path_eligible": True,
+            "disqualifiers": [],
+        },
+        "analysis_task": {
+            "task_type": "rank",
+            "dimensions": ["门店"],
+            "metrics": ["销售额"],
+            "time_range": {"raw_text": "最近 90 天"},
+            "filters": [],
+        },
+        "generated_sql": "SELECT store_name, SUM(sales_amount) AS total_sales FROM store_sales GROUP BY store_name",
+        "execution_result": {
+            "success": True,
+            "columns": ["store_name", "total_sales"],
+            "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+        },
+        "evidence_result": {"validation_status": "validated", "success": True},
+        "metric_registry": {
+            "metrics": {"total_sales": {"business_label": "销售额", "unit": "currency"}},
+            "formulas": {"total_sales": "SUM(sales_amount)"},
+        },
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_fast_pack")
+    pack = product["technical_details"]["fast_fact_context_pack"]
+    business_text = _business_answer_text(product["business_answer"])
+
+    assert pack["route"] == "fast_fact"
+    assert pack["key_evidence_rows"][0]["dimensions"][0]["display_value"] == "上海旗舰店"
+    assert pack["key_evidence_rows"][0]["metrics"][0]["display_value"] == "2.6 万"
+    assert "fast_fact_context_pack" not in business_text
+    assert "context pack" not in business_text.lower()
+    assert "raw_rows" not in business_text
+    assert "SELECT " not in business_text.upper()
+    assert "SELECT " not in str(pack).upper()
+    assert "rows" not in pack
+    assert "columns" not in pack
+
+
+def test_product_result_builder_does_not_force_fast_fact_context_pack_on_standard_routes():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    raw = {
+        "run_id": "run_standard_no_pack",
+        "status": "completed",
+        "user_question": "最近90天各门店销售表现如何？",
+        "analysis_route": {
+            "route": "standard_analysis",
+            "reason": "常规分析",
+            "confidence": "medium",
+            "requires_full_chain": True,
+            "fast_path_eligible": False,
+            "disqualifiers": [],
+        },
+        "analysis_task": {
+            "task_type": "compare",
+            "dimensions": ["门店"],
+            "metrics": ["销售额", "满意度"],
+            "time_range": {"raw_text": "最近 90 天"},
+            "filters": [],
+        },
+        "generated_sql": "SELECT store_name, SUM(sales_amount) AS total_sales FROM store_sales GROUP BY store_name",
+        "execution_result": {
+            "success": True,
+            "columns": ["store_name", "total_sales"],
+            "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+        },
+        "evidence_result": {"validation_status": "validated", "success": True},
+    }
+
+    product = build_product_analysis_result(raw, workspace_id="ws_standard_no_pack")
+
+    assert "fast_fact_context_pack" not in product["technical_details"]
+    assert product["technical_details"]["fact_payload"]["rows"] == raw["execution_result"]["rows"]
+
+
+def test_product_result_builder_returns_fast_fact_progress_steps_without_technical_leaks():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_fast_progress",
+            "status": "completed",
+            "user_question": "最近90天销售额最高的门店是谁？",
+            "analysis_route": {
+                "route": "fast_fact",
+                "reason": "低风险事实型问题",
+                "confidence": "high",
+                "requires_full_chain": False,
+                "fast_path_eligible": True,
+                "disqualifiers": [],
+            },
+            "analysis_task": {
+                "task_type": "rank",
+                "dimensions": ["门店"],
+                "metrics": ["销售额"],
+                "time_range": {"raw_text": "最近 90 天"},
+                "filters": [],
+                "missing_slots": [],
+            },
+            "generated_sql": "SELECT store_name, SUM(sales_amount) AS total_sales FROM store_sales GROUP BY store_name",
+            "execution_result": {
+                "success": True,
+                "columns": ["store_name", "total_sales"],
+                "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+            },
+            "evidence_result": {"validation_status": "validated", "success": True},
+            "trace_path": "/tmp/ws/runs/run_fast_progress/trace.json",
+            "question_understanding": {"provider_called": True, "prompt_id": "internal_prompt"},
+        },
+        workspace_id="ws_1",
+    )
+
+    steps = product["progress_steps"]
+
+    assert [step["key"] for step in steps] == [
+        "understanding",
+        "routing",
+        "querying",
+        "validating",
+        "finalizing",
+        "charting",
+    ]
+    assert [step["label"] for step in steps] == ["理解问题", "选择分析路径", "查询数据", "验证证据", "整理结论", "生成图表"]
+    assert [step["status"] for step in steps] == [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "skipped",
+    ]
+    assert steps[-1]["summary"] == "事实快答不生成图表。"
+    progress_text = " ".join(step["summary"] for step in steps)
+    assert "SELECT" not in progress_text
+    assert "trace" not in progress_text.lower()
+    assert "provider" not in progress_text.lower()
+    assert "prompt" not in progress_text.lower()
+    assert "raw_rows" not in progress_text
+
+
+def test_product_result_builder_returns_progress_steps_for_standard_deep_report_clarify_and_failed_routes():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    standard = build_product_analysis_result(
+        {
+            "run_id": "run_standard_progress",
+            "status": "completed",
+            "user_question": "最近90天各门店销售表现如何？",
+            "analysis_route": {
+                "route": "standard_analysis",
+                "reason": "常规分析",
+                "confidence": "medium",
+                "requires_full_chain": True,
+                "fast_path_eligible": False,
+                "disqualifiers": [],
+            },
+            "execution_result": {"success": True, "columns": ["store"], "rows": [["上海旗舰店"]]},
+            "evidence_result": {"validation_status": "validated", "success": True},
+            "chart_path": "/tmp/ws/runs/run_standard_progress/charts/store.png",
+        },
+        workspace_id="ws_1",
+        workspace_root="/tmp/ws",
+    )
+    deep = build_product_analysis_result(
+        {
+            "run_id": "run_deep_progress",
+            "status": "completed",
+            "user_question": "哪个门店最值得复盘，为什么？",
+            "analysis_route": {
+                "route": "deep_judgment",
+                "reason": "需要业务判断",
+                "confidence": "medium",
+                "requires_full_chain": True,
+                "fast_path_eligible": False,
+                "disqualifiers": ["judgment_intent"],
+            },
+            "execution_result": {"success": True, "columns": ["store"], "rows": [["上海旗舰店"]]},
+            "evidence_result": {"validation_status": "validated", "success": True},
+            "chart_path": "/tmp/ws/runs/run_deep_progress/charts/store.png",
+        },
+        workspace_id="ws_1",
+        workspace_root="/tmp/ws",
+    )
+    report = build_product_analysis_result(
+        {
+            "run_id": "run_report_progress",
+            "status": "completed",
+            "user_question": "生成一份管理层报告",
+            "analysis_route": {
+                "route": "report",
+                "reason": "报告请求",
+                "confidence": "high",
+                "requires_full_chain": True,
+                "fast_path_eligible": False,
+                "disqualifiers": ["report_intent"],
+            },
+            "execution_result": {"success": True, "columns": ["metric"], "rows": [[100]]},
+            "report_result": {"status": "completed", "sections": [{"status": "completed"}]},
+        },
+        workspace_id="ws_1",
+    )
+    clarify = build_product_analysis_result(
+        {
+            "run_id": "run_clarify_progress",
+            "status": "waiting_for_clarification",
+            "user_question": "帮我分析销售情况",
+            "analysis_route": {
+                "route": "clarify",
+                "reason": "缺少时间范围",
+                "confidence": "medium",
+                "requires_full_chain": True,
+                "fast_path_eligible": False,
+                "disqualifiers": ["missing_slots"],
+            },
+            "clarification_questions": ["请补充时间范围。"],
+        },
+        workspace_id="ws_1",
+    )
+    failed = build_product_analysis_result(
+        {
+            "run_id": "run_failed_progress",
+            "status": "failed",
+            "user_question": "按商品看销售额",
+            "analysis_route": {
+                "route": "standard_analysis",
+                "reason": "常规分析",
+                "confidence": "medium",
+                "requires_full_chain": True,
+                "fast_path_eligible": False,
+                "disqualifiers": [],
+            },
+            "review_result": {"approved": False, "issues": ["Unknown table: products"]},
+            "final_answer": "SQL 审核未通过，已停止执行。",
+        },
+        workspace_id="ws_1",
+    )
+
+    assert [step["label"] for step in standard["progress_steps"]] == [
+        "理解问题",
+        "选择分析路径",
+        "查询数据",
+        "验证证据",
+        "整理结论",
+        "生成图表",
+    ]
+    assert [step["status"] for step in standard["progress_steps"]] == ["completed"] * 6
+    assert deep["progress_steps"][4]["label"] == "业务判断"
+    assert deep["progress_steps"][4]["status"] == "completed"
+    assert [step["label"] for step in report["progress_steps"]] == ["理解问题", "查询数据", "整理章节", "生成报告"]
+    assert [step["status"] for step in report["progress_steps"]] == ["completed"] * 4
+    assert clarify["progress_steps"][0]["status"] == "running"
+    assert "等待补充" in clarify["progress_steps"][0]["summary"]
+    assert [step["status"] for step in clarify["progress_steps"][1:]] == ["skipped", "pending", "pending", "pending"]
+    assert failed["progress_steps"][2]["status"] == "failed"
+    assert "未能通过安全审核" in failed["progress_steps"][2]["summary"]
+    assert all(step["status"] in {"pending", "skipped"} for step in failed["progress_steps"][3:])
+
+
 def test_business_answer_rebuilds_internal_report_prompt_leaks():
     from workspaces.product_result_builder import build_business_answer
 
@@ -284,6 +690,8 @@ def test_product_result_builder_turns_schema_review_failure_into_business_answer
     assert "Unknown table" not in _business_answer_text(answer)
     assert "Unknown column" not in _business_answer_text(answer)
     assert any("当前数据已包含" in item for item in answer["recommendations"])
+    assert "渠道、收入、订单、投放花费和 ROI" not in _business_answer_text(answer)
+    assert "商品、订单明细或产品维度" not in _business_answer_text(answer)
     assert any(log["name"] == "review_result" for log in product["technical_details"]["validation_logs"])
     assert any(log["name"] == "schema_repair" for log in product["technical_details"]["validation_logs"])
     assert "Unknown table: products" in str(product["technical_details"]["validation_logs"])
@@ -321,7 +729,7 @@ def test_product_result_builder_preserves_clean_provider_business_answer():
     assert answer == provider_answer
 
 
-def test_clean_provider_business_answer_gets_minimum_recommendation_and_caveat():
+def test_clean_provider_fact_answer_gets_caveat_without_forcing_recommendation():
     from workspaces.product_result_builder import build_business_answer
 
     answer = build_business_answer(
@@ -346,10 +754,39 @@ def test_clean_provider_business_answer_gets_minimum_recommendation_and_caveat()
     )
 
     _assert_new_business_answer_shape(answer)
-    assert answer["recommendations"]
+    assert answer["recommendations"] == []
     assert answer["caveats"]
-    assert "email" in " ".join(answer["recommendations"])
     assert any("本次查询" in caveat or "时间范围" in caveat for caveat in answer["caveats"])
+
+
+def test_fact_question_does_not_force_unrelated_recommendations():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个门店销售额最高？只回答事实。",
+            "business_answer": {
+                "headline": "上海旗舰店销售额最高",
+                "direct_answer": "最近 90 天上海旗舰店销售额最高，达到 26255.44。",
+                "why": "证据表显示上海旗舰店销售额为 26255.44，高于北京国贸店的 18400.0。",
+                "evidence_bullets": ["上海旗舰店销售额为 26255.44。", "北京国贸店销售额为 18400.0。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "high",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["store_name", "sales_amount"],
+                "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_new_business_answer_shape(answer)
+    assert answer["recommendations"] == []
+    assert answer["caveats"]
+    assert "上海旗舰店" in _business_answer_text(answer)
 
 
 def test_product_result_builder_rejects_provider_business_answer_with_technical_leak():
@@ -483,10 +920,13 @@ def test_budget_question_evidence_fallback_does_not_force_first_row_when_metrics
 
     _assert_new_business_answer_shape(answer)
     text = _business_answer_text(answer)
-    assert "当前证据不足以支持该结论" in text
-    assert "email" not in " ".join(answer["recommendations"])
-    assert answer["confidence"] == "low"
-    assert any("证据" in caveat or "口径" in caveat for caveat in answer["caveats"])
+    assert "当前证据不足以支持该结论" not in text
+    assert "email" in text
+    assert "paid_search" in text
+    assert any(marker in text for marker in ("如果目标", "取舍", "口径", "权衡"))
+    assert answer["recommendations"]
+    assert answer["confidence"] in {"medium", "high"}
+    assert any("预算" in caveat or "口径" in caveat or "本次查询" in caveat for caveat in answer["caveats"])
 
 
 def test_product_result_builder_localizes_common_metric_fields_in_main_answer():

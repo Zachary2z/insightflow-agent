@@ -4,6 +4,8 @@ import re
 from time import perf_counter
 from typing import Any
 
+from workspaces.answer_evidence import business_field_label
+
 
 MISSING_DATA_TERMS = {
     "ad_impressions": "ad_impressions",
@@ -15,6 +17,26 @@ MISSING_DATA_TERMS = {
 }
 
 HYPOTHESIS_MARKERS = ("可能", "假设", "需要", "进一步验证", "无法验证", "might", "may", "hypothesis")
+
+DEFAULT_BUSINESS_ALIASES = {
+    "store_name": "门店",
+    "store": "门店",
+    "team_name": "团队",
+    "ticket_count": "工单数",
+    "avg_response_minutes": "平均响应时长",
+    "response_minutes": "响应时长",
+    "avg_resolution_hours": "平均解决时长",
+    "resolution_hours": "解决时长",
+    "total_revenue": "总收入",
+    "sum_revenue": "总收入",
+    "sales_amount": "销售额",
+    "total_sales": "总销售额",
+    "total_spend": "投放成本",
+    "spend": "投放成本",
+    "cost": "成本",
+    "margin_rate": "利润率",
+    "net_return": "净投放回报率",
+}
 
 
 def _normalize(text: Any) -> str:
@@ -145,6 +167,376 @@ def _needs_more_data(claim: str) -> list[str]:
 def _is_hypothesis(claim: str) -> bool:
     normalized_claim = _normalize(claim)
     return any(_normalize(marker) in normalized_claim for marker in HYPOTHESIS_MARKERS)
+
+
+def build_evidence_payload(
+    *,
+    task: dict[str, Any] | None,
+    execution_result: dict[str, Any] | None,
+    metric_registry: dict[str, Any] | None = None,
+    sql: str = "",
+    filters: list[str] | None = None,
+    business_aliases: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    task = task or {}
+    execution_result = execution_result or {}
+    metric_registry = metric_registry or {}
+    columns = [str(column) for column in execution_result.get("columns") or []]
+    rows = list(execution_result.get("rows") or [])
+    registry_warnings = [str(item) for item in metric_registry.get("warnings") or [] if str(item).strip()]
+    comparison_scope = _comparison_scope(task, rows)
+    warnings = [*registry_warnings]
+    if not comparison_scope["sufficient"]:
+        warnings.append(
+            f"比较范围不足：{task.get('task_type') or 'analysis'} 类问题至少需要 "
+            f"{comparison_scope['required_min_rows']} 行同口径候选对象，当前只有 {comparison_scope['row_count']} 行。"
+        )
+
+    aliases = _business_aliases(columns, metric_registry=metric_registry, overrides=business_aliases or {})
+    display_values = [_display_row(row, columns, aliases, metric_registry) for row in rows]
+    formulas = dict(metric_registry.get("formulas") or {})
+    data_limits = _data_limits_for_requested_metrics(
+        requested_metrics=list(task.get("metrics") or []),
+        columns=columns,
+        aliases=aliases,
+        metric_registry=metric_registry,
+    )
+    result_rows = _result_rows(rows, columns, aliases, metric_registry)
+    derived_metrics = _derived_metrics(rows, columns, aliases, metric_registry, task=task)
+    formula_metadata = _formula_metadata(metric_registry)
+
+    return {
+        "evidence_pack_version": "p23.shared.v1",
+        "evidence_pack_kind": "shared_fact_payload",
+        "task_type": str(task.get("task_type") or ""),
+        "intent": {
+            "task_type": str(task.get("task_type") or ""),
+            "decision_goal": str(task.get("decision_goal") or ""),
+        },
+        "metrics": list(task.get("metrics") or []),
+        "dimensions": list(task.get("dimensions") or []),
+        "time_scope": task.get("time_range") or task.get("time_scope") or {},
+        "time_range": task.get("time_range") or task.get("time_scope") or {},
+        "filters": list(filters if filters is not None else task.get("filters") or []),
+        "comparison_scope": comparison_scope,
+        "columns": columns,
+        "rows": rows,
+        "result_rows": result_rows,
+        "derived_metrics": derived_metrics,
+        "formulas": formulas,
+        "formula_metadata": formula_metadata,
+        "chart_data": _chart_data(rows, columns),
+        "warnings": list(dict.fromkeys(warnings)),
+        "data_limits": data_limits,
+        "display_values": display_values,
+        "formatted_values": display_values,
+        "technical_sql": str(sql or ""),
+        "technical_refs": {
+            "sql": "technical_details.sql",
+            "raw_rows": "technical_details.raw_rows",
+        },
+        "technical_details": {
+            "sql": str(sql or ""),
+            "row_count": len(rows),
+            "truncated": bool(execution_result.get("truncated")),
+        },
+    }
+
+
+def _comparison_scope(task: dict[str, Any], rows: list[Any]) -> dict[str, Any]:
+    task_type = str(task.get("task_type") or "").lower()
+    row_count = len(rows)
+    required_min_rows = 2 if task_type in {"rank", "compare", "recommendation"} else 1
+    return {
+        "type": "peer_comparison" if task_type in {"rank", "compare", "recommendation"} else "result_set",
+        "row_count": row_count,
+        "required_min_rows": required_min_rows,
+        "retained_rows": row_count,
+        "sufficient": row_count >= required_min_rows,
+    }
+
+
+def _business_aliases(
+    columns: list[str],
+    *,
+    metric_registry: dict[str, Any],
+    overrides: dict[str, str],
+) -> dict[str, str]:
+    aliases = dict(DEFAULT_BUSINESS_ALIASES)
+    aliases.update({str(key): str(value) for key, value in overrides.items() if str(key).strip() and str(value).strip()})
+    for metric_name, metric in (metric_registry.get("metrics") or {}).items():
+        if not isinstance(metric, dict):
+            continue
+        label = str(metric.get("business_label") or metric.get("label") or "").strip()
+        name = str(metric.get("name") or metric_name or "").strip()
+        if name and label:
+            aliases[name] = label
+    return {column: aliases.get(column, business_field_label(column, chinese=True)) for column in columns}
+
+
+def _display_row(
+    row: Any,
+    columns: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> dict[str, str]:
+    pairs = _row_pairs_for_payload(row, columns)
+    display: dict[str, str] = {}
+    for key, value in pairs:
+        label = aliases.get(key, key)
+        display[label] = _format_business_value(value, key=key, label=label, metric_registry=metric_registry)
+    return display
+
+
+def _result_rows(
+    rows: list[Any],
+    columns: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> list[dict[str, Any]]:
+    result = []
+    for index, row in enumerate(rows):
+        pairs = _row_pairs_for_payload(row, columns)
+        dimensions = []
+        metrics = []
+        for key, value in pairs:
+            entry = {
+                "key": key,
+                "label": aliases.get(key, key),
+                "value": value,
+                "display_value": _format_business_value(
+                    value,
+                    key=key,
+                    label=aliases.get(key, key),
+                    metric_registry=metric_registry,
+                ),
+            }
+            if _to_number(value) is None:
+                dimensions.append(entry)
+            else:
+                metrics.append(entry)
+        result.append(
+            {
+                "row_index": index,
+                "dimensions": dimensions,
+                "metrics": metrics,
+            }
+        )
+    return result
+
+
+def _derived_metrics(
+    rows: list[Any],
+    columns: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+    *,
+    task: dict[str, Any],
+) -> list[dict[str, Any]]:
+    pairs_by_row = [_row_pairs_for_payload(row, columns) for row in rows]
+    metric_key = _first_numeric_column(pairs_by_row)
+    if not metric_key:
+        return []
+
+    metric_label = aliases.get(metric_key, metric_key)
+    values = [_to_number(dict(pairs).get(metric_key)) for pairs in pairs_by_row]
+    derived = []
+    total = sum(value for value in values if value is not None)
+    if total:
+        derived.append(
+            {
+                "metric_id": f"{metric_key}_share",
+                "label": f"{metric_label}占比",
+                "formula": f"{metric_key} / SUM({metric_key})",
+                "source_columns": [metric_key],
+                "unit": "percentage",
+                "values": [
+                    {
+                        "row_index": index,
+                        "value": None if value is None else value / total,
+                        "display_value": "-" if value is None else f"{(value / total) * 100:.1f}%",
+                    }
+                    for index, value in enumerate(values)
+                ],
+            }
+        )
+
+    ranked_values = sorted(
+        [(index, value) for index, value in enumerate(values) if value is not None],
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    if ranked_values:
+        ranks = {index: rank for rank, (index, _value) in enumerate(ranked_values, start=1)}
+        derived.append(
+            {
+                "metric_id": f"{metric_key}_rank",
+                "label": f"{metric_label}排名",
+                "formula": f"RANK() OVER (ORDER BY {metric_key} DESC)",
+                "source_columns": [metric_key],
+                "unit": "rank",
+                "values": [
+                    {
+                        "row_index": index,
+                        "value": ranks.get(index),
+                        "display_value": f"第 {ranks[index]} 名" if index in ranks else "-",
+                    }
+                    for index in range(len(rows))
+                ],
+            }
+        )
+
+    if str(task.get("task_type") or "").lower() == "trend" and len(values) >= 2 and values[0] not in (None, 0):
+        first = values[0]
+        last = values[-1]
+        if first is not None and last is not None:
+            change = (last - first) / abs(first)
+            derived.append(
+                {
+                    "metric_id": f"{metric_key}_period_change",
+                    "label": f"{metric_label}趋势变化",
+                    "formula": f"({metric_key}_last - {metric_key}_first) / ABS({metric_key}_first)",
+                    "source_columns": [metric_key],
+                    "unit": "percentage",
+                    "values": [
+                        {
+                            "row_index": len(values) - 1,
+                            "value": change,
+                            "display_value": f"{change * 100:.1f}%",
+                        }
+                    ],
+                }
+            )
+    return derived
+
+
+def _first_numeric_column(pairs_by_row: list[list[tuple[str, Any]]]) -> str:
+    for pairs in pairs_by_row:
+        for key, value in pairs:
+            if _to_number(value) is not None:
+                return key
+    return ""
+
+
+def _formula_metadata(metric_registry: dict[str, Any]) -> list[dict[str, Any]]:
+    metrics = metric_registry.get("metrics") or {}
+    formulas = metric_registry.get("formulas") or {}
+    metadata: list[dict[str, Any]] = []
+    for metric_id, formula in formulas.items():
+        metric = metrics.get(metric_id) if isinstance(metrics, dict) else {}
+        metric = metric if isinstance(metric, dict) else {}
+        metadata.append(
+            {
+                "metric_id": str(metric_id),
+                "label": str(metric.get("business_label") or metric.get("label") or metric_id),
+                "formula": str(formula),
+                "source_columns": [str(item) for item in metric.get("source_fields") or []],
+                "unit": str(metric.get("unit") or ""),
+                "derived": str(metric_id) in {"roas", "net_return", "margin_rate", "average_order_value"},
+            }
+        )
+    return metadata
+
+
+def _data_limits_for_requested_metrics(
+    *,
+    requested_metrics: list[Any],
+    columns: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> list[str]:
+    available = {_normalize_metric_token(column) for column in columns}
+    available.update(_normalize_metric_token(label) for label in aliases.values())
+    for metric_id, metric in (metric_registry.get("metrics") or {}).items():
+        if not isinstance(metric, dict):
+            continue
+        available.add(_normalize_metric_token(metric_id))
+        available.add(_normalize_metric_token(metric.get("name") or ""))
+        available.add(_normalize_metric_token(metric.get("business_label") or metric.get("label") or ""))
+    limits = []
+    for metric in requested_metrics:
+        metric_text = str(metric or "").strip()
+        normalized = _normalize_metric_token(metric_text)
+        if normalized and normalized not in available:
+            limits.append(f"请求的指标 {metric_text} 未在当前证据字段或指标注册表中找到，未计算。")
+    return list(dict.fromkeys(limits))
+
+
+def _normalize_metric_token(value: Any) -> str:
+    return re.sub(r"[\s_\-]+", "", str(value or "").lower())
+
+
+def _chart_data(rows: list[Any], columns: list[str]) -> dict[str, Any]:
+    pairs_by_row = [_row_pairs_for_payload(row, columns) for row in rows]
+    x_axis = ""
+    y_axis = ""
+    for pairs in pairs_by_row:
+        for key, value in pairs:
+            if not x_axis and _to_number(value) is None:
+                x_axis = key
+            if not y_axis and _to_number(value) is not None:
+                y_axis = key
+        if x_axis and y_axis:
+            break
+    return {
+        "columns": columns,
+        "rows": rows,
+        "x_axis": x_axis,
+        "y_axis": y_axis,
+    }
+
+
+def _row_pairs_for_payload(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
+    if isinstance(row, dict):
+        return [(str(key), value) for key, value in row.items()]
+    if isinstance(row, (list, tuple)):
+        return [(column, row[index]) for index, column in enumerate(columns) if index < len(row)]
+    return []
+
+
+def _format_business_value(value: Any, *, key: str, label: str = "", metric_registry: dict[str, Any]) -> str:
+    if value is None:
+        return "-"
+    number = _to_number(value)
+    if number is None:
+        return str(value)
+    unit = _unit_for_key(key, metric_registry, label=label)
+    if unit == "percentage":
+        return f"{number * 100:.1f}%"
+    if unit == "currency" and abs(number) >= 10000:
+        return f"{number / 10000:.1f} 万"
+    if float(number).is_integer():
+        return str(int(number))
+    return f"{number:.4f}".rstrip("0").rstrip(".")
+
+
+def _unit_for_key(key: str, metric_registry: dict[str, Any], *, label: str = "") -> str:
+    metrics = metric_registry.get("metrics") or {}
+    metric = metrics.get(key) if isinstance(metrics, dict) else None
+    if isinstance(metric, dict) and metric.get("unit"):
+        return str(metric["unit"])
+    lowered = f"{key} {label}".lower()
+    if any(marker in lowered for marker in ("rate", "margin", "net_return", "roi")) and "roas" not in lowered:
+        return "percentage"
+    if any(
+        marker in lowered
+        for marker in ("revenue", "sales", "amount", "spend", "cost", "gmv", "收入", "销售额", "成本", "花费")
+    ):
+        return "currency"
+    return "number"
+
+
+def _to_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.replace(",", ""))
+        except ValueError:
+            return None
+    return None
 
 
 def validate_evidence(

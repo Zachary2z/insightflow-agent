@@ -71,6 +71,7 @@ export type WorkspaceSettings = {
       api_key_present?: boolean;
     };
     provider_features?: Record<string, boolean>;
+    provider_feature_labels?: Record<string, string>;
     coverage?: {
       enabled?: number;
       total?: number;
@@ -119,6 +120,7 @@ export type EvidenceSummary = {
   };
   evidence_notes?: string[];
   validation_status?: string;
+  fact_payload?: Record<string, unknown>;
 };
 
 export type ChartArtifact = {
@@ -208,6 +210,7 @@ export type ReportEvidencePack = {
   charts?: Array<Record<string, unknown>>;
   warnings?: string[];
   data_limits?: string[];
+  evidence_payloads?: Array<Record<string, unknown>>;
   technical_details?: Record<string, unknown>;
 };
 

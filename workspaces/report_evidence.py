@@ -88,6 +88,11 @@ def collect_report_evidence(
         data_limits.append("当前语义层暂未识别到可直接汇总的指标。")
     if not context.dimensions:
         data_limits.append("当前语义层暂未识别到可用于分组的业务维度。")
+    evidence_payloads = [
+        dict(query["evidence_payload"])
+        for query in technical_queries
+        if isinstance(query.get("evidence_payload"), dict)
+    ]
 
     return ReportEvidencePack(
         facts=facts,
@@ -95,6 +100,7 @@ def collect_report_evidence(
         charts=charts,
         warnings=list(dict.fromkeys(warnings)),
         data_limits=list(dict.fromkeys(data_limits)),
+        evidence_payloads=evidence_payloads,
         technical_details={
             "metric_registry": context.metric_registry,
             "queries": technical_queries,
@@ -268,6 +274,8 @@ def _collect_revenue_structure(
         db_path,
         sql=f"SELECT {_metric_formula(metric)} AS total_value FROM {_quote(table_name)}{time_filter.where_sql}",
         task={"task_type": "summary", "metrics": [_metric_label(metric)], "dimensions": []},
+        time_range=time_range,
+        evidence_ref="query_revenue_total",
         technical_queries=technical_queries,
     )
     if total.get("success") and total.get("rows"):
@@ -299,6 +307,8 @@ def _collect_revenue_structure(
             f"GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
         ),
         task={"task_type": "rank", "metrics": [_metric_label(metric)], "dimensions": [_label(dimension)]},
+        time_range=time_range,
+        evidence_ref="query_revenue_by_dimension",
         technical_queries=technical_queries,
     )
     if not detail.get("success"):
@@ -315,6 +325,7 @@ def _collect_revenue_structure(
             rows=detail.get("rows") or [],
             metric_unit="currency",
             evidence_ref="query_revenue_by_dimension",
+            evidence_payload_ref="query_revenue_by_dimension",
         )
     )
     charts.append(
@@ -366,6 +377,8 @@ def _collect_customer_segments(
             f"GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
         ),
         task={"task_type": "rank", "metrics": [_metric_label(metric)], "dimensions": [_label(dimension)]},
+        time_range=time_range,
+        evidence_ref="query_customer_segment_contribution",
         technical_queries=technical_queries,
     )
     if not result.get("success"):
@@ -382,6 +395,7 @@ def _collect_customer_segments(
             rows=result.get("rows") or [],
             metric_unit=_unit_for_metric(metric),
             evidence_ref="query_customer_segment_contribution",
+            evidence_payload_ref="query_customer_segment_contribution",
         )
     )
     charts.append(
@@ -415,11 +429,11 @@ def _collect_support_issues(
     if not issue_col:
         data_limits.append("客服相关数据缺少问题类型或可分组字段。")
         return
-    ticket_col = context.column(table_name, _TICKET_COUNT_TOKENS)
+    ticket_expression = _support_ticket_count_expression(context, table_name)
     satisfaction_col = context.column(table_name, _SATISFACTION_TOKENS)
     response_col = context.column(table_name, _RESPONSE_TOKENS)
     select_parts = [f"{_quote(issue_col)} AS issue_value"]
-    select_parts.append(f"SUM({_quote(ticket_col)}) AS ticket_value" if ticket_col else "COUNT(*) AS ticket_value")
+    select_parts.append(f"{ticket_expression} AS ticket_value")
     if satisfaction_col:
         select_parts.append(f"AVG({_quote(satisfaction_col)}) AS satisfaction_value")
     if response_col:
@@ -439,6 +453,8 @@ def _collect_support_issues(
             f"GROUP BY {_quote(issue_col)} ORDER BY ticket_value DESC"
         ),
         task={"task_type": "rank", "metrics": ["工单量"], "dimensions": ["问题类型"]},
+        time_range=time_range,
+        evidence_ref="query_support_issue_summary",
         technical_queries=technical_queries,
     )
     if not result.get("success"):
@@ -468,6 +484,7 @@ def _collect_support_issues(
             source_chapter_id="support_issues",
             description=f"证据来自{_readable_table_name(table_name)}按问题类型汇总。",
             evidence_ref="query_support_issue_summary",
+            evidence_payload_ref="query_support_issue_summary",
         )
     )
     charts.append(
@@ -521,6 +538,8 @@ def _collect_trend_changes(
             f"FROM {_quote(table_name)}{time_filter.where_sql} GROUP BY period_value ORDER BY period_value"
         ),
         task={"task_type": "trend", "metrics": [_metric_label(metric)], "dimensions": ["周期"]},
+        time_range=time_range,
+        evidence_ref="query_recent_trend",
         technical_queries=technical_queries,
     )
     if not result.get("success"):
@@ -537,6 +556,7 @@ def _collect_trend_changes(
             rows=result.get("rows") or [],
             metric_unit=_unit_for_metric(metric),
             evidence_ref="query_recent_trend",
+            evidence_payload_ref="query_recent_trend",
         )
     )
     charts.append(
@@ -557,6 +577,8 @@ def _execute_query(
     *,
     sql: str,
     task: dict[str, Any],
+    time_range: str = "",
+    evidence_ref: str = "",
     technical_queries: list[dict[str, Any]],
 ) -> dict[str, Any]:
     validation = validate_sql(sql, context.profile, metric_context={"success": True, "matched_metrics": []})
@@ -564,12 +586,18 @@ def _execute_query(
         technical_queries.append({"sql": sql, "validation": validation, "execution": {}})
         return {"success": False, "error": "; ".join(validation.get("issues") or [])}
     execution = run_sql(db_path, validation["normalized_sql"], max_rows=20)
+    task_for_payload = dict(task)
+    if time_range and not task_for_payload.get("time_range"):
+        task_for_payload["time_range"] = {"raw_text": time_range}
     payload = build_evidence_payload(
-        task=task,
+        task=task_for_payload,
         execution_result=execution,
         metric_registry=context.metric_registry,
         sql=validation["normalized_sql"],
+        business_aliases=_payload_aliases(task_for_payload),
     )
+    if evidence_ref:
+        payload["evidence_ref"] = evidence_ref
     technical_queries.append(
         {
             "sql": validation["normalized_sql"],
@@ -579,6 +607,21 @@ def _execute_query(
         }
     )
     return execution
+
+
+def _payload_aliases(task: dict[str, Any]) -> dict[str, str]:
+    metrics = [str(item) for item in task.get("metrics") or [] if str(item).strip()]
+    dimensions = [str(item) for item in task.get("dimensions") or [] if str(item).strip()]
+    aliases = {}
+    if dimensions:
+        aliases["dimension_value"] = dimensions[0]
+        aliases["period_value"] = dimensions[0]
+        aliases["issue_value"] = dimensions[0]
+    if metrics:
+        aliases["metric_value"] = metrics[0]
+        aliases["total_value"] = metrics[0]
+        aliases["ticket_value"] = metrics[0]
+    return aliases
 
 
 def _time_filter_clause(
@@ -626,6 +669,7 @@ def _two_column_table(
     rows: list[list[Any]],
     metric_unit: str,
     evidence_ref: str,
+    evidence_payload_ref: str = "",
 ) -> ReportEvidenceTable:
     return ReportEvidenceTable(
         table_id=table_id,
@@ -641,6 +685,7 @@ def _two_column_table(
         source_chapter_id=source_chapter_id,
         description=description,
         evidence_ref=evidence_ref,
+        evidence_payload_ref=evidence_payload_ref,
     )
 
 
@@ -693,6 +738,32 @@ def _field_column(item: dict[str, Any]) -> str:
 def _first_dimension_column(context: _EvidenceContext, table_name: str) -> str:
     dimension = context.dimension_for_table(table_name)
     return _field_column(dimension) if dimension else ""
+
+
+def _support_ticket_count_expression(context: _EvidenceContext, table_name: str) -> str:
+    table = _profile_table(context.profile, table_name)
+    columns = [column for column in table.get("columns") or [] if isinstance(column, dict)]
+    explicit_count = next(
+        (
+            str(column.get("name") or "")
+            for column in columns
+            if _is_explicit_ticket_count_column(column)
+        ),
+        "",
+    )
+    if explicit_count:
+        return f"SUM({_quote(explicit_count)})"
+    ticket_id = next(
+        (
+            str(column.get("name") or "")
+            for column in columns
+            if _is_ticket_id_column(column)
+        ),
+        "",
+    )
+    if ticket_id:
+        return f"COUNT(DISTINCT {_quote(ticket_id)})"
+    return "COUNT(*)"
 
 
 def _profile_table(profile: dict[str, Any], table_name: str) -> dict[str, Any]:
@@ -780,6 +851,47 @@ def _matches(item: dict[str, Any], tokens: tuple[str, ...]) -> bool:
     return any(_compact(token) in compact for token in tokens)
 
 
+def _is_explicit_ticket_count_column(column: dict[str, Any]) -> bool:
+    compact = _compact(
+        " ".join(
+            str(value or "")
+            for value in [
+                column.get("name"),
+                column.get("label"),
+                column.get("business_label"),
+                *(column.get("aliases") or []),
+                *(column.get("meanings") or []),
+                *(column.get("business_meaning_candidates") or []),
+            ]
+        )
+    )
+    if _is_id_like_compact(compact):
+        return False
+    explicit_tokens = ("ticketcount", "ticketscount", "工单数", "工单量", "数量")
+    return compact == "count" or any(token in compact for token in explicit_tokens)
+
+
+def _is_ticket_id_column(column: dict[str, Any]) -> bool:
+    compact = _compact(
+        " ".join(
+            str(value or "")
+            for value in [
+                column.get("name"),
+                column.get("label"),
+                column.get("business_label"),
+                *(column.get("aliases") or []),
+                *(column.get("meanings") or []),
+                *(column.get("business_meaning_candidates") or []),
+            ]
+        )
+    )
+    return ("ticket" in compact or "工单" in compact) and _is_id_like_compact(compact)
+
+
+def _is_id_like_compact(compact: str) -> bool:
+    return "id" in compact or "编号" in compact or compact.endswith("号")
+
+
 def _compact(value: Any) -> str:
     return re.sub(r"[\s_\-]+", "", str(value).lower())
 
@@ -792,6 +904,6 @@ _REVENUE_TOKENS = ("revenue_like", "sales_like", "gmv_like", "revenue", "sales",
 _CUSTOMER_TOKENS = ("customer", "client", "member", "segment", "客户", "会员", "客群", "人群", "分群")
 _SUPPORT_TOKENS = ("support", "ticket", "issue", "complaint", "response", "satisfaction", "客服", "工单", "问题", "投诉", "响应", "满意度")
 _ISSUE_TOKENS = ("issue", "problem", "complaint", "type", "问题", "投诉", "类型")
-_TICKET_COUNT_TOKENS = ("ticket_count", "tickets", "工单数", "工单量", "工单")
+_TICKET_COUNT_TOKENS = ("ticket_count", "tickets", "工单数", "工单量")
 _SATISFACTION_TOKENS = ("satisfaction", "score", "rating", "满意度", "评分")
 _RESPONSE_TOKENS = ("response", "响应", "响应时长", "avg_response")
