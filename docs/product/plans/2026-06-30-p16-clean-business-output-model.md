@@ -266,7 +266,7 @@ Completed on 2026-06-30:
 Verification:
 
 - TDD red: focused report backend tests failed with missing `business_answer` / unsupported constructor field / legacy completed-section behavior; focused frontend tests failed because the report reader still rendered old `summary`.
-- `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py tests/test_provider_backed_report_writer.py -q` -> `32 passed`
+- `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py tests/test_provider_backed_report_writer.py -q` -> `32 passed` (superseded/deleted in P22-H1 closeout; the old provider-backed report writer path is no longer an active Report Center path)
 - `python3 -m pytest tests/test_product_result_builder.py tests/test_report_insight_cleanup.py -q` -> `16 passed`
 - `python3 -m pytest tests/test_p12_live_deepseek_workspace_report.py -q` -> `1 skipped` without live flags
 - `python3 -m pytest` -> `324 passed, 13 skipped`

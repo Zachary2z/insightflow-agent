@@ -178,9 +178,9 @@ InsightFlow can now be described as a Chinese-first general business data-analys
 - Keep factual evidence, model judgment, validation, and final expression separated.
 - Produce Chinese business conclusions, caveats, recommendations when requested, chart annotations, Markdown reports, and report summaries.
 
-Next phase:
+Current report work:
 
-- P22: evidence-driven Report Center rewrite so reports become coherent Chinese business documents instead of stitched analysis answers.
+- P22: evidence-driven Report Center rewrite so reports become coherent Chinese business documents instead of stitched analysis answers. H1 closeout removed the old report supervisor/agent/writer/planner path and its provider prompt/schema flags; the main report body now uses business Chinese rather than development-stage notes.
 - P23: China-oriented external business tool calling and exports after the P22 `ReportDocument` contract is stable.
 
 ## Verification

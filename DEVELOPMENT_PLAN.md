@@ -28,7 +28,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P20 general business analysis foundation work that cleans old paths and separates factual tools, model judgment, fact validation, and expression/report writing so the product can handle different uploaded business datasets.
 - P20 Chinese-first product scope: product-facing UI copy, clarifications, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers are supported through semantic recognition and Chinese aliases, not bilingual output branches.
 - P21 responsive analysis experience work added conservative route classification, fast factual paths, progress states, exact historical reuse, page recovery, compact task cards, and lightweight context packs without weakening the P20 evidence chain.
-- P22 evidence-driven report generation work has started. H1 replaced stitched Analysis Workbench report sections with a clean `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer` skeleton.
+- P22 evidence-driven report generation work has started. H1 replaced stitched Analysis Workbench report sections with a clean `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer` skeleton, then closeout removed the legacy report supervisor/agent/writer/planner files and their old provider prompt/schema flags.
 
 Current runtime chain:
 

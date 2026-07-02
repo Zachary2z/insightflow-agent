@@ -54,14 +54,6 @@ def provider_sql_candidate_enabled(env: dict[str, str] | None = None, env_path: 
     return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE", env, env_path)
 
 
-def provider_business_review_planner_enabled(env: dict[str, str] | None = None, env_path: str | Path | None = None) -> bool:
-    return _flag_enabled("INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER", env, env_path)
-
-
-def provider_report_writer_enabled(env: dict[str, str] | None = None, env_path: str | Path | None = None) -> bool:
-    return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER", env, env_path)
-
-
 def provider_claim_typing_enabled(env: dict[str, str] | None = None, env_path: str | Path | None = None) -> bool:
     return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING", env, env_path)
 
@@ -128,40 +120,6 @@ def build_sql_candidate_provider(
     env: dict[str, str] | None = None,
 ) -> LLMProvider | None:
     if not provider_sql_candidate_enabled(env, env_path):
-        return None
-
-    config = load_deepseek_config(env_path=env_path, require_api_key=True)
-    if not config.success:
-        return None
-
-    try:
-        return DeepSeekProvider(config)
-    except Exception:
-        return None
-
-
-def build_business_review_planner_provider(
-    env_path: str | Path = ".env",
-    env: dict[str, str] | None = None,
-) -> LLMProvider | None:
-    if not provider_business_review_planner_enabled(env, env_path):
-        return None
-
-    config = load_deepseek_config(env_path=env_path, require_api_key=True)
-    if not config.success:
-        return None
-
-    try:
-        return DeepSeekProvider(config)
-    except Exception:
-        return None
-
-
-def build_report_writer_provider(
-    env_path: str | Path = ".env",
-    env: dict[str, str] | None = None,
-) -> LLMProvider | None:
-    if not provider_report_writer_enabled(env, env_path):
         return None
 
     config = load_deepseek_config(env_path=env_path, require_api_key=True)

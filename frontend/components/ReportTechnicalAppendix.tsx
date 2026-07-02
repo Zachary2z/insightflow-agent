@@ -39,20 +39,20 @@ export default function ReportTechnicalAppendix({ report }: ReportTechnicalAppen
         <div className="technical-content">
           <section className="technical-block">
             <h3>报告元数据</h3>
-            <JsonBlock title="Report ID" value={report.report_id} />
-            <JsonBlock title="Workspace ID" value={report.workspace_id} />
-            <JsonBlock title="JSON path" value={report.json_path} />
-            <JsonBlock title="Markdown path" value={report.markdown_path} />
-            <JsonBlock title="Trace path" value={report.trace_path} />
-            <JsonBlock title="Artifact directory" value={report.artifact_dir} />
-            <JsonBlock title="Provider metadata" value={report.provider_metadata} />
+            <JsonBlock title="报告 ID" value={report.report_id} />
+            <JsonBlock title="工作区 ID" value={report.workspace_id} />
+            <JsonBlock title="JSON 路径" value={report.json_path} />
+            <JsonBlock title="Markdown 路径" value={report.markdown_path} />
+            <JsonBlock title="Trace 路径" value={report.trace_path} />
+            <JsonBlock title="产物目录" value={report.artifact_dir} />
+            <JsonBlock title="模型元数据" value={report.provider_metadata} />
           </section>
           <section className="technical-block">
             <h3>报告合同</h3>
-            <JsonBlock title="ReportPlan" value={report.plan} />
-            <JsonBlock title="ReportEvidencePack" value={report.evidence_pack} />
-            <JsonBlock title="ReportValidationResult" value={report.validation} />
-            <JsonBlock title="Technical appendix" value={report.document?.technical_appendix} />
+            <JsonBlock title="报告规划" value={report.plan} />
+            <JsonBlock title="证据包" value={report.evidence_pack} />
+            <JsonBlock title="校验结果" value={report.validation} />
+            <JsonBlock title="技术明细" value={report.document?.technical_appendix} />
           </section>
         </div>
       ) : null}

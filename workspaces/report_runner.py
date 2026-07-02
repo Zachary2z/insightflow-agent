@@ -57,7 +57,7 @@ def run_workspace_report(
         "plan": plan.to_dict(),
         "evidence_pack": evidence_pack.to_dict(),
         "validation": validation.to_dict(),
-        "pipeline": ["plan", "evidence", "compose", "validate", "render", "save"],
+        "generation_steps": ["规划报告", "整理证据", "撰写正文", "校验证据", "渲染保存"],
     }
 
     report_store = WorkspaceReportStore(store)
@@ -81,7 +81,7 @@ def run_workspace_report(
     report.risks_and_limits = list(document.data_boundaries)
     report.sections = []
     report.provider_metadata = {
-        "pipeline": "ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer",
+        "generation_flow": "evidence_driven_report_center",
         "provider_supplied": bool(providers),
         "section_runner_used": False,
     }
@@ -251,11 +251,11 @@ def _collect_evidence(
             if isinstance(table, dict)
         ],
         source_chapter_id="overview",
-        description="H1 使用工作区 profile 作为最小可运行证据包；H2 会接入 SQL/metric/chart 工具采集细粒度证据。",
+        description="当前证据主要来自工作区数据画像，细分指标证据仍需进一步采集。",
         evidence_ref="workspace_profile",
     )
     data_limits = [
-        "P22-H1 仅完成报告合同和主流程切换，细粒度 SQL 指标证据会在 H2/H3 接入。",
+        "当前证据主要来自工作区数据画像，收入结构、趋势变化和细分人群等指标仍需进一步采集。",
         "本报告不会把查询语句、原始明细、执行轨迹或模型技术元数据放入主正文。",
     ]
     if not metric_names:
@@ -287,8 +287,8 @@ def _compose_document(
     field_count = facts["workspace_field_count"].display_value
     opening_summary = (
         f"本报告基于当前工作区的 {table_count} 张数据表、{row_count} 行记录和 "
-        f"{field_count} 个字段生成。H1 已切换为证据驱动报告合同，正文按完整中文报告组织，"
-        "不再拼接分析工作台的章节回答。"
+        f"{field_count} 个字段生成。现有资料足以先形成一版经营复盘框架，"
+        "但细分指标、趋势图表和专题判断还需要继续补充证据。"
     )
     sections = [
         ReportDocumentSection(
@@ -305,9 +305,9 @@ def _compose_document(
             section_id="business_structure",
             title=plan.chapters[1].title if len(plan.chapters) > 1 else "业务结构",
             body=(
-                "本阶段先根据工作区 profile 和 semantic layer 建立报告证据包。"
-                "后续 H2 会把章节证据需求转成 SQL、指标、表格和图表请求，"
-                "H3 再由报告撰写器基于这些证据形成更细的业务判断。"
+                "当前可见的业务结构主要来自工作区字段画像和语义层口径。"
+                "这些信息能够帮助识别可用于复盘的指标、维度和时间字段，"
+                "但还不足以直接判断各渠道、商品、人群或客服环节的经营贡献。"
             ),
             evidence_refs=["workspace_field_count"],
         ),
@@ -330,7 +330,7 @@ def _compose_document(
         sections=sections,
         action_recommendations=[
             "优先完善语义层中的核心指标、主要维度和时间字段。",
-            "在 H2 接入证据采集后，再把收入结构、趋势、客户或客服问题写成细分章节。",
+            "补齐收入结构、趋势变化、客户分层或客服质量等细分证据后，再形成专题结论。",
             "涉及资源投入或预算加码前，先补齐利润、成本、转化率等支持性证据。",
         ],
         data_boundaries=list(evidence_pack.data_limits),
@@ -367,7 +367,7 @@ def _validate_document(
 def _document_evidence_summary(evidence_pack: ReportEvidencePack) -> list[str]:
     if evidence_pack.charts:
         return [chart.title for chart in evidence_pack.charts]
-    return ["H1 暂不生成图表；本报告先基于结构化证据包和 ReportDocument 正文阅读。"]
+    return ["当前尚未生成图表；本报告先基于工作区数据画像和结构化证据阅读。"]
 
 
 def _append_trace_events(trace_path: Path, events: list[dict[str, Any]]) -> None:

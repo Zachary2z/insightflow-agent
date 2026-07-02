@@ -20,7 +20,6 @@ const FEATURE_LABELS: Record<string, string> = {
   insight_drafting: "结论撰写",
   claim_typing: "证据判断",
   visualization: "图表建议",
-  report_writer: "报告写作",
 };
 
 const ROLE_LABELS: Record<string, string> = {

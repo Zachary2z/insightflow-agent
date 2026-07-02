@@ -78,12 +78,12 @@ def test_report_contract_serializes_plan_evidence_document_and_validation():
             ReportDocumentSection(
                 section_id="overview",
                 title="经营概览",
-                body="当前样例数据收入合计为 450.00，后续 H2 会接入真实证据采集。",
+                body="当前样例数据收入合计为 450.00，细分指标证据仍需进一步采集。",
                 evidence_refs=["revenue_total"],
             )
         ],
         action_recommendations=["补充更多业务维度后再做资源投入判断。"],
-        data_boundaries=["H1 仅建立报告合同和骨架链路。"],
+        data_boundaries=["当前仅基于样例数据和工作区画像。"],
     )
     validation = ReportValidationResult(status="passed", checked_facts=["revenue_total"])
 
@@ -148,6 +148,45 @@ def test_report_markdown_renders_document_body_without_stitched_section_labels(t
     assert "Business Review" not in business_body
     assert "Overall Performance" not in business_body
     assert "Evidence Backed Recommendations" not in business_body
+
+
+def test_report_main_body_does_not_expose_engineering_phase_terms(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成经营复盘报告。",
+    )
+
+    report = result["report"]
+    markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
+    main_markdown = markdown.split("## 技术附录", 1)[0]
+    document_text = json.dumps(
+        {
+            "opening_summary": report["document"]["opening_summary"],
+            "sections": report["document"]["sections"],
+            "action_recommendations": report["document"]["action_recommendations"],
+            "data_boundaries": report["document"]["data_boundaries"],
+        },
+        ensure_ascii=False,
+    )
+    forbidden_terms = [
+        "H1",
+        "H2",
+        "H3",
+        "pipeline",
+        "ReportDocument",
+        "ReportPlan",
+        "ReportEvidencePack",
+        "工程",
+        "开发阶段",
+    ]
+
+    for term in forbidden_terms:
+        assert term not in main_markdown
+        assert term not in document_text
 
 
 def test_report_main_path_does_not_call_run_workspace_analysis_for_sections(tmp_path):

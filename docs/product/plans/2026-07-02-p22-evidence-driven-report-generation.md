@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 
-**Status:** In progress; P22-H1 complete
+**Status:** In progress; P22-H1 closeout complete
 
 **Product Direction:** P22 turns Report Center from stitched analysis answers into a Chinese business report generator. The report path should collect evidence with tools, let the model write one coherent report from that evidence, validate key facts, and render a clean report page. Old report-section answer stitching should be deleted instead of preserved.
 
@@ -281,6 +281,8 @@ P22 should remove these current behaviors from the main path:
 
 Do not preserve old paths "just in case". If a helper remains useful, migrate the minimal helper into the new module and delete the old entry point.
 
+P22-H1 closeout deleted the old `agents/report_supervisor.py`, `agents/report_agent.py`, `agents/report_writer.py`, `agents/report_planner.py`, their legacy tests, and the old provider-backed report writer/planner prompt/schema/runtime flags. User-visible report body copy was also cleaned so the main report reads as business language rather than phase or engineering notes.
+
 ## P22-H1: Report Contract And Old Path Cutover
 
 Status: Complete on 2026-07-02.
@@ -379,11 +381,12 @@ Keep tests that verify current product behavior. Delete tests that only protect 
 Required focused tests:
 
 ```bash
-python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_document_pipeline.py -q
-python3 -m pytest tests/test_report_planner.py tests/test_report_evidence_collector.py tests/test_report_composer.py tests/test_report_validator.py -q
+python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q
 python3 -m pytest tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q
 cd frontend && npm test -- --run tests/workspace-flow.test.tsx tests/api-client.test.ts
 ```
+
+Historical commands that referenced deleted legacy files such as `tests/test_report_planner.py` are superseded by the current Report Center contract, store, API, and runner tests.
 
 Required closeout checks:
 

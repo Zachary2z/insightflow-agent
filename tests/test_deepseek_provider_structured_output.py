@@ -126,48 +126,6 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
     assert "sk-test-secret" not in str(call)
 
 
-def test_structured_output_accepts_report_planner_objects_and_rejects_string_lists():
-    from llm_ops.structured_output import validate_prompt_output
-
-    accepted = validate_prompt_output(
-        "report_planner",
-        {
-            "sections": [{"section_id": "weekly_gmv", "rationale": "Core metric."}],
-            "requires_clarification": False,
-            "clarification_questions": [],
-        },
-        schema_context={"allowed_section_ids": ["weekly_gmv", "top_products"]},
-    )
-    rejected = validate_prompt_output(
-        "report_planner",
-        {"sections": ["weekly_gmv", "top_products"]},
-        schema_context={"allowed_section_ids": ["weekly_gmv", "top_products"]},
-    )
-
-    assert accepted["success"] is True
-    assert accepted["content"]["sections"] == [{"section_id": "weekly_gmv", "rationale": "Core metric."}]
-    assert accepted["content"]["requires_clarification"] is False
-    assert rejected["success"] is False
-    assert rejected["error_type"] == "llm_schema_validation_error"
-    assert "sections[0] must be an object" in rejected["error"]
-
-
-def test_report_planner_prompt_describes_strict_section_object_schema():
-    from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-
-    rendered = DEFAULT_PROMPT_REGISTRY.render(
-        "report_planner",
-        {
-            "user_question": "帮我生成本周经营周报。",
-            "allowed_section_ids": ["weekly_gmv", "top_products"],
-        },
-    )
-
-    assert rendered["success"] is True
-    assert "sections must be an array of objects" in rendered["prompt"]
-    assert "string lists are invalid" in rendered["prompt"]
-
-
 def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
     from llm_ops.structured_output import validate_prompt_output
@@ -350,14 +308,13 @@ def test_validated_request_returns_structured_error_for_schema_mismatch():
     from llm_ops.structured_output import run_validated_llm_request
 
     result = run_validated_llm_request(
-        MockLLMProvider({"sections": ["weekly_gmv"]}),
+        MockLLMProvider({"sql_candidates": [123]}),
         LLMRequest(
-            prompt="Return report plan.",
-            prompt_id="report_planner",
+            prompt="Return SQL candidates.",
+            prompt_id="guarded_sql_candidate",
             prompt_version="v1",
             model="mock-free",
         ),
-        schema_context={"allowed_section_ids": ["weekly_gmv"]},
     )
 
     assert result["success"] is False
@@ -631,10 +588,10 @@ def test_malformed_json_returns_structured_error_without_crashing():
     from llm_ops.provider import LLMRequest, MockLLMProvider, run_llm_request
 
     result = run_llm_request(
-        MockLLMProvider('{"sections": ['),
+        MockLLMProvider('{"sql_candidates": ['),
         LLMRequest(
-            prompt="Return report plan.",
-            prompt_id="report_planner",
+            prompt="Return SQL candidates.",
+            prompt_id="guarded_sql_candidate",
             prompt_version="v1",
             model="mock-free",
         ),

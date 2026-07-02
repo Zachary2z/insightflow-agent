@@ -11,7 +11,6 @@ from llm_ops.runtime_provider import (
     provider_clarification_router_enabled,
     provider_insight_drafting_enabled,
     provider_question_understanding_enabled,
-    provider_report_writer_enabled,
     provider_sql_candidate_enabled,
     provider_sql_planning_enabled,
     provider_visualization_agent_enabled,
@@ -81,7 +80,6 @@ def _model_mode_status() -> dict[str, Any]:
         "insight_drafting": provider_insight_drafting_enabled(env_path=env_path),
         "claim_typing": provider_claim_typing_enabled(env_path=env_path),
         "visualization": provider_visualization_agent_enabled(env_path=env_path),
-        "report_writer": provider_report_writer_enabled(env_path=env_path),
     }
     enabled_count = sum(1 for enabled in provider_features.values() if enabled)
     if live_mode:

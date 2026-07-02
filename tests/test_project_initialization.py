@@ -50,6 +50,16 @@ def test_legacy_streamlit_ui_is_not_part_of_product_scaffold():
     assert not (ROOT / "ui").exists()
 
 
+def test_legacy_report_agents_are_not_part_of_current_report_center():
+    removed_paths = [
+        "agents/report_supervisor.py",
+        "agents/report_agent.py",
+        "agents/report_writer.py",
+    ]
+
+    assert [path for path in removed_paths if (ROOT / path).exists()] == []
+
+
 def test_fastapi_product_entrypoint_excludes_legacy_runs_api():
     from api.app import create_app
 

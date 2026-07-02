@@ -7,7 +7,6 @@ def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
         provider_final_answer_composer_enabled,
         provider_insight_drafting_enabled,
         provider_question_understanding_enabled,
-        provider_report_writer_enabled,
         provider_sql_candidate_enabled,
         provider_sql_planning_enabled,
         provider_visualization_agent_enabled,
@@ -25,7 +24,6 @@ def test_product_live_mode_enables_product_safe_provider_flags(monkeypatch):
     assert provider_final_answer_composer_enabled(env) is True
     assert provider_claim_typing_enabled(env) is True
     assert provider_visualization_agent_enabled(env) is True
-    assert provider_report_writer_enabled(env) is True
 
 
 def test_product_live_mode_preserves_explicit_provider_flags():

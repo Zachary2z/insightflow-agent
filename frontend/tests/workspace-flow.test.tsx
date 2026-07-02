@@ -313,7 +313,6 @@ describe("workspace product components", () => {
           question_understanding: true,
           clarification: true,
           sql_planning: true,
-          report_writer: true,
         },
       },
       safety: {
@@ -348,7 +347,6 @@ describe("workspace product components", () => {
     expect(screen.getByText("问题理解")).toBeTruthy();
     expect(screen.getByText("追问判断")).toBeTruthy();
     expect(screen.getByText("SQL 规划")).toBeTruthy();
-    expect(screen.getByText("报告写作")).toBeTruthy();
     expect(screen.getByText("SQL 审核不可绕过")).toBeTruthy();
     expect(screen.getByText("敏感字段拦截已开启")).toBeTruthy();
     expect(screen.getByText("Trace 可审计")).toBeTruthy();
@@ -1914,7 +1912,7 @@ describe("workspace product components", () => {
         json_path: "workspaces/ws_1/reports/report_1/report.json",
         trace_path: "workspaces/ws_1/reports/report_1/trace.json",
         artifact_dir: "workspaces/ws_1/reports/report_1/artifacts",
-        provider_metadata: { pipeline: "ReportPlan -> ReportEvidencePack -> ReportDocument" },
+        provider_metadata: { generation_flow: "evidence_driven_report_center" },
       },
     });
 
@@ -1977,7 +1975,7 @@ describe("workspace product components", () => {
           title: "收入趋势报告",
           time_range: "最近90天",
           data_sources: ["orders"],
-          opening_summary: "管理层摘要：本报告基于 ReportDocument 阅读。",
+          opening_summary: "管理层摘要：本报告基于当前工作区证据阅读。",
           sections: [
             {
               section_id: "trend",

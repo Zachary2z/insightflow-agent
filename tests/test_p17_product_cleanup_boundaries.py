@@ -181,6 +181,27 @@ def test_frontend_product_api_and_renderers_exclude_action_and_eval_paths():
     assert "business_answer" in frontend_source
 
 
+def test_legacy_report_writer_provider_and_prompts_are_removed_from_current_product_path():
+    combined = "\n".join(
+        _source(path)
+        for path in (
+            "llm_ops/runtime_provider.py",
+            "llm_ops/prompt_registry.py",
+            "llm_ops/structured_output.py",
+            "workspaces/settings_summary.py",
+            "frontend/components/DataSettings.tsx",
+        )
+    )
+
+    for old_term in (
+        "provider_report_writer",
+        "INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER",
+        "build_report_writer_provider",
+        "report_writer",
+    ):
+        assert old_term not in combined
+
+
 def test_legacy_chart_agent_planner_and_chart_tool_are_not_product_paths():
     assert not (ROOT / "agents" / "chart_agent.py").exists()
     assert not (ROOT / "agents" / "visualization_planner.py").exists()

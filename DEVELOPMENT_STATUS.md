@@ -65,12 +65,12 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Task | Status | Notes |
 |---|---|---|
-| P22-H1 | `[x]` Complete | Defined new report contracts, cut runner to plan/evidence/document/validation/render/save, deleted fixed English preset and per-section analysis stitching from the report main path, replaced Markdown/frontend report body rendering with `ReportDocument` |
+| P22-H1 | `[x]` Complete | Defined new report contracts, cut runner to plan/evidence/document/validation/render/save, deleted fixed English preset and per-section analysis stitching from the report main path, replaced Markdown/frontend report body rendering with `ReportDocument`, and removed old report agent/provider prompt paths |
 | P22-H2 | `[ ]` Planned | Build Chinese report planner and evidence collector from workspace profile/semantic layer |
 | P22-H3 | `[ ]` Planned | Add model-backed report composer and lightweight fact validator |
 | P22-H4 | `[ ]` Planned | Replace renderer/frontend report page, collapse technical appendix, run cleanup audit and regressions |
 
-P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. Remaining search hits for those terms are historical/superseded notes, negative tests, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations; those move to P23 after the new `ReportDocument` contract is stable.
+P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, old report supervisor/agent/writer/planner files, old provider report writer/planner flags, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. Remaining search hits for those terms are historical/superseded notes, negative tests, contract names, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations; those move to P23 after the new `ReportDocument` contract is stable.
 
 ## Latest P22-H1 Result
 
@@ -80,7 +80,8 @@ P22-H1 report contract and cutover completed on 2026-07-02:
 - Replaced the report runner main path with `plan -> evidence -> compose -> validate -> render -> save`. H1 evidence/composition is a minimal skeleton based on workspace profile and semantic-layer context; H2/H3 will add real report planning, SQL/metric/chart evidence collection, model-backed composition, and stronger validation.
 - Removed fixed English `REPORT_TYPE_PRESETS`, old report-section question generation, per-section retry/analysis stitching, and stitched narrative helpers from `workspaces/report_runner.py`.
 - Replaced Markdown and frontend report detail rendering so the main body comes from `ReportDocument`; technical plan/evidence/validation details stay in the collapsed appendix.
-- Deleted the old frontend `ReportSection` business-answer renderer and rewrote report runner/store/API/frontend tests away from stitched section output.
+- Deleted the old frontend `ReportSection` business-answer renderer, old report supervisor/agent/writer/planner files, their legacy tests, and the old provider prompt/schema/runtime flags for report writer/planner.
+- Cleaned user-visible report copy so the main body uses business-language evidence boundaries rather than H1/H2/H3, pipeline, contract names, or development-stage notes.
 - Verification passed: `python3 -m pytest tests/test_workspace_report_runner.py -q` (`6 passed`), `python3 -m pytest tests/test_workspace_report_runner.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`51 passed`), `python3 -m pytest tests/test_workspace_report_api.py -q` (`12 passed`), cleanup boundary regression (`21 passed`), and focused frontend Vitest (`63 passed`).
 
 ## Latest P21-H1 Result

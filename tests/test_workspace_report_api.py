@@ -61,7 +61,7 @@ def _client_with_fake_report_runner(tmp_path):
             title=plan.title,
             time_range=plan.time_range,
             data_sources=plan.data_sources,
-            opening_summary="管理层摘要：本报告基于 ReportDocument 生成。",
+            opening_summary="管理层摘要：本报告基于当前工作区证据生成。",
             sections=[
                 ReportDocumentSection(
                     section_id="overview",
@@ -176,7 +176,7 @@ def test_get_report_detail_returns_report_document(tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["report"]["report_id"] == created["report_id"]
-    assert payload["report"]["executive_summary"] == ["管理层摘要：本报告基于 ReportDocument 生成。"]
+    assert payload["report"]["executive_summary"] == ["管理层摘要：本报告基于当前工作区证据生成。"]
     assert payload["report"]["key_findings"] == ["付费搜索贡献了当前样例收入，是后续复盘的证据线索。"]
     assert payload["report"]["action_priorities"] == ["先补齐成本和转化率后再判断预算。"]
     assert payload["report"]["risks_and_limits"] == ["当前为 API 合同测试数据。"]
