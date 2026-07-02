@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import inspect
 from pathlib import Path
 
 import yaml
@@ -106,7 +107,6 @@ def test_report_runner_uses_report_document_contract_and_chinese_default_title(t
         workspace["workspace_id"],
         "business_review",
         "生成一份最近90天经营复盘报告，关注收入结构和行动建议。",
-        section_runner=lambda **_: (_ for _ in ()).throw(AssertionError("旧 section runner 不应被调用")),
     )
 
     report = result["report"]
@@ -123,6 +123,17 @@ def test_report_runner_uses_report_document_contract_and_chinese_default_title(t
     assert report["sections"] == []
 
 
+def test_report_runner_signature_removes_removed_section_compatibility():
+    import workspaces.report_runner as report_runner
+
+    signature = inspect.signature(run_workspace_report)
+    removed_parameter = "section" + "_" + "runner"
+    removed_type = "Section" + "Runner"
+
+    assert removed_parameter not in signature.parameters
+    assert not hasattr(report_runner, removed_type)
+
+
 def test_report_markdown_renders_document_body_without_stitched_section_labels(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
 
@@ -136,7 +147,7 @@ def test_report_markdown_renders_document_body_without_stitched_section_labels(t
     markdown = Path(result["report"]["markdown_path"]).read_text(encoding="utf-8")
     business_body = markdown.split("## 技术附录", 1)[0]
 
-    assert "# 最近90天经营复盘报告" in markdown
+    assert "# 最近90天趋势变化报告" in markdown
     assert "## 报告正文" in markdown
     assert "## 数据边界" in markdown
     assert "章节业务答案" not in business_body
@@ -148,6 +159,9 @@ def test_report_markdown_renders_document_body_without_stitched_section_labels(t
     assert "Business Review" not in business_body
     assert "Overall Performance" not in business_body
     assert "Evidence Backed Recommendations" not in business_body
+    assert "workspace_table_count" not in business_body
+    assert "workspace_profile" not in business_body
+    assert "证据来自当前工作区数据画像" in business_body
 
 
 def test_report_main_body_does_not_expose_engineering_phase_terms(tmp_path):
@@ -202,6 +216,7 @@ def test_report_main_path_does_not_call_run_workspace_analysis_for_sections(tmp_
     )
 
     assert not hasattr(report_runner, "run_workspace_analysis")
+    assert "run_workspace_analysis(" not in Path(report_runner.__file__).read_text(encoding="utf-8")
     assert result["success"] is True
     assert result["report"]["document"]["sections"]
 
@@ -245,7 +260,15 @@ def test_report_json_keeps_technical_details_outside_document_body(tmp_path):
     )
 
     saved = json.loads(Path(result["report"]["json_path"]).read_text(encoding="utf-8"))
-    document_text = json.dumps(saved["document"], ensure_ascii=False)
+    document_text = json.dumps(
+        {
+            "opening_summary": saved["document"]["opening_summary"],
+            "sections": saved["document"]["sections"],
+            "action_recommendations": saved["document"]["action_recommendations"],
+            "data_boundaries": saved["document"]["data_boundaries"],
+        },
+        ensure_ascii=False,
+    )
     appendix_text = json.dumps(saved["document"]["technical_appendix"], ensure_ascii=False)
 
     assert "SELECT" not in document_text

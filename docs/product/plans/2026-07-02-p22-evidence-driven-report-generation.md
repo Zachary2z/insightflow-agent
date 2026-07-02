@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 
-**Status:** In progress; P22-H1 closeout complete
+**Status:** In progress; P22-H1 and P22-H2 closeout complete
 
 **Product Direction:** P22 turns Report Center from stitched analysis answers into a Chinese business report generator. The report path should collect evidence with tools, let the model write one coherent report from that evidence, validate key facts, and render a clean report page. Old report-section answer stitching should be deleted instead of preserved.
 
@@ -332,6 +332,15 @@ Acceptance:
 - if the workspace has no support data, the report says the support chapter lacks source data instead of inventing it;
 - evidence pack contains facts, tables, charts, warnings, and data limits;
 - evidence collection does not write final report prose.
+
+Implemented H2 notes:
+
+- Added `workspaces/report_planner.py` for Chinese-first planning from `report_type`, `report_goal`, workspace profile, and semantic layer. It plans chapters for 经营概览、收入结构、客户分群、客服问题、趋势变化、行动建议 based on the user goal and available data.
+- Added `workspaces/report_evidence.py` for evidence collection from current workspace data. It reuses `build_metric_registry()`, `validate_sql()`, `run_sql()`, and `build_evidence_payload()` instead of introducing a separate SQL path.
+- Evidence packs now include Chinese labels, display values, source chapter ids, evidence refs, business-readable table titles/descriptions/columns/rows, chart intents, warnings, data limits, and technical query details.
+- Missing requested evidence is kept as a planned chapter with missing evidence requirements and as warnings/data limits in the evidence pack.
+- `run_workspace_report()` no longer accepts the old removed compatibility parameter and keeps the current plan -> evidence -> compose -> validate -> render -> save flow.
+- Markdown and frontend main views render business-readable evidence summaries and small tables, while internal evidence ids, SQL, raw rows, provider metadata, and trace details stay in the technical appendix.
 
 ## P22-H3: Report Composer And Fact Validator
 

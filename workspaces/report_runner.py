@@ -2,27 +2,24 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from workspaces.models import utc_now_iso
 from workspaces.profiler import profile_workspace_database
+from workspaces.report_evidence import collect_report_evidence
 from workspaces.report_models import (
-    EvidenceRequirement,
-    ReportChapterPlan,
     ReportDocument,
     ReportDocumentSection,
-    ReportEvidenceFact,
     ReportEvidencePack,
-    ReportEvidenceTable,
     ReportPlan,
     ReportValidationResult,
 )
+from workspaces.report_planner import plan_workspace_report
 from workspaces.report_store import WorkspaceReportStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
 
 
-SectionRunner = Callable[..., dict[str, Any]]
 SUPPORTED_REPORT_TYPES = {"business_review", "channel_performance", "revenue_trend"}
 
 
@@ -32,8 +29,6 @@ def run_workspace_report(
     report_type: str,
     report_goal: str,
     providers: dict | None = None,
-    *,
-    section_runner: SectionRunner | None = None,
 ) -> dict[str, Any]:
     if not report_goal or not report_goal.strip():
         raise ValueError("report_goal is required")
@@ -44,13 +39,18 @@ def run_workspace_report(
     profile = _ensure_profile(store, workspace)
     semantic_layer = _ensure_semantic_layer(store, workspace, profile)
 
-    plan = _plan_report(
+    plan = plan_workspace_report(
         report_type=report_type,
         report_goal=report_goal.strip(),
         profile=profile,
         semantic_layer=semantic_layer,
     )
-    evidence_pack = _collect_evidence(plan=plan, profile=profile, semantic_layer=semantic_layer)
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
     document = _compose_document(plan=plan, evidence_pack=evidence_pack)
     validation = _validate_document(document=document, evidence_pack=evidence_pack)
     document.technical_appendix = {
@@ -83,7 +83,6 @@ def run_workspace_report(
     report.provider_metadata = {
         "generation_flow": "evidence_driven_report_center",
         "provider_supplied": bool(providers),
-        "section_runner_used": False,
     }
     saved = report_store.save_report(report, event_type="report_completed")
     _append_trace_events(
@@ -136,205 +135,153 @@ def _ensure_semantic_layer(
     return {}
 
 
-def _plan_report(
-    *,
-    report_type: str,
-    report_goal: str,
-    profile: dict[str, Any],
-    semantic_layer: dict[str, Any],
-) -> ReportPlan:
-    data_sources = _data_sources(profile)
-    metric_hint = _first_semantic_name(semantic_layer.get("metrics")) or "核心业务指标"
-    dimension_hint = _first_semantic_name(semantic_layer.get("dimensions")) or "主要业务维度"
-    time_range = _infer_time_range(report_goal)
-    chapters = [
-        ReportChapterPlan(
-            chapter_id="overview",
-            title="经营概览",
-            purpose="说明本报告覆盖的数据范围、核心事实和阅读边界。",
-            evidence_requirements=[
-                EvidenceRequirement(
-                    requirement_id="workspace_scope",
-                    chapter_id="overview",
-                    description="确认当前工作区可用表、字段和数据规模。",
-                    metric_hint=metric_hint,
-                    dimension_hint=dimension_hint,
-                )
-            ],
-        ),
-        ReportChapterPlan(
-            chapter_id="business_structure",
-            title=_structure_chapter_title(report_type),
-            purpose="基于可用事实描述主要业务结构和后续需要重点分析的方向。",
-            evidence_requirements=[
-                EvidenceRequirement(
-                    requirement_id="business_structure",
-                    chapter_id="business_structure",
-                    description="整理当前语义层中可用于分组和度量的业务口径。",
-                    metric_hint=metric_hint,
-                    dimension_hint=dimension_hint,
-                    chart_hint="bar",
-                )
-            ],
-        ),
-        ReportChapterPlan(
-            chapter_id="actions",
-            title="行动建议",
-            purpose="给出证据边界内的下一步经营动作和补数建议。",
-            evidence_requirements=[
-                EvidenceRequirement(
-                    requirement_id="action_boundary",
-                    chapter_id="actions",
-                    description="列出当前证据能支持和暂不能支持的经营判断。",
-                )
-            ],
-        ),
-    ]
-    return ReportPlan(
-        title="最近90天经营复盘报告",
-        report_style=_report_style(report_type),
-        time_range=time_range,
-        data_sources=data_sources,
-        chapters=chapters,
-    )
-
-
-def _collect_evidence(
-    *,
-    plan: ReportPlan,
-    profile: dict[str, Any],
-    semantic_layer: dict[str, Any],
-) -> ReportEvidencePack:
-    tables = list(profile.get("tables") or [])
-    table_count = len(tables)
-    row_count = sum(_safe_int(table.get("row_count")) for table in tables if isinstance(table, dict))
-    field_count = sum(len(table.get("columns") or []) for table in tables if isinstance(table, dict))
-    facts = [
-        ReportEvidenceFact(
-            fact_id="workspace_table_count",
-            label="可用数据表数量",
-            value=table_count,
-            display_value=str(table_count),
-            source_chapter_id="overview",
-            evidence_ref="workspace_profile",
-        ),
-        ReportEvidenceFact(
-            fact_id="workspace_row_count",
-            label="可用数据行数",
-            value=row_count,
-            display_value=str(row_count),
-            source_chapter_id="overview",
-            evidence_ref="workspace_profile",
-        ),
-        ReportEvidenceFact(
-            fact_id="workspace_field_count",
-            label="可用字段数量",
-            value=field_count,
-            display_value=str(field_count),
-            source_chapter_id="business_structure",
-            evidence_ref="workspace_profile",
-        ),
-    ]
-    metric_names = _semantic_names(semantic_layer.get("metrics"))
-    dimension_names = _semantic_names(semantic_layer.get("dimensions"))
-    evidence_table = ReportEvidenceTable(
-        table_id="workspace_profile",
-        title="当前工作区数据概览",
-        columns=["数据表", "行数", "字段数"],
-        rows=[
-            {
-                "数据表": str(table.get("table_name") or table.get("name") or "未命名数据表"),
-                "行数": _safe_int(table.get("row_count")),
-                "字段数": len(table.get("columns") or []),
-            }
-            for table in tables
-            if isinstance(table, dict)
-        ],
-        source_chapter_id="overview",
-        description="当前证据主要来自工作区数据画像，细分指标证据仍需进一步采集。",
-        evidence_ref="workspace_profile",
-    )
-    data_limits = [
-        "当前证据主要来自工作区数据画像，收入结构、趋势变化和细分人群等指标仍需进一步采集。",
-        "本报告不会把查询语句、原始明细、执行轨迹或模型技术元数据放入主正文。",
-    ]
-    if not metric_names:
-        data_limits.append("当前语义层暂未提供可直接用于报告的指标口径。")
-    if not dimension_names:
-        data_limits.append("当前语义层暂未提供可直接用于报告的分组维度。")
-    return ReportEvidencePack(
-        facts=facts,
-        tables=[evidence_table],
-        warnings=[],
-        data_limits=data_limits,
-        technical_details={
-            "profile_table_count": table_count,
-            "semantic_metric_count": len(metric_names),
-            "semantic_dimension_count": len(dimension_names),
-            "planned_chapter_ids": [chapter.chapter_id for chapter in plan.chapters],
-        },
-    )
-
-
 def _compose_document(
     *,
     plan: ReportPlan,
     evidence_pack: ReportEvidencePack,
 ) -> ReportDocument:
     facts = {fact.fact_id: fact for fact in evidence_pack.facts}
-    table_count = facts["workspace_table_count"].display_value
-    row_count = facts["workspace_row_count"].display_value
-    field_count = facts["workspace_field_count"].display_value
-    opening_summary = (
-        f"本报告基于当前工作区的 {table_count} 张数据表、{row_count} 行记录和 "
-        f"{field_count} 个字段生成。现有资料足以先形成一版经营复盘框架，"
-        "但细分指标、趋势图表和专题判断还需要继续补充证据。"
+    tables_by_chapter: dict[str, list[Any]] = {}
+    for table in evidence_pack.tables:
+        tables_by_chapter.setdefault(table.source_chapter_id, []).append(table)
+
+    table_count = facts.get("workspace_table_count")
+    row_count = facts.get("workspace_row_count")
+    revenue_total = facts.get("revenue_total")
+    base_summary = (
+        f"本报告基于当前工作区的 {table_count.display_value if table_count else '若干'} 张数据表"
+        f"和 {row_count.display_value if row_count else '若干'} 行记录生成。"
     )
-    sections = [
-        ReportDocumentSection(
-            section_id="overview",
-            title="经营概览",
-            body=(
-                f"当前报告覆盖的数据来源包括：{_join_or_default(plan.data_sources, '当前工作区数据')}。"
-                f"从数据准备角度看，工作区已经具备 {table_count} 张表和 {row_count} 行记录，"
-                "可以作为后续经营复盘的证据基础。"
-            ),
-            evidence_refs=["workspace_table_count", "workspace_row_count"],
-        ),
-        ReportDocumentSection(
-            section_id="business_structure",
-            title=plan.chapters[1].title if len(plan.chapters) > 1 else "业务结构",
-            body=(
-                "当前可见的业务结构主要来自工作区字段画像和语义层口径。"
-                "这些信息能够帮助识别可用于复盘的指标、维度和时间字段，"
-                "但还不足以直接判断各渠道、商品、人群或客服环节的经营贡献。"
-            ),
-            evidence_refs=["workspace_field_count"],
-        ),
-        ReportDocumentSection(
-            section_id="actions",
-            title="行动建议",
-            body=(
-                "当前可执行的动作是继续完善语义层指标、时间范围和关键业务维度，"
-                "再进入下一轮证据采集和事实校验。涉及预算、利润、客服质量或客户分群的判断，"
-                "需要等待对应证据表和图表补齐后再写入主报告结论。"
-            ),
-            evidence_refs=["action_boundary"],
-        ),
-    ]
+    if revenue_total:
+        base_summary += f" 当前可识别的总收入为 {revenue_total.display_value}。"
+    base_summary += "正文只使用已采集到的结构化证据，并在数据边界中说明暂不支持的判断。"
+
+    sections = []
+    for chapter in plan.chapters:
+        chapter_tables = tables_by_chapter.get(chapter.chapter_id, [])
+        chapter_facts = [fact for fact in evidence_pack.facts if fact.source_chapter_id == chapter.chapter_id]
+        body = _section_body(chapter.chapter_id, plan, chapter_tables, chapter_facts, evidence_pack)
+        evidence_refs = [fact.fact_id for fact in chapter_facts] + [table.table_id for table in chapter_tables]
+        chart_refs = [chart.chart_id for chart in evidence_pack.charts if chart.source_chapter_id == chapter.chapter_id]
+        sections.append(
+            ReportDocumentSection(
+                section_id=chapter.chapter_id,
+                title=chapter.title,
+                body=body,
+                chart_refs=chart_refs,
+                evidence_refs=evidence_refs,
+            )
+        )
+
     return ReportDocument(
         title=plan.title,
         time_range=plan.time_range,
         data_sources=plan.data_sources,
-        opening_summary=opening_summary,
+        opening_summary=base_summary,
         sections=sections,
-        action_recommendations=[
-            "优先完善语义层中的核心指标、主要维度和时间字段。",
-            "补齐收入结构、趋势变化、客户分层或客服质量等细分证据后，再形成专题结论。",
-            "涉及资源投入或预算加码前，先补齐利润、成本、转化率等支持性证据。",
-        ],
-        data_boundaries=list(evidence_pack.data_limits),
+        action_recommendations=_action_recommendations(evidence_pack),
+        data_boundaries=_data_boundaries(evidence_pack),
     )
+
+
+def _section_body(
+    chapter_id: str,
+    plan: ReportPlan,
+    chapter_tables: list[Any],
+    chapter_facts: list[Any],
+    evidence_pack: ReportEvidencePack,
+) -> str:
+    if chapter_id == "overview":
+        scope = _first_table(chapter_tables)
+        if scope:
+            return (
+                f"当前报告覆盖的数据来源包括：{_join_or_default(plan.data_sources, '当前工作区数据')}。"
+                f"{scope.description} 工作区已具备可用于报告阅读的数据画像，并整理了可用指标、维度和时间字段。"
+            )
+        return "当前报告基于工作区现有数据生成，但数据画像尚不完整，后续结论需要结合补充证据阅读。"
+
+    if chapter_id == "revenue_structure":
+        total = next((fact for fact in chapter_facts if fact.fact_id == "revenue_total"), None)
+        table = _first_table(chapter_tables)
+        if table and table.rows:
+            leader = table.rows[0]
+            leader_text = _row_summary(leader)
+            total_text = f"当前总收入为 {total.display_value}。" if total else ""
+            return f"{total_text}{table.description} 其中 {leader_text}，是当前收入结构中最值得优先关注的部分。"
+        return _missing_body("收入结构", evidence_pack)
+
+    if chapter_id == "customer_segments":
+        table = _first_table(chapter_tables)
+        if table and table.rows:
+            return f"{table.description} {table.rows[0].get('客户分群', '排名靠前的客户分群')}贡献最高，{_row_summary(table.rows[0])}。"
+        return _missing_body("客户分群", evidence_pack)
+
+    if chapter_id == "support_issues":
+        table = _first_table(chapter_tables)
+        if table and table.rows:
+            return f"{table.description} 当前数量最高的问题是{table.rows[0].get('问题类型', '排名靠前的问题类型')}，{_row_summary(table.rows[0])}。"
+        return _missing_body("客服问题", evidence_pack)
+
+    if chapter_id == "trend_changes":
+        table = _first_table(chapter_tables)
+        if table and len(table.rows) >= 2:
+            first = table.rows[0]
+            last = table.rows[-1]
+            return f"{table.description} 从{_row_summary(first)}变化到{_row_summary(last)}，可作为后续判断业务变化方向的基础证据。"
+        if table and table.rows:
+            return f"{table.description} 当前只有一个周期的聚合结果：{_row_summary(table.rows[0])}，暂不足以判断连续趋势。"
+        return _missing_body("趋势变化", evidence_pack)
+
+    if chapter_id == "actions":
+        available = [table.title for table in evidence_pack.tables if table.source_chapter_id != "overview"]
+        if available:
+            return (
+                f"本报告已形成{'、'.join(available)}等证据。行动建议应优先围绕已验证的收入来源、客户贡献、"
+                "服务问题和趋势变化展开；未覆盖的数据口径需要先补齐，再进入预算或资源投入判断。"
+            )
+        return "当前可用证据仍以数据画像为主，建议先补齐核心指标、关键维度和时间字段，再形成经营动作。"
+
+    table = _first_table(chapter_tables)
+    if table and table.rows:
+        return f"{table.description} {_row_summary(table.rows[0])}。"
+    return "当前章节已保留在报告规划中，但工作区暂未提供足够证据支撑具体判断。"
+
+
+def _first_table(tables: list[Any]) -> Any | None:
+    return tables[0] if tables else None
+
+
+def _row_summary(row: dict[str, Any]) -> str:
+    return "，".join(f"{key}为{value}" for key, value in row.items())
+
+
+def _missing_body(topic: str, evidence_pack: ReportEvidencePack) -> str:
+    relevant_limits = [limit for limit in [*evidence_pack.warnings, *evidence_pack.data_limits] if topic[:2] in limit or topic in limit]
+    if relevant_limits:
+        return relevant_limits[0]
+    return f"当前工作区暂未提供足够的{topic}证据，本章节保留为待补充范围，不生成推断性结论。"
+
+
+def _action_recommendations(evidence_pack: ReportEvidencePack) -> list[str]:
+    table_titles = {table.title for table in evidence_pack.tables}
+    recommendations = []
+    if "收入结构" in table_titles:
+        recommendations.append("优先复盘收入贡献最高的业务来源，确认是否需要加大资源投入或优化定价。")
+    if "客户分群贡献" in table_titles:
+        recommendations.append("围绕贡献最高的客户分群设计留存、续费或增购动作，并跟踪后续收入变化。")
+    if "客服问题概览" in table_titles:
+        recommendations.append("针对工单量较高或满意度偏低的问题类型建立专项处理机制。")
+    if "趋势变化" in table_titles:
+        recommendations.append("把最近周期变化纳入周度复盘，持续观察收入、订单或服务指标是否出现拐点。")
+    recommendations.append("涉及利润、预算、人效或长期增长判断时，先补齐对应数据口径后再决策。")
+    return list(dict.fromkeys(recommendations))
+
+
+def _data_boundaries(evidence_pack: ReportEvidencePack) -> list[str]:
+    limits = [*evidence_pack.warnings, *evidence_pack.data_limits]
+    if not limits:
+        limits = ["本报告基于当前工作区已识别的数据表、指标和维度生成。"]
+    return list(dict.fromkeys(limits))
 
 
 def _validate_document(
@@ -343,17 +290,20 @@ def _validate_document(
     evidence_pack: ReportEvidencePack,
 ) -> ReportValidationResult:
     fact_ids = {fact.fact_id for fact in evidence_pack.facts}
+    table_ids = {table.table_id for table in evidence_pack.tables}
+    chart_ids = {chart.chart_id for chart in evidence_pack.charts}
+    supported_refs = fact_ids | table_ids | chart_ids
     referenced = {
         ref
         for section in document.sections
-        for ref in section.evidence_refs
-        if ref in fact_ids
+        for ref in [*section.evidence_refs, *section.chart_refs]
+        if ref in supported_refs
     }
     warnings = [
         ref
         for section in document.sections
-        for ref in section.evidence_refs
-        if ref not in fact_ids and ref != "action_boundary"
+        for ref in [*section.evidence_refs, *section.chart_refs]
+        if ref not in supported_refs
     ]
     status = "passed" if document.title and document.sections and not warnings else "warning"
     return ReportValidationResult(
@@ -388,69 +338,6 @@ def _append_trace_events(trace_path: Path, events: list[dict[str, Any]]) -> None
         ),
         encoding="utf-8",
     )
-
-
-def _data_sources(profile: dict[str, Any]) -> list[str]:
-    names = []
-    for table in profile.get("tables") or []:
-        if not isinstance(table, dict):
-            continue
-        name = table.get("display_name") or table.get("table_name") or table.get("name")
-        if name:
-            names.append(str(name))
-    return names or ["当前工作区数据"]
-
-
-def _semantic_names(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    names = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("label") or item.get("name") or item.get("id")
-        if name:
-            names.append(str(name))
-    return names
-
-
-def _first_semantic_name(value: Any) -> str:
-    names = _semantic_names(value)
-    return names[0] if names else ""
-
-
-def _infer_time_range(report_goal: str) -> str:
-    if "90" in report_goal or "九十" in report_goal:
-        return "最近90天"
-    if "本月" in report_goal:
-        return "本月"
-    if "本周" in report_goal:
-        return "本周"
-    return "最近90天"
-
-
-def _report_style(report_type: str) -> str:
-    return {
-        "business_review": "经营复盘",
-        "channel_performance": "渠道表现复盘",
-        "revenue_trend": "收入趋势复盘",
-    }.get(report_type, "经营复盘")
-
-
-def _structure_chapter_title(report_type: str) -> str:
-    return {
-        "business_review": "业务结构",
-        "channel_performance": "渠道表现",
-        "revenue_trend": "收入趋势",
-    }.get(report_type, "业务结构")
-
-
-def _safe_int(value: Any) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
 
 def _join_or_default(items: list[str], default: str) -> str:
     visible = [item for item in items if item.strip()]

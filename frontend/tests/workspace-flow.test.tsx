@@ -1879,7 +1879,17 @@ describe("workspace product components", () => {
         },
         evidence_pack: {
           facts: [{ fact_id: "revenue_total", label: "总收入", display_value: "200.00" }],
-          tables: [],
+          tables: [
+            {
+              table_id: "revenue_by_category",
+              title: "收入结构",
+              description: "证据来自订单表按产品品类汇总。",
+              columns: ["产品品类", "收入"],
+              rows: [{ 产品品类: "企业SaaS订阅", 收入: "20.0 万" }],
+              source_chapter_id: "revenue_by_channel",
+              evidence_ref: "query_revenue_by_category",
+            },
+          ],
           charts: [],
         },
         document: {
@@ -1925,6 +1935,10 @@ describe("workspace product components", () => {
     expect(screen.getByText("行动建议")).toBeTruthy();
     expect(screen.getByText("数据边界")).toBeTruthy();
     expect(screen.getByText("报告正文")).toBeTruthy();
+    expect(screen.getByText("收入结构")).toBeTruthy();
+    expect(screen.getByText("证据来自订单表按产品品类汇总。")).toBeTruthy();
+    expect(screen.getByText("企业SaaS订阅")).toBeTruthy();
+    expect(screen.getByText("20.0 万")).toBeTruthy();
     expect(screen.getByText("管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。")).toBeTruthy();
     expect(screen.getByText("先复盘付费搜索投放效率。")).toBeTruthy();
     expect(screen.getByText("当前报告缺少 ROI、利润和转化率。")).toBeTruthy();
@@ -1941,6 +1955,8 @@ describe("workspace product components", () => {
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.json")).toBeNull();
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/artifacts")).toBeNull();
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText("revenue_by_category")).toBeNull();
+    expect(screen.queryByText("query_revenue_by_category")).toBeNull();
     expect(screen.queryByText("paid_search")).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
     expect(screen.queryByText(/sql_reviewer/)).toBeNull();

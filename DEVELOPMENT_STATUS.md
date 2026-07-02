@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P22 Evidence-Driven Report Generation in progress |
-| Current task | P22-H1 Report contract and old report path cutover complete |
-| Next planned task | P22-H2 Chinese report planner and evidence collector |
-| Last completed task | P22-H1 Report contract and old report path cutover |
+| Current task | P22-H2 Chinese report planner and evidence collector complete |
+| Next planned task | P22-H3 model-backed report composer and lightweight fact validator |
+| Last completed task | P22-H2 Chinese report planner and evidence collector |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -36,7 +36,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P19 | `[x]` Complete | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, cleanup, and live acceptance |
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
-| P22 | `[~]` In progress | Evidence-driven Report Center: H1 replaced the report main contract with `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer`, deleted the old stitched report main path, and prepared the contract for H2/H3 evidence/composer work |
+| P22 | `[~]` In progress | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection from workspace profile, semantic layer, and guarded SQL tools |
 | P23 | `[ ]` Future | Real China-oriented business tool calling and exports after the P22 report document contract is stable |
 
 ## P20 Task Status
@@ -66,11 +66,22 @@ This is the concise current status surface for InsightFlow Agent.
 | Task | Status | Notes |
 |---|---|---|
 | P22-H1 | `[x]` Complete | Defined new report contracts, cut runner to plan/evidence/document/validation/render/save, deleted fixed English preset and per-section analysis stitching from the report main path, replaced Markdown/frontend report body rendering with `ReportDocument`, and removed old report agent/provider prompt paths |
-| P22-H2 | `[ ]` Planned | Build Chinese report planner and evidence collector from workspace profile/semantic layer |
+| P22-H2 | `[x]` Complete | Added Chinese report planner and evidence collector from workspace profile, semantic layer, metric registry, SQL validator/executor, and evidence payload helpers |
 | P22-H3 | `[ ]` Planned | Add model-backed report composer and lightweight fact validator |
 | P22-H4 | `[ ]` Planned | Replace renderer/frontend report page, collapse technical appendix, run cleanup audit and regressions |
 
 P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, old report supervisor/agent/writer/planner files, old provider report writer/planner flags, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. Remaining search hits for those terms are historical/superseded notes, negative tests, contract names, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations; those move to P23 after the new `ReportDocument` contract is stable.
+
+## Latest P22-H2 Result
+
+P22-H2 Chinese report planner and evidence collector completed on 2026-07-02:
+
+- Added `workspaces/report_planner.py` for Chinese-first report planning from report type, user goal, workspace profile, and semantic layer. Goals such as 经营复盘、收入结构、客户分群、客服问题、趋势变化、行动建议 now produce matching Chinese chapters.
+- Added `workspaces/report_evidence.py` for structured evidence collection. It reuses the metric registry, SQL validator, SQL executor, and evidence payload helper; SQL and raw execution details stay in technical details.
+- Evidence packs now include business-readable Chinese facts, display values, evidence tables, chart intents, warnings, data limits, and technical query details.
+- `run_workspace_report()` no longer accepts the old removed section compatibility parameter and no longer keeps its provider metadata marker. The report path remains plan -> evidence -> compose -> validate -> render -> save.
+- Markdown and the report detail UI now render business-readable evidence table titles, descriptions, and small tables in the main body while keeping internal ids, SQL, raw rows, trace, provider metadata, and query details in the technical appendix.
+- Verification passed: report planner/evidence plus runner focused tests (`12 passed`), report API/store regression (`25 passed`), P20 realistic acceptance (`3 passed`), cleanup boundary regression (`23 passed`), report/product-result/analysis regression (`53 passed`), and focused frontend Vitest (`63 passed`).
 
 ## Latest P22-H1 Result
 

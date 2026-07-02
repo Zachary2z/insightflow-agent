@@ -26,10 +26,12 @@ def render_report_markdown(report: ReportRecord) -> str:
     if document.sections:
         for section in document.sections:
             lines.extend([f"### {section.title}", "", section.body or "本章节暂未形成正文。"])
-            if section.chart_refs:
-                lines.extend(["", "图表引用：" + "、".join(section.chart_refs)])
-            if section.evidence_refs:
-                lines.extend(["", "证据引用：" + "、".join(section.evidence_refs)])
+            for table in _tables_for_section(report, section.section_id):
+                lines.extend(["", f"**{table.get('title', '证据表')}**", ""])
+                description = str(table.get("description") or "").strip()
+                if description:
+                    lines.extend([description, ""])
+                lines.extend(_render_markdown_table(table))
             lines.append("")
     else:
         lines.extend(["暂无报告正文。", ""])
@@ -73,6 +75,33 @@ def _render_technical_appendix(report: ReportRecord, document: ReportDocument) -
         "",
         "</details>",
     ]
+
+
+def _tables_for_section(report: ReportRecord, section_id: str) -> list[dict[str, Any]]:
+    if not report.evidence_pack:
+        return []
+    return [
+        table.to_dict()
+        for table in report.evidence_pack.tables
+        if table.source_chapter_id == section_id and table.rows
+    ]
+
+
+def _render_markdown_table(table: dict[str, Any]) -> list[str]:
+    columns = [str(column) for column in table.get("columns") or [] if str(column).strip()]
+    rows = [row for row in table.get("rows") or [] if isinstance(row, dict)]
+    if not columns or not rows:
+        return []
+    visible_rows = rows[:5]
+    lines = [
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
+    ]
+    for row in visible_rows:
+        lines.append("| " + " | ".join(str(row.get(column, "")) for column in columns) + " |")
+    if len(rows) > len(visible_rows):
+        lines.append(f"（仅展示前 {len(visible_rows)} 行）")
+    return lines
 
 
 def _numbered_list(items: list[str], empty_message: str) -> list[str]:

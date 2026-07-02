@@ -126,6 +126,7 @@ function ReportDocumentBody({ report, language }: { report: WorkspaceReport; lan
   const labels = REPORT_LABELS[language];
   const document = report.document;
   const sections = document?.sections ?? [];
+  const evidenceTables = report.evidence_pack?.tables ?? [];
   if (!sections.length) {
     return (
       <ProductCard>
@@ -145,10 +146,67 @@ function ReportDocumentBody({ report, language }: { report: WorkspaceReport; lan
         <ProductCard key={section.section_id} className="report-section-card">
           <h3>{section.title}</h3>
           <p>{section.body}</p>
+          <SectionEvidenceTables
+            tables={evidenceTables.filter((table) => table.source_chapter_id === section.section_id)}
+          />
         </ProductCard>
       ))}
     </section>
   );
+}
+
+function SectionEvidenceTables({ tables }: { tables: Array<Record<string, unknown>> }) {
+  const visibleTables = tables.filter((table) => {
+    const rows = Array.isArray(table.rows) ? table.rows : [];
+    return rows.length > 0;
+  });
+  if (!visibleTables.length) {
+    return null;
+  }
+  return (
+    <div className="report-evidence-tables">
+      {visibleTables.map((table, index) => {
+        const title = typeof table.title === "string" ? table.title : "证据表";
+        const description = typeof table.description === "string" ? table.description : "";
+        const columns = Array.isArray(table.columns) ? table.columns.map(String) : [];
+        const rows = Array.isArray(table.rows) ? table.rows.slice(0, 5) : [];
+        return (
+          <div className="report-evidence-table" key={`${title}-${index}`}>
+            <h4>{title}</h4>
+            {description ? <p>{description}</p> : null}
+            {columns.length ? (
+              <table>
+                <thead>
+                  <tr>
+                    {columns.map((column) => (
+                      <th key={column}>{column}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {columns.map((column) => (
+                        <td key={column}>{cellValue(row, column)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function cellValue(row: unknown, column: string) {
+  if (row && typeof row === "object" && !Array.isArray(row)) {
+    const value = (row as Record<string, unknown>)[column];
+    return value == null ? "" : String(value);
+  }
+  return "";
 }
 
 export default function ReportViewer({ workspaceId, reportId }: ReportViewerProps) {
