@@ -17,6 +17,11 @@ from workspaces.report_models import (
 )
 
 
+class _TimeFilter:
+    def __init__(self, where_sql: str = "") -> None:
+        self.where_sql = where_sql
+
+
 def collect_report_evidence(
     *,
     plan: ReportPlan,
@@ -37,6 +42,7 @@ def collect_report_evidence(
             _collect_revenue_structure(
                 context,
                 analysis_db_path,
+                time_range=plan.time_range,
                 facts=facts,
                 tables=tables,
                 charts=charts,
@@ -48,6 +54,7 @@ def collect_report_evidence(
             _collect_customer_segments(
                 context,
                 analysis_db_path,
+                time_range=plan.time_range,
                 tables=tables,
                 charts=charts,
                 warnings=warnings,
@@ -58,6 +65,7 @@ def collect_report_evidence(
             _collect_support_issues(
                 context,
                 analysis_db_path,
+                time_range=plan.time_range,
                 tables=tables,
                 charts=charts,
                 warnings=warnings,
@@ -68,6 +76,7 @@ def collect_report_evidence(
             _collect_trend_changes(
                 context,
                 analysis_db_path,
+                time_range=plan.time_range,
                 tables=tables,
                 charts=charts,
                 warnings=warnings,
@@ -233,6 +242,7 @@ def _collect_revenue_structure(
     context: _EvidenceContext,
     db_path: str | Path,
     *,
+    time_range: str,
     facts: list[ReportEvidenceFact],
     tables: list[ReportEvidenceTable],
     charts: list[ReportEvidenceChart],
@@ -246,10 +256,17 @@ def _collect_revenue_structure(
         return
     table_name = _metric_table(metric)
     dimension = context.structure_dimension(table_name)
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label="收入结构证据",
+    )
     total = _execute_query(
         context,
         db_path,
-        sql=f"SELECT {_metric_formula(metric)} AS total_value FROM {_quote(table_name)}",
+        sql=f"SELECT {_metric_formula(metric)} AS total_value FROM {_quote(table_name)}{time_filter.where_sql}",
         task={"task_type": "summary", "metrics": [_metric_label(metric)], "dimensions": []},
         technical_queries=technical_queries,
     )
@@ -278,7 +295,8 @@ def _collect_revenue_structure(
         db_path,
         sql=(
             f"SELECT {_quote(dim_col)} AS dimension_value, {_metric_formula(metric)} AS metric_value "
-            f"FROM {_quote(table_name)} GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
+            f"FROM {_quote(table_name)}{time_filter.where_sql} "
+            f"GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
         ),
         task={"task_type": "rank", "metrics": [_metric_label(metric)], "dimensions": [_label(dimension)]},
         technical_queries=technical_queries,
@@ -315,6 +333,7 @@ def _collect_customer_segments(
     context: _EvidenceContext,
     db_path: str | Path,
     *,
+    time_range: str,
     tables: list[ReportEvidenceTable],
     charts: list[ReportEvidenceChart],
     warnings: list[str],
@@ -331,12 +350,20 @@ def _collect_customer_segments(
         data_limits.append("当前工作区暂未识别到客户分群维度，无法生成客户分群贡献证据。")
         return
     dim_col = _field_column(dimension)
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label="客户分群证据",
+    )
     result = _execute_query(
         context,
         db_path,
         sql=(
             f"SELECT {_quote(dim_col)} AS dimension_value, {_metric_formula(metric)} AS metric_value "
-            f"FROM {_quote(table_name)} GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
+            f"FROM {_quote(table_name)}{time_filter.where_sql} "
+            f"GROUP BY {_quote(dim_col)} ORDER BY metric_value DESC"
         ),
         task={"task_type": "rank", "metrics": [_metric_label(metric)], "dimensions": [_label(dimension)]},
         technical_queries=technical_queries,
@@ -373,6 +400,7 @@ def _collect_support_issues(
     context: _EvidenceContext,
     db_path: str | Path,
     *,
+    time_range: str,
     tables: list[ReportEvidenceTable],
     charts: list[ReportEvidenceChart],
     warnings: list[str],
@@ -396,11 +424,18 @@ def _collect_support_issues(
         select_parts.append(f"AVG({_quote(satisfaction_col)}) AS satisfaction_value")
     if response_col:
         select_parts.append(f"AVG({_quote(response_col)}) AS response_value")
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label="客服问题证据",
+    )
     result = _execute_query(
         context,
         db_path,
         sql=(
-            f"SELECT {', '.join(select_parts)} FROM {_quote(table_name)} "
+            f"SELECT {', '.join(select_parts)} FROM {_quote(table_name)}{time_filter.where_sql} "
             f"GROUP BY {_quote(issue_col)} ORDER BY ticket_value DESC"
         ),
         task={"task_type": "rank", "metrics": ["工单量"], "dimensions": ["问题类型"]},
@@ -451,6 +486,7 @@ def _collect_trend_changes(
     context: _EvidenceContext,
     db_path: str | Path,
     *,
+    time_range: str,
     tables: list[ReportEvidenceTable],
     charts: list[ReportEvidenceChart],
     warnings: list[str],
@@ -464,15 +500,25 @@ def _collect_trend_changes(
     table_name = _metric_table(metric)
     time_field = context.time_field_for_table(table_name)
     if not time_field:
-        data_limits.append("当前指标所在数据表缺少时间字段，无法生成趋势变化证据。")
+        data_limits.append(
+            f"趋势变化证据需要按{time_range}读取，但{_readable_table_name(table_name)}缺少时间字段，"
+            "未应用时间过滤，无法生成趋势变化证据。"
+        )
         return
     time_col = _field_column(time_field)
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label="趋势变化证据",
+    )
     result = _execute_query(
         context,
         db_path,
         sql=(
             f"SELECT substr({_quote(time_col)}, 1, 7) AS period_value, {_metric_formula(metric)} AS metric_value "
-            f"FROM {_quote(table_name)} GROUP BY period_value ORDER BY period_value"
+            f"FROM {_quote(table_name)}{time_filter.where_sql} GROUP BY period_value ORDER BY period_value"
         ),
         task={"task_type": "trend", "metrics": [_metric_label(metric)], "dimensions": ["周期"]},
         technical_queries=technical_queries,
@@ -533,6 +579,40 @@ def _execute_query(
         }
     )
     return execution
+
+
+def _time_filter_clause(
+    context: _EvidenceContext,
+    table_name: str,
+    *,
+    time_range: str,
+    data_limits: list[str],
+    evidence_label: str,
+) -> _TimeFilter:
+    normalized_range = str(time_range or "").strip()
+    if normalized_range not in {"最近90天", "最近30天", "本月", "本周"}:
+        return _TimeFilter()
+
+    time_field = context.time_field_for_table(table_name)
+    if not time_field:
+        data_limits.append(
+            f"{evidence_label}需要按{normalized_range}读取，但{_readable_table_name(table_name)}缺少时间字段，"
+            "未应用时间过滤，结果基于该表可用全量数据。"
+        )
+        return _TimeFilter()
+
+    time_col = _quote(_field_column(time_field))
+    table_ref = _quote(table_name)
+    max_date = f"(SELECT MAX(date({time_col})) FROM {table_ref})"
+    if normalized_range == "最近90天":
+        condition = f"date({time_col}) >= date({max_date}, '-90 days')"
+    elif normalized_range == "最近30天":
+        condition = f"date({time_col}) >= date({max_date}, '-30 days')"
+    elif normalized_range == "本月":
+        condition = f"strftime('%Y-%m', date({time_col})) = strftime('%Y-%m', {max_date})"
+    else:
+        condition = f"date({time_col}) >= date({max_date}, '-7 days')"
+    return _TimeFilter(where_sql=f" WHERE {condition}")
 
 
 def _two_column_table(

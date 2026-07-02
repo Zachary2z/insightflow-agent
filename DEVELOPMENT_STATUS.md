@@ -78,6 +78,8 @@ P22-H2 Chinese report planner and evidence collector completed on 2026-07-02:
 
 - Added `workspaces/report_planner.py` for Chinese-first report planning from report type, user goal, workspace profile, and semantic layer. Goals such as 经营复盘、收入结构、客户分群、客服问题、趋势变化、行动建议 now produce matching Chinese chapters.
 - Added `workspaces/report_evidence.py` for structured evidence collection. It reuses the metric registry, SQL validator, SQL executor, and evidence payload helper; SQL and raw execution details stay in technical details.
+- H2 repair aligned report titles, `time_range`, and evidence SQL. 最近90天、最近30天、本月、本周 evidence filters use the relevant table's maximum date as the anchor, not the system date.
+- If a requested evidence query cannot apply the report time range because the table has no time field, the evidence pack records a warning or data boundary instead of silently using full-table evidence.
 - Evidence packs now include business-readable Chinese facts, display values, evidence tables, chart intents, warnings, data limits, and technical query details.
 - `run_workspace_report()` no longer accepts the old removed section compatibility parameter and no longer keeps its provider metadata marker. The report path remains plan -> evidence -> compose -> validate -> render -> save.
 - Markdown and the report detail UI now render business-readable evidence table titles, descriptions, and small tables in the main body while keeping internal ids, SQL, raw rows, trace, provider metadata, and query details in the technical appendix.

@@ -339,6 +339,7 @@ Implemented H2 notes:
 - Added `workspaces/report_evidence.py` for evidence collection from current workspace data. It reuses `build_metric_registry()`, `validate_sql()`, `run_sql()`, and `build_evidence_payload()` instead of introducing a separate SQL path.
 - Evidence packs now include Chinese labels, display values, source chapter ids, evidence refs, business-readable table titles/descriptions/columns/rows, chart intents, warnings, data limits, and technical query details.
 - Missing requested evidence is kept as a planned chapter with missing evidence requirements and as warnings/data limits in the evidence pack.
+- H2 repair makes report titles, plan `time_range`, and evidence SQL consistent. 最近90天、最近30天、本月、本周 filters are anchored on the maximum date in each relevant table. If a table has no time field, the evidence pack states that time filtering was not applied instead of silently using full data.
 - `run_workspace_report()` no longer accepts the old removed compatibility parameter and keeps the current plan -> evidence -> compose -> validate -> render -> save flow.
 - Markdown and frontend main views render business-readable evidence summaries and small tables, while internal evidence ids, SQL, raw rows, provider metadata, and trace details stay in the technical appendix.
 

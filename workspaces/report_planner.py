@@ -14,6 +14,7 @@ def plan_workspace_report(
     semantic_layer: dict[str, Any],
 ) -> ReportPlan:
     goal = report_goal.strip()
+    time_range = _infer_time_range(goal)
     capabilities = _semantic_capabilities(profile, semantic_layer)
     requested = _requested_topics(goal)
     if "business_review" in requested or not requested:
@@ -38,9 +39,9 @@ def plan_workspace_report(
         chapters.append(_chapter_for_topic("actions", capabilities))
 
     return ReportPlan(
-        title=_title_for_goal(goal, report_type),
+        title=_title_for_goal(goal, report_type, time_range),
         report_style=_report_style(report_type, goal),
-        time_range=_infer_time_range(goal),
+        time_range=time_range,
         data_sources=_data_sources(profile),
         chapters=chapters,
     )
@@ -323,14 +324,14 @@ def _data_sources(profile: dict[str, Any]) -> list[str]:
     return names or ["当前工作区数据"]
 
 
-def _title_for_goal(goal: str, report_type: str) -> str:
+def _title_for_goal(goal: str, report_type: str, time_range: str) -> str:
     if "趋势" in goal and "复盘" not in goal:
-        return "最近90天趋势变化报告"
+        return f"{time_range}趋势变化报告"
     if "客服" in goal and "经营" not in goal and "复盘" not in goal:
-        return "最近90天客服问题报告"
+        return f"{time_range}客服问题报告"
     if report_type == "revenue_trend":
-        return "最近90天趋势变化报告"
-    return "最近90天经营复盘报告"
+        return f"{time_range}趋势变化报告"
+    return f"{time_range}经营复盘报告"
 
 
 def _report_style(report_type: str, goal: str) -> str:
