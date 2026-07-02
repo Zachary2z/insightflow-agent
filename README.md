@@ -33,9 +33,11 @@ The product is intentionally guarded: LLM/provider-backed steps may understand, 
 | P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
 | P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
 | P19 report and chart synthesis | Complete | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, technical appendix, and H5 live acceptance |
-| P20 general business analysis foundation | In progress | `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md` |
+| P20 general business analysis foundation | Complete | `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md` |
+| P21 responsive analysis experience | Complete | `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md` |
+| P22 evidence-driven report generation | In progress | H1 complete; `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md` |
 
-P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0, P20-H1, and P20-H2 are complete: the product now has a generalized semantic-layer baseline with Chinese business aliases, safe metric formula quoting, and a reusable Chinese analysis task contract with slot-level clarification continuation. P20 is the current foundation phase: clean old/conflicting paths, generalize data profiling and semantic context, stabilize factual evidence and metric formulas, and make answers/reports use validated evidence without fixed demo templates. Product-facing copy, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers remain supported through semantic recognition and Chinese aliases. Real external business tool calling remains a later product phase after the generalized analysis foundation and responsiveness work are stable.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0 through P20-H5 are complete: the product now has a generalized semantic-layer baseline with Chinese business aliases, safe metric formula quoting, a reusable Chinese analysis task contract with slot-level clarification continuation, a stable fact/evidence payload with metric formulas, comparison scope, warnings, and Chinese business display values, plus evidence-backed Chinese business answers, chart descriptions, and report synthesis. P21-H1 through P21-H6 are complete: each analysis run carries conservative `analysis_route` metadata, low-risk `fast_fact` questions use a shorter SQL/evidence-backed answer path, product results include business-friendly `progress_steps`, same-workspace/same-data-version/same-normalized-question completed runs can be offered as historical reuse candidates without calling the model, newly submitted runs create recoverable background run shells with compact task cards plus polling/page recovery, and `fast_fact` answers use lightweight context packs that retain key evidence while excluding raw SQL, trace, provider metadata, full workspace profile, and full raw rows from the compact pack. P22-H1 is complete: Report Center now persists `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer`, and the old fixed-preset/per-section analysis stitching path is deleted from the report main path. Product-facing copy, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers remain supported through semantic recognition and Chinese aliases.
 
 ## Quickstart
 
@@ -93,7 +95,7 @@ GET  /api/workspaces/{workspace_id}/runs/{run_id}
 GET  /api/workspaces/{workspace_id}/artifacts/{relative_path}
 ```
 
-`POST /api/workspaces/{workspace_id}/runs` accepts either a new `user_question` or a continuation request with `pending_run_id` and `clarification_answer`.
+`POST /api/workspaces/{workspace_id}/runs` accepts either a new `user_question` or a continuation request with `pending_run_id` and `clarification_answer`. New analysis requests create a recoverable run id and can return `status: "running"` while local background work continues; clients should poll `GET /api/workspaces/{workspace_id}/runs/{run_id}` for `running`, `waiting_for_clarification`, `completed`, or `failed`. For repeated completed questions in the same workspace `data_version`, it can return `status: "cache_candidate"` with `matched_run_id`; send `force_reanalysis: true` to explicitly rerun.
 
 Reports:
 
@@ -106,7 +108,7 @@ GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
 
 Supported report types are `business_review`, `channel_performance`, and `revenue_trend`.
 
-Report records now expose management-facing narrative fields before section details: `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, `risks_and_limits`, then a collapsed technical appendix for SQL, traces, raw previews, and provider metadata.
+Current report records expose the P22-H1 document contract: `plan`, `evidence_pack`, `document`, and `validation`. Markdown and the report detail UI render `ReportDocument` as a Chinese report with opening summary, body chapters, action recommendations, data boundaries, and a collapsed technical appendix. The old stitched section-answer report shape is superseded/deleted from the main path; legacy top-level summary arrays remain only as derived list/detail metadata during the cutover.
 
 ## Business Answer Contract
 
@@ -158,19 +160,44 @@ P20-H1 semantic foundation note: workspace profiling now emits generalized field
 
 P20-H2 task contract note: question understanding now emits a normalized `analysis_task` contract with `task_type`, Chinese `dimensions` and `metrics`, `time_range`, `filters`, `decision_goal`, `missing_slots`, `defaults_applied`, `resolved_question`, fixed `output_language: "zh"`, and confidence. Complete Chinese questions such as “最近90天按门店比较销售额” continue into analysis; incomplete recommendation questions ask concise Chinese follow-ups for missing slots; partial continuation answers such as “花费” keep the run waiting for the remaining time range; and provider-backed outputs are normalized so they cannot bypass missing-slot rules or switch product output away from Chinese.
 
+P20-H3 fact layer note: metric lookup now exposes a JSON-safe metric registry with base formulas and supported derived metrics only when source fields exist. ROAS, net return, margin rate, and average order value keep separate formulas and source fields; missing sources produce warnings instead of invented metrics. Product results now carry a reusable `fact_payload` under evidence and technical details with `columns`, `rows`, `formulas`, `time_scope`, `filters`, `comparison_scope`, `warnings`, `display_values`, and `technical_sql`. Main `business_answer` fields remain free of raw SQL and raw rows.
+
+P20-H4 answer/report note: answer composition now rebuilds useful Chinese recommendations from validated multi-row evidence instead of accepting stale "证据不足" downgrades. Fact-only questions keep caveats without forcing action plans; recommendation questions can explain metric tradeoffs such as revenue scale versus ROI; fallback charts choose chart types from task intent with Chinese titles and annotations; and management reports stay Chinese-first while reusing section business answers and evidence.
+
+P20-H5 closeout note: realistic acceptance now covers store sales/satisfaction and support ticket operations datasets, with factual questions, ranking, comparison, trend, recommendation, chart artifacts, evidence payloads, and management-report synthesis all running through the current workspace product path. Report section prompts now ask agents to use the current workspace schema/profile/semantic layer rather than assuming a demo schema. Common service-operation fields such as `team_name`, `ticket_count`, and `avg_response_minutes` display as Chinese business labels. Schema-review failure guidance is generic to the current workspace and no longer points users toward a demo-specific field set.
+
+## Product Capabilities After P20
+
+InsightFlow can now be described as a Chinese-first general business data-analysis multi-agent product foundation:
+
+- Import different business datasets through workspace CSV/Excel/SQLite flows.
+- Profile tables and fields, then draft a semantic layer with metrics, dimensions, time fields, entities, aliases, formulas, and relationship candidates.
+- Map Chinese, English, and mixed raw headers into Chinese business semantics.
+- Understand Chinese business questions, ask concise follow-up questions for missing slots, and continue after clarification.
+- Use SQL, metric, evidence, chart, and report tools to produce validated facts and artifacts.
+- Keep factual evidence, model judgment, validation, and final expression separated.
+- Produce Chinese business conclusions, caveats, recommendations when requested, chart annotations, Markdown reports, and report summaries.
+
+Next phase:
+
+- P22: evidence-driven Report Center rewrite so reports become coherent Chinese business documents instead of stitched analysis answers.
+- P23: China-oriented external business tool calling and exports after the P22 `ReportDocument` contract is stable.
+
 ## Verification
 
 Focused cleanup boundary:
 
 ```bash
-python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
 ```
 
 Current backend regression:
 
 ```bash
+python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q
 python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
 python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_p20_live_deepseek_acceptance.py -q
 python3 -m pytest
 ```
 
@@ -188,7 +215,18 @@ npm test
 npm run build
 ```
 
-Live provider acceptance is explicit opt-in and requires local environment configuration. Keep real DeepSeek live tests; they cover workspace analysis, workspace reports, product answer quality, clarification continuation, and history reliability.
+Live provider acceptance is explicit opt-in and requires local environment configuration. Keep real DeepSeek live tests; they cover workspace analysis, workspace reports, product answer quality, clarification continuation, history reliability, and P20 non-channel store analysis.
+
+To enable live DeepSeek acceptance locally:
+
+```bash
+export INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1
+export INSIGHTFLOW_PRODUCT_LIVE_MODE=1
+export DEEPSEEK_API_KEY=...
+python3 -m pytest tests/test_p20_live_deepseek_acceptance.py -q
+```
+
+Without those flags and a key, live tests skip by default and must not fail normal regression.
 
 ## Generated Artifacts
 

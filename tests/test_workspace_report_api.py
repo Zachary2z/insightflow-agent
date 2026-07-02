@@ -4,24 +4,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import create_app
-from workspaces.report_models import ReportRecord, ReportSection
+from workspaces.report_models import (
+    ReportDocument,
+    ReportDocumentSection,
+    ReportEvidenceFact,
+    ReportEvidencePack,
+    ReportPlan,
+    ReportValidationResult,
+)
 from workspaces.report_store import WorkspaceReportStore
 from workspaces.store import WorkspaceStore
 
 
 SUPPORTED_REPORT_TYPES = {"business_review", "channel_performance", "revenue_trend"}
-
-
-def _business_answer() -> dict:
-    return {
-        "headline": "付费搜索收入领先",
-        "direct_answer": "付费搜索是本节收入最高的渠道。",
-        "why": "证据表显示 paid_search 收入为 200.0。",
-        "evidence_bullets": ["paid_search 收入为 200.0。"],
-        "recommendations": ["优先复盘付费搜索渠道。"],
-        "caveats": ["当前只基于报告章节查询结果。"],
-        "confidence": "high",
-    }
 
 
 def _client_with_fake_report_runner(tmp_path):
@@ -43,35 +38,62 @@ def _client_with_fake_report_runner(tmp_path):
                 "providers": providers,
             }
         )
-        report = ReportRecord(
-            report_id=f"report_fake_{len(calls)}",
+        plan = ReportPlan(
+            title="最近90天经营复盘报告",
+            report_style="经营复盘",
+            time_range="最近90天",
+            data_sources=["orders"],
+        )
+        evidence_pack = ReportEvidencePack(
+            facts=[
+                ReportEvidenceFact(
+                    fact_id="revenue_total",
+                    label="总收入",
+                    value=200.0,
+                    display_value="200.00",
+                    source_chapter_id="overview",
+                    evidence_ref="table_revenue",
+                )
+            ]
+        )
+        validation = ReportValidationResult(status="passed", checked_facts=["revenue_total"])
+        document = ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="管理层摘要：本报告基于 ReportDocument 生成。",
+            sections=[
+                ReportDocumentSection(
+                    section_id="overview",
+                    title="经营概览",
+                    body="付费搜索贡献了当前样例收入，是后续复盘的证据线索。",
+                    evidence_refs=["revenue_total"],
+                )
+            ],
+            action_recommendations=["先补齐成本和转化率后再判断预算。"],
+            data_boundaries=["当前为 API 合同测试数据。"],
+            technical_appendix={
+                "plan": plan.to_dict(),
+                "evidence_pack": evidence_pack.to_dict(),
+                "validation": validation.to_dict(),
+            },
+        )
+        report = WorkspaceReportStore(store).create_report_record(
             workspace_id=workspace_id,
             report_type=report_type,
             report_goal=report_goal.strip(),
-            title="Fake Business Review",
-            status="completed",
-            executive_summary=["管理层摘要：付费搜索是收入主线。"],
-            key_findings=["关键发现：付费搜索收入最高。"],
-            action_priorities=["行动优先级：先复盘付费搜索渠道。"],
-            chart_and_evidence=["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"],
-            risks_and_limits=["风险边界：当前只基于报告章节查询结果。"],
-            sections=[
-                ReportSection(
-                    section_id="revenue_by_channel",
-                    title="Revenue by Channel",
-                    purpose="Compare channels.",
-                    status="completed",
-                    question="Which channels led revenue?",
-                    business_answer=_business_answer(),
-                    sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
-                    columns=["channel", "revenue"],
-                    rows_preview=[{"channel": "paid_search", "revenue": 200.0}],
-                    evidence_notes=["Result preview comes from workspace data."],
-                    provider_metadata={"sql_planning": {"provider_called": True}},
-                    trace_nodes=["sql_reviewer_agent", "sql_executor_node"],
-                )
-            ],
+            title=plan.title,
+            status="running",
         )
+        report.status = "completed"
+        report.plan = plan
+        report.evidence_pack = evidence_pack
+        report.document = document
+        report.validation = validation
+        report.executive_summary = [document.opening_summary]
+        report.key_findings = [document.sections[0].body]
+        report.action_priorities = list(document.action_recommendations)
+        report.risks_and_limits = list(document.data_boundaries)
         saved = WorkspaceReportStore(store).save_report(report)
         assert Path(workspace["root_path"]) in Path(saved.markdown_path).parents
         return {
@@ -103,7 +125,7 @@ def _create_report(client: TestClient, workspace_id: str) -> dict:
     return response.json()
 
 
-def test_create_report_returns_persisted_report(tmp_path):
+def test_create_report_returns_persisted_report_document(tmp_path):
     client, _, calls = _client_with_fake_report_runner(tmp_path)
     workspace_id = _create_workspace(client)
 
@@ -111,20 +133,14 @@ def test_create_report_returns_persisted_report(tmp_path):
 
     assert payload["success"] is True
     assert payload["workspace_id"] == workspace_id
-    assert payload["report_id"] == "report_fake_1"
-    assert payload["report"]["report_id"] == "report_fake_1"
     assert payload["report"]["status"] == "completed"
-    assert payload["report"]["sections"][0]["business_answer"] == _business_answer()
-    assert "summary" not in payload["report"]["sections"][0]
-    assert payload["report"]["sections"][0]["sql"].startswith("SELECT channel")
-    assert payload["report"]["sections"][0]["technical_details"]["sql"].startswith("SELECT channel")
-    assert payload["report"]["sections"][0]["technical_details"]["provider_metadata"]["sql_planning"][
-        "provider_called"
-    ] is True
-    assert payload["report"]["sections"][0]["technical_details"]["trace_nodes"] == [
-        "sql_reviewer_agent",
-        "sql_executor_node",
-    ]
+    assert payload["report"]["title"] == "最近90天经营复盘报告"
+    assert payload["report"]["title"] != "Business Review"
+    assert payload["report"]["plan"]["title"] == "最近90天经营复盘报告"
+    assert payload["report"]["evidence_pack"]["facts"][0]["fact_id"] == "revenue_total"
+    assert payload["report"]["document"]["sections"][0]["body"].startswith("付费搜索贡献")
+    assert payload["report"]["validation"]["status"] == "passed"
+    assert payload["report"]["sections"] == []
     assert calls == [
         {
             "workspace_id": workspace_id,
@@ -145,10 +161,10 @@ def test_list_reports_returns_workspace_reports(tmp_path):
     assert response.status_code == 200
     reports = response.json()["reports"]
     assert [report["report_id"] for report in reports] == [created["report_id"]]
-    assert reports[0]["title"] == "Fake Business Review"
+    assert reports[0]["title"] == "最近90天经营复盘报告"
 
 
-def test_get_report_detail_returns_report(tmp_path):
+def test_get_report_detail_returns_report_document(tmp_path):
     client, _, _ = _client_with_fake_report_runner(tmp_path)
     workspace_id = _create_workspace(client)
     created = _create_report(client, workspace_id)
@@ -160,16 +176,14 @@ def test_get_report_detail_returns_report(tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["report"]["report_id"] == created["report_id"]
-    assert payload["report"]["executive_summary"] == ["管理层摘要：付费搜索是收入主线。"]
-    assert payload["report"]["key_findings"] == ["关键发现：付费搜索收入最高。"]
-    assert payload["report"]["action_priorities"] == ["行动优先级：先复盘付费搜索渠道。"]
-    assert payload["report"]["chart_and_evidence"] == ["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"]
-    assert payload["report"]["risks_and_limits"] == ["风险边界：当前只基于报告章节查询结果。"]
-    assert "technical_details" in payload["report"]["sections"][0]
-    assert payload["report"]["sections"][0]["business_answer"]["headline"] == "付费搜索收入领先"
+    assert payload["report"]["executive_summary"] == ["管理层摘要：本报告基于 ReportDocument 生成。"]
+    assert payload["report"]["key_findings"] == ["付费搜索贡献了当前样例收入，是后续复盘的证据线索。"]
+    assert payload["report"]["action_priorities"] == ["先补齐成本和转化率后再判断预算。"]
+    assert payload["report"]["risks_and_limits"] == ["当前为 API 合同测试数据。"]
+    assert payload["report"]["document"]["opening_summary"].startswith("管理层摘要")
 
 
-def test_download_report_markdown_returns_markdown_file(tmp_path):
+def test_download_report_markdown_returns_document_markdown_file(tmp_path):
     client, _, _ = _client_with_fake_report_runner(tmp_path)
     workspace_id = _create_workspace(client)
     created = _create_report(client, workspace_id)
@@ -181,18 +195,16 @@ def test_download_report_markdown_returns_markdown_file(tmp_path):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/markdown")
     assert f'filename="{created["report_id"]}.md"' in response.headers["content-disposition"]
-    assert "# Fake Business Review" in response.text
-    assert "## 管理层摘要" in response.text
-    assert "## 关键发现" in response.text
-    assert "## 行动优先级" in response.text
-    assert "## 图表与证据" in response.text
-    assert "## 风险与边界" in response.text
-    assert "#### 结论" in response.text
-    assert "付费搜索收入领先" in response.text
-    assert "#### 直接回答" in response.text
-    assert "付费搜索是本节收入最高的渠道。" in response.text
+    assert "# 最近90天经营复盘报告" in response.text
+    assert "## 开篇摘要" in response.text
+    assert "## 报告正文" in response.text
+    assert "### 经营概览" in response.text
+    assert "## 行动建议" in response.text
+    assert "## 数据边界" in response.text
     assert "## 技术附录" in response.text
-    assert "```sql\nSELECT channel" in response.text
+    assert "章节业务答案" not in response.text
+    assert "#### 直接回答" not in response.text
+    assert "```sql" not in response.text
 
 
 @pytest.mark.parametrize(

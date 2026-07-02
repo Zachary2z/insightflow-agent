@@ -3,241 +3,82 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from workspaces.report_models import ReportRecord, ReportSection
+from workspaces.report_models import ReportDocument, ReportRecord
 
 
 def render_report_markdown(report: ReportRecord) -> str:
-    chinese = _report_is_chinese(report)
-    headings = _headings(chinese)
+    document = report.document or _empty_document(report)
     lines: list[str] = [
-        f"# {report.title}",
+        f"# {document.title or report.title}",
         "",
-        f"## {headings['goal']}",
+        f"生成状态：{report.status}",
+        f"报告目标：{report.report_goal}",
+        f"时间范围：{document.time_range or '当前工作区可用数据'}",
+        f"数据来源：{_join_or_default(document.data_sources, '当前工作区数据')}",
         "",
-        report.report_goal or "_No report goal provided._",
+        "## 开篇摘要",
         "",
-        f"## {headings['summary']}",
+        document.opening_summary or "本报告正在生成，暂未形成摘要。",
+        "",
+        "## 报告正文",
         "",
     ]
-    lines.extend(_bullet_list(report.executive_summary, "_No executive summary yet._"))
-    lines.extend(["", f"## {headings['findings']}", ""])
-    lines.extend(_bullet_list(report.key_findings, "_No key findings yet._"))
-    lines.extend(["", f"## {headings['actions']}", ""])
-    lines.extend(_bullet_list(report.action_priorities, "_No action priorities yet._"))
-    lines.extend(["", f"## {headings['charts']}", ""])
-    lines.extend(_render_chart_and_evidence(report, chinese=chinese, empty_message="_No chart or evidence summary yet._"))
-    lines.extend(["", f"## {headings['limits']}", ""])
-    lines.extend(_bullet_list(report.risks_and_limits, "_No risks or limits recorded._"))
-    lines.extend(["", f"## {headings['sections']}", ""])
-    if report.sections:
-        for section in report.sections:
-            lines.extend(_render_business_section(section, chinese=chinese))
+    if document.sections:
+        for section in document.sections:
+            lines.extend([f"### {section.title}", "", section.body or "本章节暂未形成正文。"])
+            if section.chart_refs:
+                lines.extend(["", "图表引用：" + "、".join(section.chart_refs)])
+            if section.evidence_refs:
+                lines.extend(["", "证据引用：" + "、".join(section.evidence_refs)])
             lines.append("")
     else:
-        lines.extend(["_No report sections yet._", ""])
-    lines.extend([f"## {headings['appendix']}", ""])
-    lines.extend(_render_report_appendix(report))
+        lines.extend(["暂无报告正文。", ""])
+    lines.extend(["## 行动建议", ""])
+    lines.extend(_numbered_list(document.action_recommendations, "暂无行动建议。"))
+    lines.extend(["", "## 数据边界", ""])
+    lines.extend(_bullet_list(document.data_boundaries, "暂无数据边界说明。"))
+    lines.extend(["", "## 技术附录", ""])
+    lines.extend(_render_technical_appendix(report, document))
     lines.append("")
     return "\n".join(lines)
 
 
-def _render_business_section(section: ReportSection, *, chinese: bool) -> list[str]:
-    answer = section.business_answer or {}
-    labels = _business_section_labels(chinese)
-    lines = [
-        f"### {section.title}",
-        "",
-        f"- {labels['status']}: `{section.status}`",
-        "",
-        f"#### {labels['conclusion']}",
-        "",
-        str(answer.get("headline") or "_No headline recorded._"),
-        "",
-        f"#### {labels['direct_answer']}",
-        "",
-        str(answer.get("direct_answer") or "_No direct answer recorded._"),
-        "",
-        f"#### {labels['why']}",
-        "",
-        str(answer.get("why") or "_No reasoning recorded._"),
-    ]
-    lines.extend(["", f"#### {labels['evidence']}", ""])
-    lines.extend(_bullet_list(_text_list(answer.get("evidence_bullets")), "_No evidence bullets recorded._"))
-    lines.extend(["", f"#### {labels['actions']}", ""])
-    lines.extend(_bullet_list(_text_list(answer.get("recommendations")), "_No recommendations recorded._"))
-    lines.extend(["", f"#### {labels['limits']}", ""])
-    lines.extend(_bullet_list(_text_list(answer.get("caveats")), "_No caveats recorded._"))
-    lines.extend(["", f"#### {labels['confidence']}", "", str(answer.get("confidence") or "medium")])
-    lines.extend(["", f"#### {labels['charts']}", ""])
-    lines.extend(_render_section_artifacts(section, chinese=chinese))
-    if section.error:
-        lines.extend(["", "#### Error", "", section.error])
-    return lines
+def _empty_document(report: ReportRecord) -> ReportDocument:
+    return ReportDocument(
+        title=report.title,
+        time_range="当前工作区可用数据",
+        data_sources=[],
+        opening_summary="本报告尚未形成可展示正文。",
+    )
 
 
-def _render_chart_and_evidence(report: ReportRecord, *, chinese: bool, empty_message: str) -> list[str]:
-    lines: list[str] = []
-    rendered_paths: set[str] = set()
-    for section in report.sections:
-        for artifact in section.business_artifacts or []:
-            path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
-            title = str(artifact.get("title") or section.title or "报告图表").strip()
-            if not path_or_url or path_or_url in rendered_paths:
-                continue
-            rendered_paths.add(path_or_url)
-            lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
-            lines.extend(_artifact_caption_lines(artifact, section_title=section.title, chinese=chinese))
-    if report.chart_and_evidence:
-        lines.extend(_bullet_list(report.chart_and_evidence, empty_message))
-    return lines or [empty_message]
-
-
-def _render_section_artifacts(section: ReportSection, *, chinese: bool) -> list[str]:
-    artifacts = section.business_artifacts or [
-        {"type": "chart", "path": path, "title": section.title}
-        for path in section.artifact_paths
-    ]
-    if not artifacts:
-        return ["_No chart artifacts recorded._"]
-    lines: list[str] = []
-    for artifact in artifacts:
-        path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
-        title = str(artifact.get("title") or section.title or "报告图表").strip()
-        if path_or_url:
-            lines.append(f"![{_escape_image_alt(title)}]({path_or_url})")
-        lines.extend(_artifact_caption_lines(artifact, section_title=section.title, chinese=chinese))
-    return lines
-
-
-def _artifact_caption_lines(artifact: dict[str, Any], *, section_title: str, chinese: bool) -> list[str]:
-    title = str(artifact.get("title") or section_title or "报告图表").strip()
-    unit = str(artifact.get("unit") or "").strip()
-    annotation = str(artifact.get("business_annotation") or "").strip()
-    labels = _artifact_caption_labels(chinese)
-    lines = [f"- {labels['title']}: {title}" if not chinese else f"- {labels['title']}：{title}"]
-    if unit:
-        lines.append(f"- {labels['unit']}: {unit}" if not chinese else f"- {labels['unit']}：{unit}")
-    if annotation:
-        lines.append(
-            f"- {labels['annotation']}: {annotation}"
-            if not chinese
-            else f"- {labels['annotation']}：{annotation}"
-        )
-    path_or_url = str(artifact.get("url") or artifact.get("path") or "").strip()
-    if path_or_url:
-        lines.append(f"- {labels['link']}: {path_or_url}" if not chinese else f"- {labels['link']}：{path_or_url}")
-    return lines
-
-
-def _render_report_appendix(report: ReportRecord) -> list[str]:
-    lines = [
+def _render_technical_appendix(report: ReportRecord, document: ReportDocument) -> list[str]:
+    appendix: dict[str, Any] = {
+        "report_id": report.report_id,
+        "workspace_id": report.workspace_id,
+        "report_type": report.report_type,
+        "created_at": report.created_at,
+        "updated_at": report.updated_at,
+        "validation": report.validation.to_dict() if report.validation else {},
+    }
+    if document.technical_appendix:
+        appendix.update(document.technical_appendix)
+    return [
         "<details>",
-        "<summary>Report Metadata</summary>",
+        "<summary>技术细节</summary>",
         "",
-        f"- Report ID: `{report.report_id}`",
-        f"- Workspace ID: `{report.workspace_id}`",
-        f"- Report type: `{report.report_type}`",
-        f"- Created at: `{report.created_at}`",
-        f"- Updated at: `{report.updated_at}`",
-        f"- JSON path: `{report.json_path}`",
-        f"- Markdown path: `{report.markdown_path}`",
-        f"- Trace path: `{report.trace_path}`",
-        f"- Artifact directory: `{report.artifact_dir}`",
+        "```json",
+        json.dumps(appendix, ensure_ascii=False, indent=2),
+        "```",
+        "",
+        "</details>",
     ]
-    if report.provider_metadata:
-        lines.extend(
-            [
-                "",
-                "```json",
-                json.dumps(report.provider_metadata, ensure_ascii=False, indent=2),
-                "```",
-            ]
-        )
-    lines.extend(["", "</details>", ""])
-    if report.sections:
-        for section in report.sections:
-            lines.extend(_render_section_appendix(section))
-            lines.append("")
-    else:
-        lines.append("_No technical section details recorded._")
-    return lines
 
 
-def _render_section_appendix(section: ReportSection) -> list[str]:
-    details = _section_technical_details(section)
-    lines = [
-        "<details>",
-        f"<summary>{section.title}</summary>",
-        "",
-        f"- Section ID: `{section.section_id}`",
-        f"- Status: `{section.status}`",
-        f"- Purpose: {details.get('purpose') or section.purpose or '_Not specified._'}",
-        f"- Internal question: {details.get('internal_question') or section.question or '_Not specified._'}",
-        "",
-        "#### SQL",
-        "",
-    ]
-    sql = details.get("sql") or section.sql
-    if sql:
-        lines.extend(["```sql", str(sql), "```"])
-    else:
-        lines.append("_No SQL recorded._")
-    lines.extend(["", "#### Result Preview", ""])
-    lines.extend(_render_preview_table(section, details))
-    lines.extend(["", "#### Provider Metadata", ""])
-    provider_metadata = details.get("provider_metadata") or section.provider_metadata
-    if provider_metadata:
-        lines.extend(["```json", json.dumps(provider_metadata, ensure_ascii=False, indent=2), "```"])
-    else:
-        lines.append("_No provider metadata recorded._")
-    lines.extend(["", "#### Trace Nodes", ""])
-    trace_nodes = details.get("trace_nodes") or section.trace_nodes
-    lines.extend(_bullet_list([f"`{node}`" for node in trace_nodes], "_No section trace nodes recorded._"))
-    if section.error or details.get("error"):
-        lines.extend(["", "#### Error", "", str(details.get("error") or section.error)])
-    lines.extend(["", "</details>"])
-    return lines
-
-
-def _section_technical_details(section: ReportSection) -> dict[str, Any]:
-    details = dict(section.technical_details or {})
-    details.setdefault("internal_question", section.question)
-    details.setdefault("purpose", section.purpose)
-    details.setdefault("sql", section.sql)
-    details.setdefault("columns", section.columns)
-    details.setdefault("rows_preview", section.rows_preview)
-    details.setdefault("provider_metadata", section.provider_metadata)
-    details.setdefault("trace_nodes", section.trace_nodes)
-    if section.error:
-        details.setdefault("error", section.error)
-    return details
-
-
-def _render_preview_table(section: ReportSection, details: dict[str, Any] | None = None) -> list[str]:
-    details = details or {}
-    rows_preview = list(details.get("rows_preview") or section.rows_preview)
-    columns = list(details.get("columns") or section.columns or _columns_from_rows(rows_preview))
-    if not columns or not rows_preview:
-        return ["_No result preview recorded._"]
-    header = "| " + " | ".join(_escape_table_cell(column) for column in columns) + " |"
-    divider = "| " + " | ".join("---" for _ in columns) + " |"
-    rows = [
-        "| "
-        + " | ".join(_escape_table_cell(row.get(column, "")) for column in columns)
-        + " |"
-        for row in rows_preview
-    ]
-    return [header, divider, *rows]
-
-
-def _columns_from_rows(rows: list[dict[str, Any]]) -> list[str]:
-    if not rows:
-        return []
-    return list(rows[0].keys())
-
-
-def _escape_table_cell(value: Any) -> str:
-    return str(value).replace("|", "\\|").replace("\n", " ")
+def _numbered_list(items: list[str], empty_message: str) -> list[str]:
+    if not items:
+        return [empty_message]
+    return [f"{index}. {item}" for index, item in enumerate(items, start=1)]
 
 
 def _bullet_list(items: list[str], empty_message: str) -> list[str]:
@@ -246,107 +87,6 @@ def _bullet_list(items: list[str], empty_message: str) -> list[str]:
     return [f"- {item}" for item in items]
 
 
-def _text_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if str(item).strip()]
-
-
-def _progress_summary(report: ReportRecord) -> str:
-    total = len(report.sections)
-    completed = sum(1 for section in report.sections if section.status == "completed")
-    failed = sum(1 for section in report.sections if section.status == "failed")
-    running = sum(1 for section in report.sections if section.status == "running")
-    if not total:
-        return "0/0 sections completed"
-    details = [f"{completed}/{total} sections completed"]
-    if failed:
-        details.append(f"{failed} failed")
-    if running or report.status == "running":
-        details.append("still running")
-    return ", ".join(details)
-
-
-def _report_is_chinese(report: ReportRecord) -> bool:
-    text = "\n".join(
-        [
-            report.report_goal,
-            *report.executive_summary,
-            *report.key_findings,
-            *report.action_priorities,
-            *report.risks_and_limits,
-        ]
-    )
-    if "english" in text.lower():
-        return False
-    return any("\u4e00" <= char <= "\u9fff" for char in text) or not text.strip()
-
-
-def _headings(chinese: bool) -> dict[str, str]:
-    if chinese:
-        return {
-            "goal": "报告目标",
-            "summary": "管理层摘要",
-            "findings": "关键发现",
-            "actions": "行动优先级",
-            "charts": "图表与证据",
-            "limits": "风险与边界",
-            "sections": "章节业务答案",
-            "appendix": "技术附录",
-        }
-    return {
-        "goal": "Report Goal",
-        "summary": "Executive Summary",
-        "findings": "Key Findings",
-        "actions": "Action Priorities",
-        "charts": "Chart And Evidence",
-        "limits": "Risks And Limits",
-        "sections": "Business Sections",
-        "appendix": "Technical Appendix",
-    }
-
-
-def _business_section_labels(chinese: bool) -> dict[str, str]:
-    if chinese:
-        return {
-            "status": "章节状态",
-            "conclusion": "结论",
-            "direct_answer": "直接回答",
-            "why": "为什么",
-            "evidence": "关键证据",
-            "actions": "建议动作",
-            "limits": "限制说明",
-            "confidence": "置信度",
-            "charts": "图表与证据",
-        }
-    return {
-        "status": "Status",
-        "conclusion": "Conclusion",
-        "direct_answer": "Direct Answer",
-        "why": "Why",
-        "evidence": "Key Evidence",
-        "actions": "Recommended Actions",
-        "limits": "Limits",
-        "confidence": "Confidence",
-        "charts": "Charts And Evidence",
-    }
-
-
-def _artifact_caption_labels(chinese: bool) -> dict[str, str]:
-    if chinese:
-        return {
-            "title": "图表标题",
-            "unit": "单位",
-            "annotation": "业务注释",
-            "link": "图表链接",
-        }
-    return {
-        "title": "Chart title",
-        "unit": "Unit",
-        "annotation": "Business annotation",
-        "link": "Chart link",
-    }
-
-
-def _escape_image_alt(value: str) -> str:
-    return value.replace("[", "(").replace("]", ")").replace("\n", " ")
+def _join_or_default(items: list[str], default: str) -> str:
+    visible = [item for item in items if item.strip()]
+    return "、".join(visible) if visible else default

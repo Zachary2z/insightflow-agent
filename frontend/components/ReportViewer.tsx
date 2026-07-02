@@ -5,7 +5,6 @@ import { getWorkspaceReport, type WorkspaceReport } from "../lib/api";
 import ProductCard from "./ProductCard";
 import { StatusPill } from "./ProductStatus";
 import ReportDownloadLink from "./ReportDownloadLink";
-import ReportSection from "./ReportSection";
 import ReportTechnicalAppendix from "./ReportTechnicalAppendix";
 
 type ReportViewerProps = {
@@ -21,18 +20,15 @@ const REPORT_LABELS = {
     statusPrefix: "生成状态",
     progressPrefix: "进度",
     progressComplete: "个章节已完成",
-    progressFailed: "个章节失败",
     progressRunning: "仍在生成",
     reportTypePrefix: "报告类型",
     reportGoalPrefix: "报告目标",
-    executiveSummary: "管理层摘要",
-    keyFindings: "关键发现",
-    actionPriorities: "行动优先级",
-    chartAndEvidence: "图表与证据",
-    risksAndLimits: "风险与边界",
-    sectionsEyebrow: "章节",
-    reportSections: "报告章节",
-    emptySections: "暂无报告章节。",
+    openingSummary: "开篇摘要",
+    bodyEyebrow: "正文",
+    reportBody: "报告正文",
+    actionRecommendations: "行动建议",
+    dataBoundaries: "数据边界",
+    emptyBody: "暂无报告正文。",
     missingTitle: "报告不存在",
     missingBody: "没有找到这份报告。",
     downloadMarkdown: "下载 Markdown",
@@ -42,18 +38,15 @@ const REPORT_LABELS = {
     statusPrefix: "Status",
     progressPrefix: "Progress",
     progressComplete: "sections complete",
-    progressFailed: "sections failed",
     progressRunning: "still running",
     reportTypePrefix: "Report type",
     reportGoalPrefix: "Report goal",
-    executiveSummary: "Executive Summary",
-    keyFindings: "Key Findings",
-    actionPriorities: "Action Priorities",
-    chartAndEvidence: "Chart And Evidence",
-    risksAndLimits: "Risks And Limits",
-    sectionsEyebrow: "Sections",
-    reportSections: "Report Sections",
-    emptySections: "No report sections yet.",
+    openingSummary: "Opening Summary",
+    bodyEyebrow: "Body",
+    reportBody: "Report Body",
+    actionRecommendations: "Action Recommendations",
+    dataBoundaries: "Data Boundaries",
+    emptyBody: "No report body yet.",
     missingTitle: "Report not found",
     missingBody: "This report could not be found.",
     downloadMarkdown: "Download Markdown",
@@ -63,15 +56,16 @@ const REPORT_LABELS = {
 function reportLanguage(report: WorkspaceReport): ReportLanguage {
   const text = [
     report.report_goal,
+    report.document?.opening_summary ?? "",
+    ...(report.document?.sections?.map((section) => `${section.title}\n${section.body}`) ?? []),
+    ...(report.document?.action_recommendations ?? []),
+    ...(report.document?.data_boundaries ?? []),
     ...(report.executive_summary ?? []),
     ...(report.key_findings ?? []),
     ...(report.action_priorities ?? []),
     ...(report.chart_and_evidence ?? []),
     ...(report.risks_and_limits ?? []),
   ].join("\n");
-  if (/english|英文|用英文/i.test(text)) {
-    return "en";
-  }
   return /[\u4e00-\u9fff]/.test(text) ? "zh" : "en";
 }
 
@@ -96,27 +90,22 @@ function statusLabel(status: string, language: ReportLanguage) {
 }
 
 function progressSummary(report: WorkspaceReport, language: ReportLanguage) {
-  const sections = report.sections ?? [];
+  const sections = report.document?.sections ?? [];
   const total = sections.length;
-  const completed = sections.filter((section) => section.status === "completed").length;
-  const failed = sections.filter((section) => section.status === "failed").length;
-  const running = sections.filter((section) => section.status === "running").length;
+  const completed = report.status === "completed" ? total : 0;
   const labels = REPORT_LABELS[language];
   const parts = [
     language === "zh"
       ? `${labels.progressPrefix}：${completed}/${total} ${labels.progressComplete}`
       : `${labels.progressPrefix}: ${completed}/${total} ${labels.progressComplete}`,
   ];
-  if (failed > 0) {
-    parts.push(`${failed} ${labels.progressFailed}`);
-  }
-  if (running > 0 || report.status === "running") {
+  if (report.status === "running") {
     parts.push(labels.progressRunning);
   }
   return parts.join(language === "zh" ? "，" : ", ");
 }
 
-function NarrativeList({ title, items }: { title: string; items?: string[] }) {
+function TextList({ title, items }: { title: string; items?: string[] }) {
   const visibleItems = items?.filter((item) => item.trim()) ?? [];
   if (!visibleItems.length) {
     return null;
@@ -129,6 +118,35 @@ function NarrativeList({ title, items }: { title: string; items?: string[] }) {
           <li key={item}>{item}</li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function ReportDocumentBody({ report, language }: { report: WorkspaceReport; language: ReportLanguage }) {
+  const labels = REPORT_LABELS[language];
+  const document = report.document;
+  const sections = document?.sections ?? [];
+  if (!sections.length) {
+    return (
+      <ProductCard>
+        <p>{labels.emptyBody}</p>
+      </ProductCard>
+    );
+  }
+  return (
+    <section className="report-sections">
+      <div className="product-section-title">
+        <div>
+          <p className="product-eyebrow">{labels.bodyEyebrow}</p>
+          <h2>{labels.reportBody}</h2>
+        </div>
+      </div>
+      {sections.map((section) => (
+        <ProductCard key={section.section_id} className="report-section-card">
+          <h3>{section.title}</h3>
+          <p>{section.body}</p>
+        </ProductCard>
+      ))}
     </section>
   );
 }
@@ -215,35 +233,16 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
           </div>
           <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} label={labels.downloadMarkdown} />
         </div>
-        <NarrativeList title={labels.executiveSummary} items={report.executive_summary} />
-        <NarrativeList title={labels.keyFindings} items={report.key_findings} />
-        <NarrativeList title={labels.actionPriorities} items={report.action_priorities} />
-        <NarrativeList title={labels.chartAndEvidence} items={report.chart_and_evidence} />
-        <NarrativeList title={labels.risksAndLimits} items={report.risks_and_limits} />
+        {report.document?.opening_summary ? (
+          <section className="report-summary">
+            <h3>{labels.openingSummary}</h3>
+            <p>{report.document.opening_summary}</p>
+          </section>
+        ) : null}
+        <TextList title={labels.actionRecommendations} items={report.document?.action_recommendations} />
+        <TextList title={labels.dataBoundaries} items={report.document?.data_boundaries} />
       </ProductCard>
-      <section className="report-sections">
-        <div className="product-section-title">
-          <div>
-            <p className="product-eyebrow">{labels.sectionsEyebrow}</p>
-            <h2>{labels.reportSections}</h2>
-          </div>
-        </div>
-        {report.sections?.length ? (
-          report.sections.map((section) => (
-            <ReportSection
-              key={section.section_id}
-              section={section}
-              workspaceId={workspaceId}
-              reportId={report.report_id}
-              language={language}
-            />
-          ))
-        ) : (
-          <ProductCard>
-            <p>{labels.emptySections}</p>
-          </ProductCard>
-        )}
-      </section>
+      <ReportDocumentBody report={report} language={language} />
       <ReportTechnicalAppendix report={report} />
     </section>
   );
@@ -270,9 +269,9 @@ function reportTypeLabel(reportType: string, language: ReportLanguage) {
       revenue_trend: "收入趋势",
     },
     en: {
-      business_review: "Business Review",
-      channel_performance: "Channel Performance",
-      revenue_trend: "Revenue Trend",
+      business_review: "经营复盘",
+      channel_performance: "渠道表现",
+      revenue_trend: "收入趋势",
     },
   };
   return labels[language][reportType] ?? reportType;

@@ -5,6 +5,7 @@ export type Workspace = {
   name: string;
   created_at?: string;
   updated_at?: string;
+  data_version?: number;
   sources?: WorkspaceSource[];
 };
 
@@ -88,6 +89,7 @@ export type RunAnalysisRequest = {
   initialSql?: string;
   pendingRunId?: string;
   clarificationAnswer?: string;
+  forceReanalysis?: boolean;
 };
 
 export type QuestionThread = {
@@ -128,9 +130,18 @@ export type ChartArtifact = {
   business_annotation?: string;
 };
 
+export type ProgressStep = {
+  key: string;
+  label: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  summary: string;
+};
+
 export type TechnicalDetails = {
   sql?: string;
   raw_rows?: Array<unknown[] | Record<string, unknown>>;
+  data_version?: number | string | null;
+  normalized_question?: string;
   trace_path?: string;
   provider_metadata?: Record<string, unknown>;
   validation_logs?: Array<Record<string, unknown>>;
@@ -143,6 +154,7 @@ export type ProductAnalysisResult = {
   run_id?: string | null;
   status?: string;
   question_thread?: QuestionThread;
+  progress_steps?: ProgressStep[];
   business_answer: BusinessAnswer;
   evidence?: EvidenceSummary;
   chart_artifacts?: ChartArtifact[];
@@ -154,6 +166,11 @@ export type WorkspaceRunResponse = {
   success: boolean;
   workspace_id?: string;
   run_id?: string | null;
+  status?: string | null;
+  matched_run_id?: string | null;
+  message?: string | null;
+  data_version?: number | null;
+  normalized_question?: string | null;
   result: Record<string, unknown>;
   product_result?: ProductAnalysisResult | null;
 };
@@ -177,42 +194,48 @@ export type WorkspaceRunsResponse = {
 
 export type ReportType = "business_review" | "channel_performance" | "revenue_trend";
 
-export type WorkspaceReportSection = {
+export type ReportPlan = {
+  title?: string;
+  report_style?: string;
+  time_range?: string;
+  data_sources?: string[];
+  chapters?: Array<Record<string, unknown>>;
+};
+
+export type ReportEvidencePack = {
+  facts?: Array<Record<string, unknown>>;
+  tables?: Array<Record<string, unknown>>;
+  charts?: Array<Record<string, unknown>>;
+  warnings?: string[];
+  data_limits?: string[];
+  technical_details?: Record<string, unknown>;
+};
+
+export type ReportValidationResult = {
+  status?: string;
+  checked_facts?: string[];
+  warnings?: string[];
+  unsupported_claims?: string[];
+};
+
+export type ReportDocumentSection = {
   section_id: string;
   title: string;
-  purpose?: string;
-  status: string;
-  business_answer: BusinessAnswer;
-  question?: string;
-  sql?: string;
-  columns?: string[];
-  rows_preview?: Array<Record<string, unknown>>;
-  artifact_paths?: string[];
-  evidence_notes?: string[];
-  business_artifacts?: Array<{
-    type?: string;
-    title?: string;
-    url?: string;
-    path?: string;
-    unit?: string;
-    business_annotation?: string;
-  }>;
-  technical_details?: {
-    internal_question?: string;
-    purpose?: string;
-    sql?: string;
-    columns?: string[];
-    rows_preview?: Array<Record<string, unknown>>;
-    provider_metadata?: Record<string, unknown>;
-    trace_nodes?: string[];
-    trace_path?: string;
-    workspace_run_dir?: string;
-    raw_final_answer?: string;
-    error?: string | null;
-  };
-  provider_metadata?: Record<string, unknown>;
-  trace_nodes?: string[];
-  error?: string | null;
+  body: string;
+  chart_refs?: string[];
+  evidence_refs?: string[];
+  technical_details?: Record<string, unknown>;
+};
+
+export type ReportDocument = {
+  title: string;
+  time_range?: string;
+  data_sources?: string[];
+  opening_summary?: string;
+  sections?: ReportDocumentSection[];
+  action_recommendations?: string[];
+  data_boundaries?: string[];
+  technical_appendix?: Record<string, unknown>;
 };
 
 export type WorkspaceReport = {
@@ -222,12 +245,16 @@ export type WorkspaceReport = {
   report_goal: string;
   title: string;
   status: string;
+  plan?: ReportPlan | null;
+  evidence_pack?: ReportEvidencePack | null;
+  document?: ReportDocument | null;
+  validation?: ReportValidationResult | null;
   executive_summary?: string[];
   key_findings?: string[];
   action_priorities?: string[];
   chart_and_evidence?: string[];
   risks_and_limits?: string[];
-  sections?: WorkspaceReportSection[];
+  sections?: Array<Record<string, unknown>>;
   markdown_path?: string;
   json_path?: string;
   trace_path?: string;
@@ -348,6 +375,7 @@ export async function runAnalysis(
       : {
           user_question: request.userQuestion ?? "",
           ...(request.initialSql?.trim() ? { initial_sql: request.initialSql.trim() } : {}),
+          ...(request.forceReanalysis ? { force_reanalysis: true } : {}),
         };
   const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/runs`, {
     method: "POST",

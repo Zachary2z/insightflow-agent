@@ -5,12 +5,6 @@ from pathlib import Path
 import pytest
 
 from llm_ops.deepseek_provider import load_deepseek_config
-from llm_ops.runtime_provider import (
-    provider_question_understanding_enabled,
-    provider_sql_candidate_enabled,
-    provider_sql_planning_enabled,
-    provider_visualization_agent_enabled,
-)
 from workspaces.importers import import_csv
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_runner import run_workspace_report
@@ -30,28 +24,6 @@ def _require_live_deepseek_report_flags(monkeypatch: pytest.MonkeyPatch) -> None
     config = load_deepseek_config(require_api_key=True)
     if not config.success:
         pytest.skip("Set DEEPSEEK_API_KEY to run the live P12 workspace report acceptance test.")
-    if not provider_question_understanding_enabled():
-        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1.")
-    if not provider_sql_planning_enabled():
-        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1.")
-    if not provider_sql_candidate_enabled():
-        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1.")
-    if not provider_visualization_agent_enabled():
-        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1.")
-
-
-def _completed_sections(report: dict) -> list[dict]:
-    return [
-        section
-        for section in report.get("sections", [])
-        if section.get("status") == "completed"
-    ]
-
-
-def _section_provider_metadata(section: dict, key: str) -> dict:
-    value = section.get("provider_metadata", {}).get(key)
-    assert isinstance(value, dict), f"Missing section provider metadata: {key}"
-    return value
 
 
 def _load_report_trace(report: dict) -> dict:
@@ -60,24 +32,7 @@ def _load_report_trace(report: dict) -> dict:
     return json.loads(trace_path.read_text(encoding="utf-8"))
 
 
-def _section_trace_payloads(report: dict) -> list[dict]:
-    trace = _load_report_trace(report)
-    payloads = []
-    for event in trace.get("events", []):
-        section_trace_path = event.get("section_trace_path")
-        if not section_trace_path:
-            continue
-        path = Path(section_trace_path)
-        assert path.is_file()
-        payloads.append(json.loads(path.read_text(encoding="utf-8")))
-    return payloads
-
-
-def _trace_nodes(payload: dict) -> set[str]:
-    return {str(event.get("node")) for event in payload.get("trace", [])}
-
-
-def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
+def test_live_deepseek_workspace_report_uses_p22_document_contract(
     tmp_path,
     monkeypatch,
 ):
@@ -111,7 +66,6 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
     report = result["report"]
     report_dir = Path(report["json_path"]).parent
     artifact_dir = Path(report["artifact_dir"])
-    completed_sections = _completed_sections(report)
 
     assert profile["tables"]
     assert semantic_layer["metrics"]
@@ -124,104 +78,32 @@ def test_live_deepseek_generates_workspace_report_with_real_provider_chain(
     assert Path(report["json_path"]).is_file()
     assert Path(report["markdown_path"]).is_file()
     assert Path(report["trace_path"]).is_file()
-    assert len(report["sections"]) >= 3
-    assert len(completed_sections) == len(report["sections"])
-
-    for section in completed_sections:
-        assert section["question"].strip()
-        business_answer = section["business_answer"]
-        assert business_answer["headline"].strip()
-        assert business_answer["direct_answer"].strip()
-        assert business_answer["why"].strip()
-        assert isinstance(business_answer["evidence_bullets"], list)
-        assert isinstance(business_answer["recommendations"], list)
-        assert isinstance(business_answer["caveats"], list)
-        assert business_answer["confidence"] in {"low", "medium", "high"}
-        assert section["sql"].strip()
-        assert section["rows_preview"]
-        business_answer_text = json.dumps(business_answer, ensure_ascii=False)
-        assert "SELECT " not in business_answer_text.upper()
-        assert "provider_called" not in business_answer_text
-        assert "这是自动报告内部 section" not in business_answer_text
-        assert section["technical_details"]["internal_question"].startswith(
-            "这是自动报告内部 section"
-        )
-        assert section["technical_details"]["sql"] == section["sql"]
-        assert section["technical_details"]["provider_metadata"]
-        assert "data/ecommerce.db" not in section["sql"]
-        assert "sql_reviewer_agent" in section["trace_nodes"]
-        assert "sql_executor_node" in section["trace_nodes"]
-        assert _section_provider_metadata(section, "question_understanding")[
-            "provider_called"
-        ] is True
-        assert _section_provider_metadata(section, "sql_planning")[
-            "provider_called"
-        ] is True
-        assert _section_provider_metadata(section, "llm_sql_enhancement")[
-            "provider_called"
-        ] is True
-        assert _section_provider_metadata(section, "visualization_trace")[
-            "provider_called"
-        ] is True
-
-    section_trace_payloads = _section_trace_payloads(report)
-    assert section_trace_payloads
-    for payload in section_trace_payloads:
-        nodes = _trace_nodes(payload)
-        assert "sql_reviewer_agent" in nodes
-        assert "sql_executor_node" in nodes
-        schema_events = [
-            event
-            for event in payload.get("trace", [])
-            if event.get("node") == "schema_agent"
-        ]
-        assert schema_events
-        assert any(
-            str(workspace_db) in event.get("tool_input_summary", "")
-            for event in schema_events
-        )
-        assert all(
-            "data/ecommerce.db" not in event.get("tool_input_summary", "")
-            for event in schema_events
-        )
-
-    artifact_sections = [
-        section for section in completed_sections if section.get("artifact_paths")
-    ]
-    assert artifact_sections
-    first_artifact_path = artifact_sections[0]["artifact_paths"][0]
-    first_artifact_file = report_dir / first_artifact_path
-    assert first_artifact_file.is_file()
-    assert first_artifact_file.is_relative_to(artifact_dir)
-    assert any(
-        _section_provider_metadata(section, "visualization_trace").get(
-            "external_tool_called"
-        )
-        is True
-        for section in completed_sections
-    )
+    assert report["sections"] == []
+    assert report["plan"]["title"] == "最近90天经营复盘报告"
+    assert report["evidence_pack"]["facts"]
+    assert report["document"]["sections"]
+    assert report["validation"]["status"] == "passed"
+    document_text = json.dumps(report["document"], ensure_ascii=False)
+    assert "SELECT " not in document_text.upper()
+    assert "provider_called" not in document_text
+    assert str(workspace_db) not in document_text
+    assert "data/ecommerce.db" not in document_text
 
     markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
-    assert "# Business Review" in markdown
-    assert "## Executive Summary" in markdown
-    assert "## Business Sections" in markdown
-    assert "## Technical Appendix" in markdown
-    assert markdown.index("## Executive Summary") < markdown.index("## Technical Appendix")
-    business_body = markdown.split("## Technical Appendix", 1)[0]
-    appendix = markdown.split("## Technical Appendix", 1)[1]
+    assert "# 最近90天经营复盘报告" in markdown
+    assert "## 开篇摘要" in markdown
+    assert "## 报告正文" in markdown
+    assert "## 技术附录" in markdown
+    assert markdown.index("## 开篇摘要") < markdown.index("## 技术附录")
+    business_body = markdown.split("## 技术附录", 1)[0]
+    appendix = markdown.split("## 技术附录", 1)[1]
     assert "```sql" not in business_body
     assert "provider_called" not in business_body
-    assert "这是自动报告内部 section" not in business_body
-    assert "#### 结论" in business_body
-    assert "#### 直接回答" in business_body
-    assert "#### 为什么" in business_body
-    assert "#### 关键证据" in business_body
-    assert "#### 建议动作" in business_body
-    assert "#### 限制说明" in business_body
-    assert "#### 置信度" in business_body
-    assert "```sql" in appendix
-    assert "provider_called" in appendix
-    assert first_artifact_path in markdown
+    assert "章节业务答案" not in business_body
+    assert "#### 直接回答" not in business_body
+    assert "#### 为什么" not in business_body
+    assert "置信度" not in business_body
+    assert "evidence_pack" in appendix
 
     trace = _load_report_trace(report)
-    assert any(event.get("event") == "section_completed" for event in trace["events"])
+    assert any(event.get("event") == "report_document_composed" for event in trace["events"])

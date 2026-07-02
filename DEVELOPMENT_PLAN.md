@@ -7,6 +7,8 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`
 - `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`
 - `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`
+- `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md`
+- `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`
 
 ## Current Product Direction
 
@@ -25,6 +27,8 @@ InsightFlow is a Chinese business data-analysis product with:
 - P19 business-output/report quality work that moves from one-off consistency patches toward an Answer Reviewer Agent, Final Answer Composer, and small deterministic safety guardrail.
 - P20 general business analysis foundation work that cleans old paths and separates factual tools, model judgment, fact validation, and expression/report writing so the product can handle different uploaded business datasets.
 - P20 Chinese-first product scope: product-facing UI copy, clarifications, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers are supported through semantic recognition and Chinese aliases, not bilingual output branches.
+- P21 responsive analysis experience work added conservative route classification, fast factual paths, progress states, exact historical reuse, page recovery, compact task cards, and lightweight context packs without weakening the P20 evidence chain.
+- P22 evidence-driven report generation work has started. H1 replaced stitched Analysis Workbench report sections with a clean `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer` skeleton.
 
 Current runtime chain:
 
@@ -61,9 +65,10 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
 | P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
 | P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, cleanup, and live acceptance | Complete |
-| P20 | Chinese-first general business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation | In progress |
-| P21 | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background report/chart work | Future |
-| P22 | Real business tool calling: China-oriented report/chart/export integrations after quality and responsiveness are stable | Future |
+| P20 | Chinese-first general business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation, realistic acceptance, cleanup audit, and live DeepSeek opt-in verification | Complete |
+| P21 | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs | Complete |
+| P22 | Evidence-driven report generation: replace stitched report sections with a coherent Chinese report document pipeline and delete old report paths | In progress; H1 complete |
+| P23 | Real business tool calling: China-oriented report/chart/export integrations after report quality and responsiveness are stable | Future |
 
 ## P16 Business Answer Contract
 
@@ -107,9 +112,15 @@ Report sections reuse this same shape. Main product fields must not contain raw 
 | P20-H0 | Architecture cleanup and main path inventory; remove old paths and conflicting compatibility code | Complete |
 | P20-H1 | General data profiling and semantic layer for arbitrary uploaded business datasets | Complete |
 | P20-H2 | General Chinese analysis task contract and clarification continuation | Complete |
-| P20-H3 | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope | Planned |
-| P20-H4 | Business insight, answer, chart, and report generation from validated evidence | Planned |
-| P20-H5 | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled | Planned |
+| P20-H3 | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope | Complete |
+| P20-H4 | Business insight, answer, chart, and report generation from validated evidence | Complete |
+| P20-H5 | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled | Complete |
+| P21-H1 | Conservative route policy for clarify, fast_fact, standard_analysis, deep_judgment, and report routes | Complete |
+| P21-H2 | Fast fact path for low-risk factual, ranking, summary, and simple trend questions | Complete |
+| P21-H3 | Business-friendly progress steps and frontend progress timeline | Complete |
+| P21-H4 | Exact historical reuse using workspace data_version and normalized_question | Complete |
+| P21-H5 | Page recovery, lightweight background work, and compact task cards | Complete |
+| P21-H6 | Lightweight context packs for fast_fact without starving complex routes of evidence | Complete |
 
 P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
@@ -117,7 +128,13 @@ P17 progress summary: H1-H6 are complete. The current product codebase keeps the
 
 P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. Historical P19 bilingual output support is no longer a P20 product requirement; P20 now targets a Chinese-first business product, while English or mixed raw data headers remain supported through semantic recognition and Chinese labels.
 
-P20 is now reserved for the Chinese-first general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must avoid table-specific rule trees, fixed answer templates, bilingual output branching, and old compatibility paths. P20-H0 is complete: the active FastAPI/Next.js workspace chain was inventoried, stale P17 status assertions were updated, and the trace-driven SQL template-mining/eval helper path was removed while preserving provider smoke validation. P20-H1 is complete: generated metric formulas safely quote SQL identifiers, and English/mixed raw fields such as `Sales Amount` map to Chinese business aliases such as 销售额. P20-H2 is complete: question understanding now produces a normalized Chinese `analysis_task` contract, slot-level missing information drives concise Chinese clarification, partial clarification answers remain pending, and completed continuations merge the original question with the user's supplements before analysis. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved. Responsiveness work moves to P21, and real China-oriented external business tool calling/export moves to P22 after the generalized answer/report foundation is stable.
+P20 is complete as the Chinese-first general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It avoids table-specific rule trees, fixed answer templates, bilingual output branching, and old compatibility paths. P20-H0 inventoried and cleaned the active FastAPI/Next.js workspace chain. P20-H1 added generalized profiling, semantic-layer drafts, safe formula quoting, and Chinese aliases for English/mixed raw fields. P20-H2 added the normalized Chinese `analysis_task` contract and slot-level clarification continuation. P20-H3 added the metric registry and reusable fact payload with comparison scope, warnings, formulas, display values, and technical SQL kept outside the main answer. P20-H4 made final answers, chart fallback, and management reports use validated evidence for Chinese business conclusions, recommendations when requested, tradeoff explanations, chart annotations, and report synthesis. P20-H5 proved the foundation against store sales/satisfaction and support ticket operations datasets, generalized management-report section prompts away from demo fields, added opt-in P20 live DeepSeek acceptance, and completed cleanup/documentation closeout. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved.
+
+After P20, InsightFlow can import different business datasets, auto-profile them, draft a semantic layer, map raw Chinese/English/mixed fields into Chinese business semantics, understand and clarify Chinese business questions, call SQL/metric/evidence/chart/report tools, separate factual evidence from model judgment and final expression, and produce Chinese business answers plus reports. P21 responsiveness work is complete. P22 now focuses on rebuilding Report Center into an evidence-driven Chinese report document pipeline before external business document/export integrations begin in P23.
+
+P21 is complete in `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md`. P21-H1 through P21-H6 are complete: analysis runs now produce conservative `analysis_route` metadata for `clarify`, `fast_fact`, `standard_analysis`, `deep_judgment`, and `report`; low-risk factual totals, rankings, and simple trends can use a shorter SQL/evidence-backed fast fact path; every product result now carries business-friendly `progress_steps`; exact same-workspace/same-data-version/same-normalized-question completed runs can be offered as historical reuse candidates; new non-cached analysis requests create recoverable local background run shells that the frontend restores with compact task cards and polling; and fast fact answers use lightweight context packs that retain key facts without carrying full workspace/profile/semantic/trace/provider/raw-row context. The H2 path still runs SQL review, execution, evidence validation, fact payload generation, technical detail preservation, and history persistence, but skips the heavy insight/reviewer/final composer/claim typing chain for `fast_fact`; H3 keeps progress copy free of raw SQL, trace IDs, prompt/provider metadata, and raw rows; H4 avoids LLM cache checks, vector search, similar-question matching, and keyword-heavy normalization; H5 avoids Redis, Celery, WebSocket, SSE, timeout handling, and external SaaS while preserving same-run-id recovery for `running`, `waiting_for_clarification`, `completed`, and `failed`; H6 applies strict context compression only to `fast_fact`, while `standard_analysis`, `deep_judgment`, and `report` keep richer context for answer quality. P21 makes the P20 foundation feel faster and more recoverable by routing requests conservatively, giving low-risk factual questions a shorter evidence-backed path, showing clear progress, reusing exact same-version historical runs, restoring active/history runs after page changes, keeping task cards compact, and using focused fast fact context packs. P21 did not add provider timeout work, vector cache, Redis/Celery, WebSocket/SSE, aggressive fast paths, or old compatibility paths. During P21, obsolete code, stale tests, dead imports, duplicate routes, unused adapters, historical compatibility branches, and unreachable fallback code could be deleted instead of preserved; keep one clean current product path.
+
+P22 is in progress in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 rebuilt Report Center around a clean evidence-first document pipeline skeleton: report records now carry `ReportPlan`, `ReportEvidencePack`, `ReportDocument`, and `ReportValidationResult`; Markdown and the frontend render the document body instead of analysis workbench answer blocks. The old stitched-section behavior, where preset report sections call the analysis runner and Markdown renders each section's `business_answer`, is superseded/deleted from the active report main path. Old report presets, stitched summary functions, `章节业务答案` main-body rendering, English default report titles, obsolete report agents/writers/supervisors, and tests that only protect old stitched output may be deleted instead of preserved. H2 should replace the H1 profile-based skeleton with real Chinese report planning and evidence collection. External Word/PPT/飞书/腾讯文档 export remains a later phase after the new `ReportDocument` contract is stable.
 
 ## Current Entry Points
 
@@ -156,14 +173,16 @@ Primary frontend routes:
 Use these commands for current product regression:
 
 ```bash
-python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
+python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q
 python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
 python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_p20_live_deepseek_acceptance.py -q
 cd frontend && npm test
 cd frontend && npm run build
 ```
 
-P20 should begin from `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It must keep live DeepSeek tests opt-in, preserve deterministic unit-test stability where the behavior is still current, and prefer general contracts over narrow keyword patches. It should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
+Live DeepSeek tests remain opt-in. To run the P20 live acceptance locally, set `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, and `DEEPSEEK_API_KEY`, then run `python3 -m pytest tests/test_p20_live_deepseek_acceptance.py -q`. Without those flags and a key, live tests skip and normal regression remains deterministic.
 
 ## Historical / Superseded Context
 

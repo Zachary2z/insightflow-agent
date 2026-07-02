@@ -153,12 +153,13 @@ def test_workspace_api_analysis_and_report_entrypoints_exclude_action_workflow_t
 def test_frontend_product_api_and_renderers_exclude_action_and_eval_paths():
     frontend_source = "\n".join(
         _source(path)
-        for path in (
-            "frontend/lib/api.ts",
-            "frontend/components/RunResult.tsx",
-            "frontend/components/ReportSection.tsx",
+            for path in (
+                "frontend/lib/api.ts",
+                "frontend/components/RunResult.tsx",
+                "frontend/components/ReportViewer.tsx",
+                "frontend/components/ReportTechnicalAppendix.tsx",
+            )
         )
-    )
 
     for forbidden in (
         "action workflow",
@@ -325,55 +326,6 @@ def test_current_product_docs_do_not_present_superseded_paths_as_current_guidanc
     for path, current_text in current_docs.items():
         for forbidden in forbidden_current_guidance:
             assert forbidden not in current_text, f"{forbidden!r} is current guidance in {path}"
-
-
-def test_p17_h6_status_surfaces_are_current_and_consistent():
-    readme = _source("README.md")
-    p17_plan = _source("docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md")
-    status = _source("DEVELOPMENT_STATUS.md")
-    plan = _source("DEVELOPMENT_PLAN.md")
-
-    assert "| P17 product codebase cleanup | Complete |" in readme
-    assert (
-        "| P17-H5 | Simplify README, DEVELOPMENT_PLAN, and DEVELOPMENT_STATUS so current product and remaining agent/tool chain are obvious | Complete |"
-        in p17_plan
-    )
-    assert (
-        "| P17-H6 | Final artifact hygiene, legacy audit, full backend/frontend regression, and real DeepSeek acceptance | Complete |"
-        in p17_plan
-    )
-    assert "P17 is complete. P18 is the next phase" in p17_plan
-    assert "Current phase | P20 General Business Analysis Foundation" in status
-    assert "Current task | P20-H2 Chinese analysis task contract and clarification continuation complete; next is P20-H3" in status
-    assert "Next planned task | P20-H3 Fact layer, metric registry, and evidence payload" in status
-    assert "Last completed task | P20-H2 Chinese analysis task contract and clarification continuation" in status
-    assert "Latest P17-H6 closeout result on 2026-06-30" in status
-    assert "P17/P18/P19/P20 Roadmap" in plan
-    assert "P17-H5 | Product docs/status simplification | Complete" in plan
-    assert "P17-H6 | Final artifact hygiene, legacy audit, backend/frontend regression, and real DeepSeek acceptance | Complete" in plan
-    assert "P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete" in plan
-    assert "P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete" in plan
-    assert "P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete" in plan
-    assert (
-        "P19-H4 | Synthesize reports and chart narrative from reviewed business answers, with language-aware report labels and business-readable evidence summaries | Complete"
-        in plan
-    )
-    assert "P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete" in plan
-    assert "P17 progress summary: H1-H6 are complete" in plan
-    assert "P20 general business analysis foundation" in plan
-
-
-def test_p17_h4_docs_record_old_eval_demo_cleanup_as_complete():
-    p17_plan = _source("docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md")
-    status = _source("DEVELOPMENT_STATUS.md")
-    plan = _source("DEVELOPMENT_PLAN.md")
-
-    assert (
-        "| P17-H4 | Delete obsolete historical eval/demo docs and tests that no longer protect current product behavior | Complete |"
-        in p17_plan
-    )
-    assert "Last completed task | P20-H2 Chinese analysis task contract and clarification continuation" in status
-    assert "P17 progress summary: H1-H6 are complete" in plan
 
 
 def test_superseded_superpowers_specs_are_marked_historical_not_current_guidance():

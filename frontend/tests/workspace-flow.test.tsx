@@ -11,7 +11,6 @@ import ProfileSummary from "../components/ProfileSummary";
 import ProfileWorkspace from "../components/ProfileWorkspace";
 import ReportGenerator from "../components/ReportGenerator";
 import ReportList from "../components/ReportList";
-import ReportSection from "../components/ReportSection";
 import ReportViewer from "../components/ReportViewer";
 import RunResult from "../components/RunResult";
 import SemanticLayerWorkspace from "../components/SemanticLayerWorkspace";
@@ -77,7 +76,8 @@ import {
 
 describe("workspace product components", () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.useRealTimers();
+    vi.resetAllMocks();
     pushMock.mockReset();
     window.sessionStorage.clear();
     cleanup();
@@ -611,6 +611,408 @@ describe("workspace product components", () => {
     ).toBe("Email produced the most revenue.");
   });
 
+  it("shows a compact recoverable task card immediately after submitting a background run", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({ workspace_id: "ws_1", runs: [] });
+    vi.mocked(runAnalysis).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_active",
+      status: "running",
+      result: {
+        status: "running",
+        run_id: "run_active",
+        original_question: "最近90天销售额最高的门店是谁？",
+      },
+      product_result: {
+        version: "p16.v1",
+        workspace_id: "ws_1",
+        run_id: "run_active",
+        status: "running",
+        question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "running" },
+        progress_steps: [
+          { key: "querying", label: "查询数据", status: "running", summary: "正在查询并校验数据。" },
+        ],
+        business_answer: {
+          headline: "",
+          direct_answer: "",
+          why: "",
+          evidence_bullets: [],
+          recommendations: [],
+          caveats: [],
+          confidence: "low",
+        },
+        evidence: { table_preview: { columns: [], rows: [] } },
+        chart_artifacts: [],
+        technical_details: { sql: "SELECT * FROM store_sales" },
+      },
+    });
+    vi.mocked(getWorkspaceRun).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_active",
+      status: "running",
+      result: { status: "running", run_id: "run_active", original_question: "最近90天销售额最高的门店是谁？" },
+      product_result: {
+        version: "p16.v1",
+        workspace_id: "ws_1",
+        run_id: "run_active",
+        status: "running",
+        question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "running" },
+        progress_steps: [
+          { key: "querying", label: "查询数据", status: "running", summary: "正在查询并校验数据。" },
+        ],
+        business_answer: {
+          headline: "",
+          direct_answer: "",
+          why: "",
+          evidence_bullets: [],
+          recommendations: [],
+          caveats: [],
+          confidence: "low",
+        },
+        evidence: { table_preview: { columns: [], rows: [] } },
+        chart_artifacts: [],
+        technical_details: { sql: "SELECT * FROM store_sales" },
+      },
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "最近90天销售额最高的门店是谁？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+
+    const taskCard = await screen.findByLabelText("当前分析任务");
+    expect(taskCard.textContent).toContain("正在分析");
+    expect(taskCard.textContent).toContain("正在查询并校验数据。");
+    expect(taskCard.textContent).toContain("最近90天销售额最高的门店是谁？");
+    expect(taskCard.textContent).not.toContain("SELECT");
+    expect(screen.queryByText("分析结果结构异常")).toBeNull();
+    expect(window.sessionStorage.getItem("insightflow.activeRun.ws_1")).toBe("run_active");
+  });
+
+  it("polls a background run and renders the full result after completion", async () => {
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({ workspace_id: "ws_1", runs: [] });
+    vi.mocked(runAnalysis).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_poll",
+      status: "running",
+      result: { status: "running", run_id: "run_poll", original_question: "最近90天销售额最高的门店是谁？" },
+      product_result: {
+        version: "p16.v1",
+        run_id: "run_poll",
+        status: "running",
+        question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "running" },
+        progress_steps: [
+          { key: "querying", label: "查询数据", status: "running", summary: "正在查询并校验数据。" },
+        ],
+        business_answer: {
+          headline: "",
+          direct_answer: "",
+          why: "",
+          evidence_bullets: [],
+          recommendations: [],
+          caveats: [],
+          confidence: "low",
+        },
+        evidence: { table_preview: { columns: [], rows: [] } },
+        chart_artifacts: [],
+        technical_details: {},
+      },
+    });
+    vi.mocked(getWorkspaceRun)
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_poll",
+        status: "running",
+        result: { status: "running", run_id: "run_poll", original_question: "最近90天销售额最高的门店是谁？" },
+        product_result: {
+          version: "p16.v1",
+          run_id: "run_poll",
+          status: "running",
+          question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "running" },
+          progress_steps: [
+            { key: "querying", label: "查询数据", status: "running", summary: "正在查询并校验数据。" },
+          ],
+          business_answer: {
+            headline: "",
+            direct_answer: "",
+            why: "",
+            evidence_bullets: [],
+            recommendations: [],
+            caveats: [],
+            confidence: "low",
+          },
+          evidence: { table_preview: { columns: [], rows: [] } },
+          chart_artifacts: [],
+          technical_details: {},
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        workspace_id: "ws_1",
+        run_id: "run_poll",
+        status: "completed",
+        result: {
+          product_result: {
+            version: "p16.v1",
+            run_id: "run_poll",
+            status: "completed",
+            question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+            business_answer: {
+              headline: "上海旗舰店销售额最高",
+              direct_answer: "最近90天上海旗舰店销售额最高。",
+              why: "证据表第一行显示上海旗舰店排第一。",
+              evidence_bullets: ["上海旗舰店销售额最高。"],
+              recommendations: [],
+              caveats: [],
+              confidence: "medium",
+            },
+            progress_steps: [
+              { key: "finalizing", label: "整理结论", status: "completed", summary: "已整理为业务可读结论。" },
+            ],
+            evidence: { table_preview: { columns: ["store"], rows: [["上海旗舰店"]] } },
+            chart_artifacts: [],
+            technical_details: {},
+          },
+        },
+        product_result: {
+          version: "p16.v1",
+          run_id: "run_poll",
+          status: "completed",
+          question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+          business_answer: {
+            headline: "上海旗舰店销售额最高",
+            direct_answer: "最近90天上海旗舰店销售额最高。",
+            why: "证据表第一行显示上海旗舰店排第一。",
+            evidence_bullets: ["上海旗舰店销售额最高。"],
+            recommendations: [],
+            caveats: [],
+            confidence: "medium",
+          },
+          progress_steps: [
+            { key: "finalizing", label: "整理结论", status: "completed", summary: "已整理为业务可读结论。" },
+          ],
+          evidence: { table_preview: { columns: ["store"], rows: [["上海旗舰店"]] } },
+          chart_artifacts: [],
+          technical_details: {},
+        },
+      });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "最近90天销售额最高的门店是谁？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+
+    expect(await screen.findByLabelText("当前分析任务")).toBeTruthy();
+
+    expect(await screen.findByText("上海旗舰店销售额最高", { selector: ".answer-headline" }, { timeout: 3500 })).toBeTruthy();
+    expect(window.sessionStorage.getItem("insightflow.activeRun.ws_1")).toBeNull();
+  });
+
+  it("restores the active run from session storage when the workbench remounts", async () => {
+    window.sessionStorage.setItem("insightflow.activeRun.ws_1", "run_active");
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({ workspace_id: "ws_1", runs: [] });
+    vi.mocked(getWorkspaceRun).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_active",
+      status: "running",
+      result: { status: "running", run_id: "run_active", original_question: "恢复中的问题" },
+      product_result: {
+        version: "p16.v1",
+        run_id: "run_active",
+        status: "running",
+        question_thread: { original_question: "恢复中的问题", status: "running" },
+        progress_steps: [
+          { key: "finalizing", label: "整理结论", status: "running", summary: "正在整理业务结论。" },
+        ],
+        business_answer: {
+          headline: "",
+          direct_answer: "",
+          why: "",
+          evidence_bullets: [],
+          recommendations: [],
+          caveats: [],
+          confidence: "low",
+        },
+        evidence: { table_preview: { columns: [], rows: [] } },
+        chart_artifacts: [],
+        technical_details: {},
+      },
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+
+    await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_active"));
+    const taskCard = await screen.findByLabelText("当前分析任务");
+    expect(taskCard.textContent).toContain("恢复中的问题");
+    expect(taskCard.textContent).toContain("正在分析");
+    expect(taskCard.textContent).toContain("正在整理业务结论。");
+  });
+
+  it("keeps long task questions clamped and does not place full answers or SQL in the task card", async () => {
+    const longQuestion =
+      "最近90天请帮我非常详细地分析每一家门店的销售额、订单量、满意度、复购率，并说明销售额最高的门店是谁以及为什么它表现最好";
+    vi.mocked(listWorkspaceRuns).mockResolvedValue({ workspace_id: "ws_1", runs: [] });
+    vi.mocked(runAnalysis).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_long",
+      status: "running",
+      result: { status: "running", run_id: "run_long", original_question: longQuestion },
+      product_result: {
+        version: "p16.v1",
+        run_id: "run_long",
+        status: "running",
+        question_thread: { original_question: longQuestion, status: "running" },
+        progress_steps: [
+          { key: "querying", label: "查询数据", status: "running", summary: "正在查询并校验数据。" },
+        ],
+        business_answer: {
+          headline: "这是一段不应该出现在任务卡里的完整结论",
+          direct_answer: "完整回答不应进入任务卡。",
+          why: "任务卡只展示状态。",
+          evidence_bullets: ["证据不应进入任务卡。"],
+          recommendations: ["建议不应进入任务卡。"],
+          caveats: [],
+          confidence: "medium",
+        },
+        evidence: { table_preview: { columns: ["store"], rows: [["上海旗舰店"]] } },
+        chart_artifacts: [],
+        technical_details: { sql: "SELECT store_name FROM store_sales" },
+      },
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), { target: { value: longQuestion } });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+
+    const taskCard = await screen.findByLabelText("当前分析任务");
+    const questionNode = taskCard.querySelector(".run-task-question");
+    expect(questionNode?.className).toContain("run-task-question");
+    expect(taskCard.textContent).toContain(longQuestion);
+    expect(taskCard.textContent).not.toContain("这是一段不应该出现在任务卡里的完整结论");
+    expect(taskCard.textContent).not.toContain("SELECT store_name");
+    expect(taskCard.textContent).not.toContain("证据不应进入任务卡");
+  });
+
+  it("lets users inspect a same-version historical cache candidate or rerun explicitly", async () => {
+    vi.mocked(listWorkspaceRuns)
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] });
+    vi.mocked(runAnalysis).mockImplementation(async (_workspaceId, request) => {
+      if (typeof request === "object" && "forceReanalysis" in request && request.forceReanalysis) {
+        return {
+          success: true,
+          workspace_id: "ws_1",
+          run_id: "run_new",
+          result: {
+            product_result: {
+              version: "p16.v1",
+              status: "completed",
+              question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+              business_answer: {
+                headline: "重新分析后的结论",
+                direct_answer: "本次已重新分析。",
+                why: "用户选择重新分析。",
+                evidence_bullets: [],
+                recommendations: [],
+                caveats: [],
+                confidence: "medium",
+              },
+              evidence: { table_preview: { columns: [], rows: [] } },
+              chart_artifacts: [],
+              technical_details: {},
+            },
+          },
+        };
+      }
+      return {
+        success: true,
+        workspace_id: "ws_1",
+        status: "cache_candidate",
+        matched_run_id: "run_cached",
+        message: "已找到同一数据版本下的历史分析",
+        result: {
+          status: "cache_candidate",
+          matched_run_id: "run_cached",
+        },
+        product_result: null,
+      };
+    });
+    vi.mocked(getWorkspaceRun).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      run_id: "run_cached",
+      result: {
+        product_result: {
+          version: "p16.v1",
+          status: "completed",
+          question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+          business_answer: {
+            headline: "历史复用结论",
+            direct_answer: "这是同一数据版本下的历史结果。",
+            why: "来自 matched run。",
+            evidence_bullets: [],
+            recommendations: [],
+            caveats: [],
+            confidence: "medium",
+          },
+          evidence: { table_preview: { columns: [], rows: [] } },
+          chart_artifacts: [],
+          technical_details: {},
+        },
+      },
+      product_result: {
+        version: "p16.v1",
+        status: "completed",
+        question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+        business_answer: {
+          headline: "历史复用结论",
+          direct_answer: "这是同一数据版本下的历史结果。",
+          why: "来自 matched run。",
+          evidence_bullets: [],
+          recommendations: [],
+          caveats: [],
+          confidence: "medium",
+        },
+        evidence: { table_preview: { columns: [], rows: [] } },
+        chart_artifacts: [],
+        technical_details: {},
+      },
+    });
+
+    render(<AnalysisRunner workspaceId="ws_1" />);
+    fireEvent.change(screen.getByLabelText("业务问题"), {
+      target: { value: "最近90天销售额最高的门店是谁？" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+
+    expect(await screen.findByText("已找到同一数据版本下的历史分析")).toBeTruthy();
+    expect(screen.queryByText("分析结果结构异常")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "查看历史结果" }));
+    await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_cached"));
+    expect(await screen.findByText("历史复用结论", { selector: ".answer-headline" })).toBeTruthy();
+    expect(screen.queryByText("已找到同一数据版本下的历史分析")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "开始分析" }));
+    expect(await screen.findByText("已找到同一数据版本下的历史分析")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "重新分析" }));
+    await waitFor(() =>
+      expect(runAnalysis).toHaveBeenLastCalledWith("ws_1", {
+        userQuestion: "最近90天销售额最高的门店是谁？",
+        initialSql: "",
+        forceReanalysis: true,
+      }),
+    );
+    expect(await screen.findByText("重新分析后的结论", { selector: ".answer-headline" })).toBeTruthy();
+  });
+
   it("loads the run detail route from the backend without sessionStorage", async () => {
     vi.mocked(getWorkspaceRun).mockResolvedValue({
       success: true,
@@ -833,6 +1235,63 @@ describe("workspace product components", () => {
     expect(thread.textContent).toContain("最近 90 天");
     expect(thread.textContent).toContain("分析最近 90 天各渠道收入和 ROI");
     expect(screen.getByText("建议优先加码 paid_search")).toBeTruthy();
+  });
+
+  it("renders a compact business progress timeline without technical metadata", () => {
+    const { container } = render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p16.v1",
+            status: "completed",
+            question_thread: { original_question: "最近90天销售额最高的门店是谁？", status: "completed" },
+            progress_steps: [
+              { key: "understanding", label: "理解问题", status: "completed", summary: "已识别指标、维度和时间范围。" },
+              { key: "routing", label: "选择分析路径", status: "completed", summary: "本次问题走快速事实路径。" },
+              { key: "querying", label: "查询数据", status: "completed", summary: "已完成数据查询和安全审核。" },
+              { key: "validating", label: "验证证据", status: "completed", summary: "已核对证据可支撑结论。" },
+              { key: "finalizing", label: "整理结论", status: "completed", summary: "已整理为业务可读结论。" },
+              { key: "charting", label: "生成图表", status: "skipped", summary: "事实快答不生成图表。" },
+            ],
+            business_answer: {
+              headline: "上海旗舰店销售额最高",
+              direct_answer: "最近90天上海旗舰店销售额最高。",
+              why: "证据表第一行显示：门店为上海旗舰店。",
+              evidence_bullets: ["上海旗舰店销售额最高。"],
+              recommendations: [],
+              caveats: [],
+              confidence: "medium",
+            },
+            evidence: { table_preview: { columns: ["store"], rows: [["上海旗舰店"]] } },
+            chart_artifacts: [],
+            technical_details: {
+              sql: "SELECT store_name FROM store_sales",
+              raw_rows: [["上海旗舰店"]],
+              trace_path: "workspaces/ws_1/runs/run_1/trace.json",
+              provider_metadata: { provider_called: true, prompt_id: "internal" },
+            },
+          },
+        }}
+      />,
+    );
+
+    const timeline = screen.getByLabelText("分析进度");
+    expect(timeline.textContent).toContain("分析进度");
+    expect(timeline.textContent).toContain("理解问题");
+    expect(timeline.textContent).toContain("选择分析路径");
+    expect(timeline.textContent).toContain("事实快答不生成图表。");
+    expect(timeline.textContent).toContain("已跳过");
+    expect(timeline.textContent).not.toContain("SELECT");
+    expect(timeline.textContent).not.toContain("trace");
+    expect(timeline.textContent).not.toContain("prompt");
+    expect(timeline.textContent).not.toContain("provider");
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("分析线程")).toBeLessThan(text.indexOf("分析进度"));
+    expect(text.indexOf("分析进度")).toBeLessThan(text.indexOf("业务结论"));
+    expect(screen.queryByText(/SELECT store_name/)).toBeNull();
+    expect(screen.queryByText(/provider_called/)).toBeNull();
+    expect(screen.queryByText(/trace.json/)).toBeNull();
   });
 
   it("keeps SQL raw rows and provider metadata collapsed by default", () => {
@@ -1414,59 +1873,48 @@ describe("workspace product components", () => {
         report_goal: "生成管理层收入复盘报告",
         title: "管理层收入复盘报告",
         status: "completed",
-        executive_summary: ["管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。"],
-        key_findings: ["关键发现：付费搜索收入最高，邮件渠道次之。"],
-        action_priorities: ["行动优先级：先复盘付费搜索投放效率。"],
-        chart_and_evidence: ["图表：渠道收入对比，单位：元。注释：付费搜索贡献主要收入。"],
-        risks_and_limits: ["风险边界：当前报告缺少 ROI、利润和转化率。"],
-        sections: [
-          {
-            section_id: "revenue_by_channel",
-            title: "Revenue by Channel",
-            purpose: "Compare channels.",
-            status: "completed",
-            question: "Which channels led revenue?",
-            summary: "旧 summary 不应展示。",
-            business_answer: {
-              headline: "付费搜索收入领先",
-              direct_answer: "付费搜索是本节收入最高的渠道。",
-              why: "证据表显示 paid_search 收入为 200。",
-              evidence_bullets: ["paid_search 收入为 200。"],
-              recommendations: ["优先复盘付费搜索渠道。"],
-              caveats: ["当前只基于报告章节查询结果。"],
-              confidence: "high",
+        plan: {
+          title: "管理层收入复盘报告",
+          report_style: "经营复盘",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+        },
+        evidence_pack: {
+          facts: [{ fact_id: "revenue_total", label: "总收入", display_value: "200.00" }],
+          tables: [],
+          charts: [],
+        },
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。",
+          sections: [
+            {
+              section_id: "revenue_by_channel",
+              title: "渠道收入复盘",
+              body: "付费搜索贡献主要收入，邮件渠道提供稳定补充；当前报告应继续补齐 ROI、利润和转化率后再做预算判断。",
+              evidence_refs: ["revenue_total"],
             },
-            sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
-            columns: ["channel", "revenue"],
-            rows_preview: [{ channel: "paid_search", revenue: 200 }],
-            artifact_paths: ["artifacts/revenue_by_channel_1.png"],
-            business_artifacts: [
-              {
-                type: "chart",
-                path: "artifacts/revenue_by_channel_1.png",
-                title: "渠道收入对比",
-                unit: "元",
-                business_annotation: "付费搜索贡献主要收入。",
-              },
-            ],
-            evidence_notes: ["Rows preview came from workspace data."],
-            provider_metadata: { sql_planning: { provider_called: true } },
-            trace_nodes: ["sql_reviewer"],
-            technical_details: {
-              internal_question: "这是自动报告内部 section。Which channels led revenue?",
-              purpose: "Compare channels.",
+          ],
+          action_recommendations: ["先复盘付费搜索投放效率。"],
+          data_boundaries: ["当前报告缺少 ROI、利润和转化率。"],
+          technical_appendix: {
+            evidence_pack: {
               sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
               rows_preview: [{ channel: "paid_search", revenue: 200 }],
               provider_metadata: { sql_planning: { provider_called: true } },
               trace_nodes: ["sql_reviewer"],
             },
           },
-        ],
+        },
+        validation: { status: "passed", checked_facts: ["revenue_total"] },
+        sections: [],
         markdown_path: "workspaces/ws_1/reports/report_1/report.md",
         json_path: "workspaces/ws_1/reports/report_1/report.json",
         trace_path: "workspaces/ws_1/reports/report_1/trace.json",
         artifact_dir: "workspaces/ws_1/reports/report_1/artifacts",
-        provider_metadata: { completed_section_count: 1 },
+        provider_metadata: { pipeline: "ReportPlan -> ReportEvidencePack -> ReportDocument" },
       },
     });
 
@@ -1475,42 +1923,21 @@ describe("workspace product components", () => {
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
-    expect(screen.getByText("管理层摘要")).toBeTruthy();
-    expect(screen.getByText("关键发现")).toBeTruthy();
-    expect(screen.getByText("行动优先级")).toBeTruthy();
-    expect(screen.getByText("图表与证据")).toBeTruthy();
-    expect(screen.getByText("风险与边界")).toBeTruthy();
-    expect(screen.getByText("报告章节")).toBeTruthy();
+    expect(screen.getByText("开篇摘要")).toBeTruthy();
+    expect(screen.getByText("行动建议")).toBeTruthy();
+    expect(screen.getByText("数据边界")).toBeTruthy();
+    expect(screen.getByText("报告正文")).toBeTruthy();
     expect(screen.getByText("管理层摘要：付费搜索是收入主线，邮件渠道提供稳定补充。")).toBeTruthy();
-    expect(screen.getByText("关键发现：付费搜索收入最高，邮件渠道次之。")).toBeTruthy();
-    expect(screen.getByText("行动优先级：先复盘付费搜索投放效率。")).toBeTruthy();
-    expect(screen.getByText("图表：渠道收入对比，单位：元。注释：付费搜索贡献主要收入。")).toBeTruthy();
-    expect(screen.getByText("风险边界：当前报告缺少 ROI、利润和转化率。")).toBeTruthy();
-    expect(screen.getByText("结论")).toBeTruthy();
-    expect(screen.getByText("付费搜索收入领先")).toBeTruthy();
-    expect(screen.getByText("直接回答")).toBeTruthy();
-    expect(screen.getByText("付费搜索是本节收入最高的渠道。")).toBeTruthy();
-    expect(screen.getByText("为什么")).toBeTruthy();
-    expect(screen.getByText("证据表显示 paid_search 收入为 200。")).toBeTruthy();
-    expect(screen.getByText("关键证据")).toBeTruthy();
-    expect(screen.getByText("paid_search 收入为 200。")).toBeTruthy();
-    expect(screen.getByText("建议动作")).toBeTruthy();
-    expect(screen.getByText("优先复盘付费搜索渠道。")).toBeTruthy();
-    expect(screen.getByText("限制说明")).toBeTruthy();
-    expect(screen.getByText("当前只基于报告章节查询结果。")).toBeTruthy();
-    expect(screen.getByText("置信度 high")).toBeTruthy();
+    expect(screen.getByText("先复盘付费搜索投放效率。")).toBeTruthy();
+    expect(screen.getByText("当前报告缺少 ROI、利润和转化率。")).toBeTruthy();
+    expect(screen.getByText("渠道收入复盘")).toBeTruthy();
+    expect(screen.getByText("付费搜索贡献主要收入，邮件渠道提供稳定补充；当前报告应继续补齐 ROI、利润和转化率后再做预算判断。")).toBeTruthy();
+    expect(screen.queryByText("结论")).toBeNull();
+    expect(screen.queryByText("直接回答")).toBeNull();
+    expect(screen.queryByText("为什么")).toBeNull();
+    expect(screen.queryByText("置信度 high")).toBeNull();
     expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
     expect(screen.queryByText("Rows preview came from workspace data.")).toBeNull();
-    expect(screen.getByText("图表或附件")).toBeTruthy();
-    expect(screen.getByText("单位：元")).toBeTruthy();
-    expect(screen.getAllByText("付费搜索贡献主要收入。").length).toBeGreaterThan(0);
-    expect(screen.getByRole("img", { name: "渠道收入对比" }).getAttribute("src")).toBe(
-      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
-    );
-    expect(screen.getByRole("link", { name: "下载图表" }).getAttribute("href")).toBe(
-      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_by_channel_1.png",
-    );
-    expect(screen.queryByText("Revenue by Channel 图表已生成")).toBeNull();
     expect(screen.queryByText("artifacts/revenue_by_channel_1.png")).toBeNull();
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.md")).toBeNull();
     expect(screen.queryByText("workspaces/ws_1/reports/report_1/report.json")).toBeNull();
@@ -1527,7 +1954,6 @@ describe("workspace product components", () => {
     expect(screen.getByText(/SELECT channel/)).toBeTruthy();
     expect(screen.getByText(/provider_called/)).toBeTruthy();
     expect(screen.getByText(/sql_reviewer/)).toBeTruthy();
-    expect(screen.getByText(/这是自动报告内部 section/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "下载 Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
@@ -1547,43 +1973,39 @@ describe("workspace product components", () => {
         report_goal: "生成中文收入趋势报告",
         title: "收入趋势报告",
         status: "completed",
-        executive_summary: ["管理层摘要：本报告基于章节业务答案阅读。"],
-        key_findings: ["关键发现：收入保持稳定。"],
-        action_priorities: ["行动优先级：继续观察收入变化。"],
-        chart_and_evidence: ["暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。"],
-        risks_and_limits: ["风险边界：当前缺少利润和转化率。"],
-        sections: [
-          {
-            section_id: "trend",
-            title: "收入趋势",
-            status: "completed",
-            business_answer: {
-              headline: "收入保持稳定",
-              direct_answer: "当前收入趋势没有明显异常。",
-              why: "章节证据显示收入波动较小。",
-              evidence_bullets: ["最近周期收入保持稳定。"],
-              recommendations: [],
-              caveats: ["当前没有生成可展示图表。"],
-              confidence: "medium",
+        document: {
+          title: "收入趋势报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "管理层摘要：本报告基于 ReportDocument 阅读。",
+          sections: [
+            {
+              section_id: "trend",
+              title: "收入趋势",
+              body: "当前收入趋势没有明显异常，后续可补充利润和转化率做进一步判断。",
             },
-            business_artifacts: [],
-            technical_details: {
+          ],
+          action_recommendations: ["继续观察收入变化。"],
+          data_boundaries: ["当前没有生成可展示图表。"],
+          technical_appendix: {
+            visualization: {
               error: "matplotlib backend error",
               trace_path: "/tmp/internal-trace.json",
             },
           },
-        ],
+        },
+        sections: [],
       },
     });
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
-    expect(await screen.findByText("暂无可展示图表；本报告先基于各章节证据表和业务结论阅读。")).toBeTruthy();
+    expect(await screen.findByText("当前没有生成可展示图表。")).toBeTruthy();
     expect(screen.queryByText(/matplotlib backend error/)).toBeNull();
     expect(screen.queryByText(/internal-trace/)).toBeNull();
   });
 
-  it("renders English report detail labels without Chinese business labels", async () => {
+  it("keeps report detail Chinese-first even for an English report goal", async () => {
     vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_english/download",
     );
@@ -1595,107 +2017,40 @@ describe("workspace product components", () => {
         workspace_id: "ws_1",
         report_type: "business_review",
         report_goal: "Create an English leadership report about revenue.",
-        title: "Leadership Business Review",
+        title: "最近90天经营复盘报告",
         status: "completed",
-        executive_summary: ["Executive summary: Paid search is the revenue lead."],
-        key_findings: ["Key findings: Paid search has the highest revenue."],
-        action_priorities: ["Action priorities: Review paid search efficiency."],
-        chart_and_evidence: ["Chart: Revenue by channel; unit: USD; annotation: Paid search leads revenue."],
-        risks_and_limits: ["Risks and limits: ROI and profit are not available."],
-        sections: [
-          {
-            section_id: "revenue",
-            title: "Revenue by Channel",
-            status: "completed",
-            business_answer: {
-              headline: "Paid search leads revenue",
-              direct_answer: "Paid search has the highest revenue in this section.",
-              why: "The evidence table shows paid_search revenue is 200.",
-              evidence_bullets: ["paid_search revenue is 200."],
-              recommendations: ["Review paid search efficiency before increasing spend."],
-              caveats: ["ROI and profit are not available in this section."],
-              confidence: "high",
+        document: {
+          title: "最近90天经营复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "管理层摘要：付费搜索是当前收入主线。",
+          sections: [
+            {
+              section_id: "revenue",
+              title: "收入结构",
+              body: "付费搜索收入最高，但仍需补充 ROI 和利润后再判断预算动作。",
             },
-            business_artifacts: [
-              {
-                type: "chart",
-                path: "artifacts/revenue_by_channel.png",
-                title: "Revenue by channel",
-                unit: "USD",
-                business_annotation: "Paid search leads revenue.",
-              },
-            ],
-          },
-        ],
+          ],
+          action_recommendations: ["先复盘付费搜索效率，再决定是否加码。"],
+          data_boundaries: ["当前缺少 ROI 和利润数据。"],
+        },
+        sections: [],
       },
     });
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_english" />);
 
-    expect(await screen.findByText("Leadership Business Review")).toBeTruthy();
-    expect(screen.getByText("Status: Completed")).toBeTruthy();
-    expect(screen.getByText("Progress: 1/1 sections complete")).toBeTruthy();
-    expect(screen.getByText("Report type: Business Review")).toBeTruthy();
-    expect(screen.getByText("Report goal: Create an English leadership report about revenue.")).toBeTruthy();
-    expect(screen.getByText("Executive Summary")).toBeTruthy();
-    expect(screen.getByText("Key Findings")).toBeTruthy();
-    expect(screen.getByText("Action Priorities")).toBeTruthy();
-    expect(screen.getByText("Chart And Evidence")).toBeTruthy();
-    expect(screen.getByText("Risks And Limits")).toBeTruthy();
-    expect(screen.getByText("Report Sections")).toBeTruthy();
-    expect(screen.getByText("Section status: Completed")).toBeTruthy();
-    expect(screen.getByText("Conclusion")).toBeTruthy();
-    expect(screen.getByText("Direct Answer")).toBeTruthy();
-    expect(screen.getByText("Why")).toBeTruthy();
-    expect(screen.getByText("Key Evidence")).toBeTruthy();
-    expect(screen.getByText("Recommended Actions")).toBeTruthy();
-    expect(screen.getByText("Limits")).toBeTruthy();
-    expect(screen.getByText("Confidence high")).toBeTruthy();
-    expect(screen.getByText("Charts And Evidence")).toBeTruthy();
-    expect(screen.getByText("Unit: USD")).toBeTruthy();
-    expect(screen.getByText("Paid search leads revenue.")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Download chart" })).toBeTruthy();
-    for (const chineseLabel of ["管理层摘要", "关键发现", "图表与证据", "报告章节", "结论", "直接回答", "建议动作", "限制说明", "置信度 high", "单位：USD", "下载图表"]) {
-      expect(screen.queryByText(chineseLabel)).toBeNull();
-    }
-  });
-
-  it("rejects malformed report business_answer instead of rendering legacy report body", () => {
-    render(
-      <ReportSection
-        workspaceId="ws_1"
-        reportId="report_1"
-        section={
-          {
-            section_id: "legacy_section",
-            title: "Legacy Section",
-            status: "completed",
-            summary: "旧 summary 不应展示。",
-            business_answer: {
-              summary: "旧业务摘要不应展示。",
-              next_actions: ["旧行动不应展示。"],
-              direct_answer: "",
-            },
-            artifact_paths: ["artifacts/legacy.png"],
-            business_artifacts: [
-              {
-                type: "chart",
-                path: "artifacts/legacy.png",
-                title: "Legacy Chart",
-              },
-            ],
-          } as never
-        }
-      />,
-    );
-
-    expect(screen.getByText("报告章节结构异常")).toBeTruthy();
-    expect(screen.getByText("后端没有返回完整的 P16 business_answer，请重新生成报告。")).toBeTruthy();
-    expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
-    expect(screen.queryByText("旧业务摘要不应展示。")).toBeNull();
-    expect(screen.queryByText("旧行动不应展示。")).toBeNull();
-    expect(screen.queryByText("直接回答")).toBeNull();
-    expect(screen.queryByText("Legacy Chart")).toBeNull();
+    expect(await screen.findByText("最近90天经营复盘报告")).toBeTruthy();
+    expect(screen.getByText("生成状态：已完成")).toBeTruthy();
+    expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
+    expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
+    expect(screen.getByText("报告目标：Create an English leadership report about revenue.")).toBeTruthy();
+    expect(screen.getByText("开篇摘要")).toBeTruthy();
+    expect(screen.getByText("报告正文")).toBeTruthy();
+    expect(screen.getByText("收入结构")).toBeTruthy();
+    expect(screen.getByText("付费搜索收入最高，但仍需补充 ROI 和利润后再判断预算动作。")).toBeTruthy();
+    expect(screen.queryByText("Status: Completed")).toBeNull();
+    expect(screen.queryByText("Direct Answer")).toBeNull();
   });
 
   it("renders the report detail route inside the product shell", async () => {
@@ -1712,24 +2067,22 @@ describe("workspace product components", () => {
         report_goal: "生成管理层收入复盘报告",
         title: "管理层收入复盘报告",
         status: "completed",
-        executive_summary: ["收入增长稳定。"],
-        sections: [
-          {
-            section_id: "summary",
-            title: "收入概览",
-            status: "completed",
-            summary: "旧 summary 不应展示。",
-            business_answer: {
-              headline: "收入保持增长",
-              direct_answer: "本节显示收入保持增长。",
-              why: "证据表显示最近周期收入高于上一周期。",
-              evidence_bullets: ["最近周期收入增长。"],
-              recommendations: [],
-              caveats: ["当前只基于报告章节查询结果。"],
-              confidence: "medium",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入增长稳定。",
+          sections: [
+            {
+              section_id: "summary",
+              title: "收入概览",
+              body: "报告正文显示收入保持增长。",
             },
-          },
-        ],
+          ],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+        sections: [],
       },
     });
 
@@ -1743,14 +2096,14 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("收入增长稳定。")).toBeTruthy();
-    expect(screen.getByText("本节显示收入保持增长。")).toBeTruthy();
+    expect(screen.getByText("报告正文显示收入保持增长。")).toBeTruthy();
     expect(screen.queryByText("旧 summary 不应展示。")).toBeNull();
   });
 
   it.each([
     ["completed", "已完成", "进度：1/1 个章节已完成"],
-    ["partial", "部分完成", "进度：1/2 个章节已完成，1 个章节失败"],
-    ["failed", "失败", "进度：0/1 个章节已完成，1 个章节失败"],
+    ["partial", "部分完成", "进度：0/2 个章节已完成"],
+    ["failed", "失败", "进度：0/1 个章节已完成"],
     ["running", "生成中", "进度：0/1 个章节已完成，仍在生成"],
   ])("shows clear report status and progress for %s reports", async (status, label, progress) => {
     vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
@@ -1766,68 +2119,22 @@ describe("workspace product components", () => {
         report_goal: "生成管理层收入复盘报告",
         title: "管理层收入复盘报告",
         status,
-        executive_summary: [],
-        sections:
-          status === "partial"
-            ? [
-                {
-                  section_id: "done",
-                  title: "Done",
-                  status: "completed",
-                  business_answer: {
-                    headline: "已完成",
-                    direct_answer: "本章节已完成。",
-                    why: "章节分析成功返回业务答案。",
-                    evidence_bullets: [],
-                    recommendations: [],
-                    caveats: [],
-                    confidence: "medium",
-                  },
-                },
-                {
-                  section_id: "failed",
-                  title: "Failed",
-                  status: "failed",
-                  business_answer: {
-                    headline: "章节生成失败",
-                    direct_answer: "本章节未能生成业务答案。",
-                    why: "章节分析没有完成。",
-                    evidence_bullets: [],
-                    recommendations: [],
-                    caveats: ["可重新生成报告。"],
-                    confidence: "low",
-                  },
-                  error: "Failed.",
-                },
-              ]
-            : [
-                {
-                  section_id: "section",
-                  title: "Section",
-                  status: status === "completed" ? "completed" : status === "running" ? "running" : "failed",
-                  business_answer:
-                    status === "completed"
-                      ? {
-                          headline: "已完成",
-                          direct_answer: "本章节已完成。",
-                          why: "章节分析成功返回业务答案。",
-                          evidence_bullets: [],
-                          recommendations: [],
-                          caveats: [],
-                          confidence: "medium",
-                        }
-                      : {
-                          headline: status === "running" ? "章节仍在生成" : "章节生成失败",
-                          direct_answer: status === "running" ? "本章节仍在生成。" : "本章节未能生成业务答案。",
-                          why: status === "running" ? "报告任务尚未完成。" : "章节分析没有完成。",
-                          evidence_bullets: [],
-                          recommendations: [],
-                          caveats: status === "running" ? [] : ["可重新生成报告。"],
-                          confidence: "low",
-                        },
-                  error: status === "failed" ? "Failed." : null,
-                },
-              ],
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "",
+          sections:
+            status === "partial"
+              ? [
+                  { section_id: "one", title: "第一章", body: "第一章正文。" },
+                  { section_id: "two", title: "第二章", body: "第二章正文。" },
+                ]
+              : [{ section_id: "section", title: "单章报告", body: "单章正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+        sections: [],
       },
     });
 

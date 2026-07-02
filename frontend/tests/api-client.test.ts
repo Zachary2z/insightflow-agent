@@ -125,6 +125,10 @@ describe("api client", () => {
           product_result: {
             version: "p16.v1",
             business_answer: businessAnswer,
+            progress_steps: [
+              { key: "understanding", label: "理解问题", status: "completed", summary: "已识别业务问题。" },
+              { key: "charting", label: "生成图表", status: "skipped", summary: "事实快答不生成图表。" },
+            ],
           },
         }),
       });
@@ -139,6 +143,8 @@ describe("api client", () => {
 
     expect(run.run_id).toBe("run_1");
     expect(run.product_result?.business_answer?.headline).toBe("Paid search leads revenue.");
+    expect(run.product_result?.progress_steps?.[0]?.label).toBe("理解问题");
+    expect(run.product_result?.progress_steps?.[1]?.status).toBe("skipped");
     expect(run.result.final_answer).toBe("Paid search leads revenue.");
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -203,6 +209,31 @@ describe("api client", () => {
     );
   });
 
+  it("posts explicit reanalysis requests when the user bypasses a cache candidate", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, run_id: "run_new", result: { status: "completed" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runAnalysis("ws_1", {
+      userQuestion: "最近90天销售额最高的门店是谁？",
+      forceReanalysis: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/runs",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_question: "最近90天销售额最高的门店是谁？",
+          force_reanalysis: true,
+        }),
+      }),
+    );
+  });
+
   it("loads workspace settings from FastAPI", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -235,7 +266,7 @@ describe("api client", () => {
       workspace_id: "ws_1",
       report_type: "business_review",
       report_goal: "Create a revenue review.",
-      title: "Business Review",
+      title: "最近90天经营复盘报告",
       status: "completed",
       executive_summary: ["Revenue grew."],
       sections: [],
@@ -268,7 +299,7 @@ describe("api client", () => {
     const detail = await getWorkspaceReport("ws_1", "report_1");
 
     expect(created.report_id).toBe("report_1");
-    expect(reports.reports[0].title).toBe("Business Review");
+    expect(reports.reports[0].title).toBe("最近90天经营复盘报告");
     expect(detail.report.executive_summary).toEqual(["Revenue grew."]);
     expect(getWorkspaceReportDownloadUrl("ws_1", "report_1")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",

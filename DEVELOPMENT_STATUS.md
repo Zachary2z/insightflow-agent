@@ -8,16 +8,16 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P20 General Business Analysis Foundation |
-| Current task | P20-H2 Chinese analysis task contract and clarification continuation complete; next is P20-H3 |
-| Next planned task | P20-H3 Fact layer, metric registry, and evidence payload |
-| Last completed task | P20-H2 Chinese analysis task contract and clarification continuation |
+| Current phase | P22 Evidence-Driven Report Generation in progress |
+| Current task | P22-H1 Report contract and old report path cutover complete |
+| Next planned task | P22-H2 Chinese report planner and evidence collector |
+| Last completed task | P22-H1 Report contract and old report path cutover |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
-| Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and Chinese management reports |
+| Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and coherent Chinese report documents |
 | Out of scope for P20 | Real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
 
 ## Phase Overview
@@ -34,9 +34,10 @@ This is the concise current status surface for InsightFlow Agent.
 | P17 | `[x]` Complete | Product codebase cleanup; H1-H6 complete |
 | P18 | `[x]` Complete | Business answer consistency across conclusions, evidence, recommendations, chart annotations, and reports |
 | P19 | `[x]` Complete | Compact quality phase for business-ready replies/reports using reviewer/composer, grounded recommendations, report/chart synthesis, cleanup, and live acceptance |
-| P20 | `[~]` In progress | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation |
-| P21 | `[ ]` Future | Responsive analysis experience: route classification, fast factual path, progress states, caching, and background work |
-| P22 | `[ ]` Future | Real business tool calling and exports after generalized analysis quality and responsiveness are stable |
+| P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
+| P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
+| P22 | `[~]` In progress | Evidence-driven Report Center: H1 replaced the report main contract with `ReportPlan -> ReportEvidencePack -> ReportDocument -> validation -> renderer`, deleted the old stitched report main path, and prepared the contract for H2/H3 evidence/composer work |
+| P23 | `[ ]` Future | Real China-oriented business tool calling and exports after the P22 report document contract is stable |
 
 ## P20 Task Status
 
@@ -45,9 +46,113 @@ This is the concise current status surface for InsightFlow Agent.
 | P20-H0 | `[x]` Complete | Architecture cleanup and main path inventory; removed stale template-mining eval/helper path and clarified current product chain |
 | P20-H1 | `[x]` Complete | General profiling/semantic baseline plus safe metric formula quoting and Chinese aliases for English/mixed raw fields |
 | P20-H2 | `[x]` Complete | Normalized Chinese `analysis_task` contract, slot-level clarification, partial continuation stays pending, provider output normalized to Chinese |
-| P20-H3 | `[ ]` Planned | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope |
-| P20-H4 | `[ ]` Planned | Business insight, answer, chart, and report generation from validated evidence |
-| P20-H5 | `[ ]` Planned | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled |
+| P20-H3 | `[x]` Complete | Metric registry, reusable fact/evidence payload, comparison scope, warnings, formulas, and Chinese display values |
+| P20-H4 | `[x]` Complete | Evidence-backed Chinese answers, chart intent fallback, and management report synthesis from validated evidence |
+| P20-H5 | `[x]` Complete | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled |
+
+## P21 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P21-H1 | `[x]` Complete | Conservative `analysis_route` metadata for `clarify`, `fast_fact`, `standard_analysis`, `deep_judgment`, and `report`; fast path remains metadata-only until H2 |
+| P21-H2 | `[x]` Complete | Fast fact path reuses P20 SQL review/execution/evidence validation/fact payloads and skips heavy insight/reviewer/composer/claim typing for simple factual, ranking, summary, and trend questions |
+| P21-H3 | `[x]` Complete | Business-friendly `progress_steps` contract and compact frontend progress timeline without exposing raw trace/provider metadata in the main UI |
+| P21-H4 | `[x]` Complete | Exact historical reuse with `workspace_id + data_version + normalized_question`; no vector or similar-question cache |
+| P21-H5 | `[x]` Complete | Page recovery, lightweight local background work, compact task cards with clamped long questions, and polling-based run detail recovery |
+| P21-H6 | `[x]` Complete | Lightweight context packs for `fast_fact`; complex routes keep enough evidence for answer quality |
+
+## P22 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P22-H1 | `[x]` Complete | Defined new report contracts, cut runner to plan/evidence/document/validation/render/save, deleted fixed English preset and per-section analysis stitching from the report main path, replaced Markdown/frontend report body rendering with `ReportDocument` |
+| P22-H2 | `[ ]` Planned | Build Chinese report planner and evidence collector from workspace profile/semantic layer |
+| P22-H3 | `[ ]` Planned | Add model-backed report composer and lightweight fact validator |
+| P22-H4 | `[ ]` Planned | Replace renderer/frontend report page, collapse technical appendix, run cleanup audit and regressions |
+
+P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. Remaining search hits for those terms are historical/superseded notes, negative tests, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations; those move to P23 after the new `ReportDocument` contract is stable.
+
+## Latest P22-H1 Result
+
+P22-H1 report contract and cutover completed on 2026-07-02:
+
+- Added the new report contracts in `workspaces/report_models.py`: `ReportPlan`, `ReportChapterPlan`, `EvidenceRequirement`, `ReportEvidencePack`, `ReportEvidenceFact`, `ReportEvidenceTable`, `ReportEvidenceChart`, `ReportDocument`, `ReportDocumentSection`, and `ReportValidationResult`.
+- Replaced the report runner main path with `plan -> evidence -> compose -> validate -> render -> save`. H1 evidence/composition is a minimal skeleton based on workspace profile and semantic-layer context; H2/H3 will add real report planning, SQL/metric/chart evidence collection, model-backed composition, and stronger validation.
+- Removed fixed English `REPORT_TYPE_PRESETS`, old report-section question generation, per-section retry/analysis stitching, and stitched narrative helpers from `workspaces/report_runner.py`.
+- Replaced Markdown and frontend report detail rendering so the main body comes from `ReportDocument`; technical plan/evidence/validation details stay in the collapsed appendix.
+- Deleted the old frontend `ReportSection` business-answer renderer and rewrote report runner/store/API/frontend tests away from stitched section output.
+- Verification passed: `python3 -m pytest tests/test_workspace_report_runner.py -q` (`6 passed`), `python3 -m pytest tests/test_workspace_report_runner.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`51 passed`), `python3 -m pytest tests/test_workspace_report_api.py -q` (`12 passed`), cleanup boundary regression (`21 passed`), and focused frontend Vitest (`63 passed`).
+
+## Latest P21-H1 Result
+
+P21-H1 conservative route policy completed on 2026-07-02:
+
+- Added `question_understanding.route_policy.classify_analysis_route()` with the stable `analysis_route` fields: `route`, `reason`, `confidence`, `requires_full_chain`, `fast_path_eligible`, and `disqualifiers`.
+- `run_question_understanding_agent()` now writes `analysis_route` into workflow state and question-understanding output.
+- Workspace analysis results now persist and restore `analysis_route` at the run top level and in `product_result`.
+- `fast_fact` is conservative and metadata-only in H1. It covers complete low-risk factual single-metric totals, ranking, and simple trend questions, but H1 still runs the full P20 SQL/evidence/answer/chart chain.
+- Why/cause, diagnosis, recommendation, budget, prioritization, review, report, and multi-metric tradeoff questions are disqualified from `fast_fact` and require the full chain.
+- Overall single-metric total questions and trend questions can omit a dimension slot, so “最近90天总销售额是多少？” and “本月订单量趋势怎么样？” can route as low-risk factual requests.
+- Verification passed: `python3 -m pytest tests/test_analysis_route_policy.py tests/test_workspace_analysis_runner.py::test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows tests/test_product_result_builder.py::test_product_result_builder_exposes_fact_payload_only_outside_main_answer -q` (`12 passed`), `python3 -m pytest tests/test_question_understanding_router.py tests/test_provider_backed_question_understanding.py tests/test_analysis_route_policy.py -q` (`50 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`31 passed`), cleanup boundary regression (`21 passed`), P20 realistic acceptance (`3 passed`), and full backend regression `python3 -m pytest` (`444 passed, 13 skipped`).
+- H1 legacy audit found old cleanup terms only in historical/superseded notes, cleanup/boundary tests, and negative mock-tool tests; no active old product path was restored.
+
+## Latest P21-H2 Result
+
+P21-H2 fast fact path completed on 2026-07-02:
+
+- Added `workspaces.fast_fact_composer` for concise Chinese P16 `business_answer` output for low-risk factual totals, rankings, and simple trends.
+- The workflow now routes successful `fast_fact` executions through `fast_fact_composer` after SQL review, SQL execution, and evidence validation, then skips `insight_agent`, Answer Reviewer, Final Answer Composer, and claim typing.
+- Fast fact answers keep `recommendations: []`, avoid raw SQL/raw rows/parameter dumps in the main answer, and preserve SQL, raw rows, and `fact_payload` in technical details.
+- Ranking answers include the leader, metric value, and comparison scope; trend answers summarize directional movement without generating advice.
+- Non-fast questions such as why/复盘, budget advice, reports, and multi-metric综合判断 still use the full P20 chain.
+- History detail persists the fast fact `business_answer`, `analysis_route`, evidence, and technical details.
+- Verification passed: `python3 -m pytest tests/test_fast_fact_path.py tests/test_workspace_analysis_runner.py::test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows -q` (`6 passed`), `python3 -m pytest tests/test_analysis_route_policy.py -q` (`10 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`31 passed`), `python3 -m pytest tests/test_p20_realistic_acceptance.py -q` (`3 passed`), cleanup/project boundary regression (`21 passed`), and full backend regression `python3 -m pytest` (`449 passed, 13 skipped`).
+
+## Latest P21-H3 Result
+
+P21-H3 business-friendly progress steps completed on 2026-07-02:
+
+- Added centralized `workspaces.progress_steps.build_progress_steps()` and wired `progress_steps` into every analysis `product_result`.
+- Route-aware progress now covers `fast_fact`, `standard_analysis`, `deep_judgment`, `report`, `clarify`, and `failed` states using the stable step fields `key`, `label`, `status`, and `summary`.
+- `fast_fact` shows the chart step as `skipped` with “事实快答不生成图表”; standard/deep routes keep chart progress; clarify and failed runs stop at the correct waiting/failure point with later steps pending or skipped.
+- Workspace run persistence now saves `progress_steps`, and history detail restores them. Older valid P16 history results keep their saved business answer while backfilling progress steps instead of rebuilding the whole product result.
+- Added `AnalysisProgressTimeline` to the Analysis Workbench between the analysis thread and business conclusion. The compact Chinese timeline does not render raw SQL, trace IDs, prompt/provider metadata, or raw rows in the main UI.
+- Verification passed: `python3 -m pytest tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`39 passed`), frontend focused Vitest for API/workspace flow (`58 passed`), focused history regression (`51 passed`), and full backend regression `python3 -m pytest` (`452 passed, 13 skipped`).
+
+## Latest P21-H4 Result
+
+P21-H4 exact historical reuse completed on 2026-07-02:
+
+- Workspaces now carry a simple integer `data_version` starting at `1`; CSV, Excel, and SQLite imports increment it when data changes.
+- Analysis runs persist `data_version` and a lightweight `normalized_question`; restored history detail keeps those fields, and technical details include them without promoting them into the main business conclusion UI.
+- `WorkspaceRunStore` can find reusable completed runs only by exact `workspace_id + data_version + normalized_question`. Failed, waiting, running, and old-data-version runs are ignored.
+- Normalization only trims, collapses repeated whitespace, applies Unicode width normalization, and maps common Chinese/English punctuation. It does not call an LLM, rewrite business meaning, perform similar-question matching, or add a keyword-heavy rule tree.
+- New analysis requests return `status: "cache_candidate"` with `matched_run_id` before workflow execution when an exact same-version completed run exists. Cache-check errors fall back to normal analysis, and explicit `force_reanalysis: true` bypasses reuse.
+- Analysis Workbench renders a compact Chinese reuse prompt with “查看历史结果” and “重新分析”. Viewing loads the matched run detail; rerunning submits a real new analysis with `force_reanalysis`.
+- Focused verification passed: `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_run_history_api.py tests/test_workspace_importers.py tests/test_workspace_store.py -q` (`37 passed`) and `cd frontend && npm test -- --run tests/api-client.test.ts tests/workspace-flow.test.tsx` (`60 passed`).
+
+## Latest P21-H5 Result
+
+P21-H5 background work and page recovery completed on 2026-07-02:
+
+- Added a lightweight local run shell/job layer: new analysis requests can persist a `running` run with `run_id`, `workspace_id`, `original_question`, `data_version`, `normalized_question`, and `progress_steps` before the existing analysis workflow finishes.
+- FastAPI `POST /api/workspaces/{workspace_id}/runs` now keeps H4 `cache_candidate` behavior first; non-cached new questions return a recoverable `running` run id while a local background executor updates the same run file to `completed`, `failed`, or `waiting_for_clarification`.
+- `GET /api/workspaces/{workspace_id}/runs/{run_id}` and history listing can restore running, waiting, completed, and failed runs from persisted workspace files without Redis, Celery, WebSocket, SSE, provider timeout handling, vector cache, or external SaaS.
+- Analysis Workbench now stores the active run id in `sessionStorage`, restores it after remount/refresh, polls run detail until terminal status, and clears the active marker after completion/failure/waiting.
+- Running/queued runs render a compact task card only: question, Chinese status, and current progress. Long questions are clamped, and SQL, evidence tables, full answers, charts, trace data, and provider metadata are not shown in the task card.
+- Completed/waiting/failed runs still open into the full P16 `RunResult`; cache reuse still shows “查看历史结果 / 重新分析” and explicit rerun uses `force_reanalysis`.
+- Verification passed: focused backend H5 set `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_run_history_api.py -q` (`35 passed`), full backend regression `python3 -m pytest` (`462 passed, 13 skipped`), focused frontend set `cd frontend && npm test -- --run tests/api-client.test.ts tests/workspace-flow.test.tsx` (`64 passed`), and frontend production build `cd frontend && npm run build`.
+
+## Latest P21-H6 Result
+
+P21-H6 lightweight context packs completed on 2026-07-02:
+
+- Added `workspaces.context_pack_builder.build_fast_fact_context_pack()` as the compact, fixed-shape evidence contract used only by `fast_fact`.
+- Fast fact context packs retain the user question, route, task type, metric/dimension ids and Chinese labels, time range, comparison scope, top evidence rows, formulas, units, display values, warnings, data limits, caveats, and evidence validation status.
+- The compact pack excludes raw SQL, trace, provider metadata, full workspace profile, full semantic layer, full raw rows, historical runs, prompts, and unrelated report sections. Raw SQL and raw rows remain only in existing technical details/fact payload areas.
+- `fast_fact_node` now builds and persists `fast_fact_context_pack`; `fast_fact_composer` prefers it for answer generation and falls back to minimal execution/evidence inputs if the pack is unavailable.
+- `technical_details.fast_fact_context_pack` is available for fast fact debugging and tests. `standard_analysis`, `deep_judgment`, and `report` are not forced into this compact context pack and keep the richer evidence path.
+- Focused verification passed: `python3 -m pytest tests/test_fast_fact_path.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`53 passed`).
 
 ## P19 Task Status
 
@@ -101,6 +206,53 @@ workspace import
 ```
 
 ## Latest Verified Baseline
+
+Latest P20-H5 closeout result on 2026-07-02:
+
+- Added realistic acceptance coverage in `tests/test_p20_realistic_acceptance.py` for two non-channel business scenarios: store sales/satisfaction and support ticket operations.
+- Store sales acceptance covers factual answer, ranking, multi-metric comparison, trend, recommendation, chart artifacts, fact payload, and management-report synthesis. Fact-only questions do not force recommendations; comparison/recommendation questions can select scatter charts from two numeric metrics; trend questions select line charts.
+- Support ticket acceptance covers team-level工单量、平均响应时长、满意度 analysis without requiring channel, orders, marketing spend, or revenue fields.
+- Business-review report section prompts now ask agents to use the current workspace schema, profile, and semantic layer. They no longer assume demo tables or fields for the general `business_review` report type.
+- Common service-operation fields now map to Chinese business labels: `team_name` -> 团队, `ticket_count` -> 工单数, and `avg_response_minutes` -> 平均响应时长.
+- Schema-review failure guidance is now generic to the current workspace: users are pointed to current tables, fields, metrics, and dimensions instead of a demo-specific field set.
+- Added `tests/test_p20_live_deepseek_acceptance.py`. It is opt-in and defaults to skip unless `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, provider flags, and `DEEPSEEK_API_KEY` are configured. Forced local live verification with those flags passed against real DeepSeek: `1 passed`.
+- Cleanup audit for old action/chart/mock/eval/Streamlit terms found matches only in historical/superseded notes, cleanup/boundary tests, negative mock-tool tests, and the audit command in the P20 plan; no active product import or main path was restored.
+- Verification passed: question-understanding/P17/P20/project/P20 acceptance boundary set `45 passed, 1 skipped`; metric/evidence/workspace-analysis/product-result focused set `49 passed`; report/composer/visualization focused set `36 passed`; full backend regression `python3 -m pytest` (`434 passed, 13 skipped`); frontend Vitest `npm test` (`62 passed`); frontend production build passed.
+
+P20 completion definition is now satisfied: InsightFlow is a Chinese-first general business data-analysis multi-agent product foundation that profiles uploaded datasets, builds semantic layers, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools, validates factual claims, and writes Chinese business-readable answers and reports. P21 responsiveness and fast-path work is complete; P22 is evidence-driven report generation, and China-oriented external tool calling/export moves to P23.
+
+Latest P20-H4 answer/report generation result on 2026-07-02:
+
+- Final answer composition no longer accepts stale `downgrade_to_insufficient_evidence` results when validated multi-row evidence contains supported entities and metrics; it rebuilds a useful Chinese business answer from the evidence rows.
+- Fact-only questions keep business caveats but do not force unrelated recommendations or action plans.
+- Recommendation questions with multiple metrics can explain tradeoffs such as revenue scale versus ROI/efficiency, preserving supported entities and avoiding false "证据不足" downgrades.
+- Shared Chinese field labels now cover general store-operation fields such as `store_name`, `sales_amount`, and `satisfaction_score`.
+- Visualization fallback chooses chart type from task intent: ranking uses ranked bar, trend uses line, and multi-metric comparison/recommendation uses scatter when enough numeric metrics exist. Fallback chart titles and annotations are Chinese business copy.
+- Report synthesis is Chinese-first even for English report goals and continues to reuse section `business_answer`, chart artifacts, evidence rows, and technical appendix separation.
+- Legacy audit found historical/action/chart/mock/eval terms only in historical notes, cleanup/boundary tests, and negative mock-tool tests. Active "证据不足" wording remains only as a necessary guardrail for genuinely missing rows, unsupported entities/metrics, or failed final-answer validation.
+- Verification passed: `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py -q` (`35 passed`), `python3 -m pytest tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_report_insight_cleanup.py tests/test_visualization_intelligence.py -q` (`60 passed`), `python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_question_understanding_router.py tests/test_provider_backed_question_understanding.py -q` (`54 passed`), P17/P20/project boundary checks (`21 passed`), and full backend regression `python3 -m pytest` (`430 passed, 12 skipped`).
+
+Latest P20-H3 fact-layer result on 2026-07-02:
+
+- Added a JSON-safe metric registry from workspace semantic metrics. It keeps base metric formulas and derives ROAS, net return, margin rate, and average order value only when the required revenue/spend/cost/order-count sources exist.
+- ROAS remains `revenue / spend`; net return remains `(revenue - spend) / spend`; margin rate remains `(revenue - cost) / revenue`. Missing source fields emit warnings instead of inventing derived metrics.
+- Added reusable evidence `fact_payload` for product results and technical details. It includes task type, metrics, dimensions, time scope, filters, comparison scope, columns, rows, formulas, warnings, display/formatted values, and technical SQL.
+- Comparison/ranking/recommendation payloads require at least two peer rows. If only a winner row is returned, the payload marks comparison scope as insufficient and adds a Chinese warning.
+- Chinese business display values now keep raw values alongside readable labels and formats, including `26255.44` -> `2.6 万`, percentages such as `0.367` -> `36.7%`, and raw columns such as `store_name` or `team_name` mapped to Chinese business fields.
+- Main `business_answer` fields still do not expose raw SQL or raw rows; raw rows and `technical_sql` live in `technical_details` / `fact_payload`.
+- No old demo/mock/action/chart/eval path was restored or deleted as part of H3. Legacy audit found old terms only in historical notes, cleanup/boundary tests, or tests that assert removed mock/tool choices are rejected.
+- Verification passed: `python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`48 passed`), `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`41 passed`), `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q` (`12 passed`), and full backend regression `python3 -m pytest` (`414 passed, 12 skipped`).
+
+P20-H3 task-contract metric normalization repair on 2026-07-02:
+
+- Question understanding now keeps ROAS, ROI, and net return separate before SQL planning and fact payload generation.
+- Deterministic router normalization maps `roas` to `ROAS`, `roi` to `ROI`, and `net return` / `net ROI` / `净投放回报率` / `净回报率` to `净投放回报率`.
+- Provider-backed question understanding applies the same aliases, so provider output such as `roas`, `net_return`, `net ROI`, or `净投放回报率` cannot collapse into ROI or trigger a missing-metric clarification.
+- P20-H3 metric-normalization repair also prevents `net ROI` / `netroi` from being double-counted as both net return and ROI.
+- P20-H3 metric-normalization repair now preserves explicit multi-metric questions that ask for net return and plain ROI together.
+- Existing Chinese metrics such as 销售额、花费、订单量、客单价、复购率、满意度、销量 remain unchanged.
+- This was a P20-H3 semantic/task-contract repair only; no P20-H4 answer/report generation logic was changed and no old demo/mock/action/chart/eval path was restored.
+- Verification passed: `python3 -m pytest tests/test_question_understanding_router.py tests/test_provider_backed_question_understanding.py -q` (`32 passed`), `python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`45 passed`), `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`8 passed`), and full backend regression `python3 -m pytest` (`419 passed, 12 skipped`).
 
 Latest P20-H2 task-contract result on 2026-07-02:
 
@@ -232,7 +384,7 @@ Latest P17-H6 closeout result on 2026-06-30:
 - Old eval/demo/action/mock/chart wording is retained only in Historical / Superseded notes, cleanup plans, or test-boundary assertions.
 - Final artifact hygiene keeps generated reports, charts, traces, workspace instances, frontend build output, pytest cache, and `__pycache__` out of the working artifact set, with only required `.gitkeep` placeholders retained.
 - Legacy audit found superseded cleanup terms only in historical/superseded notes or deletion-boundary tests, not active product entry points.
-- Focused cleanup boundary tests passed: `python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q` with `19 passed`.
+- Focused cleanup boundary tests are now covered by `tests/test_p17_product_cleanup_boundaries.py`, `tests/test_p20_architecture_cleanup_boundaries.py`, and `tests/test_project_initialization.py`; the old duplicated P11 cleanup-boundary file was removed during P20 cleanup.
 - Full backend regression passed: `python3 -m pytest`.
 - Frontend tests passed: `cd frontend && npm test`.
 - Frontend production build passed: `cd frontend && npm run build`.
