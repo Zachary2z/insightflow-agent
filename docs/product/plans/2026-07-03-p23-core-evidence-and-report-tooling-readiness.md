@@ -187,6 +187,19 @@ Completion record:
   - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`32 passed`)
   - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
 
+Fix record:
+
+- Fixed on 2026-07-03 after H2 review found evidence bullets and原因解释 were still too row-like and template-like.
+- Added fail-first coverage for support-ticket and channel scenarios so Chinese business answers no longer expose `第 1 行`, `Row 1`, `issue_type 为`, `ticket_count 为`, or untranslated raw field names when labels are available.
+- Added shared business evidence wording helpers that turn result rows into sentences such as最高对象、指标值、次高对象对比, while leaving SQL/raw rows/provider metadata in technical details only.
+- Added lightweight cause-hypothesis context for service issues, channels, and stores. Why answers now state that current data can confirm who is higher/lower but cannot directly prove the reason; hypotheses remain possible directions requiring process data validation.
+- Tightened recommendation intent detection: ordinary fact and why questions keep recommendations empty, while explicit建议、优化、优先级、预算、下一步 questions still receive action-oriented recommendations.
+- Updated the consistency guardrail so tradeoff rewrites localize service metrics such as工单数 and平均响应时长 instead of leaking raw column ids.
+- Verification passed:
+  - `python3 -m pytest tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_business_answer_quality.py -q` (`59 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`32 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+
 ## P23-H3: One-Pass Report Center With Shared Evidence
 
 Goal: Preserve P22's one-pass full-report direction while making report evidence, charts, and validation stronger.

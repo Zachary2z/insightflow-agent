@@ -87,6 +87,15 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 
 ## Latest P23-H2 Result
 
+P23-H2 evidence wording repair completed on 2026-07-03:
+
+- Replaced row-style Chinese evidence bullets such as `第 1 行` and raw-field `字段 为 值` strings with business evidence sentences built from the returned entity and metric rows.
+- Added shared wording helpers for business row evidence and cause-hypothesis context so support-ticket, channel, and store scenarios get domain-appropriate hypothesis language instead of one fixed原因模板.
+- Why/cause answers now say when current data only proves the result ranking and cannot directly prove the cause; hypotheses are phrased as possible directions that need process data validation.
+- Recommendation generation is now limited to explicit advice, optimization, priority, budget, or next-step questions; ordinary fact and why questions do not auto-fill recommendations.
+- The final consistency guard now localizes common service metrics such as工单数 and平均响应时长 in tradeoff rewrites instead of exposing raw field names.
+- Verification passed: composer/product/business quality set (`59 passed`), workspace analysis/fast fact set (`32 passed`), and focused frontend workspace-flow Vitest (`54 passed`).
+
 P23-H2 Chinese Business Answer Writer completed on 2026-07-03:
 
 - Added fail-first backend and frontend coverage for natural Chinese business answers without template/debug phrases, internal statuses, SQL, raw rows, trace ids, provider metadata, or direct-answer repetition in recommendations.

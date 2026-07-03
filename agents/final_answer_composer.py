@@ -7,12 +7,14 @@ from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request, validate_prompt_output
 from workspaces.answer_evidence import (
+    business_evidence_sentence,
     business_field_label,
     business_field_labels,
     contains_cjk,
     entity_key,
     metric_keys,
     primary_entity,
+    reason_hypothesis_context,
     row_bullets,
     row_summary,
     rows_as_dicts,
@@ -238,6 +240,7 @@ def _evidence_based_answer(
     metric_key_values = metric_keys(rows)
     primary = primary_entity(rows, entity_key_value=entity_key_value, metric_key_values=metric_key_values)
     first_row_summary = row_summary(rows[0], chinese=chinese)
+    evidence_sentence = business_evidence_sentence(rows, chinese=chinese) or f"{first_row_summary}。"
     evidence_bullets = row_bullets(rows, chinese=chinese)
     confidence = "medium" if str(reviewer_result.get("confidence")) == "high" else str(
         reviewer_result.get("confidence") or "medium"
@@ -251,11 +254,11 @@ def _evidence_based_answer(
         metric_labels = _metric_labels(metric_key_values, chinese=True)
         metric_text = "、".join(metric_labels) if metric_labels else "可用指标"
         why_text = (
-            f"当前证据显示，{entity_text} 在本次返回的{metric_text}中表现靠前。"
-            "如果要解释背后的业务原因，可以把它作为合理假设：可能与触达效率、需求规模、客户信任或运营承接有关，"
-            "但这些原因仍需要转化率、复购、成本或更细分过程数据进一步验证。"
+            f"{evidence_sentence} 当前数据只能确认 {entity_text} 在{metric_text}上更高，不能直接证明原因。"
+            f"可能方向包括：{reason_hypothesis_context(user_question, rows, chinese=True)}，"
+            "但需要补充过程数据进一步验证。"
             if _asks_why(user_question)
-            else f"当前数据中，{entity_text} 的结果靠前：{first_row_summary}。"
+            else f"当前数据中，{evidence_sentence}"
         )
         recommendations = (
             _composer_recommendations(
@@ -322,13 +325,11 @@ def _should_include_recommendations(user_question: str) -> bool:
             "建议",
             "推荐",
             "应该",
-            "该",
             "值得",
             "优先",
             "加预算",
             "减少预算",
             "优化",
-            "关注",
             "下一步",
             "action",
             "recommend",

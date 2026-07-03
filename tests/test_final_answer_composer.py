@@ -334,6 +334,78 @@ def test_composer_rebuilds_fact_answer_without_forcing_recommendations():
     assert answer["caveats"]
 
 
+def test_composer_uses_business_evidence_sentences_for_support_issues_without_auto_recommendations():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个客服问题工单量最高？为什么？",
+        execution_result={
+            "success": True,
+            "columns": ["issue_type", "ticket_count", "avg_response_minutes"],
+            "rows": [["退款咨询", 320, 48.0], ["物流延迟", 180, 76.0], ["发票问题", 90, 22.0]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["退款咨询", "物流延迟", "发票问题"],
+            supported_metrics=["ticket_count", "avg_response_minutes"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="low",
+        ),
+    )
+
+    text = _answer_text(answer)
+    evidence_text = " ".join(answer["evidence_bullets"])
+    assert "退款咨询" in text
+    assert "工单数" in text
+    assert "第 1 行" not in text
+    assert "issue_type 为" not in text
+    assert "ticket_count 为" not in text
+    assert "退款咨询工单数最高" in evidence_text
+    assert "物流延迟" in evidence_text
+    assert "不能直接证明原因" in answer["why"]
+    assert any(marker in answer["why"] for marker in ("问题发生频次", "处理复杂度", "服务流程"))
+    assert "可能" in answer["why"]
+    assert answer["recommendations"] == []
+
+
+def test_composer_channel_fact_evidence_bullets_are_business_sentences():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个渠道收入最高？",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["email", 44548.53], ["direct", 36506.78], ["paid_search", 22109.0]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["email", "direct", "paid_search"],
+            supported_metrics=["total_revenue"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="low",
+        ),
+    )
+
+    text = _answer_text(answer)
+    evidence_text = " ".join(answer["evidence_bullets"])
+    assert "email" in text
+    assert "44548.53" in text
+    assert "第 1 行" not in text
+    assert "Row 1" not in text
+    assert "channel 为" not in text
+    assert "total_revenue 为" not in text
+    assert "email 总收入最高，为 44548.53" in evidence_text
+    assert "direct 为 36506.78" in evidence_text
+    assert answer["recommendations"] == []
+
+
 def test_composer_rebuilds_natural_chinese_answer_with_missing_roi_boundary():
     from agents.final_answer_composer import compose_final_answer
 

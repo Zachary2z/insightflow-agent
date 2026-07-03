@@ -101,7 +101,7 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert answer["headline"]
     assert answer["direct_answer"] == raw["final_answer"]
     assert "paid_search" in answer["why"]
-    assert answer["evidence_bullets"] == ["第 1 行：渠道 为 paid_search，收入 为 200.0。"]
+    assert answer["evidence_bullets"] == ["paid_search 收入最高，为 200。"]
     assert answer["recommendations"]
     assert raw["final_answer"] not in answer["recommendations"]
     assert "raw_rows" not in product["business_answer"]
@@ -601,7 +601,7 @@ def test_chinese_business_answer_rebuilds_english_evidence_notes_from_rows():
 
     answer = build_business_answer(raw)
 
-    assert answer["evidence_bullets"] == ["第 1 行：渠道 为 email，总收入 为 44548.53。"]
+    assert answer["evidence_bullets"] == ["email 总收入最高，为 44548.53。"]
     assert "total revenue is" not in _business_answer_text(answer)
 
 
@@ -765,6 +765,73 @@ def test_clean_provider_fact_answer_gets_caveat_without_forcing_recommendation()
     assert answer["recommendations"] == []
     assert answer["caveats"]
     assert any("本次查询" in caveat or "时间范围" in caveat for caveat in answer["caveats"])
+
+
+def test_product_result_builder_uses_business_evidence_sentences_for_channel_fact_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53], ["direct", 36506.78], ["paid_search", 22109.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    text = _business_answer_text(answer)
+    evidence_text = " ".join(answer["evidence_bullets"])
+    assert "email" in text
+    assert "44548.53" in text
+    assert "第 1 行" not in text
+    assert "Row 1" not in text
+    assert "channel 为" not in text
+    assert "total_revenue 为" not in text
+    assert "email 总收入最高，为 44548.53" in evidence_text
+    assert "direct 为 36506.78" in evidence_text
+    assert answer["recommendations"] == []
+
+
+def test_product_result_builder_does_not_treat_why_as_recommendation_request():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？为什么？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53], ["direct", 36506.78]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    assert "不能直接证明原因" in answer["why"]
+    assert "可能" in answer["why"]
+    assert answer["recommendations"] == []
+
+
+def test_product_result_builder_keeps_recommendations_for_explicit_advice_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？下一步应该怎么优化？",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["email", 44548.53], ["direct", 36506.78]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    assert answer["recommendations"]
+    assert answer["direct_answer"] not in answer["recommendations"]
 
 
 def test_fact_question_does_not_force_unrelated_recommendations():
@@ -982,11 +1049,10 @@ def test_product_result_builder_localizes_common_metric_fields_in_main_answer():
     )
 
     text = _business_answer_text(answer)
-    assert "渠道 为 email" in text
-    assert "总收入 为 44548.53" in text
-    assert "订单数 为 120" in text
-    assert "客单价 为 371.24" in text
-    assert "投放成本 为 2290.5" in text
+    assert "email 总收入最高，为 44548.53" in text
+    assert "email 的订单数为 120 单" in text
+    assert "email 的客单价为 371.24" in text
+    assert "email 的投放成本为 2290.5" in text
     assert "total_revenue" not in text
     assert "order_count" not in text
     assert "avg_order_value" not in text
@@ -1012,7 +1078,7 @@ def test_product_result_builder_uses_english_fallback_for_english_question():
     assert answer["direct_answer"].startswith("The query returned 1 row")
     assert "The current data shows:" in answer["why"]
     assert answer["evidence_bullets"] == [
-        "Row 1: channel is email, total revenue is 44548.53, order count is 120, average order value is 371.24."
+        "email has the highest total revenue at 44548.53."
     ]
     assert "total revenue" in text
     assert "order count" in text

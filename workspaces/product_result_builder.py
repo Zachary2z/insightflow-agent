@@ -8,7 +8,14 @@ from urllib.parse import quote
 
 from question_understanding.route_policy import classify_analysis_route
 from tools.evidence_tool import build_evidence_payload
-from workspaces.answer_evidence import business_field_label, business_field_labels
+from workspaces.answer_evidence import (
+    business_evidence_sentence,
+    business_field_label,
+    business_field_labels,
+    business_row_sentences,
+    reason_hypothesis_context,
+    rows_as_dicts,
+)
 from workspaces.answer_consistency import apply_answer_consistency, safe_chart_annotation
 from workspaces.context_pack_builder import build_fast_fact_context_pack
 from workspaces.progress_steps import build_progress_steps
@@ -278,7 +285,7 @@ def business_answer_is_usable(
         return False
 
     combined = "\n".join(_business_answer_texts(existing))
-    if _looks_like_raw_parameter_dump(combined) or _contains_technical_leak(combined):
+    if _looks_like_raw_parameter_dump(combined) or _looks_like_mechanical_row_evidence(combined) or _contains_technical_leak(combined):
         return False
     if _needs_chinese_response(user_question) and not _business_answer_fields_contain_cjk(existing):
         return False
@@ -377,7 +384,7 @@ def _safe_direct_answer(
     direct_answer = _candidate_direct_answer(raw)
     if not direct_answer and execution_result.get("success"):
         return _answer_from_evidence(user_question, execution_result, chinese=chinese), "missing_direct_answer"
-    if _looks_like_raw_parameter_dump(direct_answer) or _contains_technical_leak(direct_answer):
+    if _looks_like_raw_parameter_dump(direct_answer) or _looks_like_mechanical_row_evidence(direct_answer) or _contains_technical_leak(direct_answer):
         return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "unsafe_text"
     if _needs_chinese_response(user_question) and direct_answer.strip() and not _contains_cjk(direct_answer):
         return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "language_mismatch"
@@ -421,6 +428,9 @@ def _list_language_mismatches_question(items: list[str], question: str) -> bool:
 
 
 def _evidence_bullets_from_rows(execution_result: dict[str, Any], *, chinese: bool, limit: int = 4) -> list[str]:
+    normalized_rows = rows_as_dicts(execution_result)
+    if normalized_rows:
+        return business_row_sentences(normalized_rows, chinese=chinese, limit=limit)
     rows = list(execution_result.get("rows") or [])[:limit]
     columns = [str(column) for column in execution_result.get("columns") or []]
     bullets: list[str] = []
@@ -443,9 +453,11 @@ def _business_why(
     anchor = _evidence_anchor_sentence(execution_result, chinese=chinese)
     if anchor:
         if chinese and _asks_why(user_question):
+            normalized_rows = rows_as_dicts(execution_result)
             return (
-                f"{anchor} 这说明该对象在当前结果中处于领先位置；背后的业务原因可能与触达效率、需求规模、"
-                "客户信任或运营承接有关，但当前证据没有直接提供转化率、复购或成本数据，需要进一步验证。"
+                f"{anchor} 当前数据只能确认结果高低，不能直接证明原因。"
+                f"可能方向包括：{reason_hypothesis_context(user_question, normalized_rows, chinese=True)}，"
+                "但需要补充过程数据进一步验证。"
             )
         return anchor
     if evidence_bullets:
@@ -481,13 +493,11 @@ def _should_include_recommendations(user_question: str) -> bool:
             "建议",
             "推荐",
             "应该",
-            "该",
             "值得",
             "优先",
             "加预算",
             "减少预算",
             "优化",
-            "关注",
             "下一步",
             "action",
             "recommend",
@@ -659,9 +669,13 @@ def _weak_evidence_caveat(execution_result: dict[str, Any], *, chinese: bool) ->
 
 
 def _evidence_anchor_sentence(execution_result: dict[str, Any], *, chinese: bool) -> str:
-    rows = execution_result.get("rows") or []
-    if not rows:
+    normalized_rows = rows_as_dicts(execution_result)
+    if not normalized_rows:
         return ""
+    if chinese:
+        sentence = business_evidence_sentence(normalized_rows, chinese=True)
+        return f"当前数据中，{sentence}" if sentence else ""
+    rows = execution_result.get("rows") or []
     columns = [str(column) for column in execution_result.get("columns") or []]
     pairs = _row_pairs(rows[0], columns)
     if not pairs:
@@ -1026,22 +1040,24 @@ def _answer_from_evidence(question: str, execution_result: dict[str, Any], *, ch
         return f"The query completed, but the evidence table returned no data rows.{suffix}"
     columns = list(execution_result.get("columns") or [])
     summary = f"已完成本轮查询，共返回 {len(rows)} 行结果。" if chinese else f"The query returned {len(rows)} row{'s' if len(rows) != 1 else ''}."
-    first_row = rows[0]
-    if isinstance(first_row, dict):
-        pairs = list(first_row.items())
-    elif isinstance(first_row, (list, tuple)):
-        pairs = list(zip(columns, first_row, strict=False))
+    if chinese:
+        sentence = business_evidence_sentence(rows_as_dicts(execution_result), chinese=True)
+        if sentence:
+            summary += "当前数据中，" + sentence
     else:
-        pairs = []
-    evidence = [
-        _business_pair_text(column, value, chinese=chinese)
-        for column, value in pairs[:5]
-        if str(column).strip()
-    ]
-    if evidence:
-        if chinese:
-            summary += "当前数据中，" + "，".join(evidence) + "。"
+        first_row = rows[0]
+        if isinstance(first_row, dict):
+            pairs = list(first_row.items())
+        elif isinstance(first_row, (list, tuple)):
+            pairs = list(zip(columns, first_row, strict=False))
         else:
+            pairs = []
+        evidence = [
+            _business_pair_text(column, value, chinese=chinese)
+            for column, value in pairs[:5]
+            if str(column).strip()
+        ]
+        if evidence:
             summary += " The current data shows: " + ", ".join(evidence) + "."
     if safe_question:
         summary += f"原问题：{safe_question}" if chinese else f" Original question: {safe_question}"
@@ -1151,6 +1167,22 @@ def _looks_like_raw_parameter_dump(text: str) -> bool:
         if len(assignments) >= 2 or (assignments and "," in stripped):
             dump_lines += 1
     return dump_lines >= max(1, len(lines) // 2)
+
+
+def _looks_like_mechanical_row_evidence(text: str) -> bool:
+    value = str(text or "")
+    if re.search(r"(?:第\s*\d+\s*行|Row\s+\d+)", value, re.IGNORECASE):
+        return True
+    raw_field_names = sorted(business_field_labels(chinese=True), key=len, reverse=True)
+    raw_field_pattern = "|".join(re.escape(name) for name in raw_field_names)
+    if raw_field_pattern and re.search(rf"\b(?:{raw_field_pattern})\b\s*(?:为|is)\s*", value, re.IGNORECASE):
+        return True
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    for line in lines:
+        stripped = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line)
+        if stripped.count(" 为 ") >= 2:
+            return True
+    return False
 
 
 def _contains_technical_leak(text: str) -> bool:

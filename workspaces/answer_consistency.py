@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from workspaces.answer_evidence import business_evidence_sentence, business_field_label, business_row_sentences
 from workspaces.product_models import empty_business_answer
 
 
@@ -383,6 +384,7 @@ def _ranked_evidence_answer(
 ) -> dict[str, Any]:
     chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
     row_summary = _row_summary(rows[0], chinese=chinese)
+    evidence_sentence = business_evidence_sentence(rows, chinese=chinese) or f"{row_summary}。"
     evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
     caveats = _dedupe(
         answer["caveats"]
@@ -400,8 +402,8 @@ def _ranked_evidence_answer(
         answer.update(
             {
                 "headline": f"当前证据最支持优先评估 {primary_entity}",
-                "direct_answer": f"当前数据支持优先评估 {primary_entity}；{row_summary}。因此本次建议先围绕 {primary_entity} 复盘。",
-                "why": f"当前数据中，{row_summary}。",
+                "direct_answer": f"当前数据支持优先评估 {primary_entity}；{evidence_sentence}因此本次建议先围绕 {primary_entity} 复盘。",
+                "why": f"当前数据中，{evidence_sentence}",
                 "evidence_bullets": evidence_bullets,
                 "recommendations": [f"围绕 {primary_entity} 做下一步资源评估，并用相同指标继续跟踪。"],
                 "caveats": caveats,
@@ -476,14 +478,7 @@ def _insufficient_alignment_answer(
 
 
 def _ranked_row_bullets(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) -> list[str]:
-    bullets: list[str] = []
-    for index, row in enumerate(rows[:limit], start=1):
-        summary = _row_summary(row, chinese=chinese)
-        if chinese:
-            bullets.append(f"第 {index} 行：{summary}。")
-        else:
-            bullets.append(f"Row {index}: {summary}.")
-    return bullets
+    return business_row_sentences(rows, chinese=chinese, limit=limit)
 
 
 def _evidence_scope(rows: list[dict[str, Any]], *, chinese: bool) -> str:
@@ -612,6 +607,12 @@ def _metric_label(metric: str, *, chinese: bool) -> str:
     lowered = str(metric or "").lower()
     if "roi" in lowered:
         return "ROI"
+    if "ticket" in lowered and "count" in lowered:
+        return "工单数" if chinese else "ticket count"
+    if "response" in lowered and ("minute" in lowered or "time" in lowered):
+        return "平均响应时长" if chinese else "average response time"
+    if "resolution" in lowered and ("hour" in lowered or "time" in lowered):
+        return "平均解决时长" if chinese else "average resolution time"
     if "avg" in lowered and "revenue" in lowered and ("order" in lowered or "per_order" in lowered):
         return "客单价" if chinese else "average order revenue"
     if lowered in {"order_count", "orders"} or ("order" in lowered and "count" in lowered):
@@ -685,7 +686,7 @@ def _metric_leader(
 def _row_summary(row: dict[str, Any], *, chinese: bool = True) -> str:
     relation = " 为 " if chinese else " is "
     separator = "，" if chinese else ", "
-    pairs = [f"{key}{relation}{value}" for key, value in list(row.items())[:4]]
+    pairs = [f"{business_field_label(key, chinese=chinese)}{relation}{value}" for key, value in list(row.items())[:4]]
     if pairs:
         return separator.join(pairs)
     return "当前证据没有可展示字段" if chinese else "the current evidence has no displayable fields"

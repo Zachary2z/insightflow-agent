@@ -12,6 +12,7 @@ BUSINESS_FIELD_LABELS_ZH = {
     "satisfaction_score": "满意度",
     "score_nps": "满意度",
     "team_name": "团队",
+    "issue_type": "客服问题",
     "ticket_count": "工单数",
     "avg_response_minutes": "平均响应时长",
     "response_minutes": "响应时长",
@@ -51,6 +52,7 @@ BUSINESS_FIELD_LABELS_EN = {
     "satisfaction_score": "satisfaction score",
     "score_nps": "satisfaction score",
     "team_name": "team",
+    "issue_type": "issue type",
     "ticket_count": "ticket count",
     "avg_response_minutes": "average response time",
     "response_minutes": "response time",
@@ -159,11 +161,133 @@ def primary_entity(rows: list[dict[str, Any]], *, entity_key_value: str, metric_
 
 
 def row_bullets(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) -> list[str]:
-    bullets = []
-    for index, row in enumerate(rows[:limit], start=1):
-        summary = row_summary(row, chinese=chinese)
-        bullets.append(f"第 {index} 行：{summary}。" if chinese else f"Row {index}: {summary}.")
-    return bullets
+    return business_row_sentences(rows, chinese=chinese, limit=limit)
+
+
+def business_row_sentences(rows: list[dict[str, Any]], *, chinese: bool, limit: int = 3) -> list[str]:
+    entity_key_value = entity_key(rows)
+    metric_key_values = metric_keys(rows)
+    if not rows or not entity_key_value or not metric_key_values:
+        ending = "。" if chinese else "."
+        return [row_summary(row, chinese=chinese) + ending for row in rows[:limit] if row]
+
+    primary_metric = metric_key_values[0]
+    ranked = _rank_rows_by_metric(rows, entity_key_value=entity_key_value, metric=primary_metric)
+    if not ranked:
+        return [row_summary(row, chinese=chinese) + "。" for row in rows[:limit] if row]
+
+    metric_label = business_field_label(primary_metric, chinese=True)
+    metric_unit = _metric_unit(primary_metric)
+    if not chinese:
+        metric_label = business_field_label(primary_metric, chinese=False)
+        comparison_parts = []
+        for entity, value, _row in ranked[:limit]:
+            formatted = _format_business_value(value, metric=primary_metric, unit="")
+            if not comparison_parts:
+                comparison_parts.append(f"{entity} has the highest {metric_label} at {formatted}")
+            else:
+                comparison_parts.append(f"{entity} has {formatted}")
+        return ["; ".join(comparison_parts) + "."]
+
+    comparison_parts = []
+    for entity, value, _row in ranked[:limit]:
+        formatted = _format_business_value(value, metric=primary_metric, unit=metric_unit)
+        if not comparison_parts:
+            comparison_parts.append(f"{_entity_metric_text(entity, metric_label)}最高，为 {formatted}")
+        else:
+            comparison_parts.append(f"{_entity_value_text(entity)}为 {formatted}")
+
+    bullets = ["；".join(comparison_parts) + "。"]
+    leader_entity, _leader_value, leader_row = ranked[0]
+    for metric in metric_key_values[1:limit]:
+        value = to_number(leader_row.get(metric))
+        if value is None:
+            continue
+        label = business_field_label(metric, chinese=True)
+        unit = _metric_unit(metric)
+        bullets.append(f"{_entity_value_text(leader_entity)}的{label}为 {_format_business_value(value, metric=metric, unit=unit)}。")
+    return bullets[:limit]
+
+
+def business_evidence_sentence(rows: list[dict[str, Any]], *, chinese: bool) -> str:
+    bullets = business_row_sentences(rows, chinese=chinese, limit=3)
+    return bullets[0] if bullets else ""
+
+
+def reason_hypothesis_context(user_question: str, rows: list[dict[str, Any]], *, chinese: bool) -> str:
+    if not chinese:
+        return "available evidence only confirms the result, not the cause"
+    text = " ".join(
+        [
+            str(user_question or ""),
+            " ".join(str(key) for row in rows[:3] for key in row.keys()),
+            " ".join(str(value) for row in rows[:3] for value in row.values() if not is_number(value)),
+        ]
+    ).lower()
+    if any(marker in text for marker in ("issue", "ticket", "客服", "工单", "响应", "处理", "退款", "物流")):
+        return "问题发生频次、处理复杂度或服务流程"
+    if any(marker in text for marker in ("channel", "渠道", "投放", "预算", "spend", "cost", "roi", "roas")):
+        return "流量质量、投放成本、转化效率或复购"
+    if any(marker in text for marker in ("store", "门店", "sales", "销售", "客单", "区域", "满意度")):
+        return "客流、客单价、商品结构或区域需求"
+    return "需求规模、客户结构、运营承接或资源配置"
+
+
+def _rank_rows_by_metric(
+    rows: list[dict[str, Any]],
+    *,
+    entity_key_value: str,
+    metric: str,
+) -> list[tuple[str, float, dict[str, Any]]]:
+    ranked: list[tuple[str, float, dict[str, Any]]] = []
+    for row in rows:
+        entity = str(row.get(entity_key_value) or "").strip()
+        value = to_number(row.get(metric))
+        if entity and value is not None:
+            ranked.append((entity, value, row))
+    return sorted(ranked, key=lambda item: item[1], reverse=True)
+
+
+def _metric_unit(metric: str) -> str:
+    lowered = str(metric or "").lower()
+    if "ticket" in lowered or "工单" in lowered:
+        return "件"
+    if ("order" in lowered and "count" in lowered) or lowered in {"orders", "订单数"}:
+        return "单"
+    if "minute" in lowered or "分钟" in lowered:
+        return "分钟"
+    if "hour" in lowered or "小时" in lowered:
+        return "小时"
+    if "rate" in lowered or "share" in lowered:
+        return "%"
+    return ""
+
+
+def _entity_metric_text(entity: str, metric_label: str) -> str:
+    if _ends_with_ascii(entity) and metric_label:
+        return f"{entity} {metric_label}"
+    return f"{entity}{metric_label}"
+
+
+def _entity_value_text(entity: str) -> str:
+    if _ends_with_ascii(entity):
+        return f"{entity} "
+    return entity
+
+
+def _ends_with_ascii(text: str) -> bool:
+    value = str(text or "").strip()
+    return bool(value) and value[-1].isascii()
+
+
+def _format_business_value(value: float, *, metric: str, unit: str) -> str:
+    if float(value).is_integer():
+        formatted = f"{int(value)}"
+    else:
+        formatted = f"{value:.2f}".rstrip("0").rstrip(".")
+    if unit == "%" and 0 <= value <= 1:
+        formatted = f"{value * 100:.1f}".rstrip("0").rstrip(".")
+    return f"{formatted} {unit}".rstrip()
 
 
 def row_summary(row: dict[str, Any], *, chinese: bool) -> str:

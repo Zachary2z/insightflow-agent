@@ -542,6 +542,19 @@ def test_workspace_analysis_non_channel_judgment_answer_reads_like_business_chin
     assert result["analysis_route"]["route"] != "fast_fact"
     assert "退款咨询" in text
     assert "工单数" in text or "ticket_count" not in text
+    assert "第 1 行" not in text
+    assert "issue_type 为" not in text
+    assert "ticket_count 为" not in text
+    assert "ticket_count" not in text
+    assert "avg_response_minutes" not in text
+    evidence_text = " ".join(answer["evidence_bullets"])
+    if evidence_text:
+        assert "退款咨询" in evidence_text
+        assert "工单" in evidence_text
+        assert "第 1 行" not in evidence_text
+        assert "issue_type 为" not in evidence_text
+    assert "不能直接证明原因" in answer["why"]
+    assert any(marker in answer["why"] for marker in ("问题发生频次", "处理复杂度", "服务流程"))
     assert "证据表第一行显示" not in text
     assert "本轮排序证据中" not in text
     assert "execution_result" not in text
