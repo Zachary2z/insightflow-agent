@@ -411,6 +411,96 @@ def test_evidence_ledger_support_and_customer_coverage_does_not_emit_fixed_optio
     assert "经营损失" not in support_text
 
 
+def test_evidence_ledger_keeps_roi_row_facts_without_contribution_derivatives():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_roi",
+                title="渠道ROI表现",
+                columns=["渠道", "ROI"],
+                rows=[
+                    {"渠道": "自然流量", "ROI": "7.5"},
+                    {"渠道": "付费投放", "ROI": "2.0"},
+                ],
+                source_chapter_id="revenue_structure",
+                description="按渠道展示 ROI。",
+                evidence_ref="query_channel_roi",
+            )
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    facts = json.dumps([item.to_dict() for item in ledger.facts], ensure_ascii=False)
+    derived = json.dumps([item.to_dict() for item in ledger.derived_metrics], ensure_ascii=False)
+
+    assert "自然流量ROI" in facts
+    assert "付费投放ROI" in facts
+    assert "ROI合计" not in derived
+    assert "ROI占比" not in derived
+    assert "top2_ROI_combined_share" not in derived
+    assert "SUM(ROI)" not in derived
+
+
+def test_evidence_ledger_does_not_sum_average_or_duration_only_tables():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="support_experience_metrics",
+                title="客服体验指标",
+                columns=["问题类型", "满意度", "平均响应时长"],
+                rows=[
+                    {"问题类型": "交付延期", "满意度": "4.1", "平均响应时长": "38"},
+                    {"问题类型": "使用咨询", "满意度": "4.7", "平均响应时长": "16"},
+                ],
+                source_chapter_id="support_issues",
+                description="按问题类型展示满意度和平均响应时长。",
+                evidence_ref="query_support_experience_metrics",
+            )
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    facts = json.dumps([item.to_dict() for item in ledger.facts], ensure_ascii=False)
+    derived = json.dumps([item.to_dict() for item in ledger.derived_metrics], ensure_ascii=False)
+
+    assert "交付延期满意度" in facts
+    assert "使用咨询平均响应时长" in facts
+    assert "满意度合计" not in derived
+    assert "满意度占比" not in derived
+    assert "平均响应时长合计" not in derived
+    assert "平均响应时长占比" not in derived
+    assert "SUM(满意度)" not in derived
+    assert "SUM(平均响应时长)" not in derived
+
+
+def test_evidence_ledger_revenue_coverage_ignores_title_and_description_for_missing_fields():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_revenue_only",
+                title="收入与ROI分析",
+                columns=["渠道", "收入"],
+                rows=[
+                    {"渠道": "自然流量", "收入": "30.0 万"},
+                    {"渠道": "付费投放", "收入": "20.0 万"},
+                ],
+                source_chapter_id="revenue_structure",
+                description="计划补充成本和ROI后再复盘投入产出。",
+                evidence_ref="query_channel_revenue_only",
+            )
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    coverage = next(item for item in ledger.chapter_coverages if item.chapter_id == "revenue_structure")
+    coverage_text = "\n".join(coverage.missing_evidence + coverage.blocked_claims + coverage.data_boundaries)
+
+    assert coverage.coverage == "partial"
+    assert "成本" in coverage_text
+    assert "利润" in coverage_text
+    assert "ROI" in coverage_text
+
+
 def test_coverage_checker_marks_strong_partial_and_missing_without_table_name_rules(tmp_path):
     _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
     plan = plan_workspace_report(

@@ -369,7 +369,11 @@ def _entity_column(table: ReportEvidenceTable) -> str:
 
 
 def _contribution_metric_column(table: ReportEvidenceTable) -> str:
-    columns = _metric_columns(table)
+    columns = [
+        column
+        for column in _metric_columns(table)
+        if _metric_role(column) in {"additive", "count"}
+    ]
     if not columns:
         return ""
     return min(columns, key=_contribution_metric_sort_key)
@@ -529,13 +533,14 @@ def _evidence_field_text(*, tables: list[ReportEvidenceTable], facts: list[Any])
     for fact in facts:
         parts.extend([str(getattr(fact, "fact_id", "")), str(getattr(fact, "label", "")), str(getattr(fact, "unit", ""))])
     for table in tables:
-        parts.extend([table.table_id, table.title, table.description])
         parts.extend(table.columns)
     return _normalize_metric_label(" ".join(part for part in parts if part))
 
 
 def _available_derived_claims(chapter_id: str, tables: list[ReportEvidenceTable]) -> list[str]:
     if not tables:
+        return []
+    if not any(_contribution_metric_column(table) for table in tables):
         return []
     if chapter_id == "trend_changes":
         return ["数据覆盖范围", "环比变化", "最高周期", "最低周期"]
