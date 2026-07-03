@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,8 @@ def collect_report_evidence(
     profile: dict[str, Any],
     semantic_layer: dict[str, Any],
     analysis_db_path: str | Path,
+    artifact_dir: str | Path | None = None,
+    artifact_base_path: str = "",
 ) -> ReportEvidencePack:
     context = _EvidenceContext(profile=profile, semantic_layer=semantic_layer)
     technical_queries: list[dict[str, Any]] = []
@@ -88,6 +91,14 @@ def collect_report_evidence(
         data_limits.append("当前语义层暂未识别到可直接汇总的指标。")
     if not context.dimensions:
         data_limits.append("当前语义层暂未识别到可用于分组的业务维度。")
+    data_limits.extend(_requested_goal_data_limits(plan, context))
+    _materialize_chart_artifacts(
+        charts=charts,
+        tables=tables,
+        artifact_dir=Path(artifact_dir) if artifact_dir else None,
+        artifact_base_path=artifact_base_path,
+        warnings=warnings,
+    )
     evidence_payloads = [
         _business_safe_evidence_payload(query["evidence_payload"])
         for query in technical_queries
@@ -107,6 +118,141 @@ def collect_report_evidence(
             "planned_chapter_ids": [chapter.chapter_id for chapter in plan.chapters],
         },
     )
+
+
+def _requested_goal_data_limits(plan: ReportPlan, context: "_EvidenceContext") -> list[str]:
+    goal = str(plan.report_goal or "")
+    if not goal:
+        return []
+    available_items = [*context.metrics, *context.dimensions, *context.time_fields, *_profile_fields(context.profile)]
+    limits: list[str] = []
+    if _goal_mentions(goal, ("ROI", "roi", "投产比", "投资回报", "回报率")) and not any(
+        _matches(item, _ROI_TOKENS) for item in available_items
+    ):
+        limits.append("用户目标包含 ROI，但当前工作区暂未识别到可计算 ROI 的成本、投放或回报口径。")
+    if _goal_mentions(goal, ("投放成本", "成本", "花费", "消耗", "spend", "cost")) and not any(
+        _matches(item, _COST_TOKENS) for item in available_items
+    ):
+        limits.append("用户目标包含投放成本，但当前工作区暂未识别到成本、花费或投放消耗字段。")
+    return limits
+
+
+def _profile_fields(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    fields: list[dict[str, Any]] = []
+    for table in profile.get("tables") or []:
+        if not isinstance(table, dict):
+            continue
+        table_name = str(table.get("table_name") or "")
+        fields.append({"name": table_name, "label": table_name, "field": table_name})
+        for column in table.get("columns") or []:
+            if isinstance(column, dict):
+                fields.append(
+                    {
+                        **column,
+                        "table": table_name,
+                        "field": f"{table_name}.{column.get('name', '')}",
+                    }
+                )
+    return fields
+
+
+def _goal_mentions(goal: str, tokens: tuple[str, ...]) -> bool:
+    compact = _compact(goal)
+    return any(_compact(token) in compact for token in tokens)
+
+
+def _materialize_chart_artifacts(
+    *,
+    charts: list[ReportEvidenceChart],
+    tables: list[ReportEvidenceTable],
+    artifact_dir: Path | None,
+    artifact_base_path: str,
+    warnings: list[str],
+) -> None:
+    if artifact_dir is None:
+        return
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    tables_by_ref = {table.evidence_ref: table for table in tables if table.rows}
+    for chart in charts:
+        if chart.path:
+            continue
+        table = tables_by_ref.get(chart.evidence_ref)
+        if not table:
+            chart.description = chart.description or "当前证据不足以生成图表。"
+            continue
+        chart_id = chart.chart_id.replace("_intent", "_chart") or chart.chart_id
+        filename = f"{_safe_artifact_name(chart_id)}.svg"
+        target = artifact_dir / filename
+        try:
+            target.write_text(
+                _render_svg_chart(chart=chart, table=table),
+                encoding="utf-8",
+            )
+        except OSError:
+            warnings.append(f"{chart.title or '报告图表'}暂未生成，当前证据可先作为表格阅读。")
+            chart.description = "当前证据不足以生成图表。"
+            continue
+        chart.chart_id = chart_id
+        chart.path = "/".join(
+            part.strip("/")
+            for part in [artifact_base_path, filename]
+            if str(part).strip("/")
+        )
+        chart.description = chart.description.replace("图表意图：", "") or f"基于{table.title}生成。"
+
+
+def _render_svg_chart(*, chart: ReportEvidenceChart, table: ReportEvidenceTable) -> str:
+    width = 720
+    height = 360
+    margin_left = 136
+    margin_right = 48
+    top = 64
+    bar_height = 28
+    gap = 20
+    rows = table.rows[:8]
+    numeric_values = [_display_number(row.get(table.columns[-1] if table.columns else "")) for row in rows]
+    max_value = max([value for value in numeric_values if value is not None] or [1.0])
+    entity_column = table.columns[0] if table.columns else ""
+    metric_column = table.columns[-1] if table.columns else ""
+    body_lines = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img">',
+        f"<title>{escape(chart.title or table.title or '报告图表')}</title>",
+        '<rect width="720" height="360" fill="#ffffff"/>',
+        f'<text x="32" y="36" font-size="20" font-family="Arial, sans-serif" fill="#111827">{escape(chart.title or table.title or "报告图表")}</text>',
+    ]
+    palette = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#4b5563", "#db2777"]
+    for index, row in enumerate(rows):
+        y = top + index * (bar_height + gap)
+        label = str(row.get(entity_column, "") or "")
+        display_value = str(row.get(metric_column, "") or "")
+        numeric_value = numeric_values[index] or 0
+        bar_width = max(8, int((width - margin_left - margin_right) * numeric_value / max_value))
+        color = palette[index % len(palette)]
+        body_lines.extend(
+            [
+                f'<text x="32" y="{y + 20}" font-size="14" font-family="Arial, sans-serif" fill="#374151">{escape(label[:18])}</text>',
+                f'<rect x="{margin_left}" y="{y}" width="{bar_width}" height="{bar_height}" rx="4" fill="{color}"/>',
+                f'<text x="{margin_left + bar_width + 8}" y="{y + 20}" font-size="14" font-family="Arial, sans-serif" fill="#111827">{escape(display_value)}</text>',
+            ]
+        )
+    body_lines.append("</svg>")
+    return "\n".join(body_lines)
+
+
+def _display_number(value: Any) -> float | None:
+    text = str(value or "").strip().replace(",", "")
+    if not text:
+        return None
+    multiplier = 10000.0 if "万" in text else 1.0
+    match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
+    return float(match.group(0)) * multiplier
+
+
+def _safe_artifact_name(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._")
+    return safe or "report_chart"
 
 
 class _EvidenceContext:
@@ -932,6 +1078,8 @@ def _quote(identifier: str) -> str:
 
 
 _REVENUE_TOKENS = ("revenue_like", "sales_like", "gmv_like", "revenue", "sales", "收入", "营收", "销售额", "营业额", "成交额")
+_COST_TOKENS = ("cost", "spend", "expense", "ad_spend", "marketing_spend", "成本", "花费", "消耗", "投放")
+_ROI_TOKENS = ("roi", "roas", "return_on_investment", "投产比", "投资回报", "回报率", "roi_like", "roas_like")
 _CUSTOMER_TOKENS = ("customer", "client", "member", "segment", "客户", "会员", "客群", "人群", "分群")
 _SUPPORT_TOKENS = ("support", "ticket", "issue", "complaint", "response", "satisfaction", "客服", "工单", "问题", "投诉", "响应", "满意度")
 _ISSUE_TOKENS = ("issue", "problem", "complaint", "type", "问题", "投诉", "类型")

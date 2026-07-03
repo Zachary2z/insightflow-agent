@@ -157,7 +157,7 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
     )
     document = report["report"]["document"]
     assert report["success"] is True
-    assert report["report"]["sections"] == []
+    assert "sections" not in report["report"]
     assert report["report"]["plan"]["title"] == "最近90天经营复盘报告"
     assert report["report"]["evidence_pack"]["facts"]
     assert document["sections"]
@@ -241,7 +241,7 @@ def test_p20_report_output_uses_document_contract_not_fixed_section_prompts(tmp_
     )
 
     assert report["success"] is True
-    assert report["report"]["sections"] == []
+    assert "sections" not in report["report"]
     assert report["report"]["document"]["sections"]
     removed_metadata_key = "section" + "_" + "runner" + "_" + "used"
     assert removed_metadata_key not in report["report"]["provider_metadata"]

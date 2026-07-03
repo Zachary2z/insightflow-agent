@@ -69,11 +69,6 @@ function reportLanguage(report: WorkspaceReport): ReportLanguage {
     ...(report.document?.sections?.map((section) => `${section.title}\n${section.body}`) ?? []),
     ...(report.document?.action_recommendations ?? []),
     ...(report.document?.data_boundaries ?? []),
-    ...(report.executive_summary ?? []),
-    ...(report.key_findings ?? []),
-    ...(report.action_priorities ?? []),
-    ...(report.chart_and_evidence ?? []),
-    ...(report.risks_and_limits ?? []),
   ].join("\n");
   return /[\u4e00-\u9fff]/.test(text) ? "zh" : "en";
 }

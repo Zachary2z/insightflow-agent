@@ -78,7 +78,7 @@ def test_live_deepseek_workspace_report_uses_p22_document_contract(
     assert Path(report["json_path"]).is_file()
     assert Path(report["markdown_path"]).is_file()
     assert Path(report["trace_path"]).is_file()
-    assert report["sections"] == []
+    assert "sections" not in report
     assert report["plan"]["title"] == "最近90天经营复盘报告"
     assert report["evidence_pack"]["facts"]
     assert report["document"]["sections"]

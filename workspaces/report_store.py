@@ -121,11 +121,15 @@ class WorkspaceReportStore:
 
     def _validate_artifact_paths(self, report: ReportRecord, report_dir: Path) -> None:
         resolved_report_dir = report_dir.resolve()
-        for section in report.sections:
-            for artifact_path in section.artifact_paths:
+        if not report.evidence_pack:
+            return
+        for chart in report.evidence_pack.charts:
+            for artifact_path in [chart.path]:
+                if not artifact_path:
+                    continue
                 candidate = Path(artifact_path)
                 if not candidate.is_absolute():
-                    candidate = report_dir / candidate
+                    candidate = self._reports_dir(report.workspace_id).parent / candidate
                 resolved_candidate = candidate.resolve()
                 if (
                     resolved_candidate != resolved_report_dir

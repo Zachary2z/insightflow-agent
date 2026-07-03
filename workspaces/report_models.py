@@ -65,6 +65,7 @@ class ReportPlan:
     title: str
     report_style: str
     time_range: str
+    report_goal: str = ""
     data_sources: list[str] = field(default_factory=list)
     chapters: list[ReportChapterPlan] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
@@ -80,6 +81,7 @@ class ReportPlan:
             title=str(data.get("title") or ""),
             report_style=str(data.get("report_style") or ""),
             time_range=str(data.get("time_range") or ""),
+            report_goal=str(data.get("report_goal") or ""),
             data_sources=[str(source) for source in data.get("data_sources", [])],
             chapters=[
                 ReportChapterPlan.from_dict(chapter)
@@ -319,12 +321,6 @@ class ReportRecord:
     evidence_pack: ReportEvidencePack | None = None
     document: ReportDocument | None = None
     validation: ReportValidationResult | None = None
-    executive_summary: list[str] = field(default_factory=list)
-    key_findings: list[str] = field(default_factory=list)
-    action_priorities: list[str] = field(default_factory=list)
-    chart_and_evidence: list[str] = field(default_factory=list)
-    risks_and_limits: list[str] = field(default_factory=list)
-    sections: list[dict[str, Any]] = field(default_factory=list)
     markdown_path: str = ""
     json_path: str = ""
     trace_path: str = ""
@@ -341,7 +337,6 @@ class ReportRecord:
         )
         data["document"] = self.document.to_dict() if self.document else None
         data["validation"] = self.validation.to_dict() if self.validation else None
-        data["sections"] = [dict(section) for section in self.sections]
         return data
 
     @classmethod
@@ -371,16 +366,6 @@ class ReportRecord:
             validation=ReportValidationResult.from_dict(validation)
             if validation
             else None,
-            executive_summary=[str(item) for item in data.get("executive_summary", [])],
-            key_findings=[str(item) for item in data.get("key_findings", [])],
-            action_priorities=[str(item) for item in data.get("action_priorities", [])],
-            chart_and_evidence=[str(item) for item in data.get("chart_and_evidence", [])],
-            risks_and_limits=[str(item) for item in data.get("risks_and_limits", [])],
-            sections=[
-                dict(section)
-                for section in data.get("sections", [])
-                if isinstance(section, dict)
-            ],
             markdown_path=str(data.get("markdown_path", "")),
             json_path=str(data.get("json_path", "")),
             trace_path=str(data.get("trace_path", "")),

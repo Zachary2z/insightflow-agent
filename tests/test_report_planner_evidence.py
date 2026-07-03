@@ -138,6 +138,47 @@ def test_chinese_report_planner_generates_goal_driven_chapters(tmp_path):
     assert any(req.description.startswith("按收入") for chapter in plan.chapters for req in chapter.evidence_requirements)
 
 
+def test_report_planner_title_matches_channel_performance_goal(tmp_path):
+    _store, _workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+
+    plan = plan_workspace_report(
+        report_type="channel_performance",
+        report_goal="生成一份最近90天渠道表现复盘报告，包含收入、订单、投放成本、ROI 和建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    assert plan.title == "最近90天渠道表现复盘报告"
+    assert plan.report_goal == "生成一份最近90天渠道表现复盘报告，包含收入、订单、投放成本、ROI 和建议。"
+    assert plan.report_style == "渠道表现复盘"
+    assert plan.time_range == "最近90天"
+    assert "Business Review" not in plan.title
+    assert "管理层摘要" not in plan.title
+    assert "Revenue Overview" not in plan.title
+
+
+def test_report_evidence_records_requested_cost_and_roi_data_limits(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="channel_performance",
+        report_goal="生成一份最近90天渠道表现复盘报告，包含收入、订单、投放成本、ROI 和建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    limits = "\n".join(evidence_pack.data_limits)
+    assert "投放成本" in limits
+    assert "ROI" in limits
+    assert "当前工作区" in limits
+
+
 def test_report_planner_keeps_requested_unsupported_chapter_with_missing_requirement(tmp_path):
     _store, _workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
 
@@ -183,6 +224,33 @@ def test_evidence_collector_builds_business_readable_pack_from_orders_and_suppor
     assert all(any("\u4e00" <= char <= "\u9fff" for char in column) for table in evidence_pack.tables for column in table.columns)
     assert evidence_pack.technical_details["queries"]
     assert "SELECT" in json.dumps(evidence_pack.technical_details, ensure_ascii=False).upper()
+
+
+def test_evidence_collector_generates_chart_artifacts_for_chartable_tables(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构、客户分群和趋势变化。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    artifact_dir = Path(workspace["root_path"]) / "reports" / "report_chart_test" / "artifacts"
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+        artifact_dir=artifact_dir,
+        artifact_base_path="reports/report_chart_test/artifacts",
+    )
+
+    artifact_charts = [chart for chart in evidence_pack.charts if chart.path]
+    assert artifact_charts
+    assert all(chart.path.startswith("reports/report_chart_test/artifacts/") for chart in artifact_charts)
+    assert all((Path(workspace["root_path"]) / chart.path).is_file() for chart in artifact_charts)
+    assert any(chart.chart_id == "revenue_structure_chart" for chart in artifact_charts)
+    assert "待生成图表" not in json.dumps([chart.to_dict() for chart in artifact_charts], ensure_ascii=False)
 
 
 def test_report_evidence_pack_exposes_shared_payloads_for_non_channel_sales(tmp_path):

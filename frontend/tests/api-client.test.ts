@@ -268,8 +268,15 @@ describe("api client", () => {
       report_goal: "Create a revenue review.",
       title: "最近90天经营复盘报告",
       status: "completed",
-      executive_summary: ["Revenue grew."],
-      sections: [],
+      document: {
+        title: "最近90天经营复盘报告",
+        time_range: "最近90天",
+        data_sources: ["orders"],
+        opening_summary: "Revenue grew.",
+        sections: [],
+        action_recommendations: [],
+        data_boundaries: [],
+      },
       markdown_path: "workspaces/ws_1/reports/report_1/report.md",
       json_path: "workspaces/ws_1/reports/report_1/report.json",
       trace_path: "workspaces/ws_1/reports/report_1/trace.json",
@@ -300,7 +307,7 @@ describe("api client", () => {
 
     expect(created.report_id).toBe("report_1");
     expect(reports.reports[0].title).toBe("最近90天经营复盘报告");
-    expect(detail.report.executive_summary).toEqual(["Revenue grew."]);
+    expect(detail.report.document?.opening_summary).toBe("Revenue grew.");
     expect(getWorkspaceReportDownloadUrl("ws_1", "report_1")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );

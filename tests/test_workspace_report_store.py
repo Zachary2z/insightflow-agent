@@ -97,11 +97,6 @@ def _sample_report(workspace_id: str) -> ReportRecord:
         evidence_pack=evidence_pack,
         document=document,
         validation=validation,
-        executive_summary=[document.opening_summary],
-        key_findings=[document.sections[0].body],
-        action_priorities=list(document.action_recommendations),
-        risks_and_limits=list(document.data_boundaries),
-        sections=[],
     )
 
 
@@ -139,7 +134,8 @@ def test_report_store_saves_and_loads_report_document_json(tmp_path):
     assert loaded.evidence_pack.facts[0].fact_id == "revenue_total"
     assert loaded.document.sections[0].title == "经营概览"
     assert loaded.validation.status == "passed"
-    assert loaded.sections == []
+    assert "sections" not in loaded.to_dict()
+    assert "executive_summary" not in loaded.to_dict()
 
 
 def test_report_store_renders_document_markdown_without_stitched_section_body(tmp_path):

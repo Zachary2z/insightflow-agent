@@ -244,13 +244,13 @@ Files to inspect first:
 
 Tasks:
 
-- [ ] Add failing tests proving Report Center does not call Analysis Workbench to generate per-section answers and does not stitch section answers into the final report body.
-- [ ] Keep section/chapter planning only for evidence collection. The final `ReportWriter` must receive the full plan, all evidence packs, chart refs, warnings, and limits, then write the complete report once.
-- [ ] Make report titles, report type labels, and time ranges match the user's report goal.
-- [ ] Generate or attach real chart artifacts when the evidence pack contains chartable data; keep chart-intent placeholders only when artifact generation is unavailable or intentionally deferred.
-- [ ] Ensure model-written recommendations stay in the report, but unsupported hard facts are downgraded to data limits or conditional suggestions.
-- [ ] Update Markdown and frontend report rendering so the report reads as one complete Chinese document with charts, evidence summaries, recommendations, data boundaries, and collapsed technical appendix.
-- [ ] Delete old section-answer rendering, old stitched summary helpers, and obsolete compatibility fields when no longer needed.
+- [x] Add failing tests proving Report Center does not call Analysis Workbench to generate per-section answers and does not stitch section answers into the final report body.
+- [x] Keep section/chapter planning only for evidence collection. The final `ReportWriter` must receive the full plan, all evidence packs, chart refs, warnings, and limits, then write the complete report once.
+- [x] Make report titles, report type labels, and time ranges match the user's report goal.
+- [x] Generate or attach real chart artifacts when the evidence pack contains chartable data; keep chart-intent placeholders only when artifact generation is unavailable or intentionally deferred.
+- [x] Ensure model-written recommendations stay in the report, but unsupported hard facts are downgraded to data limits or conditional suggestions.
+- [x] Update Markdown and frontend report rendering so the report reads as one complete Chinese document with charts, evidence summaries, recommendations, data boundaries, and collapsed technical appendix.
+- [x] Delete old section-answer rendering, old stitched summary helpers, and obsolete compatibility fields when no longer needed.
 
 Acceptance:
 
@@ -258,6 +258,21 @@ Acceptance:
 - A channel performance report has a channel-specific title and evidence focus.
 - Charts render inline when artifacts exist and can be downloaded.
 - Key report numbers, rankings, dates, and percentages pass validation or are explicitly marked as unavailable.
+
+Completion record:
+
+- Completed on 2026-07-03.
+- Strengthened runner/API/composer tests so Report Center cannot call `run_workspace_analysis()` for section bodies, cannot depend on Analysis Workbench `business_answer` output, and must call `report_composer` once with the full `ReportPlan` and shared `ReportEvidencePack`.
+- Added `ReportPlan.report_goal`, channel-specific report title/style handling, and evidence data boundaries for requested ROI/投放成本 when the workspace lacks those fields. Supported revenue/order evidence still flows through shared `p23.shared.v1` payloads instead of failing the report.
+- Report evidence collection now materializes chartable evidence tables into local SVG chart artifacts in each report's artifact directory. Markdown and `ReportViewer` inline real chart artifacts with download links; missing charts continue to render as business-readable待生成图表/证据不足 placeholders.
+- Deleted obsolete report compatibility fields from the active model/API/frontend path: top-level `executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, `risks_and_limits`, and old top-level `sections`. The user-facing report body now comes from `ReportDocument`.
+- Main report text and Markdown remain free of SQL, raw rows, execution results, query ids, provider metadata, trace paths, internal contract names, and old section-answer labels. Technical details remain in the collapsed appendix or report technical JSON paths.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`45 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `python3 -m pytest tests/test_workspace_report_store.py tests/test_p20_realistic_acceptance.py -q` (`8 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
 ## P23-H4: Artifact And Tool-Calling Readiness
 

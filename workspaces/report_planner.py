@@ -42,6 +42,7 @@ def plan_workspace_report(
         title=_title_for_goal(goal, report_type, time_range),
         report_style=_report_style(report_type, goal),
         time_range=time_range,
+        report_goal=goal,
         data_sources=_data_sources(profile),
         chapters=chapters,
     )
@@ -325,6 +326,8 @@ def _data_sources(profile: dict[str, Any]) -> list[str]:
 
 
 def _title_for_goal(goal: str, report_type: str, time_range: str) -> str:
+    if "渠道" in goal or report_type == "channel_performance":
+        return f"{time_range}渠道表现复盘报告"
     if "趋势" in goal and "复盘" not in goal:
         return f"{time_range}趋势变化报告"
     if "客服" in goal and "经营" not in goal and "复盘" not in goal:
@@ -335,6 +338,8 @@ def _title_for_goal(goal: str, report_type: str, time_range: str) -> str:
 
 
 def _report_style(report_type: str, goal: str) -> str:
+    if "渠道" in goal or report_type == "channel_performance":
+        return "渠道表现复盘"
     if "经营" in goal or "复盘" in goal or report_type == "business_review":
         return "经营复盘"
     if "客服" in goal:

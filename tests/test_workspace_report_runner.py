@@ -120,7 +120,12 @@ def test_report_runner_uses_report_document_contract_and_chinese_default_title(t
     assert report["document"]["opening_summary"]
     assert report["document"]["sections"][0]["body"]
     assert report["validation"]["status"] == "passed"
-    assert report["sections"] == []
+    assert "sections" not in report
+    assert "executive_summary" not in report
+    assert "key_findings" not in report
+    assert "action_priorities" not in report
+    assert "chart_and_evidence" not in report
+    assert "risks_and_limits" not in report
 
 
 def test_report_runner_signature_removes_removed_section_compatibility():
@@ -273,6 +278,53 @@ def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, mon
     assert result["success"] is True
     assert calls == {"composer": 1, "validator": 1}
     assert result["report"]["document"]["opening_summary"].startswith("这是由新报告撰写器")
+
+
+def test_report_runner_composes_once_without_section_business_answers(tmp_path, monkeypatch):
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = {"composer": 0}
+
+    def fake_compose_report_document(*, plan, evidence_pack, provider=None):
+        calls["composer"] += 1
+        evidence_text = json.dumps(evidence_pack.to_dict(), ensure_ascii=False)
+        assert "business_answer" not in evidence_text
+        assert "直接回答" not in evidence_text
+        assert "章节业务答案" not in evidence_text
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="完整报告正文由报告撰写器一次性生成。",
+            sections=[
+                ReportDocumentSection(
+                    section_id="overview",
+                    title="经营概览",
+                    body="这不是逐章节分析回答拼接出来的正文。",
+                    evidence_refs=["workspace_table_count"],
+                )
+            ],
+            action_recommendations=["继续使用报告证据包生成整篇报告。"],
+            data_boundaries=["当前为 one-pass runner 回归测试。"],
+        )
+
+    monkeypatch.setattr(report_runner, "compose_report_document", fake_compose_report_document)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+    )
+    report_text = json.dumps(result["report"], ensure_ascii=False)
+
+    assert calls["composer"] == 1
+    assert "完整报告正文由报告撰写器一次性生成" in report_text
+    assert "business_answer" not in report_text
+    assert "章节业务答案" not in report_text
+    assert "直接回答" not in report_text
+    assert "sections" not in result["report"]
 
 
 def test_existing_semantic_layer_is_not_overwritten(tmp_path):

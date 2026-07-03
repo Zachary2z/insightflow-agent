@@ -1787,8 +1787,6 @@ describe("workspace product components", () => {
         report_goal: "Compare acquisition channel revenue.",
         title: "Channel Performance",
         status: "completed",
-        executive_summary: ["Paid search led revenue."],
-        sections: [],
         markdown_path: "workspaces/ws_1/reports/report_1/report.md",
         json_path: "workspaces/ws_1/reports/report_1/report.json",
         trace_path: "workspaces/ws_1/reports/report_1/trace.json",
@@ -1828,8 +1826,15 @@ describe("workspace product components", () => {
           report_goal: "生成管理层收入复盘报告",
           title: "管理层收入复盘报告",
           status: "completed",
-          executive_summary: ["Revenue grew."],
-          sections: [],
+          document: {
+            title: "管理层收入复盘报告",
+            time_range: "最近90天",
+            data_sources: ["orders"],
+            opening_summary: "Revenue grew.",
+            sections: [],
+            action_recommendations: [],
+            data_boundaries: [],
+          },
           markdown_path: "workspaces/ws_1/reports/report_1/report.md",
           json_path: "workspaces/ws_1/reports/report_1/report.json",
           trace_path: "workspaces/ws_1/reports/report_1/trace.json",
@@ -1937,7 +1942,6 @@ describe("workspace product components", () => {
           },
         },
         validation: { status: "passed", checked_facts: ["revenue_total"] },
-        sections: [],
         markdown_path: "workspaces/ws_1/reports/report_1/report.md",
         json_path: "workspaces/ws_1/reports/report_1/report.json",
         trace_path: "workspaces/ws_1/reports/report_1/trace.json",
@@ -2053,7 +2057,6 @@ describe("workspace product components", () => {
             },
           ],
         },
-        sections: [],
       },
     });
 
@@ -2096,7 +2099,6 @@ describe("workspace product components", () => {
           action_recommendations: ["先复盘付费搜索效率，再决定是否加码。"],
           data_boundaries: ["当前缺少 ROI 和利润数据。"],
         },
-        sections: [],
       },
     });
 
@@ -2144,7 +2146,6 @@ describe("workspace product components", () => {
           action_recommendations: [],
           data_boundaries: [],
         },
-        sections: [],
       },
     });
 
@@ -2196,7 +2197,6 @@ describe("workspace product components", () => {
           action_recommendations: [],
           data_boundaries: [],
         },
-        sections: [],
       },
     });
 

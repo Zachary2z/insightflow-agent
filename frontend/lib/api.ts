@@ -252,12 +252,6 @@ export type WorkspaceReport = {
   evidence_pack?: ReportEvidencePack | null;
   document?: ReportDocument | null;
   validation?: ReportValidationResult | null;
-  executive_summary?: string[];
-  key_findings?: string[];
-  action_priorities?: string[];
-  chart_and_evidence?: string[];
-  risks_and_limits?: string[];
-  sections?: Array<Record<string, unknown>>;
   markdown_path?: string;
   json_path?: string;
   trace_path?: string;

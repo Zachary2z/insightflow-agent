@@ -113,10 +113,6 @@ def _client_with_fake_report_runner(tmp_path):
         report.evidence_pack = evidence_pack
         report.document = document
         report.validation = validation
-        report.executive_summary = [document.opening_summary]
-        report.key_findings = [document.sections[0].body]
-        report.action_priorities = list(document.action_recommendations)
-        report.risks_and_limits = list(document.data_boundaries)
         saved = WorkspaceReportStore(store).save_report(report)
         assert Path(workspace["root_path"]) in Path(saved.markdown_path).parents
         return {
@@ -163,7 +159,15 @@ def test_create_report_returns_persisted_report_document(tmp_path):
     assert payload["report"]["evidence_pack"]["facts"][0]["fact_id"] == "revenue_total"
     assert payload["report"]["document"]["sections"][0]["body"].startswith("付费搜索贡献")
     assert payload["report"]["validation"]["status"] == "passed"
-    assert payload["report"]["sections"] == []
+    for obsolete_field in [
+        "sections",
+        "executive_summary",
+        "key_findings",
+        "action_priorities",
+        "chart_and_evidence",
+        "risks_and_limits",
+    ]:
+        assert obsolete_field not in payload["report"]
     assert calls == [
         {
             "workspace_id": workspace_id,
@@ -226,11 +230,11 @@ def test_get_report_detail_returns_report_document(tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["report"]["report_id"] == created["report_id"]
-    assert payload["report"]["executive_summary"] == ["管理层摘要：本报告基于当前工作区证据生成。"]
-    assert payload["report"]["key_findings"] == ["付费搜索贡献了当前样例收入，是后续复盘的证据线索。"]
-    assert payload["report"]["action_priorities"] == ["先补齐成本和转化率后再判断预算。"]
-    assert payload["report"]["risks_and_limits"] == ["当前为 API 合同测试数据。"]
     assert payload["report"]["document"]["opening_summary"].startswith("管理层摘要")
+    assert payload["report"]["document"]["action_recommendations"] == ["先补齐成本和转化率后再判断预算。"]
+    assert payload["report"]["document"]["data_boundaries"] == ["当前为 API 合同测试数据。"]
+    for obsolete_field in ["executive_summary", "key_findings", "action_priorities", "risks_and_limits"]:
+        assert obsolete_field not in payload["report"]
 
 
 def test_download_report_markdown_returns_document_markdown_file(tmp_path):

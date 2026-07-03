@@ -145,7 +145,6 @@ function reportTimeRange(report: WorkspaceReport) {
 function reportSummary(report: WorkspaceReport) {
   return (
     report.document?.opening_summary ||
-    report.executive_summary?.find((item) => item.trim()) ||
     "打开报告查看正文、图表和行动建议。"
   );
 }

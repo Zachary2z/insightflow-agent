@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
-| Current task | P23-H3 One-Pass Report Center With Shared Evidence next |
-| Next planned task | P23-H3 One-Pass Report Center With Shared Evidence |
-| Last completed task | P23-H2 Chinese Business Answer Writer |
+| Current task | P23-H4 Artifact And Tool-Calling Readiness next |
+| Next planned task | P23-H4 Artifact And Tool-Calling Readiness |
+| Last completed task | P23-H3 One-Pass Report Center With Shared Evidence |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -37,7 +37,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
-| P23 | `[~]` In progress | H1-H2 complete; core evidence/report tooling readiness continues with one-pass report hardening, artifact readiness, cleanup, and live acceptance before external tool integrations |
+| P23 | `[~]` In progress | H1-H3 complete; core evidence/report tooling readiness continues with artifact readiness, cleanup, and live acceptance before external tool integrations |
 | P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
@@ -81,9 +81,26 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 |---|---|---|
 | P23-H1 | `[x]` Complete | Shared EvidencePack foundation: analysis `fact_payload` and report `ReportEvidencePack.evidence_payloads` now share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references |
 | P23-H2 | `[x]` Complete | Chinese Business Answer Writer: natural Chinese business answers preserve model explanations/recommendations while binding hard facts and missing-data boundaries to shared evidence |
-| P23-H3 | `[ ]` Next | One-Pass Report Center With Shared Evidence |
-| P23-H4 | `[ ]` Planned | Artifact And Tool-Calling Readiness |
+| P23-H3 | `[x]` Complete | One-Pass Report Center With Shared Evidence |
+| P23-H4 | `[ ]` Next | Artifact And Tool-Calling Readiness |
 | P23-H5 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance |
+
+## Latest P23-H3 Result
+
+P23-H3 One-Pass Report Center With Shared Evidence completed on 2026-07-03:
+
+- Strengthened Report Center tests so the main path cannot call `run_workspace_analysis()` for report sections, cannot use Analysis Workbench `business_answer` blocks as report body, and must call `report_composer` once with the full plan plus evidence pack.
+- Added `ReportPlan.report_goal` and channel-specific title/style handling so goals such as “最近90天渠道表现复盘报告” produce that report identity instead of generic English or management-summary titles.
+- Report evidence collection now records requested-but-missing ROI and投放成本 as data boundaries when the workspace lacks those fields, while preserving supported revenue/order evidence instead of failing the whole report.
+- Evidence collection can materialize chartable report evidence tables into local SVG chart artifacts under the report artifact directory. `ReportViewer` and Markdown continue to inline real chart artifacts with download links, while missing charts remain business-readable placeholders.
+- Removed obsolete top-level report compatibility fields (`executive_summary`, `key_findings`, `action_priorities`, `chart_and_evidence`, `risks_and_limits`, and old `sections`) from `ReportRecord`, API types, frontend fixtures, and report storage. The current report body is only `ReportDocument`.
+- Kept technical details in the collapsed appendix and report JSON technical paths; the main report body remains free of SQL, raw rows, query ids, provider metadata, trace paths, internal contract names, and section-answer labels.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`45 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `python3 -m pytest tests/test_workspace_report_store.py tests/test_p20_realistic_acceptance.py -q` (`8 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
 ## Latest P23-H2 Result
 

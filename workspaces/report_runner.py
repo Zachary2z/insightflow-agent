@@ -40,11 +40,23 @@ def run_workspace_report(
         profile=profile,
         semantic_layer=semantic_layer,
     )
+    report_store = WorkspaceReportStore(store)
+    report = report_store.create_report_record(
+        workspace_id=workspace_id,
+        report_type=report_type,
+        report_goal=report_goal.strip(),
+        title=plan.title,
+        status="running",
+    )
+    artifact_dir = Path(report.artifact_dir)
+    artifact_base_path = artifact_dir.relative_to(Path(workspace["root_path"])).as_posix()
     evidence_pack = collect_report_evidence(
         plan=plan,
         profile=profile,
         semantic_layer=semantic_layer,
         analysis_db_path=workspace["analysis_db_path"],
+        artifact_dir=artifact_dir,
+        artifact_base_path=artifact_base_path,
     )
     document = compose_report_document(
         plan=plan,
@@ -63,26 +75,12 @@ def run_workspace_report(
         "generation_steps": ["规划报告", "整理证据", "撰写正文", "校验证据", "渲染保存"],
     }
 
-    report_store = WorkspaceReportStore(store)
-    report = report_store.create_report_record(
-        workspace_id=workspace_id,
-        report_type=report_type,
-        report_goal=report_goal.strip(),
-        title=plan.title,
-        status="running",
-    )
     report.title = plan.title
     report.status = "completed" if validation.status == "passed" else "partial"
     report.plan = plan
     report.evidence_pack = evidence_pack
     report.document = document
     report.validation = validation
-    report.executive_summary = [document.opening_summary]
-    report.key_findings = [section.body for section in document.sections[:3]]
-    report.action_priorities = list(document.action_recommendations)
-    report.chart_and_evidence = _document_evidence_summary(evidence_pack)
-    report.risks_and_limits = list(document.data_boundaries)
-    report.sections = []
     report.provider_metadata = {
         "generation_flow": "evidence_driven_report_center",
         "provider_supplied": bool(providers),
@@ -142,12 +140,6 @@ def _report_composer_provider(providers: dict | None) -> Any | None:
     if not isinstance(providers, dict):
         return None
     return providers.get("report_composer") or providers.get("composer")
-
-
-def _document_evidence_summary(evidence_pack: Any) -> list[str]:
-    if evidence_pack.charts:
-        return [chart.title for chart in evidence_pack.charts]
-    return ["当前尚未生成图表；本报告先基于工作区数据画像和结构化证据阅读。"]
 
 
 def _append_trace_events(trace_path: Path, events: list[dict[str, Any]]) -> None:
