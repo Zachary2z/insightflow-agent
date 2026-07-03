@@ -238,6 +238,35 @@ def test_report_evidence_pack_exposes_shared_payloads_for_non_channel_sales(tmp_
     assert revenue_table.evidence_payload_ref
 
 
+def test_report_evidence_payloads_do_not_embed_sql_or_raw_rows(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    payloads = evidence_pack.to_dict()["evidence_payloads"]
+    serialized_payloads = json.dumps(payloads, ensure_ascii=False)
+
+    assert payloads
+    assert "SELECT" not in serialized_payloads.upper()
+    assert "technical_sql" not in serialized_payloads
+    assert "technical_details" not in serialized_payloads
+    assert "raw_rows" not in serialized_payloads
+    assert all("rows" not in payload for payload in payloads)
+    assert all("rows" not in payload.get("chart_data", {}) for payload in payloads)
+    assert "SELECT" in json.dumps(evidence_pack.technical_details["queries"], ensure_ascii=False).upper()
+
+
 def test_evidence_collector_records_data_limit_when_support_data_missing(tmp_path):
     _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
     plan = plan_workspace_report(

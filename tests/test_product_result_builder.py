@@ -187,7 +187,10 @@ def test_product_result_builder_exposes_fact_payload_only_outside_main_answer():
     assert product["evidence"]["fact_payload"]["comparison_scope"]["row_count"] == 3
     assert product["evidence"]["fact_payload"]["display_values"][0]["总收入"] == "2.6 万"
     assert product["evidence"]["fact_payload"]["formulas"]["sum_sales_amount"] == "SUM(sales_amount)"
-    assert product["technical_details"]["fact_payload"]["technical_sql"].startswith("SELECT store_name")
+    assert "technical_sql" not in product["evidence"]["fact_payload"]
+    assert "technical_details" not in product["evidence"]["fact_payload"]
+    assert product["evidence"]["fact_payload"]["technical_refs"]["sql"] == "technical_details.sql"
+    assert product["technical_details"]["sql"].startswith("SELECT store_name")
     assert product["technical_details"]["raw_rows"] == raw["execution_result"]["rows"]
 
 
@@ -256,10 +259,14 @@ def test_product_result_builder_exposes_shared_evidence_pack_without_main_answer
     assert payload["derived_metrics"][0]["values"][0]["display_value"] == "75.0%"
     assert any("ROI" in limit and "未计算" in limit for limit in payload["data_limits"])
     assert payload["technical_refs"]["sql"] == "technical_details.sql"
+    assert "technical_sql" not in payload
+    assert "technical_details" not in payload
     assert "SELECT" not in business_text.upper()
     assert "raw_rows" not in business_text
     assert "trace_path" not in business_text
     assert "provider_metadata" not in business_text
+    assert product["technical_details"]["sql"].startswith("SELECT")
+    assert product["technical_details"]["raw_rows"] == raw["execution_result"]["rows"]
 
 
 def test_product_result_builder_exposes_fast_fact_context_pack_only_in_technical_details():

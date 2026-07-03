@@ -128,7 +128,9 @@ def test_build_evidence_payload_preserves_comparison_rows_formulas_and_business_
     assert payload["display_values"][0]["总收入"] == "2.6 万"
     assert payload["display_values"][1]["广告投入产出比"] == "3.68"
     assert payload["display_values"][1]["净投放回报率"] == "268.0%"
-    assert payload["technical_sql"] == "SELECT ..."
+    assert "technical_sql" not in payload
+    assert "technical_details" not in payload
+    assert payload["technical_refs"] == {"sql": "technical_details.sql", "raw_rows": "technical_details.raw_rows"}
 
 
 def test_build_evidence_payload_warns_when_ranking_has_only_winner_row():
@@ -270,3 +272,66 @@ def test_build_evidence_payload_records_missing_metric_limit_instead_of_inventin
 
     assert "roi" not in {item["metric_id"].lower() for item in payload["derived_metrics"]}
     assert any("ROI" in limit and "未计算" in limit for limit in payload["data_limits"])
+
+
+def test_build_evidence_payload_does_not_embed_sql_in_shared_business_payload():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["渠道"], "metrics": ["收入"]},
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue"],
+            "rows": [["自然流量", 1200.0], ["付费搜索", 800.0]],
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+        business_aliases={"channel": "渠道", "revenue": "收入"},
+    )
+
+    assert "technical_sql" not in payload
+    assert "technical_details" not in payload
+    assert payload["technical_refs"] == {
+        "sql": "technical_details.sql",
+        "raw_rows": "technical_details.raw_rows",
+    }
+
+
+def test_build_evidence_payload_targets_requested_metric_for_derived_metrics():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["渠道"], "metrics": ["收入"]},
+        execution_result={
+            "success": True,
+            "columns": ["channel", "order_count", "revenue"],
+            "rows": [["自然流量", 42, 1200.0], ["付费搜索", 31, 800.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "revenue": {
+                    "business_label": "收入",
+                    "formula": "SUM(revenue)",
+                    "unit": "currency",
+                    "source_fields": ["orders.revenue"],
+                },
+                "order_count": {
+                    "business_label": "订单数",
+                    "formula": "COUNT(order_id)",
+                    "unit": "number",
+                    "source_fields": ["orders.order_id"],
+                },
+            },
+            "formulas": {"revenue": "SUM(revenue)", "order_count": "COUNT(order_id)"},
+            "warnings": [],
+        },
+        business_aliases={"channel": "渠道", "order_count": "订单数", "revenue": "收入"},
+    )
+
+    derived_ids = {item["metric_id"] for item in payload["derived_metrics"]}
+    assert "revenue_share" in derived_ids
+    assert "revenue_rank" in derived_ids
+    assert "order_count_share" not in derived_ids
+    assert "order_count_rank" not in derived_ids
+    share = next(item for item in payload["derived_metrics"] if item["metric_id"] == "revenue_share")
+    assert share["values"][0]["display_value"] == "60.0%"

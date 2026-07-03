@@ -130,6 +130,16 @@ Completion record:
   - `python3 -m pytest tests/test_report_composer_validator.py tests/test_workspace_report_api.py tests/test_workspace_report_store.py -q` (`25 passed`)
   - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
 
+Fix record:
+
+- Fixed on 2026-07-03 after H1 review found two contract leaks.
+- Removed `technical_sql` and embedded `technical_details.sql` from the shared business evidence payload. Analysis SQL remains available through `product_result.technical_details.sql`; report SQL remains available through `ReportEvidencePack.technical_details["queries"]`.
+- Kept `technical_refs` in `build_evidence_payload()` for analysis-side technical expansion, while Report Center strips SQL refs, raw `rows`, trace, query ids, and provider metadata from top-level `ReportEvidencePack.evidence_payloads`.
+- Changed derived share/rank/trend metric selection to prefer columns matching `task["metrics"]`, metric registry labels/source fields, and business aliases before falling back to the first numeric column. For example, when `order_count` and `revenue` are both present and the user asks for收入, `revenue_share` and `revenue_rank` are produced instead of `order_count_*`.
+- Verification passed:
+  - `python3 -m pytest tests/test_evidence_tool.py tests/test_product_result_builder.py tests/test_report_planner_evidence.py -q` (`45 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py -q` (`32 passed`)
+
 ## P23-H2: Chinese Business Answer Writer
 
 Goal: Keep the model's explanation and recommendations, but make hard facts evidence-bound and user-facing wording natural.

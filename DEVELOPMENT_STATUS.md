@@ -97,6 +97,13 @@ P23-H1 Shared EvidencePack Contract completed on 2026-07-03:
 - Cleanup audit found stitched/fixed-template/legacy chart/mock terms only in historical/superseded docs, negative boundary tests, and P23 follow-up cleanup wording; no active product-code path needed migration for H1.
 - Focused verification passed: evidence/metric/product-result/report-planner set (`51 passed`), workspace analysis/report runner set (`32 passed`), report composer/API/store set (`25 passed`), and frontend workspace-flow Vitest (`54 passed`).
 
+P23-H1 boundary fix completed on 2026-07-03:
+
+- Shared business evidence payloads no longer embed `technical_sql` or `technical_details.sql`. Analysis Workbench reads SQL from `product_result.technical_details.sql`; Report Center reads SQL from `ReportEvidencePack.technical_details["queries"]`.
+- Report Center strips SQL refs, raw `rows`, trace/query/provider metadata, and other technical-only fields from top-level `ReportEvidencePack.evidence_payloads`, while keeping the full technical query records in the appendix path.
+- Derived share/rank/trend metrics now choose numeric columns by requested metric, metric registry metadata, and business aliases before falling back to the first numeric column, so收入 questions over `order_count` plus `revenue` generate `revenue_share`/`revenue_rank`.
+- Fix verification passed: evidence/product-result/report-planner set (`45 passed`) and workspace analysis/report runner set (`32 passed`).
+
 ## Latest P22-H4 Result
 
 P22-H4 Report Center UI and Markdown rendering polish completed on 2026-07-02:

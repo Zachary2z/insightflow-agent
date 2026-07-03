@@ -89,7 +89,7 @@ def collect_report_evidence(
     if not context.dimensions:
         data_limits.append("当前语义层暂未识别到可用于分组的业务维度。")
     evidence_payloads = [
-        dict(query["evidence_payload"])
+        _business_safe_evidence_payload(query["evidence_payload"])
         for query in technical_queries
         if isinstance(query.get("evidence_payload"), dict)
     ]
@@ -622,6 +622,37 @@ def _payload_aliases(task: dict[str, Any]) -> dict[str, str]:
         aliases["total_value"] = metrics[0]
         aliases["ticket_value"] = metrics[0]
     return aliases
+
+
+def _business_safe_evidence_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    forbidden_keys = {
+        "technical_sql",
+        "technical_details",
+        "rows",
+        "raw_rows",
+        "query_id",
+        "trace",
+        "trace_path",
+        "provider_metadata",
+        "technical_refs",
+    }
+    return {
+        str(key): _strip_forbidden_payload_values(value, forbidden_keys)
+        for key, value in payload.items()
+        if str(key) not in forbidden_keys
+    }
+
+
+def _strip_forbidden_payload_values(value: Any, forbidden_keys: set[str]) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): _strip_forbidden_payload_values(item, forbidden_keys)
+            for key, item in value.items()
+            if str(key) not in forbidden_keys
+        }
+    if isinstance(value, list):
+        return [_strip_forbidden_payload_values(item, forbidden_keys) for item in value]
+    return value
 
 
 def _time_filter_clause(

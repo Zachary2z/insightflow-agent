@@ -204,6 +204,12 @@ def build_evidence_payload(
     result_rows = _result_rows(rows, columns, aliases, metric_registry)
     derived_metrics = _derived_metrics(rows, columns, aliases, metric_registry, task=task)
     formula_metadata = _formula_metadata(metric_registry)
+    chart_metric_keys = _requested_numeric_metric_keys(
+        [_row_pairs_for_payload(row, columns) for row in rows],
+        aliases,
+        metric_registry,
+        task=task,
+    )
 
     return {
         "evidence_pack_version": "p23.shared.v1",
@@ -225,20 +231,14 @@ def build_evidence_payload(
         "derived_metrics": derived_metrics,
         "formulas": formulas,
         "formula_metadata": formula_metadata,
-        "chart_data": _chart_data(rows, columns),
+        "chart_data": _chart_data(rows, columns, preferred_metric_keys=chart_metric_keys),
         "warnings": list(dict.fromkeys(warnings)),
         "data_limits": data_limits,
         "display_values": display_values,
         "formatted_values": display_values,
-        "technical_sql": str(sql or ""),
         "technical_refs": {
             "sql": "technical_details.sql",
             "raw_rows": "technical_details.raw_rows",
-        },
-        "technical_details": {
-            "sql": str(sql or ""),
-            "row_count": len(rows),
-            "truncated": bool(execution_result.get("truncated")),
         },
     }
 
@@ -334,10 +334,24 @@ def _derived_metrics(
     task: dict[str, Any],
 ) -> list[dict[str, Any]]:
     pairs_by_row = [_row_pairs_for_payload(row, columns) for row in rows]
-    metric_key = _first_numeric_column(pairs_by_row)
-    if not metric_key:
+    metric_keys = _requested_numeric_metric_keys(pairs_by_row, aliases, metric_registry, task=task)
+    if not metric_keys:
         return []
 
+    derived = []
+    for metric_key in metric_keys:
+        derived.extend(_derived_metrics_for_key(rows, pairs_by_row, aliases, task=task, metric_key=metric_key))
+    return derived
+
+
+def _derived_metrics_for_key(
+    rows: list[Any],
+    pairs_by_row: list[list[tuple[str, Any]]],
+    aliases: dict[str, str],
+    *,
+    task: dict[str, Any],
+    metric_key: str,
+) -> list[dict[str, Any]]:
     metric_label = aliases.get(metric_key, metric_key)
     values = [_to_number(dict(pairs).get(metric_key)) for pairs in pairs_by_row]
     derived = []
@@ -410,12 +424,97 @@ def _derived_metrics(
     return derived
 
 
-def _first_numeric_column(pairs_by_row: list[list[tuple[str, Any]]]) -> str:
+def _requested_numeric_metric_keys(
+    pairs_by_row: list[list[tuple[str, Any]]],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+    *,
+    task: dict[str, Any],
+) -> list[str]:
+    numeric_keys = _numeric_columns(pairs_by_row)
+    if not numeric_keys:
+        return []
+
+    requested = [str(metric).strip() for metric in task.get("metrics") or [] if str(metric).strip()]
+    matched: list[str] = []
+    for metric in requested:
+        key = _match_requested_metric_key(
+            metric,
+            numeric_keys=numeric_keys,
+            aliases=aliases,
+            metric_registry=metric_registry,
+        )
+        if key and key not in matched:
+            matched.append(key)
+
+    return matched or numeric_keys[:1]
+
+
+def _numeric_columns(pairs_by_row: list[list[tuple[str, Any]]]) -> list[str]:
+    numeric_keys: list[str] = []
     for pairs in pairs_by_row:
         for key, value in pairs:
-            if _to_number(value) is not None:
-                return key
+            if _to_number(value) is not None and key not in numeric_keys:
+                numeric_keys.append(key)
+    return numeric_keys
+
+
+def _match_requested_metric_key(
+    requested_metric: str,
+    *,
+    numeric_keys: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> str:
+    requested = _normalize_metric_token(requested_metric)
+    if not requested:
+        return ""
+
+    candidates_by_key = {
+        key: _metric_key_candidates(key, aliases=aliases, metric_registry=metric_registry)
+        for key in numeric_keys
+    }
+    for key, candidates in candidates_by_key.items():
+        if requested in candidates:
+            return key
+    for key, candidates in candidates_by_key.items():
+        if any(requested in candidate or candidate in requested for candidate in candidates if candidate):
+            return key
     return ""
+
+
+def _metric_key_candidates(
+    key: str,
+    *,
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> set[str]:
+    candidates = {
+        _normalize_metric_token(key),
+        _normalize_metric_token(aliases.get(key, "")),
+    }
+    key_leaf = key.split(".")[-1]
+    candidates.add(_normalize_metric_token(key_leaf))
+    for metric_id, metric in (metric_registry.get("metrics") or {}).items():
+        if not isinstance(metric, dict):
+            continue
+        values = [
+            metric_id,
+            metric.get("name"),
+            metric.get("business_label"),
+            metric.get("label"),
+            *(metric.get("aliases") or []),
+            *(metric.get("source_fields") or []),
+        ]
+        normalized_values = {_normalize_metric_token(value) for value in values}
+        source_leafs = {
+            _normalize_metric_token(str(value).split(".")[-1])
+            for value in metric.get("source_fields") or []
+        }
+        if _normalize_metric_token(key) in normalized_values | source_leafs:
+            candidates.update(normalized_values)
+            candidates.update(source_leafs)
+    return {candidate for candidate in candidates if candidate}
 
 
 def _formula_metadata(metric_registry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -466,14 +565,21 @@ def _normalize_metric_token(value: Any) -> str:
     return re.sub(r"[\s_\-]+", "", str(value or "").lower())
 
 
-def _chart_data(rows: list[Any], columns: list[str]) -> dict[str, Any]:
+def _chart_data(rows: list[Any], columns: list[str], *, preferred_metric_keys: list[str] | None = None) -> dict[str, Any]:
     pairs_by_row = [_row_pairs_for_payload(row, columns) for row in rows]
     x_axis = ""
     y_axis = ""
+    preferred_metrics = list(preferred_metric_keys or [])
     for pairs in pairs_by_row:
         for key, value in pairs:
             if not x_axis and _to_number(value) is None:
                 x_axis = key
+            if not y_axis and key in preferred_metrics and _to_number(value) is not None:
+                y_axis = key
+        if x_axis and y_axis:
+            break
+    for pairs in pairs_by_row:
+        for key, value in pairs:
             if not y_axis and _to_number(value) is not None:
                 y_axis = key
         if x_axis and y_axis:
