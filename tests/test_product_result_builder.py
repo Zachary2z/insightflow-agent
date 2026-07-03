@@ -1059,6 +1059,66 @@ def test_product_result_builder_localizes_common_metric_fields_in_main_answer():
     assert "total_spend" not in text
 
 
+def test_product_result_builder_localizes_sql_aliases_in_fallback_answer_and_evidence():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个客服问题工单量最高？",
+            "execution_result": {
+                "success": True,
+                "columns": ["issue_type", "total_tickets", "avg_response", "priority_score"],
+                "rows": [
+                    ["退款咨询", 320, 48.0, 15360.0],
+                    ["物流延迟", 180, 76.0, 13680.0],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+            "generated_sql": "SELECT issue_type, SUM(ticket_count) AS total_tickets FROM support_issues GROUP BY issue_type",
+        }
+    )
+
+    text = _business_answer_text(answer)
+    evidence_text = " ".join(answer["evidence_bullets"])
+    assert "退款咨询" in text
+    assert "总工单数" in text or "工单数" in text
+    assert "平均响应时长" in text
+    assert "优先级评分" in text
+    assert "退款咨询" in evidence_text
+    assert "第 1 行" not in text
+    assert "SQL" not in text
+    assert "raw rows" not in text
+    for forbidden in ("total_tickets", "avg_response", "priority_score", "execution_result", "provider_metadata"):
+        assert forbidden not in text
+    assert answer["recommendations"] == []
+
+
+def test_product_result_builder_explicit_priority_question_keeps_recommendations_without_alias_leak():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个客服问题最需要优先处理，下一步怎么优化？",
+            "execution_result": {
+                "success": True,
+                "columns": ["issue_type", "total_tickets", "avg_response", "priority_score"],
+                "rows": [
+                    ["退款咨询", 320, 48.0, 15360.0],
+                    ["物流延迟", 180, 76.0, 13680.0],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    text = _business_answer_text(answer)
+    assert answer["recommendations"]
+    assert answer["direct_answer"] not in answer["recommendations"]
+    assert "优先级评分" in text or "判断口径" in text
+    for forbidden in ("total_tickets", "avg_response", "priority_score"):
+        assert forbidden not in text
+
+
 def test_product_result_builder_uses_english_fallback_for_english_question():
     from workspaces.product_result_builder import build_business_answer
 

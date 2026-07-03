@@ -12,6 +12,10 @@ from workspaces.answer_evidence import (
     business_field_labels,
     contains_cjk,
     entity_key,
+    localize_business_field_names,
+    metric_leader_entities,
+    metric_leaders,
+    metric_tradeoff_summary,
     metric_keys,
     primary_entity,
     reason_hypothesis_context,
@@ -237,8 +241,17 @@ def _evidence_based_answer(
             return tradeoff_answer
 
     entity_key_value = entity_key(rows)
-    metric_key_values = metric_keys(rows)
+    metric_key_values = _prioritized_metric_keys(metric_keys(rows), user_question=user_question)
     primary = primary_entity(rows, entity_key_value=entity_key_value, metric_key_values=metric_key_values)
+    generic_tradeoff = _generic_metric_tradeoff_answer(
+        user_question=user_question,
+        rows=rows,
+        reviewer_result=reviewer_result,
+        chinese=chinese,
+        metric_key_values=metric_key_values,
+    )
+    if generic_tradeoff:
+        return generic_tradeoff
     first_row_summary = row_summary(rows[0], chinese=chinese)
     evidence_sentence = business_evidence_sentence(rows, chinese=chinese) or f"{first_row_summary}。"
     evidence_bullets = row_bullets(rows, chinese=chinese)
@@ -251,10 +264,10 @@ def _evidence_based_answer(
     if chinese:
         entity_text = primary or "当前第一行对象"
         wants_recommendations = _should_include_recommendations(user_question)
-        metric_labels = _metric_labels(metric_key_values, chinese=True)
-        metric_text = "、".join(metric_labels) if metric_labels else "可用指标"
+        primary_metric = metric_key_values[0] if metric_key_values else ""
+        primary_metric_label = business_field_label(primary_metric, chinese=True) if primary_metric else "主要指标"
         why_text = (
-            f"{evidence_sentence} 当前数据只能确认 {entity_text} 在{metric_text}上更高，不能直接证明原因。"
+            f"{evidence_sentence} 当前数据只能确认结果高低，不能直接证明原因。"
             f"可能方向包括：{reason_hypothesis_context(user_question, rows, chinese=True)}，"
             "但需要补充过程数据进一步验证。"
             if _asks_why(user_question)
@@ -271,9 +284,9 @@ def _evidence_based_answer(
             else []
         )
         direct_answer = (
-            f"在当前证据下，建议优先关注 {entity_text}；它在本次返回的{metric_text}中表现靠前。"
+            f"在当前证据下，建议优先关注 {entity_text}；它按{primary_metric_label}看排在第一。"
             if wants_recommendations
-            else f"本轮结果显示 {entity_text} 排在第一，因为它在本次查询返回的{metric_text}中表现靠前。"
+            else f"本轮结果显示 {entity_text} 排在第一，主要依据是{primary_metric_label}。"
         )
         headline = (
             f"当前证据支持优先关注 {entity_text}"
@@ -349,7 +362,7 @@ def _tradeoff_answer(
 ) -> dict[str, Any]:
     rows = rows_as_dicts(execution_result)
     entity_key_value = entity_key(rows)
-    metric_key_values = metric_keys(rows)
+    metric_key_values = _prioritized_metric_keys(metric_keys(rows), user_question=user_question)
     if not rows or not entity_key_value or len(metric_key_values) < 2:
         return {}
 
@@ -422,6 +435,82 @@ def _tradeoff_answer(
                 ]
             ),
             "confidence": confidence,
+        }
+    return _validate_or_empty(answer, user_question=user_question)
+
+
+def _generic_metric_tradeoff_answer(
+    *,
+    user_question: str,
+    rows: list[dict[str, Any]],
+    reviewer_result: dict[str, Any],
+    chinese: bool,
+    metric_key_values: list[str],
+) -> dict[str, Any]:
+    if len(rows) < 2 or len(metric_key_values) < 2 or not _is_decision_or_priority_question(user_question):
+        return {}
+    leaders = metric_leaders(rows, metric_key_values=metric_key_values, chinese=chinese)
+    leader_entities = metric_leader_entities(leaders)
+    if len(leader_entities) <= 1:
+        return {}
+    leader_sentences = metric_tradeoff_summary(rows, chinese=chinese, metric_key_values=metric_key_values)
+    if not leader_sentences:
+        return {}
+    confidence = str(reviewer_result.get("confidence") or "medium")
+    if confidence not in {"low", "medium", "high"}:
+        confidence = "medium"
+    primary = leaders[0]
+    primary_entity = str(primary.get("entity") or "")
+    primary_label = str(primary.get("metric_label") or "")
+    leader_summary = "；".join(sentence.rstrip("。.") for sentence in leader_sentences)
+    recommendations = (
+        [f"先明确本次优先级按哪个业务指标判断；若以{primary_label}为主，可以优先围绕 {primary_entity} 做复盘和资源安排。"]
+        if chinese and _should_include_recommendations(user_question)
+        else []
+    )
+    if chinese:
+        answer = {
+            "headline": "不同指标领先对象不同，需要按判断口径取舍",
+            "direct_answer": (
+                f"本次不能简单用一个赢家概括：{leader_summary}。"
+                f"如果本次目标主要看{primary_label}，可以先关注 {primary_entity}；"
+                "其他领先指标对应对象也需要单独跟进。"
+            ),
+            "why": (
+                f"当前数据只能确认各指标高低，不能直接证明原因。"
+                f"可能方向包括：{reason_hypothesis_context(user_question, rows, chinese=True)}，"
+                "但需要补充过程数据进一步验证。"
+            ),
+            "evidence_bullets": leader_sentences,
+            "recommendations": recommendations,
+            "caveats": _composer_caveats(
+                reviewer_result,
+                user_question=user_question,
+                execution_result={"columns": metric_key_values, "rows": rows},
+                chinese=True,
+            ),
+            "confidence": "medium" if confidence == "high" else confidence,
+        }
+    else:
+        answer = {
+            "headline": "Different metrics point to different leaders",
+            "direct_answer": (
+                "There is no single leader across all returned metrics: "
+                + leader_summary
+                + f". If {primary_label} is the main basis, start with {primary_entity}."
+            ),
+            "why": "The current rows show a metric tradeoff rather than one object leading every metric.",
+            "evidence_bullets": leader_sentences,
+            "recommendations": ["Choose the priority metric before shifting resources."]
+            if _should_include_recommendations(user_question)
+            else [],
+            "caveats": _composer_caveats(
+                reviewer_result,
+                user_question=user_question,
+                execution_result={"columns": metric_key_values, "rows": rows},
+                chinese=False,
+            ),
+            "confidence": "medium" if confidence == "high" else confidence,
         }
     return _validate_or_empty(answer, user_question=user_question)
 
@@ -633,6 +722,7 @@ def _clean_text(value: Any, *, chinese: bool) -> str:
     text = re.sub(r"\b(?:SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA)\b.+", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"\b(?:trace_id|trace_path|prompt_id|provider_metadata)\s*=\s*\S+", "", text, flags=re.IGNORECASE)
     text = _remove_template_debug_phrases(text, chinese=chinese)
+    text = localize_business_field_names(text, chinese=chinese)
     for raw_key, label in sorted(business_field_labels(chinese=chinese).items(), key=lambda item: len(item[0]), reverse=True):
         text = re.sub(rf"\b{re.escape(raw_key)}\b", label, text, flags=re.IGNORECASE)
     return " ".join(text.split())
@@ -661,6 +751,46 @@ def _metric_labels(metrics: list[str], *, chinese: bool) -> list[str]:
         if label and label not in labels:
             labels.append(label)
     return labels
+
+
+def _prioritized_metric_keys(metrics: list[str], *, user_question: str) -> list[str]:
+    if not metrics:
+        return []
+    lowered_question = str(user_question or "").lower()
+    priority_markers = ("优先", "最需要", "priority", "prioritize")
+    if any(marker in lowered_question for marker in priority_markers):
+        for metric in metrics:
+            if "priority" in metric.lower() or "score" in metric.lower():
+                return [metric, *[item for item in metrics if item != metric]]
+    ticket_markers = ("工单", "ticket", "问题量")
+    if any(marker in lowered_question for marker in ticket_markers):
+        for metric in metrics:
+            lowered = metric.lower()
+            if "ticket" in lowered or "issue" in lowered:
+                return [metric, *[item for item in metrics if item != metric]]
+    return metrics
+
+
+def _is_decision_or_priority_question(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "建议",
+            "推荐",
+            "应该",
+            "值得",
+            "优先",
+            "最需要",
+            "优化",
+            "下一步",
+            "budget",
+            "recommend",
+            "should",
+            "priority",
+            "prioritize",
+        )
+    )
 
 
 def _asks_why(question: str) -> bool:

@@ -89,6 +89,44 @@ def test_multi_metric_best_question_returns_tradeoff_instead_of_conflicting_sing
     )
 
 
+def test_tradeoff_answer_localizes_sql_alias_metrics_when_leaders_differ():
+    from workspaces.answer_consistency import apply_answer_consistency
+
+    execution_result = {
+        "success": True,
+        "columns": ["issue_type", "total_tickets", "avg_response", "priority_score"],
+        "rows": [
+            ["退款咨询", 320, 48.0, 15360.0],
+            ["物流延迟", 180, 76.0, 13680.0],
+            ["发票问题", 90, 22.0, 1980.0],
+        ],
+    }
+    answer = apply_answer_consistency(
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        business_answer={
+            "headline": "退款咨询最需要优先处理",
+            "direct_answer": "退款咨询最需要优先处理，因为它在 total_tickets、avg_response、priority_score 中表现靠前。",
+            "why": "第 1 行显示 issue_type 为 退款咨询，total_tickets 为 320。",
+            "evidence_bullets": ["退款咨询 total_tickets 为 320。"],
+            "recommendations": ["优先处理退款咨询。"],
+            "caveats": [],
+            "confidence": "high",
+        },
+        execution_result=execution_result,
+        evidence_result={"validation_status": "validated"},
+    )
+
+    text = _answer_text(answer)
+    assert "总工单数" in text or "工单数" in text
+    assert "平均响应时长" in text
+    assert "优先级评分" in text
+    assert "退款咨询" in text
+    assert "物流延迟" in text
+    assert any(marker in text for marker in ("不同指标", "判断口径", "取舍", "按平均响应时长"))
+    for forbidden in ("total_tickets", "avg_response", "priority_score", "SQL", "execution_result", "第 1 行"):
+        assert forbidden not in text
+
+
 def test_english_tradeoff_answer_uses_english_metric_labels_and_readable_numbers():
     from workspaces.product_result_builder import build_business_answer
 

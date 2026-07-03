@@ -87,6 +87,15 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 
 ## Latest P23-H2 Result
 
+P23-H2 metric alias and tradeoff repair completed on 2026-07-03:
+
+- Added shared dynamic business field labeling in `workspaces.answer_evidence` so SQL aliases such as `total_tickets`, `avg_response`, and `priority_score` render as 总工单数、平均响应时长、优先级评分 in product-facing Chinese answers.
+- Added shared metric-leader/tradeoff helpers and reused them from the final composer and consistency guardrail, so multi-metric answers say which object leads by each metric instead of implying one object leads every metric.
+- Tightened deterministic and provider-normalized Chinese wording: ordinary fact questions keep recommendations empty; explicit 优先处理、优化、预算、下一步 questions retain recommendations inside the evidence boundary.
+- Fixed the consistency layer so tradeoff rewrites use business metric labels, keep cause explanations as hypotheses, and state that current result metrics cannot directly prove原因.
+- Added full-chain support-issue coverage for aliased SQL metrics and verified the manual support_issues example returns business labels without `total_tickets`, `avg_response`, `priority_score`, `第 1 行`, `execution_result`, SQL, or raw rows in the main answer.
+- Verification passed: answer consistency/composer/product/workspace set (`85 passed`), business quality/fast fact set (`23 passed`), and focused frontend workspace-flow Vitest (`54 passed`).
+
 P23-H2 evidence wording repair completed on 2026-07-03:
 
 - Replaced row-style Chinese evidence bullets such as `第 1 行` and raw-field `字段 为 值` strings with business evidence sentences built from the returned entity and metric rows.

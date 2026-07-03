@@ -189,6 +189,17 @@ Completion record:
 
 Fix record:
 
+- Fixed again on 2026-07-03 after H2 follow-up found SQL aliases and multi-metric wording could still leak into final Chinese business answers.
+- Added dynamic shared business labels in `workspaces.answer_evidence` for SQL aliases such as `total_tickets`, `avg_response`, and `priority_score`, plus generic token rules for totals, averages, response time, revenue/sales, orders, cost/spend, ROI/ROAS, and priority scores.
+- Added shared metric leader/tradeoff helpers so evidence bullets and consistency rewrites calculate each metric's leading object from returned rows. Multi-metric answers now express判断口径 differences instead of saying one object is ahead on all returned metrics.
+- Updated `agents.final_answer_composer`, `workspaces.answer_consistency`, and `workspaces.product_result_builder` to reuse the shared labeling and leader helpers, including provider-answer cleanup and deterministic fallback paths.
+- Recommendation generation remains limited to explicit建议、优化、优先级、预算、下一步 style questions; fact and why-only questions stay focused on facts, cause boundaries, and hypotheses.
+- Full-chain support_issues coverage now verifies aliased SQL output (`total_tickets`, `avg_response`, `priority_score`) becomes 总工单数、平均响应时长、优先级评分 or 判断口径 language in the main business answer, without leaking SQL/raw rows/execution_result or row-number wording.
+- Verification passed:
+  - `python3 -m pytest tests/test_answer_consistency.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`85 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_fast_fact_path.py -q` (`23 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+
 - Fixed on 2026-07-03 after H2 review found evidence bullets and原因解释 were still too row-like and template-like.
 - Added fail-first coverage for support-ticket and channel scenarios so Chinese business answers no longer expose `第 1 行`, `Row 1`, `issue_type 为`, `ticket_count 为`, or untranslated raw field names when labels are available.
 - Added shared business evidence wording helpers that turn result rows into sentences such as最高对象、指标值、次高对象对比, while leaving SQL/raw rows/provider metadata in technical details only.

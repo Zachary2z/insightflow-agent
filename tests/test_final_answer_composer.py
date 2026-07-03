@@ -406,6 +406,81 @@ def test_composer_channel_fact_evidence_bullets_are_business_sentences():
     assert answer["recommendations"] == []
 
 
+def test_composer_multi_metric_aliases_use_tradeoff_not_all_metrics_ahead():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        execution_result={
+            "success": True,
+            "columns": ["issue_type", "total_tickets", "avg_response", "priority_score"],
+            "rows": [
+                ["退款咨询", 320, 48.0, 15360.0],
+                ["物流延迟", 180, 76.0, 13680.0],
+                ["发票问题", 90, 22.0, 1980.0],
+            ],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["退款咨询", "物流延迟", "发票问题"],
+            supported_metrics=["total_tickets", "avg_response", "priority_score"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="medium",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "退款咨询" in text
+    assert "物流延迟" in text
+    assert "总工单数" in text or "工单数" in text
+    assert "平均响应时长" in text
+    assert "优先级评分" in text
+    assert any(marker in text for marker in ("判断口径", "按平均响应时长", "如果目标", "不同指标"))
+    assert "所有指标" not in text
+    assert "全部指标" not in text
+    assert "在本次返回的总工单数、平均响应时长、优先级评分中表现靠前" not in text
+    for forbidden in ("total_tickets", "avg_response", "priority_score", "第 1 行", "execution_result"):
+        assert forbidden not in text
+
+
+def test_composer_single_primary_metric_keeps_auxiliary_metric_as_context_only():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个客服问题工单量最高？",
+        execution_result={
+            "success": True,
+            "columns": ["issue_type", "total_tickets", "avg_response"],
+            "rows": [
+                ["退款咨询", 320, 48.0],
+                ["物流延迟", 180, 76.0],
+            ],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["退款咨询", "物流延迟"],
+            supported_metrics=["total_tickets", "avg_response"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="medium",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "退款咨询" in answer["direct_answer"]
+    assert "工单数" in text
+    assert "平均响应时长" in text
+    assert "本轮结果显示 退款咨询 排在第一" in answer["direct_answer"]
+    assert "总工单数、平均响应时长" not in answer["direct_answer"]
+    assert "在本次查询返回的总工单数、平均响应时长中表现靠前" not in text
+    assert "avg_response" not in text
+
+
 def test_composer_rebuilds_natural_chinese_answer_with_missing_roi_boundary():
     from agents.final_answer_composer import compose_final_answer
 

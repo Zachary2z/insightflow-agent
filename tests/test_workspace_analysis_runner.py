@@ -563,6 +563,63 @@ def test_workspace_analysis_non_channel_judgment_answer_reads_like_business_chin
     assert answer["direct_answer"] not in answer["recommendations"]
 
 
+def test_workspace_analysis_support_issue_priority_aliases_are_business_labeled(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Service Issue Alias Priority Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE support_issues (issue_type TEXT, business_date TEXT, ticket_count INTEGER, avg_response_minutes REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO support_issues VALUES (?, ?, ?, ?)",
+            [
+                ("退款咨询", "2026-06-01", 320, 48.0),
+                ("物流延迟", "2026-06-02", 180, 76.0),
+                ("发票问题", "2026-06-03", 90, 22.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        initial_sql=(
+            "SELECT issue_type, "
+            "SUM(ticket_count) AS total_tickets, "
+            "AVG(avg_response_minutes) AS avg_response, "
+            "SUM(ticket_count) * AVG(avg_response_minutes) AS priority_score "
+            "FROM support_issues "
+            "GROUP BY issue_type "
+            "ORDER BY priority_score DESC "
+            "LIMIT 3"
+        ),
+    )
+
+    assert result["status"] == "completed"
+    answer = result["product_result"]["business_answer"]
+    text = _business_answer_text(answer)
+    assert "退款咨询" in text
+    assert "物流延迟" in text
+    assert "工单数" in text or "总工单数" in text
+    assert "平均响应时长" in text
+    assert "优先级评分" in text or "判断口径" in text
+    assert any(marker in text for marker in ("按平均响应时长", "判断口径", "不同指标", "如果目标"))
+    assert "不能直接证明原因" in answer["why"]
+    assert answer["recommendations"]
+    for forbidden in (
+        "total_tickets",
+        "avg_response",
+        "priority_score",
+        "第 1 行",
+        "execution_result",
+        "SQL",
+        "raw rows",
+    ):
+        assert forbidden not in text
+
+
 def test_workspace_analysis_shell_can_be_restored_before_job_finishes(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Recoverable Run Workspace")

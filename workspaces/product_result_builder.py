@@ -13,6 +13,7 @@ from workspaces.answer_evidence import (
     business_field_label,
     business_field_labels,
     business_row_sentences,
+    localize_business_field_names,
     reason_hypothesis_context,
     rows_as_dicts,
 )
@@ -285,7 +286,12 @@ def business_answer_is_usable(
         return False
 
     combined = "\n".join(_business_answer_texts(existing))
-    if _looks_like_raw_parameter_dump(combined) or _looks_like_mechanical_row_evidence(combined) or _contains_technical_leak(combined):
+    if _looks_like_raw_parameter_dump(combined) or _contains_technical_leak(combined):
+        return False
+    if _looks_like_mechanical_row_evidence(combined) and not _contains_decision_or_recommendation_intent(
+        user_question,
+        combined,
+    ):
         return False
     if _needs_chinese_response(user_question) and not _business_answer_fields_contain_cjk(existing):
         return False
@@ -733,7 +739,7 @@ def _remove_template_debug_phrases(text: str, *, chinese: bool) -> str:
 
 
 def _localize_common_field_names(text: str, *, chinese: bool) -> str:
-    localized = text
+    localized = localize_business_field_names(text, chinese=chinese)
     labels = business_field_labels(chinese=chinese)
     for raw_key, label in sorted(labels.items(), key=lambda item: len(item[0]), reverse=True):
         localized = re.sub(rf"\b{re.escape(raw_key)}\b", label, localized, flags=re.IGNORECASE)
@@ -746,6 +752,26 @@ def _localize_common_field_names(text: str, *, chinese: bool) -> str:
         for zh_label, en_label in sorted(zh_to_en.items(), key=lambda item: len(item[0]), reverse=True):
             localized = localized.replace(zh_label, en_label)
     return localized
+
+
+def _contains_decision_or_recommendation_intent(*texts: str) -> bool:
+    lowered = " ".join(str(text or "") for text in texts).lower()
+    markers = (
+        "建议",
+        "推荐",
+        "应该",
+        "值得",
+        "优先",
+        "加预算",
+        "减少预算",
+        "优化",
+        "下一步",
+        "recommend",
+        "should",
+        "prioritize",
+        "budget",
+    )
+    return any(marker in lowered for marker in markers)
 
 
 def _is_sql_review_failure(raw: dict[str, Any]) -> bool:

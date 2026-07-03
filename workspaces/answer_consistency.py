@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from workspaces.answer_evidence import business_evidence_sentence, business_field_label, business_row_sentences
+from workspaces.answer_evidence import (
+    business_evidence_sentence,
+    business_field_label,
+    business_row_sentences,
+    metric_tradeoff_summary,
+    reason_hypothesis_context,
+)
 from workspaces.product_models import empty_business_answer
 
 
@@ -39,7 +45,7 @@ BUDGET_REDUCTION_MARKERS = (
     "decrease",
     "cut",
 )
-TRADEOFF_MARKERS = ("取舍", "权衡", "口径", "如果目标", "decision basis", "tradeoff")
+TRADEOFF_MARKERS = ("取舍", "权衡", "判断口径", "不同指标", "如果目标", "decision basis", "tradeoff")
 CHART_DECISION_MARKERS = ADVICE_MARKERS + (
     "最佳",
     "优先",
@@ -74,7 +80,13 @@ def apply_answer_consistency(
 
     conflict = _multi_metric_conflict(question, rows)
     if conflict and not _has_tradeoff_language(answer):
-        return _tradeoff_answer(answer=answer, conflict=conflict, chinese=_contains_cjk(question))
+        return _tradeoff_answer(
+            answer=answer,
+            conflict=conflict,
+            chinese=_contains_cjk(question),
+            include_recommendations=_should_include_recommendations(question),
+            question=question,
+        )
 
     alignment = _answer_evidence_alignment(question=question, answer=answer, rows=rows)
     if alignment:
@@ -402,8 +414,8 @@ def _ranked_evidence_answer(
         answer.update(
             {
                 "headline": f"当前证据最支持优先评估 {primary_entity}",
-                "direct_answer": f"当前数据支持优先评估 {primary_entity}；{evidence_sentence}因此本次建议先围绕 {primary_entity} 复盘。",
-                "why": f"当前数据中，{evidence_sentence}",
+                "direct_answer": f"当前数据支持优先评估 {primary_entity}，建议先围绕 {primary_entity} 复盘。",
+                "why": f"当前数据中，{primary_entity}在主要排序指标上领先；完整对比见证据说明。",
                 "evidence_bullets": evidence_bullets,
                 "recommendations": [f"围绕 {primary_entity} 做下一步资源评估，并用相同指标继续跟踪。"],
                 "caveats": caveats,
@@ -554,23 +566,29 @@ def _tradeoff_answer(
     answer: dict[str, Any],
     conflict: dict[str, Any],
     chinese: bool,
+    include_recommendations: bool,
+    question: str = "",
 ) -> dict[str, Any]:
     leaders: dict[str, tuple[str, float]] = conflict["leaders"]
-    leader_sentences = [
-        _leader_sentence(metric=metric, name=name, value=value, chinese=chinese)
-        for metric, (name, value) in leaders.items()
-    ]
+    leader_sentences = _leader_sentences_from_conflict(conflict, chinese=chinese)
     leader_summary = "；".join(sentence.rstrip("。.") for sentence in leader_sentences)
     caveat = "不同数值指标指向不同对象，需要先明确决策口径，不能只用单一最高值下结论。"
+    recommendations = ["先明确重点运营口径，再按该口径决定资源倾斜对象。"] if include_recommendations else []
 
     if chinese:
+        hypothesis = reason_hypothesis_context(question, [], chinese=True)
         answer.update(
             {
                 "headline": "不同指标领先对象不同，需要按判断口径取舍",
                 "direct_answer": leader_summary + "。因此需要先明确决策口径，再判断谁最值得重点投入。",
-                "why": "本次证据显示多个指标的领先对象不一致：" + leader_summary + "。",
+                "why": (
+                    "本次证据显示多个指标的领先对象不一致："
+                    + leader_summary
+                    + "。当前数据只能确认指标高低，不能直接证明原因。"
+                    + f"可能方向包括：{hypothesis}，但需要补充过程数据进一步验证。"
+                ),
                 "evidence_bullets": leader_sentences,
-                "recommendations": ["先明确重点运营口径，再按该口径决定资源倾斜对象。"],
+                "recommendations": recommendations,
                 "caveats": _dedupe(answer["caveats"] + [caveat]),
                 "confidence": "medium" if answer["confidence"] == "high" else answer["confidence"],
             }
@@ -587,12 +605,38 @@ def _tradeoff_answer(
             ),
             "why": "The evidence has a multi-metric tradeoff: " + " ".join(leader_sentences),
             "evidence_bullets": leader_sentences,
-            "recommendations": ["Choose the decision basis before shifting resources."],
+            "recommendations": ["Choose the decision basis before shifting resources."] if include_recommendations else [],
             "caveats": _dedupe(answer["caveats"] + ["Different numeric metrics point to different leaders."]),
             "confidence": "medium" if answer["confidence"] == "high" else answer["confidence"],
         }
     )
     return answer
+
+
+def _should_include_recommendations(question: str) -> bool:
+    lowered = str(question or "").lower()
+    if any(marker in lowered for marker in ("只回答事实", "不用建议", "不需要建议", "不要建议", "只看事实")):
+        return False
+    return any(marker in lowered for marker in ADVICE_MARKERS + ("优化", "下一步", "优先处理", "priority", "prioritize"))
+
+
+def _leader_sentences_from_conflict(conflict: dict[str, Any], *, chinese: bool) -> list[str]:
+    leaders: dict[str, tuple[str, float]] = conflict["leaders"]
+    if not chinese:
+        return [_leader_sentence(metric=metric, name=name, value=value, chinese=False) for metric, (name, value) in leaders.items()]
+    rows = []
+    entity_key = str(conflict.get("entity_key") or "entity")
+    metrics = list(leaders)
+    for metric, (name, value) in leaders.items():
+        row = {entity_key: name}
+        for candidate in metrics:
+            if candidate == metric:
+                row[candidate] = value
+        rows.append(row)
+    shared = metric_tradeoff_summary(rows, chinese=chinese, metric_key_values=metrics)
+    if len(shared) == len(metrics):
+        return shared
+    return [_leader_sentence(metric=metric, name=name, value=value, chinese=chinese) for metric, (name, value) in leaders.items()]
 
 
 def _leader_sentence(*, metric: str, name: str, value: float, chinese: bool) -> str:
@@ -604,24 +648,15 @@ def _leader_sentence(*, metric: str, name: str, value: float, chinese: bool) -> 
 
 
 def _metric_label(metric: str, *, chinese: bool) -> str:
+    label = business_field_label(metric, chinese=chinese)
     lowered = str(metric or "").lower()
-    if "roi" in lowered:
-        return "ROI"
-    if "ticket" in lowered and "count" in lowered:
-        return "工单数" if chinese else "ticket count"
-    if "response" in lowered and ("minute" in lowered or "time" in lowered):
-        return "平均响应时长" if chinese else "average response time"
-    if "resolution" in lowered and ("hour" in lowered or "time" in lowered):
-        return "平均解决时长" if chinese else "average resolution time"
-    if "avg" in lowered and "revenue" in lowered and ("order" in lowered or "per_order" in lowered):
-        return "客单价" if chinese else "average order revenue"
-    if lowered in {"order_count", "orders"} or ("order" in lowered and "count" in lowered):
-        return "订单数" if chinese else "orders"
-    if "spend" in lowered:
-        return "投放成本" if chinese else "spend"
-    if "revenue" in lowered:
-        return "收入" if chinese else "revenue"
-    return str(metric or "").strip() or "该指标"
+    if not chinese and label == "total revenue":
+        return "revenue"
+    if not chinese and label == "order count":
+        return "orders"
+    if not chinese and lowered == "avg_revenue_per_order":
+        return "average order revenue"
+    return label or ("该指标" if chinese else "the metric")
 
 
 def _format_metric_value(value: float, *, metric: str = "") -> str:

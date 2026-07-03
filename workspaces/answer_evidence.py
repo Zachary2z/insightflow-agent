@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -92,7 +93,27 @@ def business_field_label(key: Any, *, chinese: bool) -> str:
     text = str(key or "").strip()
     if not text:
         return ""
-    return business_field_labels(chinese=chinese).get(text.lower(), text)
+    lowered = text.lower()
+    exact = business_field_labels(chinese=chinese).get(lowered)
+    if exact:
+        return exact
+    dynamic = _dynamic_business_field_label(lowered, chinese=chinese)
+    return dynamic or text
+
+
+def localize_business_field_names(text: Any, *, chinese: bool) -> str:
+    """Replace SQL-style aliases in product-facing text with business labels."""
+
+    value = str(text or "")
+    if not value:
+        return ""
+
+    def replace(match: re.Match[str]) -> str:
+        raw = match.group(0)
+        label = business_field_label(raw, chinese=chinese)
+        return label if label and label != raw else raw
+
+    return re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\b", replace, value)
 
 
 def rows_as_dicts(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -198,14 +219,21 @@ def business_row_sentences(rows: list[dict[str, Any]], *, chinese: bool, limit: 
             comparison_parts.append(f"{_entity_value_text(entity)}为 {formatted}")
 
     bullets = ["；".join(comparison_parts) + "。"]
-    leader_entity, _leader_value, leader_row = ranked[0]
+    leader_entity, _leader_value, _leader_row = ranked[0]
     for metric in metric_key_values[1:limit]:
-        value = to_number(leader_row.get(metric))
-        if value is None:
+        metric_ranked = _rank_rows_by_metric(rows, entity_key_value=entity_key_value, metric=metric)
+        if not metric_ranked:
             continue
+        metric_leader, value, _row = metric_ranked[0]
         label = business_field_label(metric, chinese=True)
         unit = _metric_unit(metric)
-        bullets.append(f"{_entity_value_text(leader_entity)}的{label}为 {_format_business_value(value, metric=metric, unit=unit)}。")
+        formatted = _format_business_value(value, metric=metric, unit=unit)
+        if len(ranked) == 1 and metric_leader == leader_entity:
+            bullets.append(f"{_entity_value_text(metric_leader)}的{label}为 {formatted}。")
+        elif metric_leader == leader_entity:
+            bullets.append(f"按{label}看，{_entity_value_text(metric_leader)}也最高，为 {formatted}。")
+        else:
+            bullets.append(f"按{label}看，{_entity_value_text(metric_leader)}更高，为 {formatted}。")
     return bullets[:limit]
 
 
@@ -233,6 +261,66 @@ def reason_hypothesis_context(user_question: str, rows: list[dict[str, Any]], *,
     return "需求规模、客户结构、运营承接或资源配置"
 
 
+def metric_leaders(
+    rows: list[dict[str, Any]],
+    *,
+    entity_key_value: str = "",
+    metric_key_values: list[str] | None = None,
+    chinese: bool = True,
+) -> list[dict[str, Any]]:
+    resolved_entity_key = entity_key_value or entity_key(rows)
+    if not rows or not resolved_entity_key:
+        return []
+    resolved_metrics = metric_key_values if metric_key_values is not None else metric_keys(rows)
+    leaders: list[dict[str, Any]] = []
+    for metric in resolved_metrics:
+        ranked = _rank_rows_by_metric(rows, entity_key_value=resolved_entity_key, metric=metric)
+        if not ranked:
+            continue
+        leader, value, _row = ranked[0]
+        leaders.append(
+            {
+                "metric": metric,
+                "metric_label": business_field_label(metric, chinese=chinese),
+                "entity": leader,
+                "value": value,
+            }
+        )
+    return leaders
+
+
+def metric_leader_entities(leaders: list[dict[str, Any]]) -> list[str]:
+    entities: list[str] = []
+    for leader in leaders:
+        entity = str(leader.get("entity") or "").strip()
+        if entity and entity not in entities:
+            entities.append(entity)
+    return entities
+
+
+def metric_tradeoff_summary(
+    rows: list[dict[str, Any]],
+    *,
+    chinese: bool = True,
+    metric_key_values: list[str] | None = None,
+) -> list[str]:
+    leaders = metric_leaders(rows, metric_key_values=metric_key_values, chinese=chinese)
+    sentences: list[str] = []
+    for leader in leaders:
+        metric = str(leader.get("metric") or "")
+        label = str(leader.get("metric_label") or business_field_label(metric, chinese=chinese))
+        entity = str(leader.get("entity") or "")
+        value = to_number(leader.get("value"))
+        if not metric or not entity or value is None:
+            continue
+        formatted = _format_leader_value(value, metric=metric)
+        if chinese:
+            sentences.append(f"按{label}看，{entity}领先，数值为 {formatted}。")
+        else:
+            sentences.append(f"By {label}, {entity} leads with {formatted}.")
+    return sentences
+
+
 def _rank_rows_by_metric(
     rows: list[dict[str, Any]],
     *,
@@ -254,7 +342,7 @@ def _metric_unit(metric: str) -> str:
         return "件"
     if ("order" in lowered and "count" in lowered) or lowered in {"orders", "订单数"}:
         return "单"
-    if "minute" in lowered or "分钟" in lowered:
+    if "minute" in lowered or "分钟" in lowered or "response" in lowered:
         return "分钟"
     if "hour" in lowered or "小时" in lowered:
         return "小时"
@@ -288,6 +376,64 @@ def _format_business_value(value: float, *, metric: str, unit: str) -> str:
     if unit == "%" and 0 <= value <= 1:
         formatted = f"{value * 100:.1f}".rstrip("0").rstrip(".")
     return f"{formatted} {unit}".rstrip()
+
+
+def _format_leader_value(value: float, *, metric: str = "") -> str:
+    if float(value).is_integer():
+        return f"{int(value):,}"
+    decimals = 3 if ("roi" in str(metric or "").lower() or abs(value) < 1) else 2
+    return f"{value:,.{decimals}f}".rstrip("0").rstrip(".")
+
+
+def _dynamic_business_field_label(lowered: str, *, chinese: bool) -> str:
+    tokens = _field_tokens(lowered)
+    token_set = set(tokens)
+    if not tokens:
+        return ""
+    if "roi" in token_set:
+        return "ROI"
+    if "roas" in token_set:
+        return "ROAS"
+    has_total = bool(token_set & {"total", "sum", "summed"})
+    has_avg = bool(token_set & {"avg", "average", "mean"})
+    if "priority" in token_set and "score" in token_set:
+        return "优先级评分" if chinese else "priority score"
+    if ("ticket" in token_set or "tickets" in token_set or "issue" in token_set or "issues" in token_set) and (
+        has_total or "count" in token_set or "volume" in token_set
+    ):
+        if chinese:
+            return "总工单数" if has_total else "工单数"
+        return "total tickets" if has_total else "ticket count"
+    if has_avg and "response" in token_set:
+        return "平均响应时长" if chinese else "average response time"
+    if has_avg and "resolution" in token_set:
+        return "平均解决时长" if chinese else "average resolution time"
+    if (has_total or "sum" in token_set) and ("revenue" in token_set or "income" in token_set):
+        return "总收入" if chinese else "total revenue"
+    if (has_total or "sum" in token_set) and ("sales" in token_set or "gmv" in token_set):
+        return "总销售额" if chinese else "total sales"
+    if has_avg and "order" in token_set and (
+        "revenue" in token_set or "value" in token_set or "amount" in token_set
+    ):
+        return "客单价" if chinese else "average order value"
+    if "order" in token_set and ("count" in token_set or has_total):
+        return "订单数" if chinese else "order count"
+    if "spend" in token_set:
+        return "投放成本" if chinese else "spend"
+    if "cost" in token_set:
+        return "成本" if chinese else "cost"
+    if "conversion" in token_set and "rate" in token_set:
+        return "转化率" if chinese else "conversion rate"
+    if "satisfaction" in token_set and "score" in token_set:
+        return "满意度" if chinese else "satisfaction score"
+    if "score" in token_set:
+        return "评分" if chinese else ""
+    return ""
+
+
+def _field_tokens(value: str) -> list[str]:
+    normalized = re.sub(r"[^a-z0-9]+", "_", value.lower())
+    return [token for token in normalized.split("_") if token]
 
 
 def row_summary(row: dict[str, Any], *, chinese: bool) -> str:
