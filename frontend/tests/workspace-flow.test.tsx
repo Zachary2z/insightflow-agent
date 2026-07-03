@@ -1938,6 +1938,20 @@ describe("workspace product components", () => {
           action_recommendations: ["先复盘付费搜索投放效率。"],
           data_boundaries: ["当前报告缺少 ROI、利润和转化率。"],
           technical_appendix: {
+            evidence_ledger: {
+              ledger_version: "p23.report_ledger.v1",
+              chapter_coverages: [
+                {
+                  chapter_id: "revenue_structure",
+                  title: "收入结构",
+                  coverage: "partial",
+                  available_evidence: ["总收入", "收入占比"],
+                  missing_evidence: ["缺少利润/ROI"],
+                  allowed_claims: ["可以说明收入结构"],
+                  blocked_claims: ["不能判断利润率"],
+                },
+              ],
+            },
             evidence_pack: {
               sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
               rows_preview: [{ channel: "paid_search", revenue: 200 }],
@@ -2009,6 +2023,12 @@ describe("workspace product components", () => {
     fireEvent.click(screen.getByText("技术附录"));
     expect(screen.getByText("证据概况")).toBeTruthy();
     expect(screen.getByText("校验状态：passed")).toBeTruthy();
+    expect(screen.getByText("章节覆盖")).toBeTruthy();
+    expect(screen.getByText("收入结构：partial")).toBeTruthy();
+    expect(screen.getByText(/可用：总收入、收入占比/)).toBeTruthy();
+    expect(screen.getByText(/缺口：缺少利润\/ROI/)).toBeTruthy();
+    expect(screen.queryByText(/p23.report_ledger.v1/)).toBeNull();
+    expect(screen.queryByText(/claim_phrases/)).toBeNull();
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
     expect(screen.queryByText(/sql_reviewer/)).toBeNull();

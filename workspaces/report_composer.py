@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.provider import run_llm_request
 from workspaces.report_models import (
+    EvidenceLedger,
     ReportDocument,
     ReportDocumentSection,
     ReportEvidencePack,
     ReportPlan,
 )
+from workspaces.report_ledger import build_evidence_ledger
 
 
 PROMPT_ID = "report_composer"
-PROMPT_VERSION = "2026-07-02"
+PROMPT_VERSION = "2026-07-03"
+REPAIR_PROMPT_ID = "report_composer_repair"
 
 _FORBIDDEN_BODY_TERMS = (
     "SELECT",
@@ -36,27 +40,66 @@ def compose_report_document(
     *,
     plan: ReportPlan,
     evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger | None = None,
     provider: LLMProvider | None = None,
 ) -> ReportDocument:
+    ledger = evidence_ledger or evidence_pack.ledger or build_evidence_ledger(
+        plan=plan,
+        evidence_pack=evidence_pack,
+    )
     if provider is not None:
         document = _compose_with_provider(
             plan=plan,
             evidence_pack=evidence_pack,
+            evidence_ledger=ledger,
             provider=provider,
         )
         if document is not None:
             return document
-    return _fallback_document(plan=plan, evidence_pack=evidence_pack)
+    return _fallback_document(plan=plan, evidence_pack=evidence_pack, evidence_ledger=ledger)
+
+
+def repair_report_document(
+    *,
+    document: ReportDocument,
+    plan: ReportPlan,
+    evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger,
+    unsupported_claims: list[str],
+    provider: LLMProvider | None = None,
+) -> ReportDocument:
+    if provider is not None:
+        repaired = _repair_with_provider(
+            document=document,
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+            unsupported_claims=unsupported_claims,
+            provider=provider,
+        )
+        if repaired is not None:
+            return repaired
+    return _deterministic_repair(
+        document=document,
+        plan=plan,
+        evidence_pack=evidence_pack,
+        unsupported_claims=unsupported_claims,
+    )
 
 
 def _compose_with_provider(
     *,
     plan: ReportPlan,
     evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger,
     provider: LLMProvider,
 ) -> ReportDocument | None:
     request = LLMRequest(
-        prompt=_build_prompt(plan=plan, evidence_pack=evidence_pack),
+        prompt=_build_prompt(
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+        ),
         prompt_id=PROMPT_ID,
         prompt_version=PROMPT_VERSION,
         model=getattr(provider, "model", "unknown"),
@@ -72,33 +115,65 @@ def _compose_with_provider(
     return document
 
 
-def _build_prompt(*, plan: ReportPlan, evidence_pack: ReportEvidencePack) -> str:
+def _repair_with_provider(
+    *,
+    document: ReportDocument,
+    plan: ReportPlan,
+    evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger,
+    unsupported_claims: list[str],
+    provider: LLMProvider,
+) -> ReportDocument | None:
     payload = {
         "report_plan": plan.to_dict(),
-        "evidence_pack": _safe_evidence_pack(evidence_pack),
-        "output_contract": {
-            "title": "string",
-            "time_range": "string",
-            "data_sources": ["string"],
-            "opening_summary": "string",
-            "sections": [
-                {
-                    "section_id": "string",
-                    "title": "string",
-                    "body": "string",
-                    "chart_refs": ["string"],
-                    "evidence_refs": ["string"],
-                }
-            ],
-            "action_recommendations": ["string"],
-            "data_boundaries": ["string"],
-        },
+        "current_document": document.to_dict(),
+        "unsupported_claims": unsupported_claims,
+        "evidence_ledger": _safe_evidence_ledger(evidence_ledger),
+        "chart_refs": _chart_refs(evidence_pack),
+        "output_contract": _output_contract(),
+    }
+    request = LLMRequest(
+        prompt=(
+            "你是 InsightFlow 的报告事实修复器。请只修复 unsupported_claims 指出的硬事实："
+            "删除、软化为假设/待验证，或替换为 evidence_ledger 支持的事实。"
+            "不要新增账本外数字，不要恢复行动建议正文 section，不要输出 SQL/raw rows/provider metadata。\n\n"
+            + json.dumps(payload, ensure_ascii=False, indent=2)
+        ),
+        prompt_id=REPAIR_PROMPT_ID,
+        prompt_version=PROMPT_VERSION,
+        model=getattr(provider, "model", "unknown"),
+        metadata={"node": "report_composer_repair"},
+    )
+    response = run_llm_request(provider, request)
+    content = response.get("content")
+    if not response.get("success") or not isinstance(content, dict):
+        return None
+    repaired = _document_from_provider_content(content, plan=plan, evidence_pack=evidence_pack)
+    if repaired is None or _contains_forbidden_body_text(repaired):
+        return None
+    return repaired
+
+
+def _build_prompt(
+    *,
+    plan: ReportPlan,
+    evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger,
+) -> str:
+    payload = {
+        "report_plan": plan.to_dict(),
+        "evidence_ledger": _safe_evidence_ledger(evidence_ledger),
+        "chart_refs": _chart_refs(evidence_pack),
+        "data_boundaries": list(evidence_ledger.data_boundaries or evidence_pack.data_limits),
+        "output_contract": _output_contract(),
     }
     return (
-        "你是 InsightFlow 的中文业务报告撰写器。请基于给定 ReportPlan 和 EvidencePack 写一份自然、完整的中文业务报告。\n"
-        "事实边界：只能使用 evidence_pack 中出现的数字、排名、实体、时间范围、数据来源和图表意图；可以做业务解释和建议，"
+        "你是 InsightFlow 的中文业务报告撰写器。请基于给定 ReportPlan、EvidenceLedger、chart refs 和 data boundaries 写一份自然、完整的中文业务报告。\n"
+        "事实边界：只能把 ledger 中的 facts/derived_metrics 作为硬事实来源；金额、日期、百分比、排名、图表值、数据来源和时间范围必须来自 ledger 或 report_plan；"
+        "可以做业务解释、假设、判断和建议，"
         "但不能编造新数字、新实体、新字段、新图表、外部行业结论或未给出的数据来源。\n"
-        "写作要求：报告应像完整业务文档，不要写成多个分析答案拼接；避免重复分析问答式字段块。"
+        "建议目标数字可以出现，但必须表达为目标、计划或建议，不要伪装成已经发生的历史事实。"
+        "写作要求：报告正文必须一次性生成完整 ReportDocument，不要写成多个分析答案拼接；避免重复分析问答式字段块。"
         "可按计划组织为开篇摘要、经营概览、收入结构、客户分群、客服问题、趋势变化等正文章节；"
         "行动建议请只写入 action_recommendations，不要另写一个行动建议正文 section。\n"
         "结构要求：time_range 字段必须与 report_plan.time_range 完全一致；实际数据覆盖月份可在正文或数据边界中说明。\n"
@@ -125,6 +200,52 @@ def _safe_evidence_pack(evidence_pack: ReportEvidencePack) -> dict[str, Any]:
         "charts": [chart.to_dict() for chart in evidence_pack.charts],
         "warnings": list(evidence_pack.warnings),
         "data_limits": list(evidence_pack.data_limits),
+    }
+
+
+def _safe_evidence_ledger(ledger: EvidenceLedger) -> dict[str, Any]:
+    data = ledger.to_dict()
+    data["technical_refs"] = [
+        {
+            "evidence_ref": str(ref.get("evidence_ref") or ""),
+            "table_id": str(ref.get("table_id") or ""),
+            "chapter_id": str(ref.get("chapter_id") or ""),
+        }
+        for ref in data.get("technical_refs", [])
+    ]
+    return data
+
+
+def _chart_refs(evidence_pack: ReportEvidencePack) -> list[dict[str, Any]]:
+    return [
+        {
+            "chart_id": chart.chart_id,
+            "title": chart.title,
+            "source_chapter_id": chart.source_chapter_id,
+            "chart_type": chart.chart_type,
+            "description": chart.description,
+        }
+        for chart in evidence_pack.charts
+    ]
+
+
+def _output_contract() -> dict[str, Any]:
+    return {
+        "title": "string",
+        "time_range": "string",
+        "data_sources": ["string"],
+        "opening_summary": "string",
+        "sections": [
+            {
+                "section_id": "string",
+                "title": "string",
+                "body": "string",
+                "chart_refs": ["string"],
+                "evidence_refs": ["string"],
+            }
+        ],
+        "action_recommendations": ["string"],
+        "data_boundaries": ["string"],
     }
 
 
@@ -197,7 +318,9 @@ def _fallback_document(
     *,
     plan: ReportPlan,
     evidence_pack: ReportEvidencePack,
+    evidence_ledger: EvidenceLedger | None = None,
 ) -> ReportDocument:
+    del evidence_ledger
     facts = {fact.fact_id: fact for fact in evidence_pack.facts}
     tables_by_chapter: dict[str, list[Any]] = {}
     for table in evidence_pack.tables:
@@ -248,6 +371,63 @@ def _fallback_document(
         action_recommendations=_action_recommendations(evidence_pack),
         data_boundaries=_data_boundaries(evidence_pack),
     )
+
+
+def _deterministic_repair(
+    *,
+    document: ReportDocument,
+    plan: ReportPlan,
+    evidence_pack: ReportEvidencePack,
+    unsupported_claims: list[str],
+) -> ReportDocument:
+    blocked_values = [_claim_value(claim) for claim in unsupported_claims]
+    blocked_values = [value for value in blocked_values if value]
+    replacement = _fallback_document(plan=plan, evidence_pack=evidence_pack)
+    opening_summary = _remove_blocked_sentences(document.opening_summary, blocked_values)
+    sections = [
+        ReportDocumentSection(
+            section_id=section.section_id,
+            title=section.title,
+            body=_remove_blocked_sentences(section.body, blocked_values),
+            chart_refs=list(section.chart_refs),
+            evidence_refs=list(section.evidence_refs),
+        )
+        for section in document.sections
+        if _remove_blocked_sentences(section.body, blocked_values)
+    ]
+    if not opening_summary:
+        opening_summary = replacement.opening_summary
+    if not sections:
+        sections = replacement.sections
+    boundaries = list(dict.fromkeys([*document.data_boundaries, "已自动删除或替换缺少证据账本支持的硬事实。", *_data_boundaries(evidence_pack)]))
+    return ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=document.data_sources or plan.data_sources,
+        opening_summary=opening_summary,
+        sections=sections,
+        action_recommendations=document.action_recommendations or replacement.action_recommendations,
+        data_boundaries=boundaries,
+    )
+
+
+def _claim_value(claim: str) -> str:
+    if "：" in claim:
+        return claim.rsplit("：", 1)[-1].strip()
+    match = re.search(r"\d+(?:\.\d+)?\s*(?:万元|分钟|万|元|%|单|行|张|个)?", claim)
+    return match.group(0).strip() if match else ""
+
+
+def _remove_blocked_sentences(text: str, blocked_values: list[str]) -> str:
+    if not text:
+        return ""
+    sentences = re.split(r"(?<=[。！？!?])", text)
+    kept = [
+        sentence
+        for sentence in sentences
+        if sentence.strip() and not any(value and value in sentence for value in blocked_values)
+    ]
+    return "".join(kept).strip()
 
 
 def _section_body(

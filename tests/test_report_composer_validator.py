@@ -1,7 +1,10 @@
 import json
 
 from llm_ops.provider import MockLLMProvider
+from llm_ops.provider import LLMRequest
 from workspaces.report_composer import compose_report_document
+from workspaces.report_composer import repair_report_document
+from workspaces.report_ledger import build_evidence_ledger
 from workspaces.report_models import (
     EvidenceRequirement,
     ReportChapterPlan,
@@ -168,6 +171,18 @@ def _document_text(document: ReportDocument) -> str:
     )
 
 
+class RecordingProvider:
+    model = "mock-free"
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests: list[LLMRequest] = []
+
+    def generate(self, request: LLMRequest):
+        self.requests.append(request)
+        return self.responses.pop(0)
+
+
 def test_model_backed_report_composer_uses_provider_json_without_leaking_technical_details():
     provider = MockLLMProvider(
         {
@@ -224,6 +239,47 @@ def test_model_backed_report_composer_uses_provider_json_without_leaking_technic
     ]:
         assert forbidden not in text
     assert provider.generate  # keeps the fake provider path explicit for this test
+
+
+def test_report_composer_prompt_passes_evidence_ledger_instead_of_debug_pack():
+    provider = RecordingProvider(
+        [
+            {
+                "title": "最近90天经营复盘报告",
+                "time_range": "最近90天",
+                "data_sources": ["订单明细", "客服反馈"],
+                "opening_summary": "最近90天总收入为 43.0 万。",
+                "sections": [
+                    {
+                        "section_id": "revenue_structure",
+                        "title": "收入结构",
+                        "body": "企业SaaS订阅收入为 26.8 万，位居产品收入第一。",
+                        "evidence_refs": ["ledger_fact_revenue_total"],
+                    }
+                ],
+                "action_recommendations": ["建议把企业SaaS订阅作为续费复盘重点。"],
+                "data_boundaries": ["当前缺少利润、复购率和销售人效数据。"],
+            }
+        ]
+    )
+    evidence_pack = _sample_evidence_pack()
+    ledger = build_evidence_ledger(plan=_sample_plan(), evidence_pack=evidence_pack)
+
+    document = compose_report_document(
+        plan=_sample_plan(),
+        evidence_pack=evidence_pack,
+        evidence_ledger=ledger,
+        provider=provider,
+    )
+
+    prompt = provider.requests[0].prompt
+    assert document.opening_summary == "最近90天总收入为 43.0 万。"
+    assert '"evidence_ledger"' in prompt
+    assert "p23.report_ledger.v1" in prompt
+    assert "ledger_fact_revenue_total" in prompt
+    assert "只能把 ledger 中的 facts/derived_metrics 作为硬事实来源" in prompt
+    assert "technical_details" not in prompt
+    assert "SELECT" not in prompt
 
 
 def test_report_composer_no_key_fallback_returns_chinese_report_document():
@@ -671,6 +727,154 @@ def test_report_validator_still_flags_underived_percentages():
 
     assert validation.status == "warning"
     assert any("99.9%" in claim for claim in validation.unsupported_claims)
+
+
+def test_report_validator_uses_ledger_for_combined_shares_and_period_changes():
+    plan = ReportPlan(
+        title="最近90天渠道表现复盘报告",
+        report_style="渠道表现复盘",
+        time_range="最近90天",
+        data_sources=["订单明细"],
+        chapters=[],
+    )
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_revenue",
+                title="渠道收入结构",
+                columns=["渠道", "收入"],
+                rows=[
+                    {"渠道": "email", "收入": "26.8 万"},
+                    {"渠道": "direct", "收入": "18.6 万"},
+                    {"渠道": "organic", "收入": "15.5 万"},
+                ],
+                source_chapter_id="revenue_structure",
+                evidence_ref="query_channel_revenue",
+            ),
+            ReportEvidenceTable(
+                table_id="recent_trend",
+                title="趋势变化",
+                columns=["周期", "收入"],
+                rows=[
+                    {"周期": "2026-04", "收入": "10.0 万"},
+                    {"周期": "2026-05", "收入": "12.0 万"},
+                ],
+                source_chapter_id="trend_changes",
+                evidence_ref="query_recent_trend",
+            ),
+        ],
+    )
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="email 和 direct 合计贡献 74.5%，2026年5月较2026年4月环比增长 20.0%。",
+        sections=[],
+        action_recommendations=["建议把响应时长目标降至 40 分钟以内。"],
+        data_boundaries=[],
+    )
+
+    validation = validate_report_document(
+        document=document,
+        plan=plan,
+        evidence_pack=evidence_pack,
+        evidence_ledger=ledger,
+    )
+
+    assert validation.status == "passed"
+    assert validation.unsupported_claims == []
+
+
+def test_report_validator_ignores_recommendation_targets_but_flags_fake_history():
+    plan = _sample_plan()
+    evidence_pack = _sample_evidence_pack()
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    target_document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="最近90天总收入为 43.0 万。",
+        sections=[],
+        action_recommendations=["建议将退款响应目标控制在 40 分钟以内。"],
+        data_boundaries=[],
+    )
+    fake_history_document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="最近90天总收入为 43.0 万。",
+        sections=[],
+        action_recommendations=["当前退款响应时长已经为 99.9 分钟，需要继续优化。"],
+        data_boundaries=[],
+    )
+
+    target_validation = validate_report_document(
+        document=target_document,
+        plan=plan,
+        evidence_pack=evidence_pack,
+        evidence_ledger=ledger,
+    )
+    fake_validation = validate_report_document(
+        document=fake_history_document,
+        plan=plan,
+        evidence_pack=evidence_pack,
+        evidence_ledger=ledger,
+    )
+
+    assert target_validation.status == "passed"
+    assert not target_validation.unsupported_claims
+    assert fake_validation.status == "warning"
+    assert any("99.9 分钟" in claim for claim in fake_validation.unsupported_claims)
+
+
+def test_report_repair_rewrites_unsupported_hard_facts_once():
+    plan = _sample_plan()
+    evidence_pack = _sample_evidence_pack()
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    provider = RecordingProvider(
+        [
+            {
+                "title": plan.title,
+                "time_range": plan.time_range,
+                "data_sources": plan.data_sources,
+                "opening_summary": "最近90天总收入为 43.0 万。",
+                "sections": [
+                    {
+                        "section_id": "revenue_structure",
+                        "title": "收入结构",
+                        "body": "企业SaaS订阅收入为 26.8 万，位居产品收入第一。",
+                        "evidence_refs": ["revenue_by_dimension"],
+                    }
+                ],
+                "action_recommendations": ["建议补齐利润证据后再做预算决策。"],
+                "data_boundaries": ["当前缺少利润、复购率和销售人效数据。"],
+            }
+        ]
+    )
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="最近90天总收入为 99.9 万。",
+        sections=[],
+        action_recommendations=[],
+        data_boundaries=[],
+    )
+
+    repaired = repair_report_document(
+        document=document,
+        plan=plan,
+        evidence_pack=evidence_pack,
+        evidence_ledger=ledger,
+        unsupported_claims=["正文数字缺少证据支持：99.9 万"],
+        provider=provider,
+    )
+
+    assert repaired.opening_summary == "最近90天总收入为 43.0 万。"
+    assert len(provider.requests) == 1
+    assert provider.requests[0].prompt_id == "report_composer_repair"
+    assert "99.9 万" in provider.requests[0].prompt
 
 
 def test_report_validator_allows_reasonable_evidence_backed_recommendation():

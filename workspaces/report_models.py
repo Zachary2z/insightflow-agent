@@ -179,6 +179,122 @@ class ReportEvidenceChart:
 
 
 @dataclass
+class ReportLedgerItem:
+    evidence_id: str
+    label: str
+    display_value: str
+    value: Any = None
+    unit: str = ""
+    chapter_id: str = ""
+    source_table: str = ""
+    source_evidence: str = ""
+    formula: str = ""
+    calculation_note: str = ""
+    source_values: list[str] = field(default_factory=list)
+    claim_phrases: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ReportLedgerItem":
+        return cls(
+            evidence_id=str(data.get("evidence_id") or ""),
+            label=str(data.get("label") or ""),
+            display_value=str(data.get("display_value") or ""),
+            value=data.get("value"),
+            unit=str(data.get("unit") or ""),
+            chapter_id=str(data.get("chapter_id") or ""),
+            source_table=str(data.get("source_table") or ""),
+            source_evidence=str(data.get("source_evidence") or ""),
+            formula=str(data.get("formula") or ""),
+            calculation_note=str(data.get("calculation_note") or ""),
+            source_values=[str(item) for item in data.get("source_values", [])],
+            claim_phrases=[str(item) for item in data.get("claim_phrases", [])],
+        )
+
+
+@dataclass
+class ReportChapterCoverage:
+    chapter_id: str
+    coverage: str
+    available_evidence: list[str] = field(default_factory=list)
+    missing_evidence: list[str] = field(default_factory=list)
+    allowed_claims: list[str] = field(default_factory=list)
+    blocked_claims: list[str] = field(default_factory=list)
+    data_boundaries: list[str] = field(default_factory=list)
+    title: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ReportChapterCoverage":
+        return cls(
+            chapter_id=str(data.get("chapter_id") or ""),
+            coverage=str(data.get("coverage") or "missing"),
+            available_evidence=[str(item) for item in data.get("available_evidence", [])],
+            missing_evidence=[str(item) for item in data.get("missing_evidence", [])],
+            allowed_claims=[str(item) for item in data.get("allowed_claims", [])],
+            blocked_claims=[str(item) for item in data.get("blocked_claims", [])],
+            data_boundaries=[str(item) for item in data.get("data_boundaries", [])],
+            title=str(data.get("title") or ""),
+        )
+
+
+@dataclass
+class EvidenceLedger:
+    ledger_version: str = "p23.report_ledger.v1"
+    facts: list[ReportLedgerItem] = field(default_factory=list)
+    derived_metrics: list[ReportLedgerItem] = field(default_factory=list)
+    chapter_coverages: list[ReportChapterCoverage] = field(default_factory=list)
+    recommendation_context: list[dict[str, Any]] = field(default_factory=list)
+    data_boundaries: list[str] = field(default_factory=list)
+    technical_refs: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["facts"] = [fact.to_dict() for fact in self.facts]
+        data["derived_metrics"] = [metric.to_dict() for metric in self.derived_metrics]
+        data["chapter_coverages"] = [
+            coverage.to_dict() for coverage in self.chapter_coverages
+        ]
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "EvidenceLedger":
+        return cls(
+            ledger_version=str(data.get("ledger_version") or "p23.report_ledger.v1"),
+            facts=[
+                ReportLedgerItem.from_dict(item)
+                for item in data.get("facts", [])
+                if isinstance(item, dict)
+            ],
+            derived_metrics=[
+                ReportLedgerItem.from_dict(item)
+                for item in data.get("derived_metrics", [])
+                if isinstance(item, dict)
+            ],
+            chapter_coverages=[
+                ReportChapterCoverage.from_dict(item)
+                for item in data.get("chapter_coverages", [])
+                if isinstance(item, dict)
+            ],
+            recommendation_context=[
+                dict(item)
+                for item in data.get("recommendation_context", [])
+                if isinstance(item, dict)
+            ],
+            data_boundaries=[str(item) for item in data.get("data_boundaries", [])],
+            technical_refs=[
+                dict(item)
+                for item in data.get("technical_refs", [])
+                if isinstance(item, dict)
+            ],
+        )
+
+
+@dataclass
 class ReportEvidencePack:
     facts: list[ReportEvidenceFact] = field(default_factory=list)
     tables: list[ReportEvidenceTable] = field(default_factory=list)
@@ -186,6 +302,7 @@ class ReportEvidencePack:
     warnings: list[str] = field(default_factory=list)
     data_limits: list[str] = field(default_factory=list)
     evidence_payloads: list[dict[str, Any]] = field(default_factory=list)
+    ledger: EvidenceLedger | None = None
     technical_details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -193,6 +310,7 @@ class ReportEvidencePack:
         data["facts"] = [fact.to_dict() for fact in self.facts]
         data["tables"] = [table.to_dict() for table in self.tables]
         data["charts"] = [chart.to_dict() for chart in self.charts]
+        data["ledger"] = self.ledger.to_dict() if self.ledger else None
         return data
 
     @classmethod
@@ -220,6 +338,9 @@ class ReportEvidencePack:
                 for payload in data.get("evidence_payloads", [])
                 if isinstance(payload, dict)
             ],
+            ledger=EvidenceLedger.from_dict(data["ledger"])
+            if isinstance(data.get("ledger"), dict)
+            else None,
             technical_details=dict(data.get("technical_details", {})),
         )
 

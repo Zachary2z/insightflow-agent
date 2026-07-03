@@ -300,15 +300,127 @@ Follow-up fix record:
   - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
   - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
-## P23-H4: Artifact And Tool-Calling Readiness
+## P23-H4: Evidence Ledger And Report Self-Repair
 
-Goal: Prepare the internal artifact contract so P24 can connect real external tools without rewriting the analysis/report chain.
+Goal: Stop chasing every possible model-written number with validator patches. Tools should prepare a traceable evidence ledger first; the report writer should use that ledger; validation should check factual claims against ledger ids and repair unsupported facts automatically.
+
+Why this replaces more P23-H3 patching:
+
+- Live DeepSeek reports can correctly derive facts such as totals, shares, period-over-period changes, thresholds, and target recommendations in many different forms.
+- A validator that scans the final prose and tries to rediscover every possible calculation will keep growing into brittle rule code.
+- The more stable product design is to calculate common business facts and derived metrics before writing, expose them as a compact evidence ledger, and ask the model to cite or select from that ledger for factual statements.
+- Model freedom should remain in explanations, hypotheses, and recommendations. It should not be responsible for inventing or recalculating hard facts in prose.
+
+Files to inspect first:
+
+- `workspaces/report_evidence.py`
+- `workspaces/report_models.py`
+- `workspaces/report_composer.py`
+- `workspaces/report_validator.py`
+- `workspaces/report_runner.py`
+- `workspaces/report_markdown.py`
+- `tools/evidence_tool.py`
+- `tools/metric_tool.py`
+- `frontend/components/ReportViewer.tsx`
+- `tests/test_report_composer_validator.py`
+- `tests/test_report_planner_evidence.py`
+- `tests/test_workspace_report_runner.py`
+- `tests/test_workspace_report_api.py`
+
+Target evidence ledger shape:
+
+```json
+{
+  "ledger_version": "p23.report_ledger.v1",
+  "facts": [
+    {
+      "evidence_id": "revenue_total",
+      "label": "总收入",
+      "display_value": "97.0 万",
+      "value": 970000,
+      "unit": "currency",
+      "source": "revenue_total",
+      "formula": "SUM(revenue)",
+      "claim_phrases": ["总收入97.0万元", "收入合计97.0万"]
+    }
+  ],
+  "derived_metrics": [
+    {
+      "evidence_id": "channel_share_enterprise_wechat",
+      "label": "企业微信收入占比",
+      "display_value": "39.2%",
+      "formula": "380000 / 970000",
+      "source_values": ["企业微信收入38.0万", "总收入97.0万"]
+    }
+  ],
+  "recommendation_context": [
+    {
+      "topic": "交付排期",
+      "basis": ["满意度最低", "平均响应时长最高"],
+      "allowed_target_metric": "平均响应时长"
+    }
+  ],
+  "data_boundaries": ["缺少利润、成本和转化率字段。"]
+}
+```
+
+Evidence sufficiency rules:
+
+- The ledger should be generated from structured `EvidenceRequirement` records, not from free-form model prose.
+- Each report chapter should define a minimum evidence set. For example, revenue structure needs total value, grouped ranking, share, top/bottom comparison, and missing efficiency/profit fields; trend chapters need time series, period changes, max/min periods, and time coverage limits.
+- A `CoverageChecker` should mark every chapter as `strong`, `partial`, or `missing`, with `available_evidence`, `missing_evidence`, `allowed_claims`, and `blocked_claims`.
+- If a missing evidence item can be derived from existing evidence, the system should compute it before writing the report. If it requires unavailable source fields, it should become a data boundary.
+- The model may help interpret the report goal and choose relevant chapters, but tools own evidence sufficiency, calculations, and data boundaries.
+
+Tasks:
+
+- [x] Add failing tests proving Report Center can generate a ledger with raw facts, table totals, shares, combined shares, period-over-period changes, rankings, and data coverage facts from generic evidence tables.
+- [x] Add failing tests for chapter-level coverage: strong evidence when the minimum set exists, partial evidence when optional fields such as cost/profit/ROI are missing, and missing evidence when a requested topic has no usable fields.
+- [x] Create a focused report evidence ledger module instead of continuing to expand prose-scanning validator branches. Keep it small and independent enough to read in one pass.
+- [x] Add a `CoverageChecker` that turns evidence requirements into available evidence, missing evidence, allowed claims, blocked claims, and data boundaries.
+- [x] Add an automatic evidence completion step for derivable facts such as totals, shares, combined shares, period-over-period changes, rankings, and max/min comparisons before the report composer runs.
+- [x] Feed the report composer with `EvidenceLedger` plus chart refs and boundaries. Prompt the model to use ledger values for hard facts, while allowing free Chinese business explanation and recommendations.
+- [x] Change report validation from broad prose-number guessing to ledger-backed claim validation. Validate factual claims in opening summary, sections, and data boundaries; treat recommendation target numbers as proposed targets when the wording clearly marks them as goals or actions.
+- [x] Add a single automatic repair pass: when unsupported factual claims remain, ask the report composer to rewrite only those unsupported facts by deleting them, softening them into hypotheses, or replacing them with available ledger facts.
+- [x] Keep the final report user-facing. The ledger and repair trace belong in the collapsed appendix or technical JSON, not in the main report body.
+- [x] Delete old validator branches and compatibility code that become unreachable after ledger-backed validation. Do not preserve old behavior only for historical reports.
+
+Acceptance:
+
+- A live DeepSeek report can include common derived metrics such as totals, shares, combined shares, and period-over-period changes without creating `partial` reports when those values are ledger-backed.
+- Every report chapter carries coverage metadata, so the model knows which claims are allowed and which claims are blocked by missing data.
+- If evidence is insufficient but recoverable through derivation, the system completes the ledger before report writing; if not recoverable, it produces a clear data boundary instead of asking the model to guess.
+- Unsupported invented hard facts are repaired or removed before the user sees the final report.
+- Recommendation targets such as “目标降至40分钟以内” do not fail validation when they are clearly proposals rather than historical facts.
+- The code path is easier to understand than the current validator-rule chase: evidence ledger generation, report writing, validation, and repair are separate modules or clearly separated functions.
+- No table-specific business rule tree is introduced for the current Chinese sample data.
+- Old report-section stitching, old compatibility fields, unused fallback branches, and obsolete tests may be deleted instead of kept.
+
+Implementation result:
+
+- Added `workspaces/report_ledger.py` with `EvidenceLedger`, ledger facts/derived metrics, `CoverageChecker`, recommendation context, data boundaries, and technical refs. The ledger version is `p23.report_ledger.v1`.
+- `ReportRunner` now runs `ReportPlan -> ReportEvidencePack -> EvidenceLedger -> one-pass ReportComposer -> ledger-backed Validator -> optional one-pass Repair -> render/save`.
+- `ReportComposer` prompts on `EvidenceLedger`, chart refs, and data boundaries, while preserving model freedom for explanations and recommendations. It also exposes `repair_report_document()` for one repair pass.
+- `ReportValidator` now uses ledger-backed supported values and no longer contains the old branches that derived shares/chapter-total shares/payload percentages by scanning final prose. It still validates title/time range/data sources, refs, dates, rankings, unsupported hard numbers, and fake historical facts inside action recommendations.
+- Markdown and `ReportTechnicalAppendix` show concise chapter coverage summaries in the collapsed appendix and do not dump raw ledger JSON into the report body.
+- Live DeepSeek smoke passed with provider available: status `completed`, validation `passed`, `unsupported_claims` empty, `generation_flow=ledger_backed_report_center`, no duplicate action section, no SQL/raw_rows/trace/provider_metadata/query leaks in the main body, and the ledger contained totals, shares, combined shares, and period changes.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`64 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `python3 -m pytest tests/test_workspace_report_store.py tests/test_p20_realistic_acceptance.py tests/test_p12_live_deepseek_workspace_report.py -q` (`8 passed, 1 skipped`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+
+## P23-H5: Artifact And Tool-Calling Readiness
+
+Goal: Prepare the internal artifact contract so P24 can connect real external tools without rewriting the analysis/report chain or bypassing the P23-H4 evidence ledger.
 
 Files to inspect first:
 
 - `workspaces/report_models.py`
 - `workspaces/report_store.py`
 - `workspaces/report_markdown.py`
+- `workspaces/report_ledger.py` if created in P23-H4
 - `tools/external_visualization_tool.py` if still present
 - `frontend/lib/api.ts`
 - `frontend/components/ReportViewer.tsx`
@@ -323,7 +435,8 @@ Target artifact records:
   "title": "渠道收入排行",
   "format": "png",
   "file_path": "...",
-  "evidence_pack_id": "evidence_xxx",
+  "evidence_id": "channel_revenue_ranking",
+  "ledger_id": "report_ledger_xxx",
   "created_by_tool": "local_chart_renderer",
   "status": "completed"
 }
@@ -332,18 +445,22 @@ Target artifact records:
 Tasks:
 
 - [ ] Inventory current chart/report artifact fields used by analysis, reports, API responses, Markdown, and frontend rendering.
-- [ ] Consolidate artifact records enough that future Word/PDF/PPT/Excel/飞书/腾讯文档 tools can consume the same references.
+- [ ] Consolidate artifact records enough that future Word/PDF/PPT/Excel/飞书/腾讯文档 tools can consume the same references without re-querying or re-interpreting facts.
+- [ ] Ensure chart and report artifacts can reference `EvidenceLedger` entries by `evidence_id` / derived metric id, not only by loose table or chart titles.
+- [ ] Add or update tool call records so each tool call captures tool name, input summary, referenced evidence ids, output artifact ids, status, and error without exposing secrets or raw data in the main UI.
 - [ ] Preserve local artifact generation as the current implementation; do not add real external SaaS in P23.
-- [ ] Ensure tool call records capture tool name, input summary, output artifact, status, and error without exposing secrets or full raw data in the main UI.
+- [ ] Keep artifact records compatible with local chart generation today and external document/export tools in P24.
 - [ ] Delete unused mock external tool placeholders that are not part of the current product path.
 
 Acceptance:
 
 - Analysis and report chart artifacts use a compatible record shape.
-- Reports can reference chart artifacts without knowing whether they were generated locally or by a future external tool.
+- Reports can reference chart artifacts through ledger evidence ids without knowing whether they were generated locally or by a future external tool.
+- Future document/export tools can render charts and report sections from artifact ids plus ledger evidence ids, rather than reading raw SQL rows or asking the model to recalculate.
+- Tool call records stay technical and auditable, while the main UI remains business-facing.
 - P24 can focus on real tool integration instead of fixing artifact plumbing.
 
-## P23-H5: Cleanup, Regression, And Live Acceptance
+## P23-H6: Cleanup, Regression, And Live Acceptance
 
 Goal: Prove P23 is stable and clean enough to move into real external tool integrations.
 
@@ -354,6 +471,11 @@ Tasks:
 - [ ] Run full backend pytest and frontend build.
 - [ ] Run opt-in real DeepSeek tests when `DEEPSEEK_API_KEY`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, and live-test flags are available.
 - [ ] Manually test at least five Chinese analysis questions and two Chinese reports on a realistic Chinese business dataset.
+- [ ] Confirm Report Center uses the EvidenceLedger path for live reports and does not fall back to prose-number validator patching as the primary safety mechanism.
+- [ ] Confirm live reports with ledger-backed totals, shares, combined shares, period changes, and rankings complete without unsupported hard-fact claims.
+- [ ] Confirm unsupported hard facts are either repaired once, softened into hypotheses, or moved to data boundaries before the user sees the final report.
+- [ ] Confirm report technical appendix can summarize coverage status without showing ledger debug dumps in the main report body.
+- [ ] Confirm chart/report artifacts reference ledger evidence ids after P23-H5.
 - [ ] Audit old-path terms and remove or mark remaining hits as historical/superseded.
 - [ ] Confirm generated runtime artifacts, traces, workspace DBs, reports, and secrets are not staged.
 
@@ -379,8 +501,10 @@ Acceptance:
 - Analysis answers are natural Chinese business replies.
 - Report Center produces full Chinese reports, not stitched analysis answers.
 - Hard facts are evidence-bound and validated.
+- Evidence-bound report facts flow through the P23-H4 ledger; the final validator no longer needs a growing list of ad hoc prose-number exceptions.
 - Model-written explanations and recommendations are preserved with clear evidence strength.
 - Real chart artifacts render where chartable evidence exists.
+- Artifacts can be traced back to ledger evidence ids and do not require raw data or SQL in the main UI.
 - No obsolete active path blocks future external tool calling.
 
 ## P23 Does Not Do

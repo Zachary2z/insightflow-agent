@@ -232,10 +232,12 @@ def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, mon
     store, workspace = _create_workspace_with_orders(tmp_path)
     calls = {"composer": 0, "validator": 0}
 
-    def fake_compose_report_document(*, plan, evidence_pack, provider=None):
+    def fake_compose_report_document(*, plan, evidence_pack, evidence_ledger=None, provider=None):
         calls["composer"] += 1
         assert plan.title == "最近90天经营复盘报告"
         assert evidence_pack.facts
+        assert evidence_ledger is not None
+        assert evidence_ledger.ledger_version == "p23.report_ledger.v1"
         assert provider == "fake-report-provider"
         return ReportDocument(
             title=plan.title,
@@ -254,11 +256,12 @@ def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, mon
             data_boundaries=["当前为 runner 调用链测试。"],
         )
 
-    def fake_validate_report_document(*, document, plan, evidence_pack):
+    def fake_validate_report_document(*, document, plan, evidence_pack, evidence_ledger=None):
         calls["validator"] += 1
         assert document.opening_summary.startswith("这是由新报告撰写器")
         assert plan.title == document.title
         assert evidence_pack.facts
+        assert evidence_ledger is not None
         return ReportValidationResult(
             status="passed",
             checked_facts=["workspace_table_count"],
@@ -286,12 +289,13 @@ def test_report_runner_composes_once_without_section_business_answers(tmp_path, 
     store, workspace = _create_workspace_with_orders(tmp_path)
     calls = {"composer": 0}
 
-    def fake_compose_report_document(*, plan, evidence_pack, provider=None):
+    def fake_compose_report_document(*, plan, evidence_pack, evidence_ledger=None, provider=None):
         calls["composer"] += 1
         evidence_text = json.dumps(evidence_pack.to_dict(), ensure_ascii=False)
         assert "business_answer" not in evidence_text
         assert "直接回答" not in evidence_text
         assert "章节业务答案" not in evidence_text
+        assert evidence_ledger is not None
         return ReportDocument(
             title=plan.title,
             time_range=plan.time_range,
@@ -325,6 +329,65 @@ def test_report_runner_composes_once_without_section_business_answers(tmp_path, 
     assert "章节业务答案" not in report_text
     assert "直接回答" not in report_text
     assert "sections" not in result["report"]
+
+
+def test_report_runner_repairs_unsupported_facts_once_and_completes(tmp_path, monkeypatch):
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = {"compose": 0, "repair": 0, "validate": 0}
+
+    def fake_compose_report_document(*, plan, evidence_pack, evidence_ledger=None, provider=None):
+        calls["compose"] += 1
+        assert evidence_ledger is not None
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="最近90天总收入为 99.9 万。",
+            sections=[],
+            action_recommendations=[],
+            data_boundaries=[],
+        )
+
+    def fake_repair_report_document(*, document, plan, evidence_pack, evidence_ledger, unsupported_claims, provider=None):
+        calls["repair"] += 1
+        assert unsupported_claims == ["正文数字缺少证据支持：99.9 万"]
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="报告已删除缺少证据支持的收入数字。",
+            sections=[],
+            action_recommendations=["补齐口径后再做预算判断。"],
+            data_boundaries=["已自动修正缺少账本支持的硬事实。"],
+        )
+
+    def fake_validate_report_document(*, document, plan, evidence_pack, evidence_ledger=None):
+        calls["validate"] += 1
+        if calls["validate"] == 1:
+            return ReportValidationResult(status="warning", unsupported_claims=["正文数字缺少证据支持：99.9 万"])
+        return ReportValidationResult(status="passed", checked_facts=["ledger_fact_workspace_table_count"])
+
+    monkeypatch.setattr(report_runner, "compose_report_document", fake_compose_report_document)
+    monkeypatch.setattr(report_runner, "repair_report_document", fake_repair_report_document)
+    monkeypatch.setattr(report_runner, "validate_report_document", fake_validate_report_document)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+    )
+
+    report = result["report"]
+    assert result["success"] is True
+    assert report["status"] == "completed"
+    assert calls == {"compose": 1, "repair": 1, "validate": 2}
+    assert report["validation"]["unsupported_claims"] == []
+    assert report["provider_metadata"]["repair_attempted"] is True
+    assert report["document"]["technical_appendix"]["repair"]["attempted"] is True
+    assert report["provider_metadata"]["generation_flow"] == "ledger_backed_report_center"
 
 
 def test_existing_semantic_layer_is_not_overwritten(tmp_path):

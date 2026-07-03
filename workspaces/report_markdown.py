@@ -68,6 +68,9 @@ def _render_technical_appendix(report: ReportRecord, document: ReportDocument) -
         "- 校验状态：" + (validation.status if validation else "未校验"),
         f"- 证据概况：已整理 {fact_count} 个关键事实、{table_count} 张证据表、{chart_count} 个图表或图表意图。",
     ]
+    coverage_lines = _coverage_summary_lines(document)
+    if coverage_lines:
+        lines.extend(["", "### 章节覆盖", *coverage_lines])
     lines.extend(f"- 校验提醒：{warning}" for warning in warnings)
     lines.extend(f"- 待复核表述：{claim}" for claim in unsupported_claims)
     return [
@@ -78,6 +81,25 @@ def _render_technical_appendix(report: ReportRecord, document: ReportDocument) -
         "",
         "</details>",
     ]
+
+
+def _coverage_summary_lines(document: ReportDocument) -> list[str]:
+    ledger = document.technical_appendix.get("evidence_ledger")
+    if not isinstance(ledger, dict):
+        return []
+    coverages = [
+        item
+        for item in ledger.get("chapter_coverages", [])
+        if isinstance(item, dict)
+    ]
+    lines = []
+    for coverage in coverages:
+        title = str(coverage.get("title") or coverage.get("chapter_id") or "未命名章节")
+        status = str(coverage.get("coverage") or "missing")
+        available = _join_or_default([str(item) for item in coverage.get("available_evidence", [])], "暂无")
+        missing = _join_or_default([str(item) for item in coverage.get("missing_evidence", [])], "暂无")
+        lines.append(f"- {title}：{status}；可用：{available}；缺口：{missing}")
+    return lines
 
 
 def _tables_for_section(report: ReportRecord, section_id: str) -> list[dict[str, Any]]:

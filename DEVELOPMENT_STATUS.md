@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
-| Current task | P23-H4 Artifact And Tool-Calling Readiness next |
-| Next planned task | P23-H4 Artifact And Tool-Calling Readiness |
-| Last completed task | P23-H3 One-Pass Report Center With Shared Evidence |
+| Current task | P23-H5 Artifact And Tool-Calling Readiness next |
+| Next planned task | P23-H5 Artifact And Tool-Calling Readiness |
+| Last completed task | P23-H4 Evidence Ledger And Report Self-Repair |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -37,7 +37,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
-| P23 | `[~]` In progress | H1-H3 complete; core evidence/report tooling readiness continues with artifact readiness, cleanup, and live acceptance before external tool integrations |
+| P23 | `[~]` In progress | H1-H4 complete; core evidence/report tooling readiness continues with artifact readiness, cleanup, and live acceptance before external tool integrations |
 | P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
@@ -82,8 +82,44 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 | P23-H1 | `[x]` Complete | Shared EvidencePack foundation: analysis `fact_payload` and report `ReportEvidencePack.evidence_payloads` now share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references |
 | P23-H2 | `[x]` Complete | Chinese Business Answer Writer: natural Chinese business answers preserve model explanations/recommendations while binding hard facts and missing-data boundaries to shared evidence |
 | P23-H3 | `[x]` Complete | One-Pass Report Center With Shared Evidence |
-| P23-H4 | `[ ]` Next | Artifact And Tool-Calling Readiness |
-| P23-H5 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance |
+| P23-H4 | `[x]` Complete | Evidence Ledger And Report Self-Repair: replaced prose-number validator patching with tool-built evidence ledger, ledger-backed report writing, factual-claim validation, and one automatic repair pass |
+| P23-H5 | `[ ]` Next | Artifact And Tool-Calling Readiness on top of EvidenceLedger references, so charts/reports/future exports can cite ledger evidence ids instead of raw rows or model-recomputed facts |
+| P23-H6 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, and live DeepSeek analysis/report acceptance |
+
+## Latest P23-H4 Result
+
+P23-H4 Evidence Ledger And Report Self-Repair completed on 2026-07-03:
+
+- Added `workspaces/report_ledger.py` plus serializable `EvidenceLedger`/coverage models. Report Center now builds `p23.report_ledger.v1` before writing, with ledger facts, derived metrics, chapter coverage, recommendation context, data boundaries, and technical refs.
+- The ledger derives common report facts from generic evidence tables and shared payloads: row facts, totals, shares, combined top-2 shares, rankings, period changes, max/min periods, and data coverage ranges. Missing cost/profit/ROI/retention/loss fields become explicit boundaries instead of model guesses.
+- ReportComposer now receives `ReportPlan + EvidenceLedger + chart refs + data boundaries`, writes one complete `ReportDocument`, and keeps action recommendations out of body sections. No section-answer stitching or Analysis Workbench chapter generation was restored.
+- ReportValidator now validates hard factual claims against the ledger value set. It still checks title/time range/data sources, evidence/chart refs, date forms, ranking conflicts, and unsupported invented amounts/percentages, while clearly worded recommendation targets are not treated as historical facts.
+- Runner now follows `plan -> evidence -> ledger -> one-pass compose -> ledger-backed validate -> optional one repair -> render/save`. If unsupported hard facts remain, one repair pass asks the provider to delete, soften, or replace them; no-key mode has deterministic repair fallback.
+- Markdown and ReportViewer keep the main report clean and show only concise coverage summaries in the collapsed technical appendix; raw ledger JSON, SQL, raw rows, trace, query ids, and provider metadata stay out of the main body.
+- Removed the old validator branches that tried to rediscover table shares, chapter-total shares, and payload percentages directly from final prose.
+- Live DeepSeek smoke passed with provider available: report status `completed`, validation `passed`, `unsupported_claims` empty, `generation_flow=ledger_backed_report_center`, `provider_supplied=true`, one repair attempted, no duplicate action section, no SQL/raw_rows/trace/provider_metadata/query leaks in main body, and the ledger contained total/share/combined-share/period-change evidence.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`64 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `python3 -m pytest tests/test_workspace_report_store.py tests/test_p20_realistic_acceptance.py tests/test_p12_live_deepseek_workspace_report.py -q` (`8 passed, 1 skipped`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+
+## P23-H4 Direction Update
+
+P23-H4 should not continue the P23-H3 pattern of adding validator rules for every new number DeepSeek can produce. Live report testing showed that models can produce correct but previously unregistered derived values such as totals, combined shares, period-over-period changes, and recommendation target values. Chasing all of these in the final prose validator would make the code increasingly brittle.
+
+The next implementation should instead introduce a compact report evidence ledger before report writing:
+
+- tools calculate raw facts and common derived metrics first, including totals, shares, combined shares, rankings, period changes, and data coverage facts;
+- each report fact gets an `evidence_id`, display value, formula/source description, and acceptable claim phrases;
+- each report chapter gets coverage metadata: available evidence, missing evidence, allowed claims, blocked claims, and data boundaries;
+- derivable missing evidence is completed by tools before writing, while unavailable source fields become explicit data boundaries;
+- the report composer receives the ledger, chart refs, and data boundaries, then writes a natural Chinese report using ledger-backed hard facts;
+- validation checks factual claims against the ledger and treats clearly worded recommendation targets as proposed actions, not historical facts;
+- if unsupported factual claims remain, one automatic repair pass asks the model to delete, soften, or replace only those claims before the user sees the final report.
+
+Cleanup requirement: while implementing P23-H4, delete old validator branches, obsolete compatibility fields, stale tests, fallback code, and old report paths that are made unreachable by ledger-backed validation. Do not keep old code only to preserve historical report behavior. The current product direction is a clean Chinese-first FastAPI/Next.js analysis and report product.
 
 ## Latest P23-H3 Result
 

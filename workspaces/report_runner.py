@@ -6,8 +6,9 @@ from typing import Any
 
 from workspaces.models import utc_now_iso
 from workspaces.profiler import profile_workspace_database
-from workspaces.report_composer import compose_report_document
+from workspaces.report_composer import compose_report_document, repair_report_document
 from workspaces.report_evidence import collect_report_evidence
+from workspaces.report_ledger import build_evidence_ledger
 from workspaces.report_planner import plan_workspace_report
 from workspaces.report_store import WorkspaceReportStore
 from workspaces.report_validator import validate_report_document
@@ -58,21 +59,53 @@ def run_workspace_report(
         artifact_dir=artifact_dir,
         artifact_base_path=artifact_base_path,
     )
+    evidence_ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    composer_provider = _report_composer_provider(providers)
     document = compose_report_document(
         plan=plan,
         evidence_pack=evidence_pack,
-        provider=_report_composer_provider(providers),
+        evidence_ledger=evidence_ledger,
+        provider=composer_provider,
     )
     validation = validate_report_document(
         document=document,
         plan=plan,
         evidence_pack=evidence_pack,
+        evidence_ledger=evidence_ledger,
     )
+    repair_attempted = False
+    repair_claims: list[str] = []
+    if validation.unsupported_claims:
+        repair_attempted = True
+        repair_claims = list(validation.unsupported_claims)
+        document = repair_report_document(
+            document=document,
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+            unsupported_claims=repair_claims,
+            provider=composer_provider,
+        )
+        validation = validate_report_document(
+            document=document,
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+        )
     document.technical_appendix = {
         "plan": plan.to_dict(),
-        "evidence_pack": evidence_pack.to_dict(),
+        "evidence_ledger": evidence_ledger.to_dict(),
+        "evidence_pack_summary": {
+            "fact_count": len(evidence_pack.facts),
+            "table_count": len(evidence_pack.tables),
+            "chart_count": len(evidence_pack.charts),
+        },
         "validation": validation.to_dict(),
-        "generation_steps": ["规划报告", "整理证据", "撰写正文", "校验证据", "渲染保存"],
+        "repair": {
+            "attempted": repair_attempted,
+            "unsupported_claims": repair_claims,
+        },
+        "generation_steps": ["规划报告", "整理证据", "生成证据账本", "撰写正文", "校验证据", "必要时修复一次", "渲染保存"],
     }
 
     report.title = plan.title
@@ -82,8 +115,9 @@ def run_workspace_report(
     report.document = document
     report.validation = validation
     report.provider_metadata = {
-        "generation_flow": "evidence_driven_report_center",
+        "generation_flow": "ledger_backed_report_center",
         "provider_supplied": bool(providers),
+        "repair_attempted": repair_attempted,
     }
     saved = report_store.save_report(report, event_type="report_completed")
     _append_trace_events(
@@ -96,7 +130,14 @@ def run_workspace_report(
                 "table_count": len(evidence_pack.tables),
                 "chart_count": len(evidence_pack.charts),
             },
+            {
+                "event": "report_evidence_ledger_built",
+                "fact_count": len(evidence_ledger.facts),
+                "derived_metric_count": len(evidence_ledger.derived_metrics),
+                "coverage_count": len(evidence_ledger.chapter_coverages),
+            },
             {"event": "report_document_composed", "section_count": len(document.sections)},
+            {"event": "report_repaired", "attempted": repair_attempted},
             {"event": "report_validated", "status": validation.status},
         ],
     )

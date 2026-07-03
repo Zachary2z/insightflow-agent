@@ -11,6 +11,7 @@ from workspaces.report_models import (
     ReportValidationResult,
 )
 from workspaces.report_evidence import collect_report_evidence
+from workspaces.report_ledger import CoverageChecker, build_evidence_ledger
 from workspaces.report_planner import plan_workspace_report
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
@@ -229,6 +230,62 @@ def test_evidence_collector_builds_business_readable_pack_from_orders_and_suppor
     assert all(any("\u4e00" <= char <= "\u9fff" for char in column) for table in evidence_pack.tables for column in table.columns)
     assert evidence_pack.technical_details["queries"]
     assert "SELECT" in json.dumps(evidence_pack.technical_details, ensure_ascii=False).upper()
+
+
+def test_evidence_ledger_derives_totals_shares_rankings_period_changes_and_coverage(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成经营复盘报告，关注收入结构、客户分群、客服问题、趋势变化和行动建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    serialized = json.dumps(ledger.to_dict(), ensure_ascii=False)
+
+    assert ledger.ledger_version == "p23.report_ledger.v1"
+    assert any(item.evidence_id == "ledger_fact_revenue_total" and item.display_value == "43.0 万" for item in ledger.facts)
+    assert "收入占比" in serialized
+    assert "合计占比" in serialized
+    assert "排名第1" in serialized
+    assert "环比" in serialized
+    assert "最高周期" in serialized
+    assert "数据覆盖" in serialized
+    assert any(coverage.chapter_id == "revenue_structure" for coverage in ledger.chapter_coverages)
+    assert any("利润" in boundary or "ROI" in boundary for boundary in ledger.data_boundaries)
+    assert not any("SELECT" in json.dumps(item.to_dict(), ensure_ascii=False).upper() for item in ledger.facts + ledger.derived_metrics)
+
+
+def test_coverage_checker_marks_strong_partial_and_missing_without_table_name_rules(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成经营复盘报告，关注收入结构、客服问题和行动建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    coverages = {item.chapter_id: item for item in ledger.chapter_coverages}
+
+    assert coverages["overview"].coverage == "strong"
+    assert coverages["revenue_structure"].coverage == "partial"
+    assert any("利润" in item or "ROI" in item for item in coverages["revenue_structure"].missing_evidence)
+    assert coverages["support_issues"].coverage == "missing"
+    assert any("客服" in item or "工单" in item for item in coverages["support_issues"].blocked_claims)
+    assert CoverageChecker(plan=plan, evidence_pack=evidence_pack).check()[0].chapter_id == "overview"
 
 
 def test_evidence_collector_generates_chart_artifacts_for_chartable_tables(tmp_path):
@@ -616,3 +673,55 @@ def test_report_markdown_does_not_duplicate_action_recommendation_sections(tmp_p
     assert markdown.count("## 行动建议") == 1
     assert "不要作为正文重复展示" not in markdown
     assert "优先复盘高收入来源。" in markdown
+
+
+def test_report_markdown_appendix_summarizes_coverage_without_ledger_dump(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path, include_support=False)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构和客服问题。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="本报告基于当前工作区证据生成。",
+        sections=[],
+        action_recommendations=["先补齐客服数据。"],
+        data_boundaries=evidence_pack.data_limits,
+        technical_appendix={"evidence_ledger": ledger.to_dict()},
+    )
+    report = ReportRecord(
+        report_id="report_coverage_summary",
+        workspace_id=workspace["workspace_id"],
+        report_type="business_review",
+        report_goal=plan.report_goal,
+        title=plan.title,
+        status="partial",
+        plan=plan,
+        evidence_pack=evidence_pack,
+        document=document,
+        validation=ReportValidationResult(status="warning"),
+    )
+
+    markdown = render_report_markdown(report)
+    main_body = markdown.split("## 技术附录", 1)[0]
+    appendix = markdown.split("## 技术附录", 1)[1]
+
+    assert "ledger_version" not in main_body
+    assert "claim_phrases" not in main_body
+    assert "coverage" not in main_body
+    assert "章节覆盖" in appendix
+    assert "收入结构" in appendix
+    assert "客服问题" in appendix
+    assert "ledger_version" not in appendix
+    assert "claim_phrases" not in appendix
