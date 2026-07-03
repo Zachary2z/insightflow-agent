@@ -553,6 +553,39 @@ def test_evidence_collector_generates_chart_artifacts_for_chartable_tables(tmp_p
     assert "待生成图表" not in json.dumps([chart.to_dict() for chart in artifact_charts], ensure_ascii=False)
 
 
+def test_chart_artifacts_reference_evidence_ledger_items(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构和趋势变化。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    artifact_dir = Path(workspace["root_path"]) / "reports" / "report_chart_ledger_test" / "artifacts"
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+        artifact_dir=artifact_dir,
+        artifact_base_path="reports/report_chart_ledger_test/artifacts",
+    )
+
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    ledger_ids = {item.evidence_id for item in ledger.facts + ledger.derived_metrics}
+    chart = next(chart for chart in evidence_pack.charts if chart.chart_id == "revenue_structure_chart")
+
+    assert chart.artifact_id == "artifact_chart_revenue_structure_chart"
+    assert chart.evidence_ids or chart.ledger_metric_ids
+    assert set(chart.evidence_ids + chart.ledger_metric_ids).issubset(ledger_ids)
+    assert any(item.startswith("ledger_fact_") for item in chart.evidence_ids)
+    assert any(item.startswith("ledger_metric_") for item in chart.ledger_metric_ids)
+    serialized_chart = json.dumps(chart.to_dict(), ensure_ascii=False)
+    assert "query_id" not in serialized_chart
+    assert "raw_rows" not in serialized_chart
+    assert "SELECT" not in serialized_chart.upper()
+
+
 def test_report_evidence_pack_exposes_shared_payloads_for_non_channel_sales(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Store Sales Shared Evidence Workspace")
@@ -963,3 +996,68 @@ def test_report_markdown_appendix_summarizes_coverage_without_ledger_dump(tmp_pa
     assert "客服问题" in appendix
     assert "ledger_version" not in appendix
     assert "claim_phrases" not in appendix
+
+
+def test_report_markdown_appendix_summarizes_artifact_ledger_refs_without_raw_ledger_dump(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构和趋势变化。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    artifact_dir = Path(workspace["root_path"]) / "reports" / "report_artifact_summary" / "artifacts"
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+        artifact_dir=artifact_dir,
+        artifact_base_path="reports/report_artifact_summary/artifacts",
+    )
+    ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="本报告基于当前工作区证据生成。",
+        sections=[],
+        action_recommendations=["继续观察收入变化。"],
+        data_boundaries=evidence_pack.data_limits,
+        technical_appendix={
+            "evidence_ledger": ledger.to_dict(),
+            "ledger_reference_summary": {
+                "evidence_ids": [item.evidence_id for item in ledger.facts[:2]],
+                "ledger_metric_ids": [item.evidence_id for item in ledger.derived_metrics[:2]],
+            },
+            "artifact_summary": {
+                "artifact_count": 3,
+                "chart_count": 1,
+                "report_artifacts": ["Markdown 报告", "报告文档记录"],
+            },
+        },
+    )
+    report = ReportRecord(
+        report_id="report_artifact_summary",
+        workspace_id=workspace["workspace_id"],
+        report_type="business_review",
+        report_goal=plan.report_goal,
+        title=plan.title,
+        status="completed",
+        plan=plan,
+        evidence_pack=evidence_pack,
+        document=document,
+        validation=ReportValidationResult(status="passed"),
+    )
+
+    markdown = render_report_markdown(report)
+    appendix = markdown.split("## 技术附录", 1)[1]
+
+    assert "Artifact" not in appendix
+    assert "产物概况" in appendix
+    assert "账本引用" in appendix
+    assert "Markdown 报告" in appendix
+    assert "ledger_version" not in appendix
+    assert "claim_phrases" not in appendix
+    assert "SELECT" not in appendix.upper()
+    assert "raw_rows" not in appendix

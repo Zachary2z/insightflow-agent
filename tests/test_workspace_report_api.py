@@ -5,12 +5,14 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from workspaces.report_models import (
+    ReportArtifactRecord,
     ReportDocument,
     ReportDocumentSection,
     ReportEvidenceFact,
     ReportEvidenceChart,
     ReportEvidencePack,
     ReportPlan,
+    ReportToolCallRecord,
     ReportValidationResult,
 )
 from workspaces.report_store import WorkspaceReportStore
@@ -113,6 +115,27 @@ def _client_with_fake_report_runner(tmp_path):
         report.evidence_pack = evidence_pack
         report.document = document
         report.validation = validation
+        report.artifacts = [
+            ReportArtifactRecord(
+                artifact_id="artifact_markdown_report_api",
+                artifact_type="markdown_report",
+                title="Markdown 报告",
+                download_url=f"/api/workspaces/{workspace_id}/reports/{report.report_id}/download",
+                source="report_markdown",
+                evidence_ids=["ledger_fact_revenue_total"],
+                chart_ids=["revenue_chart_intent"],
+            )
+        ]
+        report.tool_calls = [
+            ReportToolCallRecord(
+                tool_call_id="tool_call_markdown_report_api",
+                tool_name="report_markdown_renderer",
+                input_summary="渲染 Markdown 报告：最近90天经营复盘报告",
+                referenced_evidence_ids=["ledger_fact_revenue_total"],
+                output_artifact_ids=["artifact_markdown_report_api"],
+                status="completed",
+            )
+        ]
         saved = WorkspaceReportStore(store).save_report(report)
         assert Path(workspace["root_path"]) in Path(saved.markdown_path).parents
         return {
@@ -159,6 +182,10 @@ def test_create_report_returns_persisted_report_document(tmp_path):
     assert payload["report"]["evidence_pack"]["facts"][0]["fact_id"] == "revenue_total"
     assert payload["report"]["document"]["sections"][0]["body"].startswith("付费搜索贡献")
     assert payload["report"]["validation"]["status"] == "passed"
+    assert payload["report"]["artifacts"][0]["artifact_type"] == "markdown_report"
+    assert payload["report"]["artifacts"][0]["source"] == "report_markdown"
+    assert payload["report"]["tool_calls"][0]["tool_name"] == "report_markdown_renderer"
+    assert "SELECT" not in payload["report"]["tool_calls"][0]["input_summary"].upper()
     for obsolete_field in [
         "sections",
         "executive_summary",
@@ -233,6 +260,8 @@ def test_get_report_detail_returns_report_document(tmp_path):
     assert payload["report"]["document"]["opening_summary"].startswith("管理层摘要")
     assert payload["report"]["document"]["action_recommendations"] == ["先补齐成本和转化率后再判断预算。"]
     assert payload["report"]["document"]["data_boundaries"] == ["当前为 API 合同测试数据。"]
+    assert payload["report"]["artifacts"][0]["evidence_ids"] == ["ledger_fact_revenue_total"]
+    assert payload["report"]["tool_calls"][0]["output_artifact_ids"] == ["artifact_markdown_report_api"]
     for obsolete_field in ["executive_summary", "key_findings", "action_priorities", "risks_and_limits"]:
         assert obsolete_field not in payload["report"]
 

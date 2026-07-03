@@ -241,6 +241,33 @@ export type ReportDocument = {
   technical_appendix?: Record<string, unknown>;
 };
 
+export type ReportArtifactRecord = {
+  artifact_id?: string;
+  artifact_type?: "chart" | "markdown_report" | "report_document" | "future_export" | string;
+  title?: string;
+  relative_path?: string;
+  download_url?: string;
+  source?: "local_renderer" | "report_markdown" | "future_external_tool" | string;
+  evidence_ids?: string[];
+  ledger_metric_ids?: string[];
+  chart_ids?: string[];
+  created_at?: string;
+  status?: string;
+  error?: string;
+};
+
+export type ReportToolCallRecord = {
+  tool_call_id?: string;
+  tool_name?: string;
+  input_summary?: string;
+  referenced_evidence_ids?: string[];
+  output_artifact_ids?: string[];
+  status?: string;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
+};
+
 export type WorkspaceReport = {
   report_id: string;
   workspace_id: string;
@@ -256,6 +283,8 @@ export type WorkspaceReport = {
   json_path?: string;
   trace_path?: string;
   artifact_dir?: string;
+  artifacts?: ReportArtifactRecord[];
+  tool_calls?: ReportToolCallRecord[];
   created_at?: string;
   updated_at?: string;
   provider_metadata?: Record<string, unknown>;

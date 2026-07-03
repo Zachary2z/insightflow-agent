@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
-| Current task | P23-H5 Artifact And Tool-Calling Readiness next |
-| Next planned task | P23-H5 Artifact And Tool-Calling Readiness |
-| Last completed task | P23-H4 Evidence Ledger non-additive contribution repair |
+| Current task | P23-H6 Cleanup, Regression, And Live Acceptance next |
+| Next planned task | P23-H6 Cleanup, Regression, And Live Acceptance |
+| Last completed task | P23-H5 Artifact And Tool-Calling Readiness |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -37,7 +37,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
-| P23 | `[~]` In progress | H1-H4 complete; core evidence/report tooling readiness continues with artifact readiness, cleanup, and live acceptance before external tool integrations |
+| P23 | `[~]` In progress | H1-H5 complete; core evidence/report tooling readiness continues with cleanup and live acceptance before external tool integrations |
 | P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
@@ -83,8 +83,25 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 | P23-H2 | `[x]` Complete | Chinese Business Answer Writer: natural Chinese business answers preserve model explanations/recommendations while binding hard facts and missing-data boundaries to shared evidence |
 | P23-H3 | `[x]` Complete | One-Pass Report Center With Shared Evidence |
 | P23-H4 | `[x]` Complete | Evidence Ledger And Report Self-Repair: replaced prose-number validator patching with tool-built evidence ledger, ledger-backed report writing, factual-claim validation, one automatic repair pass, evidence-aware coverage, and conservative metric-role-based contribution metric selection |
-| P23-H5 | `[ ]` Next | Artifact And Tool-Calling Readiness on top of EvidenceLedger references, so charts/reports/future exports can cite ledger evidence ids instead of raw rows or model-recomputed facts |
-| P23-H6 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, and live DeepSeek analysis/report acceptance |
+| P23-H5 | `[x]` Complete | Artifact And Tool-Calling Readiness: chart/report artifacts and local renderer tool calls now cite EvidenceLedger facts/metrics without raw rows or model-recomputed facts |
+| P23-H6 | `[ ]` Next | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, and live DeepSeek analysis/report acceptance |
+
+## Latest P23-H5 Result
+
+P23-H5 Artifact And Tool-Calling Readiness completed on 2026-07-03:
+
+- Added `ReportArtifactRecord` and `ReportToolCallRecord` to the report contract. Artifact records cover chart, Markdown report, report document, and future export readiness with title, relative path or download URL, source, evidence ids, ledger metric ids, chart ids, timestamps, status, and error.
+- Extended `ReportEvidenceChart` so local chart artifacts carry `artifact_id`, ledger fact ids, and ledger derived metric ids. `build_evidence_ledger()` annotates charts from their `evidence_ref`, so chart artifacts are tied to trusted ledger facts rather than loose table titles.
+- Report Center now records local chart renderer and Markdown renderer calls with safe input summaries, referenced ledger evidence ids, output artifact ids, status/error, and start/complete times.
+- Markdown/report document artifacts now include ledger reference summaries. Future external export tools can use artifact ids plus ledger evidence ids to retrieve trusted facts instead of re-querying SQL or asking the model to recalculate.
+- `ReportViewer` shows only business-readable artifact summaries such as chart, Markdown report, report document, or future export readiness status. The main report UI still hides raw ledger JSON, SQL, raw rows, query ids, trace/provider metadata, local paths, artifact ids, ledger ids, and tool names.
+- No real PowerPoint, Word, PDF, 飞书, 钉钉, 企业微信, or other SaaS integration was added, no simulated external integration layer was introduced, and old `chart_tool`, `action_delivery`, `powerbi_publisher_mock`, or `jira_ticket_mock` paths were not restored.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`54 passed`)
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_workspace_report_store.py -q` (`25 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`67 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
 ## Latest P23-H4 Result
 

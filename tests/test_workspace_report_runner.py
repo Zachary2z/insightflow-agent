@@ -99,6 +99,37 @@ def test_report_contract_serializes_plan_evidence_document_and_validation():
     }
 
 
+def test_report_contract_serializes_artifacts_and_tool_call_records():
+    from workspaces.report_models import ReportArtifactRecord, ReportToolCallRecord
+
+    artifact = ReportArtifactRecord(
+        artifact_id="artifact_chart_revenue_structure_chart",
+        artifact_type="chart",
+        title="收入结构图表",
+        relative_path="reports/report_1/artifacts/revenue_structure_chart.svg",
+        source="local_renderer",
+        evidence_ids=["ledger_fact_revenue_total"],
+        ledger_metric_ids=["ledger_metric_revenue_by_dimension_收入_total"],
+        chart_ids=["revenue_structure_chart"],
+        status="completed",
+    )
+    tool_call = ReportToolCallRecord(
+        tool_call_id="tool_call_chart_revenue_structure_chart",
+        tool_name="local_chart_renderer",
+        input_summary="渲染图表：收入结构图表",
+        referenced_evidence_ids=["ledger_fact_revenue_total"],
+        output_artifact_ids=["artifact_chart_revenue_structure_chart"],
+        status="completed",
+    )
+
+    assert artifact.to_dict()["artifact_type"] == "chart"
+    assert artifact.to_dict()["source"] == "local_renderer"
+    assert artifact.to_dict()["evidence_ids"] == ["ledger_fact_revenue_total"]
+    assert artifact.to_dict()["ledger_metric_ids"] == ["ledger_metric_revenue_by_dimension_收入_total"]
+    assert tool_call.to_dict()["tool_name"] == "local_chart_renderer"
+    assert "SELECT" not in tool_call.to_dict()["input_summary"].upper()
+
+
 def test_report_runner_uses_report_document_contract_and_chinese_default_title(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
 
@@ -120,6 +151,9 @@ def test_report_runner_uses_report_document_contract_and_chinese_default_title(t
     assert report["document"]["opening_summary"]
     assert report["document"]["sections"][0]["body"]
     assert report["validation"]["status"] == "passed"
+    assert any(artifact["artifact_type"] == "markdown_report" for artifact in report["artifacts"])
+    assert any(artifact["artifact_type"] == "report_document" for artifact in report["artifacts"])
+    assert any(call["tool_name"] == "report_markdown_renderer" for call in report["tool_calls"])
     assert "sections" not in report
     assert "executive_summary" not in report
     assert "key_findings" not in report
@@ -281,6 +315,46 @@ def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, mon
     assert result["success"] is True
     assert calls == {"composer": 1, "validator": 1}
     assert result["report"]["document"]["opening_summary"].startswith("这是由新报告撰写器")
+
+
+def test_report_runner_records_local_artifact_and_tool_call_readiness(tmp_path):
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告，关注收入结构和行动建议。",
+    )
+
+    report = result["report"]
+    artifacts = report["artifacts"]
+    tool_calls = report["tool_calls"]
+    chart_artifacts = [artifact for artifact in artifacts if artifact["artifact_type"] == "chart"]
+    markdown_artifact = next(artifact for artifact in artifacts if artifact["artifact_type"] == "markdown_report")
+    document_artifact = next(artifact for artifact in artifacts if artifact["artifact_type"] == "report_document")
+    serialized_public_records = json.dumps({"artifacts": artifacts, "tool_calls": tool_calls}, ensure_ascii=False)
+
+    assert all(artifact["source"] == "local_renderer" for artifact in chart_artifacts)
+    assert all(artifact["evidence_ids"] or artifact["ledger_metric_ids"] for artifact in chart_artifacts)
+    assert markdown_artifact["source"] == "report_markdown"
+    assert markdown_artifact["download_url"].endswith(f"/api/workspaces/{workspace['workspace_id']}/reports/{report['report_id']}/download")
+    assert markdown_artifact["evidence_ids"]
+    assert document_artifact["artifact_type"] == "report_document"
+    assert document_artifact["source"] == "report_markdown"
+    if chart_artifacts:
+        assert any(call["tool_name"] == "local_chart_renderer" for call in tool_calls)
+    assert any(call["tool_name"] == "report_markdown_renderer" for call in tool_calls)
+    assert all(call["referenced_evidence_ids"] for call in tool_calls)
+    assert all(call["output_artifact_ids"] for call in tool_calls)
+    assert "future_external_tool" not in serialized_public_records
+    assert "SELECT" not in serialized_public_records.upper()
+    assert "raw_rows" not in serialized_public_records
+    assert "query_id" not in serialized_public_records
+    assert "trace" not in serialized_public_records
+    assert "provider_metadata" not in serialized_public_records
+    assert report["document"]["technical_appendix"]["artifact_summary"]["artifact_count"] == len(artifacts)
+    assert report["document"]["technical_appendix"]["ledger_reference_summary"]["evidence_ids"]
 
 
 def test_report_runner_composes_once_without_section_business_answers(tmp_path, monkeypatch):

@@ -71,6 +71,12 @@ def _render_technical_appendix(report: ReportRecord, document: ReportDocument) -
     coverage_lines = _coverage_summary_lines(document)
     if coverage_lines:
         lines.extend(["", "### 章节覆盖", *coverage_lines])
+    artifact_lines = _artifact_summary_lines(document)
+    if artifact_lines:
+        lines.extend(["", "### 产物概况", *artifact_lines])
+    ledger_reference_lines = _ledger_reference_summary_lines(document)
+    if ledger_reference_lines:
+        lines.extend(["", "### 账本引用", *ledger_reference_lines])
     lines.extend(f"- 校验提醒：{warning}" for warning in warnings)
     lines.extend(f"- 待复核表述：{claim}" for claim in unsupported_claims)
     return [
@@ -100,6 +106,34 @@ def _coverage_summary_lines(document: ReportDocument) -> list[str]:
         missing = _join_or_default([str(item) for item in coverage.get("missing_evidence", [])], "暂无")
         lines.append(f"- {title}：{status}；可用：{available}；缺口：{missing}")
     return lines
+
+
+def _artifact_summary_lines(document: ReportDocument) -> list[str]:
+    summary = document.technical_appendix.get("artifact_summary")
+    if not isinstance(summary, dict):
+        return []
+    artifact_count = str(summary.get("artifact_count") or "0")
+    chart_count = str(summary.get("chart_count") or "0")
+    report_artifacts = _join_or_default(
+        [str(item) for item in summary.get("report_artifacts", [])],
+        "暂无",
+    )
+    return [
+        f"- 已记录 {artifact_count} 个报告产物，其中图表 {chart_count} 个。",
+        f"- 报告文件：{report_artifacts}",
+    ]
+
+
+def _ledger_reference_summary_lines(document: ReportDocument) -> list[str]:
+    summary = document.technical_appendix.get("ledger_reference_summary")
+    if not isinstance(summary, dict):
+        return []
+    fact_count = str(summary.get("fact_count") or len(summary.get("evidence_ids", []) or []))
+    metric_count = str(summary.get("derived_metric_count") or len(summary.get("ledger_metric_ids", []) or []))
+    return [
+        f"- 报告产物引用 {fact_count} 个账本事实和 {metric_count} 个派生指标。",
+        "- 后续外部导出可使用产物记录与账本证据编号获取可信事实。",
+    ]
 
 
 def _tables_for_section(report: ReportRecord, section_id: str) -> list[dict[str, Any]]:

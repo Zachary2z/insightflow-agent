@@ -430,27 +430,30 @@ Target artifact records:
 
 ```json
 {
-  "artifact_id": "chart_xxx",
+  "artifact_id": "artifact_chart_xxx",
   "artifact_type": "chart",
   "title": "渠道收入排行",
-  "format": "png",
-  "file_path": "...",
-  "evidence_id": "channel_revenue_ranking",
-  "ledger_id": "report_ledger_xxx",
-  "created_by_tool": "local_chart_renderer",
-  "status": "completed"
+  "relative_path": "reports/report_xxx/artifacts/chart_xxx.svg",
+  "download_url": "",
+  "source": "local_renderer",
+  "evidence_ids": ["ledger_fact_xxx"],
+  "ledger_metric_ids": ["ledger_metric_xxx"],
+  "chart_ids": ["chart_xxx"],
+  "created_at": "2026-07-03T00:00:00Z",
+  "status": "completed",
+  "error": ""
 }
 ```
 
 Tasks:
 
-- [ ] Inventory current chart/report artifact fields used by analysis, reports, API responses, Markdown, and frontend rendering.
-- [ ] Consolidate artifact records enough that future Word/PDF/PPT/Excel/飞书/腾讯文档 tools can consume the same references without re-querying or re-interpreting facts.
-- [ ] Ensure chart and report artifacts can reference `EvidenceLedger` entries by `evidence_id` / derived metric id, not only by loose table or chart titles.
-- [ ] Add or update tool call records so each tool call captures tool name, input summary, referenced evidence ids, output artifact ids, status, and error without exposing secrets or raw data in the main UI.
-- [ ] Preserve local artifact generation as the current implementation; do not add real external SaaS in P23.
-- [ ] Keep artifact records compatible with local chart generation today and external document/export tools in P24.
-- [ ] Delete unused mock external tool placeholders that are not part of the current product path.
+- [x] Inventory current chart/report artifact fields used by analysis, reports, API responses, Markdown, and frontend rendering.
+- [x] Consolidate artifact records enough that future Word/PDF/PPT/Excel/飞书/腾讯文档 tools can consume the same references without re-querying or re-interpreting facts.
+- [x] Ensure chart and report artifacts can reference `EvidenceLedger` entries by `evidence_id` / derived metric id, not only by loose table or chart titles.
+- [x] Add or update tool call records so each tool call captures tool name, input summary, referenced evidence ids, output artifact ids, status, and error without exposing secrets or raw data in the main UI.
+- [x] Preserve local artifact generation as the current implementation; do not add real external SaaS in P23.
+- [x] Keep artifact records compatible with local chart generation today and external document/export tools in P24.
+- [x] Delete unused mock external tool placeholders that are not part of the current product path.
 
 Acceptance:
 
@@ -459,6 +462,21 @@ Acceptance:
 - Future document/export tools can render charts and report sections from artifact ids plus ledger evidence ids, rather than reading raw SQL rows or asking the model to recalculate.
 - Tool call records stay technical and auditable, while the main UI remains business-facing.
 - P24 can focus on real tool integration instead of fixing artifact plumbing.
+
+Completion record:
+
+- Completed on 2026-07-03.
+- Added `ReportArtifactRecord` and `ReportToolCallRecord` to the report contract. Artifact records now carry `artifact_id`, `artifact_type`, title, `relative_path` or `download_url`, `source`, `evidence_ids`, `ledger_metric_ids`, `chart_ids`, timestamps, status, and error. Tool call records carry tool name, safe input summary, referenced ledger evidence ids, output artifact ids, status/error, and start/complete times.
+- Extended `ReportEvidenceChart` with `artifact_id`, `evidence_ids`, and `ledger_metric_ids`. `build_evidence_ledger()` now annotates chart artifacts by matching chart `evidence_ref` to ledger facts and derived metrics, so charts no longer depend only on loose table titles.
+- `run_workspace_report()` now records local chart artifacts, Markdown report artifacts, report-document artifacts, local chart renderer calls, and Markdown renderer calls. Report and Markdown artifacts reference ledger evidence ids so future export tools can consume trusted facts without raw SQL, raw rows, query ids, trace, provider metadata, or model recalculation.
+- Markdown and `ReportViewer` show business-readable artifact summaries and ledger-reference counts only. The main UI does not display raw ledger JSON, SQL, raw rows, query ids, trace/provider metadata, artifact ids, ledger ids, local filesystem paths, or tool names.
+- No real PowerPoint/Word/PDF/飞书/钉钉/企业微信 integration was added, no simulated external integration layer was introduced, and old `chart_tool` / `action_delivery` / `powerbi_publisher_mock` / `jira_ticket_mock` paths were not restored.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`54 passed`)
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_workspace_report_store.py -q` (`25 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`67 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
 ## P23-H6: Cleanup, Regression, And Live Acceptance
 
@@ -515,7 +533,7 @@ Acceptance:
 - No aggressive similar-question cache.
 - No frontend redesign beyond what is needed to present the cleaned answer/report contracts.
 - No table-specific business rule tree for the Chinese sample dataset.
-- No new mock SaaS integration layer.
+- No new simulated external SaaS integration layer.
 
 ## Handoff To P24
 

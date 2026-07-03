@@ -160,6 +160,9 @@ class ReportEvidenceChart:
     url: str = ""
     description: str = ""
     evidence_ref: str = ""
+    artifact_id: str = ""
+    evidence_ids: list[str] = field(default_factory=list)
+    ledger_metric_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -175,6 +178,9 @@ class ReportEvidenceChart:
             url=str(data.get("url") or ""),
             description=str(data.get("description") or ""),
             evidence_ref=str(data.get("evidence_ref") or ""),
+            artifact_id=str(data.get("artifact_id") or ""),
+            evidence_ids=[str(item) for item in data.get("evidence_ids", [])],
+            ledger_metric_ids=[str(item) for item in data.get("ledger_metric_ids", [])],
         )
 
 
@@ -368,6 +374,79 @@ class ReportValidationResult:
 
 
 @dataclass
+class ReportArtifactRecord:
+    artifact_id: str
+    artifact_type: str
+    title: str
+    relative_path: str = ""
+    download_url: str = ""
+    source: str = "local_renderer"
+    evidence_ids: list[str] = field(default_factory=list)
+    ledger_metric_ids: list[str] = field(default_factory=list)
+    chart_ids: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=utc_now_iso)
+    status: str = "completed"
+    error: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ReportArtifactRecord":
+        return cls(
+            artifact_id=str(data.get("artifact_id") or ""),
+            artifact_type=str(data.get("artifact_type") or ""),
+            title=str(data.get("title") or ""),
+            relative_path=str(data.get("relative_path") or ""),
+            download_url=str(data.get("download_url") or ""),
+            source=str(data.get("source") or "local_renderer"),
+            evidence_ids=[str(item) for item in data.get("evidence_ids", [])],
+            ledger_metric_ids=[str(item) for item in data.get("ledger_metric_ids", [])],
+            chart_ids=[str(item) for item in data.get("chart_ids", [])],
+            created_at=str(data.get("created_at") or utc_now_iso()),
+            status=str(data.get("status") or "completed"),
+            error=str(data.get("error") or ""),
+        )
+
+
+@dataclass
+class ReportToolCallRecord:
+    tool_call_id: str
+    tool_name: str
+    input_summary: str
+    referenced_evidence_ids: list[str] = field(default_factory=list)
+    output_artifact_ids: list[str] = field(default_factory=list)
+    status: str = "completed"
+    error: str = ""
+    started_at: str = field(default_factory=utc_now_iso)
+    completed_at: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        if not data["completed_at"]:
+            data["completed_at"] = data["started_at"]
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ReportToolCallRecord":
+        return cls(
+            tool_call_id=str(data.get("tool_call_id") or ""),
+            tool_name=str(data.get("tool_name") or ""),
+            input_summary=str(data.get("input_summary") or ""),
+            referenced_evidence_ids=[
+                str(item) for item in data.get("referenced_evidence_ids", [])
+            ],
+            output_artifact_ids=[
+                str(item) for item in data.get("output_artifact_ids", [])
+            ],
+            status=str(data.get("status") or "completed"),
+            error=str(data.get("error") or ""),
+            started_at=str(data.get("started_at") or utc_now_iso()),
+            completed_at=str(data.get("completed_at") or ""),
+        )
+
+
+@dataclass
 class ReportDocumentSection:
     section_id: str
     title: str
@@ -446,6 +525,8 @@ class ReportRecord:
     json_path: str = ""
     trace_path: str = ""
     artifact_dir: str = ""
+    artifacts: list[ReportArtifactRecord] = field(default_factory=list)
+    tool_calls: list[ReportToolCallRecord] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = field(default_factory=utc_now_iso)
     provider_metadata: dict[str, Any] = field(default_factory=dict)
@@ -458,6 +539,8 @@ class ReportRecord:
         )
         data["document"] = self.document.to_dict() if self.document else None
         data["validation"] = self.validation.to_dict() if self.validation else None
+        data["artifacts"] = [artifact.to_dict() for artifact in self.artifacts]
+        data["tool_calls"] = [tool_call.to_dict() for tool_call in self.tool_calls]
         return data
 
     @classmethod
@@ -491,6 +574,16 @@ class ReportRecord:
             json_path=str(data.get("json_path", "")),
             trace_path=str(data.get("trace_path", "")),
             artifact_dir=str(data.get("artifact_dir", "")),
+            artifacts=[
+                ReportArtifactRecord.from_dict(item)
+                for item in data.get("artifacts", [])
+                if isinstance(item, dict)
+            ],
+            tool_calls=[
+                ReportToolCallRecord.from_dict(item)
+                for item in data.get("tool_calls", [])
+                if isinstance(item, dict)
+            ],
             created_at=str(data.get("created_at", utc_now_iso())),
             updated_at=str(data.get("updated_at", utc_now_iso())),
             provider_metadata=dict(data.get("provider_metadata", {})),

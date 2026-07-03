@@ -9,6 +9,12 @@ from workspaces.profiler import profile_workspace_database
 from workspaces.report_composer import compose_report_document, repair_report_document
 from workspaces.report_evidence import collect_report_evidence
 from workspaces.report_ledger import build_evidence_ledger
+from workspaces.report_models import (
+    EvidenceLedger,
+    ReportArtifactRecord,
+    ReportRecord,
+    ReportToolCallRecord,
+)
 from workspaces.report_planner import plan_workspace_report
 from workspaces.report_store import WorkspaceReportStore
 from workspaces.report_validator import validate_report_document
@@ -92,9 +98,20 @@ def run_workspace_report(
             evidence_pack=evidence_pack,
             evidence_ledger=evidence_ledger,
         )
+    report.artifacts = _build_report_artifacts(
+        report=report,
+        workspace_root=Path(workspace["root_path"]),
+        evidence_ledger=evidence_ledger,
+    )
+    report.tool_calls = _build_report_tool_calls(
+        report=report,
+        evidence_ledger=evidence_ledger,
+    )
     document.technical_appendix = {
         "plan": plan.to_dict(),
         "evidence_ledger": evidence_ledger.to_dict(),
+        "ledger_reference_summary": _ledger_reference_summary(evidence_ledger),
+        "artifact_summary": _artifact_summary(report),
         "evidence_pack_summary": {
             "fact_count": len(evidence_pack.facts),
             "table_count": len(evidence_pack.tables),
@@ -181,6 +198,158 @@ def _report_composer_provider(providers: dict | None) -> Any | None:
     if not isinstance(providers, dict):
         return None
     return providers.get("report_composer") or providers.get("composer")
+
+
+def _build_report_artifacts(
+    *,
+    report: ReportRecord,
+    workspace_root: Path,
+    evidence_ledger: EvidenceLedger,
+) -> list[ReportArtifactRecord]:
+    artifacts: list[ReportArtifactRecord] = []
+    if report.evidence_pack:
+        for chart in report.evidence_pack.charts:
+            if not (chart.path or chart.url):
+                continue
+            artifact_id = chart.artifact_id or f"artifact_chart_{chart.chart_id}"
+            chart.artifact_id = artifact_id
+            artifacts.append(
+                ReportArtifactRecord(
+                    artifact_id=artifact_id,
+                    artifact_type="chart",
+                    title=chart.title or "报告图表",
+                    relative_path=chart.path,
+                    download_url=chart.url,
+                    source="local_renderer",
+                    evidence_ids=list(chart.evidence_ids),
+                    ledger_metric_ids=list(chart.ledger_metric_ids),
+                    chart_ids=[chart.chart_id] if chart.chart_id else [],
+                    status="completed",
+                    created_at=report.updated_at or report.created_at,
+                )
+            )
+
+    report_evidence_ids = [item.evidence_id for item in evidence_ledger.facts]
+    report_metric_ids = [item.evidence_id for item in evidence_ledger.derived_metrics]
+    chart_ids = [
+        chart.chart_id
+        for chart in (report.evidence_pack.charts if report.evidence_pack else [])
+        if chart.chart_id
+    ]
+    artifacts.extend(
+        [
+            ReportArtifactRecord(
+                artifact_id=f"artifact_markdown_{report.report_id}",
+                artifact_type="markdown_report",
+                title="Markdown 报告",
+                relative_path=_relative_to_workspace(report.markdown_path, workspace_root),
+                download_url=f"/api/workspaces/{report.workspace_id}/reports/{report.report_id}/download",
+                source="report_markdown",
+                evidence_ids=report_evidence_ids,
+                ledger_metric_ids=report_metric_ids,
+                chart_ids=chart_ids,
+                status="completed",
+                created_at=report.updated_at or report.created_at,
+            ),
+            ReportArtifactRecord(
+                artifact_id=f"artifact_document_{report.report_id}",
+                artifact_type="report_document",
+                title="报告文档记录",
+                relative_path=_relative_to_workspace(report.json_path, workspace_root),
+                source="report_markdown",
+                evidence_ids=report_evidence_ids,
+                ledger_metric_ids=report_metric_ids,
+                chart_ids=chart_ids,
+                status="completed",
+                created_at=report.updated_at or report.created_at,
+            ),
+        ]
+    )
+    return artifacts
+
+
+def _build_report_tool_calls(
+    *,
+    report: ReportRecord,
+    evidence_ledger: EvidenceLedger,
+) -> list[ReportToolCallRecord]:
+    calls: list[ReportToolCallRecord] = []
+    chart_artifacts = {
+        artifact.artifact_id: artifact
+        for artifact in report.artifacts
+        if artifact.artifact_type == "chart"
+    }
+    for artifact in chart_artifacts.values():
+        evidence_ids = [*artifact.evidence_ids, *artifact.ledger_metric_ids]
+        calls.append(
+            ReportToolCallRecord(
+                tool_call_id=f"tool_call_chart_{artifact.chart_ids[0] if artifact.chart_ids else artifact.artifact_id}",
+                tool_name="local_chart_renderer",
+                input_summary=f"渲染图表：{artifact.title}",
+                referenced_evidence_ids=evidence_ids,
+                output_artifact_ids=[artifact.artifact_id],
+                status=artifact.status,
+                error=artifact.error,
+                started_at=report.updated_at or report.created_at,
+                completed_at=report.updated_at or report.created_at,
+            )
+        )
+
+    report_artifact_ids = [
+        artifact.artifact_id
+        for artifact in report.artifacts
+        if artifact.artifact_type in {"markdown_report", "report_document"}
+    ]
+    if report_artifact_ids:
+        calls.append(
+            ReportToolCallRecord(
+                tool_call_id=f"tool_call_markdown_{report.report_id}",
+                tool_name="report_markdown_renderer",
+                input_summary=f"渲染 Markdown 报告：{report.title}",
+                referenced_evidence_ids=[
+                    item.evidence_id
+                    for item in [*evidence_ledger.facts, *evidence_ledger.derived_metrics]
+                ],
+                output_artifact_ids=report_artifact_ids,
+                status="completed",
+                started_at=report.updated_at or report.created_at,
+                completed_at=report.updated_at or report.created_at,
+            )
+        )
+    return calls
+
+
+def _ledger_reference_summary(evidence_ledger: EvidenceLedger) -> dict[str, Any]:
+    return {
+        "evidence_ids": [item.evidence_id for item in evidence_ledger.facts],
+        "ledger_metric_ids": [item.evidence_id for item in evidence_ledger.derived_metrics],
+        "fact_count": len(evidence_ledger.facts),
+        "derived_metric_count": len(evidence_ledger.derived_metrics),
+    }
+
+
+def _artifact_summary(report: ReportRecord) -> dict[str, Any]:
+    artifacts = list(report.artifacts)
+    return {
+        "artifact_count": len(artifacts),
+        "chart_count": sum(1 for artifact in artifacts if artifact.artifact_type == "chart"),
+        "report_artifacts": [
+            artifact.title
+            for artifact in artifacts
+            if artifact.artifact_type in {"markdown_report", "report_document"}
+        ],
+        "tool_call_count": len(report.tool_calls),
+    }
+
+
+def _relative_to_workspace(path_value: str, workspace_root: Path) -> str:
+    if not path_value:
+        return ""
+    path = Path(path_value)
+    try:
+        return path.resolve().relative_to(workspace_root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _append_trace_events(trace_path: Path, events: list[dict[str, Any]]) -> None:

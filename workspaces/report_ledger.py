@@ -31,7 +31,32 @@ def build_evidence_ledger(
         technical_refs=_technical_refs(evidence_pack),
     )
     evidence_pack.ledger = ledger
+    _annotate_chart_ledger_refs(evidence_pack=evidence_pack, ledger=ledger)
     return ledger
+
+
+def _annotate_chart_ledger_refs(
+    *,
+    evidence_pack: ReportEvidencePack,
+    ledger: EvidenceLedger,
+) -> None:
+    facts_by_ref = _ledger_ids_by_source(ledger.facts)
+    metrics_by_ref = _ledger_ids_by_source(ledger.derived_metrics)
+    for chart in evidence_pack.charts:
+        if not chart.artifact_id:
+            chart.artifact_id = f"artifact_chart_{chart.chart_id or _slug(chart.title)}"
+        evidence_ref = chart.evidence_ref
+        chart.evidence_ids = facts_by_ref.get(evidence_ref, [])[:12]
+        chart.ledger_metric_ids = metrics_by_ref.get(evidence_ref, [])[:12]
+
+
+def _ledger_ids_by_source(items: list[ReportLedgerItem]) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for item in items:
+        if not item.source_evidence or not item.evidence_id:
+            continue
+        grouped.setdefault(item.source_evidence, []).append(item.evidence_id)
+    return grouped
 
 
 class CoverageChecker:

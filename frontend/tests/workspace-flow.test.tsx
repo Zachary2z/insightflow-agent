@@ -1913,9 +1913,69 @@ describe("workspace product components", () => {
               url: "/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.png",
               description: "按产品品类展示收入贡献。",
               evidence_ref: "query_revenue_by_category",
+              artifact_id: "artifact_chart_revenue_structure_chart",
+              evidence_ids: ["ledger_fact_revenue_total"],
+              ledger_metric_ids: ["ledger_metric_revenue_by_category_收入_total"],
             },
           ],
         },
+        artifacts: [
+          {
+            artifact_id: "artifact_chart_revenue_structure_chart",
+            artifact_type: "chart",
+            title: "收入结构图表",
+            relative_path: "reports/report_1/artifacts/revenue_structure.png",
+            source: "local_renderer",
+            evidence_ids: ["ledger_fact_revenue_total"],
+            ledger_metric_ids: ["ledger_metric_revenue_by_category_收入_total"],
+            chart_ids: ["revenue_structure_chart"],
+            status: "completed",
+          },
+          {
+            artifact_id: "artifact_report_markdown_report_1",
+            artifact_type: "markdown_report",
+            title: "Markdown 报告",
+            download_url: "/api/workspaces/ws_1/reports/report_1/download",
+            source: "report_markdown",
+            evidence_ids: ["ledger_fact_revenue_total"],
+            ledger_metric_ids: ["ledger_metric_revenue_by_category_收入_total"],
+            chart_ids: ["revenue_structure_chart"],
+            status: "completed",
+          },
+          {
+            artifact_id: "artifact_future_export_placeholder",
+            artifact_type: "future_export",
+            title: "未来外部导出占位",
+            source: "future_external_tool",
+            evidence_ids: ["ledger_fact_revenue_total"],
+            ledger_metric_ids: [],
+            chart_ids: ["revenue_structure_chart"],
+            status: "pending",
+            error: "不在当前阶段执行外部导出。",
+          },
+        ],
+        tool_calls: [
+          {
+            tool_call_id: "tool_call_chart_revenue_structure_chart",
+            tool_name: "local_chart_renderer",
+            input_summary: "渲染图表：收入结构图表",
+            referenced_evidence_ids: ["ledger_fact_revenue_total"],
+            output_artifact_ids: ["artifact_chart_revenue_structure_chart"],
+            status: "completed",
+            started_at: "2026-07-02T15:29:00Z",
+            completed_at: "2026-07-02T15:29:01Z",
+          },
+          {
+            tool_call_id: "tool_call_markdown_report_1",
+            tool_name: "report_markdown_renderer",
+            input_summary: "渲染 Markdown 报告：管理层收入复盘报告",
+            referenced_evidence_ids: ["ledger_fact_revenue_total"],
+            output_artifact_ids: ["artifact_report_markdown_report_1"],
+            status: "completed",
+            started_at: "2026-07-02T15:29:01Z",
+            completed_at: "2026-07-02T15:29:02Z",
+          },
+        ],
         document: {
           title: "管理层收入复盘报告",
           time_range: "最近90天",
@@ -1989,6 +2049,11 @@ describe("workspace product components", () => {
       "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.png",
     );
     expect(screen.getByText("收入结构")).toBeTruthy();
+    expect(screen.getByText("报告产物")).toBeTruthy();
+    expect(screen.getByText("图表：收入结构图表")).toBeTruthy();
+    expect(screen.getByText("Markdown 报告：Markdown 报告")).toBeTruthy();
+    expect(screen.getByText("外部导出准备：未来外部导出占位")).toBeTruthy();
+    expect(screen.getByText("状态：待处理")).toBeTruthy();
     expect(screen.getByText("证据来自订单表按产品品类汇总。")).toBeTruthy();
     expect(screen.getByText("企业SaaS订阅")).toBeTruthy();
     expect(screen.getByText("20.0 万")).toBeTruthy();
@@ -2012,6 +2077,11 @@ describe("workspace product components", () => {
     expect(screen.queryByText(/SELECT channel/)).toBeNull();
     expect(screen.queryByText("revenue_by_category")).toBeNull();
     expect(screen.queryByText("query_revenue_by_category")).toBeNull();
+    expect(screen.queryByText("artifact_chart_revenue_structure_chart")).toBeNull();
+    expect(screen.queryByText("ledger_fact_revenue_total")).toBeNull();
+    expect(screen.queryByText("ledger_metric_revenue_by_category_收入_total")).toBeNull();
+    expect(screen.queryByText("local_chart_renderer")).toBeNull();
+    expect(screen.queryByText("report_markdown_renderer")).toBeNull();
     expect(screen.queryByText("paid_search")).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
     expect(screen.queryByText(/sql_reviewer/)).toBeNull();

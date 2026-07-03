@@ -253,6 +253,50 @@ function SectionEvidenceTables({ tables }: { tables: Array<Record<string, unknow
   );
 }
 
+function ReportArtifactSummary({ report }: { report: WorkspaceReport }) {
+  const visibleArtifacts = (report.artifacts ?? []).filter((artifact) => {
+    const type = textValue(artifact.artifact_type, "");
+    return ["chart", "markdown_report", "report_document", "future_export"].includes(type);
+  });
+  if (!visibleArtifacts.length) {
+    return null;
+  }
+  return (
+    <section className="report-summary">
+      <h3>报告产物</h3>
+      <ul>
+        {visibleArtifacts.map((artifact, index) => (
+          <li key={`${artifact.artifact_type}-${artifact.title}-${index}`}>
+            <strong>{artifactTypeLabel(textValue(artifact.artifact_type, ""))}：{textValue(artifact.title, "未命名产物")}</strong>
+            <span>状态：{artifactStatusLabel(textValue(artifact.status, "completed"))}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function artifactTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    chart: "图表",
+    markdown_report: "Markdown 报告",
+    report_document: "报告文档",
+    future_export: "外部导出准备",
+  };
+  return labels[type] ?? "报告产物";
+}
+
+function artifactStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    completed: "已完成",
+    pending: "待处理",
+    running: "处理中",
+    failed: "失败",
+    skipped: "未执行",
+  };
+  return labels[status] ?? status;
+}
+
 function chartsForSection(charts: Array<Record<string, unknown>>, sectionId: string, chartRefs: string[]) {
   const refs = new Set(chartRefs);
   const selected = charts.filter((chart) => {
@@ -400,6 +444,7 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
         ) : null}
       </ProductCard>
       <ReportDocumentBody report={report} language={language} workspaceId={workspaceId} />
+      <ReportArtifactSummary report={report} />
       <TextList title={labels.actionRecommendations} items={report.document?.action_recommendations} />
       <TextList title={labels.dataBoundaries} items={report.document?.data_boundaries} />
       <ReportTechnicalAppendix report={report} />
