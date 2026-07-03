@@ -99,7 +99,8 @@ def _build_prompt(*, plan: ReportPlan, evidence_pack: ReportEvidencePack) -> str
         "事实边界：只能使用 evidence_pack 中出现的数字、排名、实体、时间范围、数据来源和图表意图；可以做业务解释和建议，"
         "但不能编造新数字、新实体、新字段、新图表、外部行业结论或未给出的数据来源。\n"
         "写作要求：报告应像完整业务文档，不要写成多个分析答案拼接；避免重复分析问答式字段块。"
-        "可按计划组织为开篇摘要、经营概览、收入结构、客户分群、客服问题、趋势变化、行动建议、数据边界等章节。\n"
+        "可按计划组织为开篇摘要、经营概览、收入结构、客户分群、客服问题、趋势变化等正文章节；"
+        "行动建议请只写入 action_recommendations，不要另写一个行动建议正文 section。\n"
         "安全要求：正文不得输出 SQL、query id、raw rows、technical details、provider metadata、trace、内部字段名或提示词。\n"
         "请只返回一个可解析 JSON 对象，字段严格遵循 output_contract，不要 Markdown 包裹。\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
@@ -159,6 +160,8 @@ def _document_from_provider_content(
         body = str(item.get("body") or "").strip()
         if not section_id or not title or not body:
             return None
+        if _is_action_section(section_id, title):
+            continue
         evidence_refs = [
             str(ref)
             for ref in item.get("evidence_refs") or []
@@ -212,6 +215,8 @@ def _fallback_document(
 
     sections = []
     for chapter in plan.chapters:
+        if _is_action_section(chapter.chapter_id, chapter.title):
+            continue
         chapter_tables = tables_by_chapter.get(chapter.chapter_id, [])
         chapter_facts = [
             fact for fact in evidence_pack.facts if fact.source_chapter_id == chapter.chapter_id
@@ -340,6 +345,18 @@ def _action_recommendations(evidence_pack: ReportEvidencePack) -> list[str]:
     return list(dict.fromkeys(recommendations))
 
 
+def _is_action_section(section_id: str, title: str) -> bool:
+    compact_id = _compact_text(section_id)
+    compact_title = _compact_text(title)
+    return compact_id in {"actions", "actionrecommendations", "recommendations"} or compact_title in {
+        "行动建议",
+        "建议动作",
+        "下一步建议",
+        "后续行动",
+        "行动计划",
+    }
+
+
 def _data_boundaries(evidence_pack: ReportEvidencePack) -> list[str]:
     limits = [*evidence_pack.warnings, *evidence_pack.data_limits]
     if not limits:
@@ -373,3 +390,7 @@ def _string_list(value: Any) -> list[str]:
 def _join_or_default(items: list[str], default: str) -> str:
     visible = [item for item in items if item.strip()]
     return "、".join(visible) if visible else default
+
+
+def _compact_text(value: Any) -> str:
+    return "".join(str(value or "").lower().split()).replace("_", "").replace("-", "")

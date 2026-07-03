@@ -87,6 +87,18 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 
 ## Latest P23-H3 Result
 
+P23-H3 derived-share validator and duplicate-action repair completed on 2026-07-03:
+
+- Fixed `report_validator` so percentages such as `26.8%`, `18.6%`, and `15.5%` pass only when they can be directly derived from numeric values in the same `ReportEvidenceTable`; unrelated percentages such as `99.9%` still produce warning validation.
+- Updated provider and fallback report composition so an `actions` / `行动建议` section is filtered out of `ReportDocument.sections`; recommendations remain in the bottom-level `action_recommendations` list.
+- Added defensive Markdown and `ReportViewer` filtering so older or provider-shaped documents with an actions section do not render duplicate “行动建议” blocks. Progress counts now use only business body sections.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`49 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+  - `git diff --check` passed
+
 P23-H3 One-Pass Report Center With Shared Evidence completed on 2026-07-03:
 
 - Strengthened Report Center tests so the main path cannot call `run_workspace_analysis()` for report sections, cannot use Analysis Workbench `business_answer` blocks as report body, and must call `report_composer` once with the full plan plus evidence pack.

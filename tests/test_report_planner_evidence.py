@@ -4,7 +4,12 @@ from pathlib import Path
 
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_markdown import render_report_markdown
-from workspaces.report_models import ReportDocument, ReportRecord, ReportValidationResult
+from workspaces.report_models import (
+    ReportDocument,
+    ReportDocumentSection,
+    ReportRecord,
+    ReportValidationResult,
+)
 from workspaces.report_evidence import collect_report_evidence
 from workspaces.report_planner import plan_workspace_report
 from workspaces.semantic_draft import generate_semantic_layer_draft
@@ -556,3 +561,58 @@ def test_report_markdown_main_body_hides_sql_query_ids_and_technical_details(tmp
     assert "query_revenue" not in main_body
     assert "technical_details" not in main_body
     assert "raw_rows" not in main_body
+
+
+def test_report_markdown_does_not_duplicate_action_recommendation_sections(tmp_path):
+    _store, workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，关注收入结构和行动建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="本报告基于当前工作区证据生成。",
+        sections=[
+            ReportDocumentSection(
+                section_id="revenue_structure",
+                title="收入结构",
+                body="收入结构正文。",
+            ),
+            ReportDocumentSection(
+                section_id="actions",
+                title="行动建议",
+                body="不要作为正文重复展示。",
+            ),
+        ],
+        action_recommendations=["优先复盘高收入来源。"],
+        data_boundaries=evidence_pack.data_limits,
+    )
+    report = ReportRecord(
+        report_id="report_no_duplicate_actions",
+        workspace_id=workspace["workspace_id"],
+        report_type="business_review",
+        report_goal=plan.report_goal,
+        title=plan.title,
+        status="completed",
+        plan=plan,
+        evidence_pack=evidence_pack,
+        document=document,
+        validation=ReportValidationResult(status="passed"),
+    )
+
+    markdown = render_report_markdown(report)
+
+    assert "### 行动建议" not in markdown
+    assert markdown.count("## 行动建议") == 1
+    assert "不要作为正文重复展示" not in markdown
+    assert "优先复盘高收入来源。" in markdown

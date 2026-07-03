@@ -115,6 +115,27 @@ def _sample_evidence_pack() -> ReportEvidencePack:
     )
 
 
+def _share_evidence_pack() -> ReportEvidencePack:
+    return ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_revenue",
+                title="渠道收入结构",
+                columns=["渠道", "收入"],
+                rows=[
+                    {"渠道": "email", "收入": "26.8 万"},
+                    {"渠道": "direct", "收入": "18.6 万"},
+                    {"渠道": "organic", "收入": "15.5 万"},
+                    {"渠道": "其他渠道", "收入": "39.1 万"},
+                ],
+                source_chapter_id="revenue_structure",
+                description="证据来自订单表按渠道汇总。",
+                evidence_ref="query_channel_revenue",
+            )
+        ]
+    )
+
+
 def _document_text(document: ReportDocument) -> str:
     return json.dumps(
         {
@@ -198,10 +219,47 @@ def test_report_composer_no_key_fallback_returns_chinese_report_document():
     assert document.sections
     assert "43.0 万" in text
     assert "企业SaaS订阅" in text
-    assert "行动建议" in [section.title for section in document.sections]
+    assert "行动建议" not in [section.title for section in document.sections]
+    assert document.action_recommendations
     assert "直接回答" not in text
     assert "为什么" not in text
     assert "置信度" not in text
+
+
+def test_report_composer_filters_duplicate_action_sections_from_provider_output():
+    provider = MockLLMProvider(
+        {
+            "title": "最近90天经营复盘报告",
+            "time_range": "最近90天",
+            "data_sources": ["订单明细", "客服反馈"],
+            "opening_summary": "最近90天总收入为 43.0 万。",
+            "sections": [
+                {
+                    "section_id": "revenue_structure",
+                    "title": "收入结构",
+                    "body": "企业SaaS订阅收入为 26.8 万，位居产品收入第一。",
+                    "evidence_refs": ["revenue_by_dimension"],
+                },
+                {
+                    "section_id": "actions",
+                    "title": "行动建议",
+                    "body": "建议优先复盘高收入来源。",
+                    "evidence_refs": ["revenue_by_dimension"],
+                },
+            ],
+            "action_recommendations": ["建议优先复盘高收入来源。"],
+            "data_boundaries": ["当前缺少利润、复购率和销售人效数据。"],
+        }
+    )
+
+    document = compose_report_document(
+        plan=_sample_plan(),
+        evidence_pack=_sample_evidence_pack(),
+        provider=provider,
+    )
+
+    assert [section.title for section in document.sections] == ["收入结构"]
+    assert document.action_recommendations == ["建议优先复盘高收入来源。"]
 
 
 def test_report_validator_flags_conflicting_top_ranked_entity():
@@ -230,6 +288,76 @@ def test_report_validator_flags_conflicting_top_ranked_entity():
 
     assert validation.status == "warning"
     assert any("收入结构" in claim and "企业SaaS订阅" in claim for claim in validation.unsupported_claims)
+
+
+def test_report_validator_accepts_percentages_derived_from_same_evidence_table():
+    plan = ReportPlan(
+        title="最近90天渠道表现复盘报告",
+        report_style="渠道表现复盘",
+        time_range="最近90天",
+        data_sources=["订单明细"],
+        chapters=[],
+    )
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="email、direct、organic 分别贡献 26.8%、18.6%、15.5%。",
+        sections=[
+            ReportDocumentSection(
+                section_id="revenue_structure",
+                title="渠道收入结构",
+                body="email 占比 26.8%，direct 占比 18.6%，organic 占比 15.5%。",
+                evidence_refs=["channel_revenue"],
+            )
+        ],
+        action_recommendations=["优先复盘 email 的承接能力。"],
+        data_boundaries=[],
+    )
+
+    validation = validate_report_document(
+        document=document,
+        plan=plan,
+        evidence_pack=_share_evidence_pack(),
+    )
+
+    assert validation.status == "passed"
+    assert validation.unsupported_claims == []
+
+
+def test_report_validator_still_flags_underived_percentages():
+    plan = ReportPlan(
+        title="最近90天渠道表现复盘报告",
+        report_style="渠道表现复盘",
+        time_range="最近90天",
+        data_sources=["订单明细"],
+        chapters=[],
+    )
+    document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=plan.data_sources,
+        opening_summary="email 贡献 99.9%。",
+        sections=[
+            ReportDocumentSection(
+                section_id="revenue_structure",
+                title="渠道收入结构",
+                body="email 占比 99.9%。",
+                evidence_refs=["channel_revenue"],
+            )
+        ],
+        action_recommendations=[],
+        data_boundaries=[],
+    )
+
+    validation = validate_report_document(
+        document=document,
+        plan=plan,
+        evidence_pack=_share_evidence_pack(),
+    )
+
+    assert validation.status == "warning"
+    assert any("99.9%" in claim for claim in validation.unsupported_claims)
 
 
 def test_report_validator_allows_reasonable_evidence_backed_recommendation():

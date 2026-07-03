@@ -1929,6 +1929,11 @@ describe("workspace product components", () => {
               evidence_refs: ["revenue_total"],
               chart_refs: ["revenue_structure_chart"],
             },
+            {
+              section_id: "actions",
+              title: "行动建议",
+              body: "这段不应该作为正文重复展示。",
+            },
           ],
           action_recommendations: ["先复盘付费搜索投放效率。"],
           data_boundaries: ["当前报告缺少 ROI、利润和转化率。"],
@@ -1978,6 +1983,8 @@ describe("workspace product components", () => {
     expect(screen.getByText("当前报告缺少 ROI、利润和转化率。")).toBeTruthy();
     expect(screen.getByText("渠道收入复盘")).toBeTruthy();
     expect(screen.getByText("付费搜索贡献主要收入，邮件渠道提供稳定补充；当前报告应继续补齐 ROI、利润和转化率后再做预算判断。")).toBeTruthy();
+    expect(screen.queryByText("这段不应该作为正文重复展示。")).toBeNull();
+    expect(screen.getAllByText("行动建议").length).toBe(1);
     expect(screen.queryByText("结论")).toBeNull();
     expect(screen.queryByText("直接回答")).toBeNull();
     expect(screen.queryByText("为什么")).toBeNull();

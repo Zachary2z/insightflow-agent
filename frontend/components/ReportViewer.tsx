@@ -94,7 +94,7 @@ function statusLabel(status: string, language: ReportLanguage) {
 }
 
 function progressSummary(report: WorkspaceReport, language: ReportLanguage) {
-  const sections = report.document?.sections ?? [];
+  const sections = reportBodySections(report.document?.sections ?? []);
   const total = sections.length;
   const completed = report.status === "completed" ? total : 0;
   const labels = REPORT_LABELS[language];
@@ -137,7 +137,7 @@ function ReportDocumentBody({
 }) {
   const labels = REPORT_LABELS[language];
   const document = report.document;
-  const sections = document?.sections ?? [];
+  const sections = reportBodySections(document?.sections ?? []);
   const evidenceTables = report.evidence_pack?.tables ?? [];
   const evidenceCharts = report.evidence_pack?.charts ?? [];
   if (!sections.length) {
@@ -265,6 +265,23 @@ function chartsForSection(charts: Array<Record<string, unknown>>, sectionId: str
     unique.set(key, chart);
   });
   return Array.from(unique.values());
+}
+
+function reportBodySections(sections: Array<{ section_id: string; title: string; body: string }>) {
+  return sections.filter((section) => !isActionSection(section.section_id, section.title));
+}
+
+function isActionSection(sectionId: string, title: string) {
+  const compactId = compactText(sectionId);
+  const compactTitle = compactText(title);
+  return (
+    ["actions", "actionrecommendations", "recommendations"].includes(compactId) ||
+    ["行动建议", "建议动作", "下一步建议", "后续行动", "行动计划"].includes(compactTitle)
+  );
+}
+
+function compactText(value: string) {
+  return value.toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 function chartArtifactUrl(chart: Record<string, unknown>, workspaceId: string) {

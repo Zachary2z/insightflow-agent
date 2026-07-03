@@ -21,8 +21,11 @@ def render_report_markdown(report: ReportRecord) -> str:
         "## 报告正文",
         "",
     ]
-    if document.sections:
-        for section in document.sections:
+    body_sections = [
+        section for section in document.sections if not _is_action_section(section.section_id, section.title)
+    ]
+    if body_sections:
+        for section in body_sections:
             lines.extend([f"### {section.title}", "", section.body or "本章节暂未形成正文。"])
             for chart in _charts_for_section(report, section.section_id, section.chart_refs):
                 lines.extend(["", *_render_chart(chart)])
@@ -166,3 +169,19 @@ def _status_label(status: str) -> str:
 
 def _date_label(value: str) -> str:
     return value[:10] if value else "未知"
+
+
+def _is_action_section(section_id: str, title: str) -> bool:
+    compact_id = _compact_text(section_id)
+    compact_title = _compact_text(title)
+    return compact_id in {"actions", "actionrecommendations", "recommendations"} or compact_title in {
+        "行动建议",
+        "建议动作",
+        "下一步建议",
+        "后续行动",
+        "行动计划",
+    }
+
+
+def _compact_text(value: Any) -> str:
+    return "".join(str(value or "").lower().split()).replace("_", "").replace("-", "")

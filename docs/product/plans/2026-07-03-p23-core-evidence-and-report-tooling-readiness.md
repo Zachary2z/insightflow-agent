@@ -274,6 +274,19 @@ Completion record:
   - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
   - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
+Fix record:
+
+- Fixed on 2026-07-03 after live DeepSeek report smoke testing exposed two P23-H3 polish issues.
+- `report_validator` now accepts percentage/share values only when they are directly derivable from numeric values in the same evidence table, with reasonable rounded forms such as `26.8%`, `18.6%`, and `15.5%`. Unrelated percentages still produce warning validation.
+- Provider and deterministic report composition now filter `actions` / `行动建议` sections out of `ReportDocument.sections`; the report keeps recommendations in the dedicated bottom-level `action_recommendations` list.
+- Markdown rendering and `ReportViewer` also defensively skip action sections, so older/provider-shaped documents do not show a duplicate “行动建议” block. Frontend progress counts only body sections.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`49 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+  - `git diff --check` passed
+
 ## P23-H4: Artifact And Tool-Calling Readiness
 
 Goal: Prepare the internal artifact contract so P24 can connect real external tools without rewriting the analysis/report chain.

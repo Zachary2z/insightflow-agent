@@ -87,7 +87,37 @@ def _supported_values(evidence_pack: ReportEvidencePack) -> set[str]:
         for row in table.rows:
             for value in row.values():
                 values.update(_value_forms(value))
+        values.update(_table_share_value_forms(table.rows))
     return {value for value in values if value}
+
+
+def _table_share_value_forms(rows: list[dict[str, Any]]) -> set[str]:
+    values: set[str] = set()
+    if len(rows) < 2:
+        return values
+    columns = sorted({str(key) for row in rows for key in row})
+    for column in columns:
+        numeric_values = [_to_number(row.get(column)) for row in rows]
+        if any(value is None for value in numeric_values):
+            continue
+        total = sum(value or 0 for value in numeric_values)
+        if total <= 0:
+            continue
+        for value in numeric_values:
+            if value is None:
+                continue
+            share = value / total * 100
+            values.update(_percentage_forms(share))
+    return values
+
+
+def _percentage_forms(value: float) -> set[str]:
+    forms = {
+        f"{value:.0f}%",
+        f"{value:.1f}%",
+        f"{value:.2f}%",
+    }
+    return {form for form in forms if not form.startswith("-")}
 
 
 def _value_forms(value: Any) -> set[str]:
