@@ -287,6 +287,19 @@ Fix record:
   - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
   - `git diff --check` passed
 
+Follow-up fix record:
+
+- Fixed on 2026-07-03 after another live DeepSeek report smoke showed `partial` reports from two validator gaps: provider-written structured `time_range` drift and supported date/year expressions being interpreted as ordinary unsupported numbers.
+- `ReportDocument.time_range` is now locked to `ReportPlan.time_range` during provider content conversion. Providers can still explain actual data coverage such as `2026年4月至6月` in the report prose or data boundaries, but cannot overwrite the structured report time range.
+- `report_validator` now builds evidence-backed time forms from table/fact date values and trend periods, so supported forms such as `2026-04`, `2026年4月至6月`, and `2026 年 4 月至 6 月` do not create unsupported `2026` claims. Ordinary unsupported business numbers such as `2026 单` still warn.
+- Validator support was extended to shared evidence payload `display_value` / `value` fields, table column unit forms such as `100 行`, currency variants such as `4.5万元`, metric-column unit conversions such as `0.77万`, and same-chapter total-derived shares such as `20.4%` and `17.7%`, while unrelated percentages remain rejected.
+- Live DeepSeek report smoke passed with provider available: report status `completed`, validation status `passed`, `unsupported_claims` empty, plan/document `time_range` stable, no duplicate `行动建议` section, and no SQL/raw rows/trace/provider metadata leaks in the main body.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`56 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+
 ## P23-H4: Artifact And Tool-Calling Readiness
 
 Goal: Prepare the internal artifact contract so P24 can connect real external tools without rewriting the analysis/report chain.

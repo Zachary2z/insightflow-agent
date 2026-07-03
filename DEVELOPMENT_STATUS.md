@@ -87,6 +87,19 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 
 ## Latest P23-H3 Result
 
+P23-H3 time-range and date-evidence validator repair completed on 2026-07-03:
+
+- Locked provider-composed `ReportDocument.time_range` to `ReportPlan.time_range`, so providers may describe actual data coverage such as `2026年4月至6月` in report prose but cannot drift the structured report time range away from the plan.
+- Extended `report_validator` to treat evidence-backed month/date expressions as time facts instead of unsupported ordinary numbers, including forms such as `2026-04`, `2026年4月至6月`, and spaced Chinese forms such as `2026 年 4 月至 6 月`.
+- Kept number validation strict for non-date claims: unsupported business numbers such as `2026 单` still produce warning validation.
+- Extended supported hard-fact forms from shared evidence payloads, table column units, currency display variants, metric-column unit conversions, and same-chapter total facts, so model prose such as `4.5万元`, `100 行`, `0.77万`, and evidence-derived shares such as `20.4%` validate only when backed by the current evidence pack.
+- Live DeepSeek report smoke passed with provider available: status `completed`, validation `passed`, `unsupported_claims` empty, stable plan/document time range, no duplicate行动建议 section, and no SQL/raw rows/trace/provider metadata leaks in the main body.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_composer_validator.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`56 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
+
 P23-H3 derived-share validator and duplicate-action repair completed on 2026-07-03:
 
 - Fixed `report_validator` so percentages such as `26.8%`, `18.6%`, and `15.5%` pass only when they can be directly derived from numeric values in the same `ReportEvidenceTable`; unrelated percentages such as `99.9%` still produce warning validation.

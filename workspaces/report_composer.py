@@ -101,6 +101,7 @@ def _build_prompt(*, plan: ReportPlan, evidence_pack: ReportEvidencePack) -> str
         "写作要求：报告应像完整业务文档，不要写成多个分析答案拼接；避免重复分析问答式字段块。"
         "可按计划组织为开篇摘要、经营概览、收入结构、客户分群、客服问题、趋势变化等正文章节；"
         "行动建议请只写入 action_recommendations，不要另写一个行动建议正文 section。\n"
+        "结构要求：time_range 字段必须与 report_plan.time_range 完全一致；实际数据覆盖月份可在正文或数据边界中说明。\n"
         "安全要求：正文不得输出 SQL、query id、raw rows、technical details、provider metadata、trace、内部字段名或提示词。\n"
         "请只返回一个可解析 JSON 对象，字段严格遵循 output_contract，不要 Markdown 包裹。\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
@@ -183,7 +184,7 @@ def _document_from_provider_content(
         )
     return ReportDocument(
         title=str(content.get("title") or plan.title).strip() or plan.title,
-        time_range=str(content.get("time_range") or plan.time_range).strip() or plan.time_range,
+        time_range=plan.time_range,
         data_sources=_string_list(content.get("data_sources")) or list(plan.data_sources),
         opening_summary=str(content.get("opening_summary") or "").strip(),
         sections=sections,
