@@ -37,6 +37,33 @@ def _create_workspace_with_orders(tmp_path):
     return store, workspace
 
 
+def _create_workspace_with_chartable_recent_orders(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Report Runner Chart Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            """
+            CREATE TABLE orders (
+                order_date TEXT,
+                product_category TEXT,
+                customer_segment TEXT,
+                revenue REAL,
+                order_count INTEGER
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO orders VALUES (?, ?, ?, ?, ?)",
+            [
+                ("2026-04-01", "企业SaaS订阅", "成长型团队", 120000.0, 12),
+                ("2026-05-01", "数据分析服务", "高价值企业", 86000.0, 8),
+                ("2026-06-01", "企业SaaS订阅", "高价值企业", 148000.0, 11),
+                ("2026-06-15", "运营代投服务", "成长型团队", 76000.0, 6),
+            ],
+        )
+    return store, workspace
+
+
 def test_report_contract_serializes_plan_evidence_document_and_validation():
     plan = ReportPlan(
         title="最近90天经营复盘报告",
@@ -355,6 +382,45 @@ def test_report_runner_records_local_artifact_and_tool_call_readiness(tmp_path):
     assert "provider_metadata" not in serialized_public_records
     assert report["document"]["technical_appendix"]["artifact_summary"]["artifact_count"] == len(artifacts)
     assert report["document"]["technical_appendix"]["ledger_reference_summary"]["evidence_ids"]
+
+
+def test_report_runner_persists_chart_artifacts_from_evidence_pack(tmp_path):
+    store, workspace = _create_workspace_with_chartable_recent_orders(tmp_path)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告，关注收入结构、客户分群和趋势变化。",
+    )
+
+    report = result["report"]
+    evidence_charts = [
+        chart
+        for chart in report["evidence_pack"]["charts"]
+        if chart.get("path") or chart.get("url")
+    ]
+    chart_artifacts = [
+        artifact
+        for artifact in report["artifacts"]
+        if artifact["artifact_type"] == "chart"
+    ]
+    chart_tool_calls = [
+        tool_call
+        for tool_call in report["tool_calls"]
+        if tool_call["tool_name"] == "local_chart_renderer"
+    ]
+    evidence_chart_ids = {chart["chart_id"] for chart in evidence_charts}
+    artifact_ids = {artifact["artifact_id"] for artifact in chart_artifacts}
+
+    assert len(report["evidence_pack"]["charts"]) > 0
+    assert evidence_charts
+    assert chart_artifacts
+    assert all(artifact["evidence_ids"] or artifact["ledger_metric_ids"] for artifact in chart_artifacts)
+    assert all(set(artifact["chart_ids"]).issubset(evidence_chart_ids) for artifact in chart_artifacts)
+    assert chart_tool_calls
+    assert all(set(tool_call["output_artifact_ids"]).issubset(artifact_ids) for tool_call in chart_tool_calls)
+    assert report["document"]["technical_appendix"]["artifact_summary"]["chart_count"] == len(chart_artifacts)
 
 
 def test_report_runner_composes_once_without_section_business_answers(tmp_path, monkeypatch):

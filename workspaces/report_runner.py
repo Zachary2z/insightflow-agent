@@ -98,15 +98,12 @@ def run_workspace_report(
             evidence_pack=evidence_pack,
             evidence_ledger=evidence_ledger,
         )
-    report.artifacts = _build_report_artifacts(
-        report=report,
-        workspace_root=Path(workspace["root_path"]),
-        evidence_ledger=evidence_ledger,
-    )
-    report.tool_calls = _build_report_tool_calls(
-        report=report,
-        evidence_ledger=evidence_ledger,
-    )
+    report.title = plan.title
+    report.status = "completed" if validation.status == "passed" else "partial"
+    report.plan = plan
+    report.evidence_pack = evidence_pack
+    report.document = document
+    report.validation = validation
     document.technical_appendix = {
         "plan": plan.to_dict(),
         "evidence_ledger": evidence_ledger.to_dict(),
@@ -124,13 +121,16 @@ def run_workspace_report(
         },
         "generation_steps": ["规划报告", "整理证据", "生成证据账本", "撰写正文", "校验证据", "必要时修复一次", "渲染保存"],
     }
-
-    report.title = plan.title
-    report.status = "completed" if validation.status == "passed" else "partial"
-    report.plan = plan
-    report.evidence_pack = evidence_pack
-    report.document = document
-    report.validation = validation
+    report.artifacts = _build_report_artifacts(
+        report=report,
+        workspace_root=Path(workspace["root_path"]),
+        evidence_ledger=evidence_ledger,
+    )
+    report.tool_calls = _build_report_tool_calls(
+        report=report,
+        evidence_ledger=evidence_ledger,
+    )
+    document.technical_appendix["artifact_summary"] = _artifact_summary(report)
     report.provider_metadata = {
         "generation_flow": "ledger_backed_report_center",
         "provider_supplied": bool(providers),
