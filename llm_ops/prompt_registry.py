@@ -88,7 +88,7 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
     [
         PromptTemplate(
             prompt_id="guarded_sql_candidate",
-            version="v1",
+            version="v2",
             description="Propose SQL candidates that still require validate_sql before execution.",
             required_variables=[
                 "user_question",
@@ -118,6 +118,11 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "sql_candidates must be an array of objects, not an array of strings. The SQL key must be sql.\n"
                 "When the user asks for a dataset-relative recent window, use the latest available time value "
                 "from Workspace context instead of DATE('now').\n"
+                "For comparison, judgment, reason, recommendation, priority, budget, or optimization questions, "
+                "return comparable candidate objects by default, usually LIMIT 3 or LIMIT 5. Do not use LIMIT 1 "
+                "unless the user explicitly asks to return only the first item or only one row. Pure factual "
+                "\"who is highest/lowest\" questions may use LIMIT 1, but \"why\", \"should\", \"recommend\", "
+                "\"priority\", or \"budget\" questions need multi-row comparison evidence.\n"
                 "Generate SQLite-compatible SQL only. For recent N-day windows, use SQLite date syntax such as "
                 "date((SELECT MAX(order_date) FROM orders), '-90 days') or julianday(); "
                 "Do not use INTERVAL, DATE_SUB, NOW(), CURRENT_DATE arithmetic, or non-SQLite date functions.\n"

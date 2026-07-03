@@ -34,6 +34,7 @@ class AgentState(TypedDict, total=False):
     clarification_result: dict[str, Any]
     sql_planning: dict[str, Any]
     sql_routing_strategy: str
+    comparison_scope_adjustment: dict[str, Any]
     analysis_plan: dict[str, Any]
     scenario_type: str
     analysis_steps: list[dict[str, Any]]

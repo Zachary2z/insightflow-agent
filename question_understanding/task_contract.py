@@ -175,7 +175,10 @@ def legacy_dimension_id(dimension_label: str) -> str:
 
 def _normalize_task_type(value: Any, question: str) -> str:
     compact = compact_text(value)
-    if contains_any(question, ("加预算", "减少预算", "优化", "建议", "推荐", "该", "should")):
+    if compact in {"recommendation", "recommend", "advise", "priority", "prioritize"} or contains_any(
+        question,
+        ("加预算", "减少预算", "优化", "建议", "推荐", "应该", "优先", "最需要", "值得", "关注", "复盘", "should"),
+    ):
         return "recommendation"
     if contains_any(question, ("异常", "异常门店", "波动", "anomaly")):
         return "anomaly"
@@ -202,6 +205,8 @@ def _decision_goal(question: str, provider_goal: Any) -> str | None:
         return "判断哪些产品需要优化"
     if contains_any(question, ("关注异常门店", "异常门店")):
         return "识别需要关注的异常门店"
+    if contains_any(question, ("优先处理", "最需要处理", "最需要优先", "最值得关注", "优先复盘")):
+        return "判断哪个对象需要优先关注或处理"
     return None
 
 

@@ -620,6 +620,85 @@ def test_workspace_analysis_support_issue_priority_aliases_are_business_labeled(
         assert forbidden not in text
 
 
+def test_workspace_analysis_provider_priority_question_preserves_comparison_scope(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Provider Priority Scope Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE support_issues (issue_type TEXT, business_date TEXT, ticket_count INTEGER, avg_response_minutes REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO support_issues VALUES (?, ?, ?, ?)",
+            [
+                ("退款咨询", "2026-06-01", 320, 48.0),
+                ("物流延迟", "2026-06-02", 180, 76.0),
+                ("发票问题", "2026-06-03", 90, 22.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    provider_sql = (
+        "SELECT issue_type, "
+        "SUM(ticket_count) AS total_tickets, "
+        "AVG(avg_response_minutes) AS avg_response, "
+        "SUM(ticket_count) * AVG(avg_response_minutes) AS priority_score "
+        "FROM support_issues "
+        "GROUP BY issue_type "
+        "ORDER BY priority_score DESC "
+        "LIMIT 1"
+    )
+    support_intent = {
+        "strategy": "llm_candidate",
+        "intent": {
+            "metric": "priority_score",
+            "dimension": "issue_type",
+            "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近90天"},
+            "filters": [],
+            "operation": "recommendation",
+            "limit": 3,
+        },
+        "missing_slots": [],
+        "clarification_questions": [],
+        "risk_flags": [],
+        "reason": "需要对多个客服问题进行优先级判断。",
+    }
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        providers={
+            "question_understanding": MockLLMProvider(support_intent),
+            "sql_planning": MockLLMProvider(_provider_sql_plan()),
+            "sql_candidate": MockLLMProvider(
+                {"sql_candidates": [{"sql": provider_sql, "rationale": "Provider only returned one row."}]}
+            ),
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["comparison_scope_adjustment"]["applied"] is True
+    assert result["execution_result"]["row_count"] >= 2
+    assert "LIMIT 1" not in result["generated_sql"].upper()
+    answer = result["product_result"]["business_answer"]
+    text = _business_answer_text(answer)
+    assert "退款咨询" in text
+    assert "物流延迟" in text
+    assert "工单数" in text or "总工单数" in text
+    assert "平均响应时长" in text
+    assert "优先级评分" in text or "判断口径" in text
+    for forbidden in (
+        "total_tickets",
+        "avg_response",
+        "priority_score",
+        "第 1 行",
+        "execution_result",
+        "SQL",
+        "raw rows",
+    ):
+        assert forbidden not in text
+
+
 def test_workspace_analysis_shell_can_be_restored_before_job_finishes(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Recoverable Run Workspace")

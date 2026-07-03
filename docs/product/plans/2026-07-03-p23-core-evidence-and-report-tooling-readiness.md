@@ -189,6 +189,17 @@ Completion record:
 
 Fix record:
 
+- Fixed again on 2026-07-03 after live/provider-style SQL planning showed comparison judgment questions could still return only `LIMIT 1` and lose the peer evidence needed to answer “哪个最需要优先处理/为什么/建议”.
+- Added `sql_planning.comparison_scope` as a shared semantic guard for comparison-needed questions. It detects priority, recommendation, budget, optimization, and why-plus-comparison intent from the question and normalized task, while respecting explicit one-result requests.
+- The guarded provider SQL candidate agent and final SQL reviewer now widen safe validated `LIMIT 1` SELECT queries to `LIMIT 3` for comparison-needed questions and record `comparison_scope_adjustment.reason = insufficient_comparison_scope` before execution.
+- Updated the guarded SQL candidate prompt so provider SQL planning asks for multiple candidate rows, usually `LIMIT 3` or `LIMIT 5`, for why/advice/priority/budget questions; pure factual highest/lowest questions may still use `LIMIT 1`.
+- Tightened Chinese task normalization so 优先、最需要、值得、关注、复盘 and provider `recommendation`/`priority` operations route as recommendation-style analysis instead of summary-only analysis.
+- Added provider-mock and full workspace-chain regressions for the support-issue priority scenario. A provider SQL candidate with `LIMIT 1` now executes with multi-row comparison evidence and the final business answer keeps Chinese metric labels without leaking SQL aliases, SQL, raw rows, or `execution_result`.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_provider_assisted_sql_planning_workflow.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`94 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_fast_fact_path.py -q` (`23 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+
 - Fixed again on 2026-07-03 after H2 follow-up found SQL aliases and multi-metric wording could still leak into final Chinese business answers.
 - Added dynamic shared business labels in `workspaces.answer_evidence` for SQL aliases such as `total_tickets`, `avg_response`, and `priority_score`, plus generic token rules for totals, averages, response time, revenue/sales, orders, cost/spend, ROI/ROAS, and priority scores.
 - Added shared metric leader/tradeoff helpers so evidence bullets and consistency rewrites calculate each metric's leading object from returned rows. Multi-metric answers now express判断口径 differences instead of saying one object is ahead on all returned metrics.

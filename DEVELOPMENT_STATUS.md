@@ -87,6 +87,15 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 
 ## Latest P23-H2 Result
 
+P23-H2 provider comparison-scope repair completed on 2026-07-03:
+
+- Added a shared SQL comparison-scope guard in `sql_planning.comparison_scope` so judgment, priority, recommendation, budget, optimization, and why-plus-comparison questions require comparable multi-row evidence unless the user explicitly asks for only one result.
+- Updated the guarded provider SQL candidate path and final SQL reviewer to widen safe validated `LIMIT 1` SELECT queries to `LIMIT 3` for comparison-needed questions, recording `comparison_scope_adjustment.reason = insufficient_comparison_scope` before execution.
+- Updated the provider SQL candidate prompt so live DeepSeek planning is instructed to return multiple candidate objects, usually `LIMIT 3` or `LIMIT 5`, for why/advice/priority/budget questions while keeping pure factual highest/lowest questions eligible for `LIMIT 1`.
+- Tightened task normalization so provider outputs and Chinese questions containing 优先、最需要、值得、关注、复盘 are treated as recommendation/deep-judgment style tasks instead of summary-only tasks.
+- Added provider-mock and full workspace-chain regressions proving a support-issue priority question with provider SQL `LIMIT 1` executes with at least two comparison rows and the final business answer mentions multiple候选对象 without exposing aliases, SQL, raw rows, or `execution_result`.
+- Verification passed: provider/workspace/composer/product/consistency set (`94 passed`), business quality/fast fact set (`23 passed`), and focused frontend workspace-flow Vitest (`54 passed`).
+
 P23-H2 metric alias and tradeoff repair completed on 2026-07-03:
 
 - Added shared dynamic business field labeling in `workspaces.answer_evidence` so SQL aliases such as `total_tickets`, `avg_response`, and `priority_score` render as 总工单数、平均响应时长、优先级评分 in product-facing Chinese answers.
