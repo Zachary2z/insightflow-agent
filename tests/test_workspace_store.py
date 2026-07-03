@@ -18,6 +18,7 @@ def test_workspace_store_creates_expected_layout(tmp_path):
     assert workspace["analysis_db_path"].endswith("analysis.db")
     assert workspace["profile_path"].endswith("profile.json")
     assert workspace["semantic_layer_path"].endswith("semantic_layer.yaml")
+    assert workspace["data_version"] == 1
 
 
 def test_workspace_store_rejects_artifact_path_escape(tmp_path):
@@ -44,3 +45,13 @@ def test_workspace_store_lists_and_loads_metadata(tmp_path):
 
     assert loaded["workspace_id"] == created["workspace_id"]
     assert listed == [loaded]
+
+
+def test_workspace_store_can_increment_data_version(tmp_path):
+    store = WorkspaceStore(root_dir=tmp_path / "workspaces")
+    created = store.create_workspace(name="Versioned")
+
+    updated = store.increment_data_version(created["workspace_id"])
+
+    assert updated["data_version"] == 2
+    assert store.get_workspace(created["workspace_id"])["data_version"] == 2

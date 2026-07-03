@@ -19,6 +19,7 @@ def run_metric_agent(
     updated = {
         **state,
         "metric_context": result,
+        "metric_registry": result.get("metric_registry") or {},
         "selected_metrics": result.get("matched_metrics", []),
     }
     if not result.get("success"):

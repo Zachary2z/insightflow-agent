@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
-| Current task | P23-H2 Chinese Business Answer Writer next |
-| Next planned task | P23-H2 Chinese Business Answer Writer |
-| Last completed task | P23-H1 Shared EvidencePack Contract |
+| Current task | P23-H3 One-Pass Report Center With Shared Evidence next |
+| Next planned task | P23-H3 One-Pass Report Center With Shared Evidence |
+| Last completed task | P23-H2 Chinese Business Answer Writer |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -37,7 +37,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
-| P23 | `[~]` In progress | H1 complete; core evidence/report tooling readiness continues with natural Chinese business answers, one-pass report hardening, artifact readiness, cleanup, and live acceptance before external tool integrations |
+| P23 | `[~]` In progress | H1-H2 complete; core evidence/report tooling readiness continues with one-pass report hardening, artifact readiness, cleanup, and live acceptance before external tool integrations |
 | P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
@@ -80,10 +80,23 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 | Task | Status | Notes |
 |---|---|---|
 | P23-H1 | `[x]` Complete | Shared EvidencePack foundation: analysis `fact_payload` and report `ReportEvidencePack.evidence_payloads` now share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references |
-| P23-H2 | `[ ]` Next | Chinese Business Answer Writer: keep natural model explanations/recommendations while binding hard facts to shared evidence |
-| P23-H3 | `[ ]` Planned | One-Pass Report Center With Shared Evidence |
+| P23-H2 | `[x]` Complete | Chinese Business Answer Writer: natural Chinese business answers preserve model explanations/recommendations while binding hard facts and missing-data boundaries to shared evidence |
+| P23-H3 | `[ ]` Next | One-Pass Report Center With Shared Evidence |
 | P23-H4 | `[ ]` Planned | Artifact And Tool-Calling Readiness |
 | P23-H5 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance |
+
+## Latest P23-H2 Result
+
+P23-H2 Chinese Business Answer Writer completed on 2026-07-03:
+
+- Added fail-first backend and frontend coverage for natural Chinese business answers without template/debug phrases, internal statuses, SQL, raw rows, trace ids, provider metadata, or direct-answer repetition in recommendations.
+- Updated the final answer composer/provider prompt, product result fallback builder, insight fallback text, and final consistency guardrail so Chinese answers read like business analysis: factual conclusion, evidence-based reason, hypothesis-style interpretation when causes are not directly proven, conditional recommendations, and business data-boundary caveats.
+- Missing ROI, cost, conversion, or repeat-purchase inputs now preserve supported revenue/ranking conclusions while clearly saying what cannot be concluded and what data should be added before budget or efficiency decisions.
+- Product-facing caveats now describe query/data scope instead of model cleanup internals; recommendations no longer simply repeat `direct_answer`.
+- Added a non-channel service-issue workspace analysis regression proving the answer writer stays natural and does not depend on channel/orders/revenue-only sample logic.
+- Analysis Workbench frontend still renders business answer before evidence/charts and keeps technical details collapsed by default.
+- Cleanup audit found remaining old wording/path hits only in historical/superseded docs, negative tests, cleanup-boundary tests, and the P23 task text itself; no active product-code path needed further migration.
+- Verification passed: composer/product/business quality set (`54 passed`), workspace analysis/fast fact set (`32 passed`), and focused frontend workspace-flow Vitest (`54 passed`).
 
 ## Latest P23-H1 Result
 

@@ -20,6 +20,8 @@ def test_import_csv_creates_table_and_source_metadata(tmp_path):
     result = import_csv(store, workspace["workspace_id"], csv_path)
 
     assert result["success"] is True
+    assert result["data_version"] == 2
+    assert store.get_workspace(workspace["workspace_id"])["data_version"] == 2
     assert result["imported_tables"] == ["monthly_sales"]
     with sqlite3.connect(workspace["analysis_db_path"]) as conn:
         rows = conn.execute("SELECT order_id, revenue FROM monthly_sales ORDER BY order_id").fetchall()
@@ -64,6 +66,8 @@ def test_import_excel_creates_one_table_per_sheet(tmp_path):
     result = import_excel(store, workspace["workspace_id"], excel_path)
 
     assert result["success"] is True
+    assert result["data_version"] == 2
+    assert store.get_workspace(workspace["workspace_id"])["data_version"] == 2
     assert result["imported_tables"] == ["customers", "support_tickets"]
 
 
@@ -78,6 +82,8 @@ def test_import_sqlite_copies_user_tables(tmp_path):
     result = import_sqlite(store, workspace["workspace_id"], source_db)
 
     assert result["success"] is True
+    assert result["data_version"] == 2
+    assert store.get_workspace(workspace["workspace_id"])["data_version"] == 2
     assert result["imported_tables"] == ["invoices"]
     with sqlite3.connect(workspace["analysis_db_path"]) as conn:
         assert conn.execute("SELECT amount FROM invoices").fetchone()[0] == 250.0

@@ -13,7 +13,20 @@ _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "se
 _UNSAFE_TERMS = ("删除", "更新", "写入", "插入", "drop", "delete", "update", "insert")
 _SENSITIVE_TERMS = ("手机号", "电话", "邮箱", "email", "phone", "地址", "身份证", "payment")
 _BULK_TERMS = ("导出所有", "全部用户", "所有用户", "批量导出")
+_SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export"}
 _METRIC_ALIASES = {
+    "roas": "roas",
+    "ROAS": "roas",
+    "roi": "roi",
+    "ROI": "roi",
+    "net_return": "net_return",
+    "net return": "net_return",
+    "net_roi": "net_return",
+    "net roi": "net_return",
+    "netroi": "net_return",
+    "净投放回报率": "net_return",
+    "净回报率": "net_return",
+    "净投放回报": "net_return",
     "销售额": "gmv",
     "成交额": "gmv",
     "收入": "gmv",
@@ -100,6 +113,10 @@ def _normalize_slot(value: Any, aliases: dict[str, str]) -> str:
     return aliases.get(text.lower(), aliases.get(text, text))
 
 
+def _safety_risk_flags(risk_flags: list[Any]) -> list[str]:
+    return [str(flag) for flag in risk_flags if str(flag) in _SAFETY_RISK_FLAGS]
+
+
 def _normalize_provider_content(
     content: dict[str, Any],
     *,
@@ -125,7 +142,7 @@ def _normalize_provider_content(
     normalized["analysis_task"] = task
     normalized["missing_slots"] = list(task.get("missing_slots", []))
     normalized["clarification_questions"] = build_clarification_questions(normalized["missing_slots"])
-    normalized["strategy"] = strategy_for_task(task, risk_flags=risk_flags)
+    normalized["strategy"] = strategy_for_task(task, risk_flags=_safety_risk_flags(risk_flags))
     normalized["risk_flags"] = risk_flags
     return normalized
 
@@ -231,7 +248,7 @@ def _provider_result(
         _normalize_provider_content(content, question=question, workspace_context=workspace_context)
     )
     risk_flags = normalized.get("risk_flags", [])
-    if risk_flags:
+    if _safety_risk_flags(risk_flags):
         normalized["strategy"] = "reject"
         normalized["rejection_reason"] = "Request asks for sensitive fields or unsafe data access."
     else:

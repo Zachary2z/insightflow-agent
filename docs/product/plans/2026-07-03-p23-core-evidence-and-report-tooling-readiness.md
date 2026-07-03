@@ -159,12 +159,12 @@ Files to inspect first:
 
 Tasks:
 
-- [ ] Add failing tests for natural Chinese answers that do not contain default phrases such as `证据表第一行显示`, `本轮排序证据中`, internal statuses, SQL, trace ids, or provider metadata.
-- [ ] Change answer composition so the model returns structured slots for factual conclusion, evidence-backed reasons, business interpretations, recommendations, missing data, caveats, and confidence.
-- [ ] Allow model-written reasons and recommendations to remain, but label or phrase unsupported causal explanations as hypotheses or conditions.
-- [ ] Validate only hard facts. Do not block reasonable qualitative advice when it stays inside the evidence boundary.
-- [ ] Update frontend rendering if needed so factual conclusion, explanation, recommendations, missing data, evidence, and technical details are visually distinct.
-- [ ] Delete obsolete fixed wording and over-strict downgrade branches that conflict with useful evidence-backed answers.
+- [x] Add failing tests for natural Chinese answers that do not contain default phrases such as `证据表第一行显示`, `本轮排序证据中`, internal statuses, SQL, trace ids, or provider metadata.
+- [x] Change answer composition so the model returns structured slots for factual conclusion, evidence-backed reasons, business interpretations, recommendations, missing data, caveats, and confidence.
+- [x] Allow model-written reasons and recommendations to remain, but label or phrase unsupported causal explanations as hypotheses or conditions.
+- [x] Validate only hard facts. Do not block reasonable qualitative advice when it stays inside the evidence boundary.
+- [x] Update frontend rendering if needed so factual conclusion, explanation, recommendations, missing data, evidence, and technical details are visually distinct.
+- [x] Delete obsolete fixed wording and over-strict downgrade branches that conflict with useful evidence-backed answers.
 
 Acceptance:
 
@@ -172,6 +172,20 @@ Acceptance:
 - The answer may include model judgment, but hard facts match the evidence pack.
 - If cost, ROI, conversion, or repeat-purchase data is missing, the answer can still explain what is known and clearly say what cannot be concluded.
 - Technical details remain available but are not the first thing users read.
+
+Completion record:
+
+- Completed on 2026-07-03.
+- Added fail-first coverage for the final answer composer, product result builder, workspace analysis runner, and frontend workspace flow so Chinese business answers no longer default to template/debug phrases, internal statuses, SQL, raw rows, trace ids, or provider metadata in the main answer.
+- Updated `agents/final_answer_composer.py`, `workspaces/product_result_builder.py`, and `workspaces/answer_consistency.py` so deterministic and provider-normalized answers use natural Chinese business wording, keep factual conclusions grounded in returned evidence, preserve reasonable explanation/recommendation judgment, and phrase unsupported causes as hypotheses or data-bound conditions.
+- Missing ROI/cost/conversion/repeat-purchase inputs now produce business boundary caveats and conditional next-step recommendations instead of refusing the whole revenue conclusion or inventing efficiency facts.
+- Recommendations are no longer direct-answer duplicates, and caveats now read as business scope/data-boundary notes instead of model/debug cleanup notices.
+- Analysis Workbench frontend ordering remains business answer -> evidence -> chart -> collapsed technical details; the main card stays free of SQL/raw rows/provider metadata.
+- Cleanup audit found remaining old wording/path hits only in historical/superseded docs, negative tests, cleanup-boundary tests, and the P23 task text itself; no active product-code path needed further migration.
+- Verification passed:
+  - `python3 -m pytest tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_business_answer_quality.py -q` (`54 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`32 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
 
 ## P23-H3: One-Pass Report Center With Shared Evidence
 

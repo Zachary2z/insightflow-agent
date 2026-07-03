@@ -103,3 +103,122 @@ def test_retrieve_metric_definition_can_use_workspace_semantic_layer(tmp_path):
     assert result["matched_metrics"] == ["sum_sales_amount"]
     assert result["metrics"]["sum_sales_amount"]["field"] == "store_operations.sales_amount"
     assert result["semantic_context"]["matched_dimensions"] == ["store_name"]
+
+
+def test_metric_registry_distinguishes_roas_net_return_and_margin_formulas():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "销售额",
+                "field": "campaigns.revenue",
+                "formula": 'SUM("campaigns"."revenue")',
+                "business_meaning": "revenue_like",
+                "source_fields": ["campaigns.revenue"],
+            },
+            {
+                "name": "sum_spend",
+                "label": "投放成本",
+                "field": "campaigns.spend",
+                "formula": 'SUM("campaigns"."spend")',
+                "business_meaning": "spend_like",
+                "source_fields": ["campaigns.spend"],
+            },
+            {
+                "name": "sum_cost",
+                "label": "成本",
+                "field": "campaigns.cost",
+                "formula": 'SUM("campaigns"."cost")',
+                "business_meaning": "cost_like",
+                "source_fields": ["campaigns.cost"],
+            },
+        ]
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["success"] is True
+    formulas = result["formulas"]
+    assert formulas["roas"] == 'SUM("campaigns"."revenue") / NULLIF(SUM("campaigns"."spend"), 0)'
+    assert formulas["net_return"] == (
+        '(SUM("campaigns"."revenue") - SUM("campaigns"."spend")) '
+        '/ NULLIF(SUM("campaigns"."spend"), 0)'
+    )
+    assert formulas["margin_rate"] == (
+        '(SUM("campaigns"."revenue") - SUM("campaigns"."cost")) '
+        '/ NULLIF(SUM("campaigns"."revenue"), 0)'
+    )
+    assert result["metrics"]["roas"]["business_label"] == "广告投入产出比"
+    assert result["metrics"]["net_return"]["business_label"] == "净投放回报率"
+    assert result["metrics"]["margin_rate"]["business_label"] == "利润率"
+    assert result["metrics"]["roas"]["source_fields"] == ["campaigns.revenue", "campaigns.spend"]
+    assert result["metrics"]["net_return"]["source_fields"] == ["campaigns.revenue", "campaigns.spend"]
+    assert result["metrics"]["margin_rate"]["source_fields"] == ["campaigns.revenue", "campaigns.cost"]
+
+
+def test_metric_registry_does_not_invent_derived_metrics_without_source_fields():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_ticket_count",
+                "label": "工单数",
+                "field": "support_tickets.ticket_id",
+                "formula": 'COUNT("support_tickets"."ticket_id")',
+                "business_meaning": "count_like",
+                "source_fields": ["support_tickets.ticket_id"],
+            },
+            {
+                "name": "avg_resolution_hours",
+                "label": "平均解决时长",
+                "field": "support_tickets.resolution_hours",
+                "formula": 'AVG("support_tickets"."resolution_hours")',
+                "business_meaning": "duration_like",
+                "source_fields": ["support_tickets.resolution_hours"],
+            },
+        ]
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["success"] is True
+    assert "roas" not in result["metrics"]
+    assert "net_return" not in result["metrics"]
+    assert "margin_rate" not in result["metrics"]
+    assert "average_order_value" not in result["metrics"]
+    assert any("ROAS" in warning for warning in result["warnings"])
+
+
+def test_metric_registry_can_register_average_order_value_when_sources_exist():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_sales_amount",
+                "label": "销售额",
+                "field": "stores.Sales Amount",
+                "formula": 'SUM("stores"."Sales Amount")',
+                "business_meaning": "revenue_like",
+                "source_fields": ["stores.Sales Amount"],
+            },
+            {
+                "name": "count_orders",
+                "label": "订单数",
+                "field": "stores.order_id",
+                "formula": 'COUNT("stores"."order_id")',
+                "business_meaning": "order_count_like",
+                "source_fields": ["stores.order_id"],
+            },
+        ]
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["metrics"]["average_order_value"]["formula"] == (
+        'SUM("stores"."Sales Amount") / NULLIF(COUNT("stores"."order_id"), 0)'
+    )
+    assert result["metrics"]["average_order_value"]["unit"] == "currency"

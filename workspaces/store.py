@@ -48,12 +48,20 @@ class WorkspaceStore:
         metadata_path = self.root_dir / workspace_id / "workspace.json"
         if not metadata_path.exists():
             raise FileNotFoundError(f"Workspace not found: {workspace_id}")
-        return json.loads(metadata_path.read_text(encoding="utf-8"))
+        workspace = json.loads(metadata_path.read_text(encoding="utf-8"))
+        workspace.setdefault("data_version", 1)
+        return workspace
 
     def save_workspace(self, workspace: dict) -> dict:
+        workspace.setdefault("data_version", 1)
         workspace["updated_at"] = utc_now_iso()
         self._write_record(workspace)
         return workspace
+
+    def increment_data_version(self, workspace_id: str) -> dict:
+        workspace = self.get_workspace(workspace_id)
+        workspace["data_version"] = int(workspace.get("data_version") or 1) + 1
+        return self.save_workspace(workspace)
 
     def resolve_workspace_path(self, workspace_id: str, relative_path: str | Path) -> Path:
         workspace_root = (self.root_dir / workspace_id).resolve()
@@ -63,6 +71,7 @@ class WorkspaceStore:
         return candidate
 
     def _write_record(self, workspace: dict) -> None:
+        workspace.setdefault("data_version", 1)
         root = Path(workspace["root_path"])
         root.mkdir(parents=True, exist_ok=True)
         (root / "workspace.json").write_text(

@@ -53,7 +53,7 @@ export default function ReportGenerator({ workspaceId }: ReportGeneratorProps) {
     <ProductCard className="report-generator-card">
       <div className="product-section-title">
         <div>
-          <p className="product-eyebrow">Create Report</p>
+          <p className="product-eyebrow">生成报告</p>
           <h2>新建报告</h2>
           <p className="panel-help">选择报告类型，写下业务目标。系统会复用当前工作区数据和安全分析链路生成报告。</p>
         </div>

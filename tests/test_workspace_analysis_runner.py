@@ -1,7 +1,14 @@
+import json
 import sqlite3
+from pathlib import Path
 
 from llm_ops.provider import MockLLMProvider
-from workspaces.analysis_runner import run_workspace_analysis
+from workspaces.analysis_runner import (
+    create_workspace_analysis_run_shell,
+    execute_workspace_analysis_job,
+    submit_workspace_analysis_run,
+    run_workspace_analysis,
+)
 from workspaces.profiler import profile_workspace_database
 from workspaces.run_store import WorkspaceRunStore
 from workspaces.semantic_draft import generate_semantic_layer_draft
@@ -50,6 +57,19 @@ def _provider_sql_plan():
         "risk_flags": [],
         "reason": "Use a provider SQL candidate for this workspace schema.",
     }
+
+
+def _business_answer_text(answer):
+    return " ".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
 
 
 def _create_ecommerce_workspace(tmp_path):
@@ -143,6 +163,49 @@ def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_p
     assert result["product_result"]["business_answer"]["headline"]
     assert result["product_result"]["technical_details"]["sql"] == result["generated_sql"]
     assert result["business_answer"] == result["product_result"]["business_answer"]
+
+
+def test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Store Fact Payload Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, order_date TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("上海旗舰店", "2026-06-01", 26255.44),
+                ("北京国贸店", "2026-06-02", 18400.0),
+                ("深圳湾店", "2026-06-03", 12000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_revenue "
+            "FROM store_sales GROUP BY store_name ORDER BY total_revenue DESC LIMIT 3"
+        ),
+    )
+
+    fact_payload = result["product_result"]["evidence"]["fact_payload"]
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] == "fast_fact"
+    assert result["analysis_route"]["fast_path_eligible"] is True
+    assert result["product_result"]["analysis_route"] == result["analysis_route"]
+    assert not any(event.get("node") == "insight_agent" for event in result["trace"])
+    assert any(event.get("node") == "fast_fact_composer" for event in result["trace"])
+    assert fact_payload["comparison_scope"]["row_count"] == 3
+    assert fact_payload["comparison_scope"]["sufficient"] is True
+    assert fact_payload["rows"] == result["execution_result"]["rows"]
+    assert fact_payload["display_values"][0]["门店"] == "上海旗舰店"
+    assert fact_payload["display_values"][0]["总收入"] == "2.6 万"
+    assert fact_payload["formulas"]
+    assert "technical_sql" not in result["product_result"]["technical_details"]["fact_payload"]
+    assert result["product_result"]["technical_details"]["sql"].startswith("SELECT store_name")
 
 
 def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path):
@@ -245,12 +308,429 @@ def test_workspace_analysis_persists_full_product_result_for_history_detail(tmp_
     stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], result["run_id"])
 
     assert stored["run_id"] == result["run_id"]
+    assert stored["result"]["analysis_route"] == result["analysis_route"]
+    assert stored["product_result"]["analysis_route"] == result["product_result"]["analysis_route"]
     assert stored["product_result"]["business_answer"] == result["product_result"]["business_answer"]
     assert stored["product_result"]["evidence"]["table_preview"]["rows"] == result["product_result"]["evidence"][
         "table_preview"
     ]["rows"]
     assert stored["product_result"]["technical_details"]["sql"] == result["generated_sql"]
     assert stored["result"]["product_result"]["question_thread"]["original_question"] == "按渠道汇总收入"
+
+
+def test_workspace_analysis_returns_cache_candidate_for_same_data_version_and_normalized_question(
+    tmp_path,
+):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("History Reuse Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?)",
+            [("上海旗舰店", 26255.44), ("北京国贸店", 18400.0)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+    )
+    exploding_provider = _SequenceProvider([])
+
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="  最近90天销售额最高的门店是谁?   ",
+        providers={"question_understanding": exploding_provider},
+    )
+
+    assert first["status"] == "completed"
+    assert first["data_version"] == 1
+    assert first["normalized_question"] == "最近90天销售额最高的门店是谁?"
+    assert first["product_result"]["technical_details"]["data_version"] == 1
+    assert second == {
+        "status": "cache_candidate",
+        "matched_run_id": first["run_id"],
+        "message": "已找到同一数据版本下的历史分析",
+        "workspace_id": workspace["workspace_id"],
+        "data_version": 1,
+        "normalized_question": "最近90天销售额最高的门店是谁?",
+    }
+    assert exploding_provider.requests == []
+
+
+def test_workspace_analysis_does_not_reuse_after_data_version_changes(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Version Changed Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?)",
+            [("上海旗舰店", 26255.44), ("北京国贸店", 18400.0)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+    )
+    store.increment_data_version(workspace["workspace_id"])
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+    )
+
+    assert first["data_version"] == 1
+    assert second["status"] == "completed"
+    assert second["run_id"] != first["run_id"]
+    assert second["data_version"] == 2
+
+
+def test_workspace_analysis_persists_progress_steps_for_history_detail(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Progress History Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, business_date TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("上海旗舰店", "2026-06-01", 26255.44),
+                ("北京国贸店", "2026-06-02", 18400.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], result["run_id"])
+
+    assert result["progress_steps"] == result["product_result"]["progress_steps"]
+    assert stored["product_result"]["progress_steps"] == result["product_result"]["progress_steps"]
+    assert [step["status"] for step in stored["product_result"]["progress_steps"]] == [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "skipped",
+    ]
+    assert "SELECT" not in " ".join(step["summary"] for step in stored["product_result"]["progress_steps"])
+
+
+def test_workspace_analysis_persists_fast_fact_context_pack_for_history_detail(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Fast Fact Context Pack History Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, business_date TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("上海旗舰店", "2026-06-01", 26255.44),
+                ("北京国贸店", "2026-06-02", 18400.0),
+                ("深圳湾店", "2026-06-03", 12000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 3"
+        ),
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], result["run_id"])
+
+    pack = result["fast_fact_context_pack"]
+    assert result["analysis_route"]["route"] == "fast_fact"
+    assert pack["key_evidence_rows"][0]["dimensions"][0]["display_value"] == "上海旗舰店"
+    assert result["technical_details"]["fast_fact_context_pack"] == pack
+    assert result["product_result"]["technical_details"]["fast_fact_context_pack"] == pack
+    assert stored["result"]["fast_fact_context_pack"] == pack
+    assert stored["product_result"]["technical_details"]["fast_fact_context_pack"] == pack
+
+
+def test_workspace_analysis_standard_route_is_not_forced_into_fast_fact_context_pack(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Standard Route No Fast Pack Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL, satisfaction_score REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [("上海旗舰店", 26255.44, 4.8), ("北京国贸店", 18400.0, 4.2)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="销售额、满意度综合看哪个门店最好？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+    )
+
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert "fast_fact_context_pack" not in result
+    assert "fast_fact_context_pack" not in result["technical_details"]
+    assert "fast_fact_context_pack" not in result["product_result"]["technical_details"]
+    assert result["product_result"]["technical_details"]["fact_payload"]["rows"] == result["execution_result"]["rows"]
+
+
+def test_workspace_analysis_non_channel_judgment_answer_reads_like_business_chinese(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Service Issue Judgment Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE support_issues (issue_type TEXT, business_date TEXT, ticket_count INTEGER, avg_response_minutes REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO support_issues VALUES (?, ?, ?, ?)",
+            [
+                ("退款咨询", "2026-06-01", 320, 48.0),
+                ("物流延迟", "2026-06-02", 180, 76.0),
+                ("发票问题", "2026-06-03", 90, 22.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        initial_sql=(
+            "SELECT issue_type, SUM(ticket_count) AS ticket_count, AVG(avg_response_minutes) AS avg_response_minutes "
+            "FROM support_issues GROUP BY issue_type ORDER BY ticket_count DESC LIMIT 3"
+        ),
+    )
+
+    answer = result["product_result"]["business_answer"]
+    text = _business_answer_text(answer)
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert "退款咨询" in text
+    assert "工单数" in text or "ticket_count" not in text
+    assert "证据表第一行显示" not in text
+    assert "本轮排序证据中" not in text
+    assert "execution_result" not in text
+    assert "channel" not in text.lower()
+    assert answer["recommendations"]
+    assert answer["direct_answer"] not in answer["recommendations"]
+
+
+def test_workspace_analysis_shell_can_be_restored_before_job_finishes(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Recoverable Run Workspace")
+
+    shell = create_workspace_analysis_run_shell(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], shell["run_id"])
+    history = WorkspaceRunStore(store).list_runs(workspace["workspace_id"])
+
+    assert shell["status"] == "running"
+    assert shell["data_version"] == 1
+    assert shell["normalized_question"] == "最近90天销售额最高的门店是谁?"
+    assert stored["run_id"] == shell["run_id"]
+    assert stored["result"]["status"] == "running"
+    assert stored["result"]["original_question"] == "最近90天销售额最高的门店是谁？"
+    assert stored["product_result"]["progress_steps"][2]["key"] == "querying"
+    assert stored["product_result"]["progress_steps"][2]["status"] == "running"
+    assert history[0]["run_id"] == shell["run_id"]
+    assert history[0]["status"] == "running"
+    assert history[0]["question"] == "最近90天销售额最高的门店是谁？"
+
+
+def test_workspace_analysis_job_updates_same_run_id_when_completed(tmp_path, monkeypatch):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Recoverable Completion Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL)")
+        conn.execute("INSERT INTO store_sales VALUES ('上海旗舰店', 26255.44)")
+
+    shell = create_workspace_analysis_run_shell(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+    )
+
+    def complete_workflow(*, run_id, workspace_root, trace_dir, user_question, **kwargs):
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "original_question": user_question,
+            "final_answer": "上海旗舰店销售额最高。",
+            "execution_result": {
+                "success": True,
+                "columns": ["store_name", "total_sales"],
+                "rows": [["上海旗舰店", 26255.44]],
+            },
+            "evidence_result": {"validation_status": "passed"},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", complete_workflow)
+
+    result = execute_workspace_analysis_job(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        run_id=shell["run_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], shell["run_id"])
+
+    assert result["run_id"] == shell["run_id"]
+    assert result["status"] == "completed"
+    assert stored["run_id"] == shell["run_id"]
+    assert stored["result"]["status"] == "completed"
+    assert stored["product_result"]["status"] == "completed"
+    assert stored["product_result"]["business_answer"]["headline"]
+    assert stored["result"]["data_version"] == shell["data_version"]
+    assert stored["result"]["normalized_question"] == shell["normalized_question"]
+
+
+def test_workspace_analysis_job_persists_failed_state_for_recovery(tmp_path, monkeypatch):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Recoverable Failure Workspace")
+    shell = create_workspace_analysis_run_shell(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="分析不存在字段",
+    )
+
+    def fail_workflow(*args, **kwargs):
+        raise RuntimeError("workflow exploded")
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", fail_workflow)
+
+    result = execute_workspace_analysis_job(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        run_id=shell["run_id"],
+        user_question="分析不存在字段",
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], shell["run_id"])
+
+    assert result["status"] == "failed"
+    assert "workflow exploded" in result["error_message"]
+    assert stored["result"]["status"] == "failed"
+    assert stored["result"]["error_message"] == "workflow exploded"
+    assert stored["product_result"]["status"] == "failed"
+    assert stored["product_result"]["progress_steps"][-2]["status"] == "failed"
+
+
+def test_workspace_analysis_job_persists_waiting_for_clarification_for_recovery(tmp_path, monkeypatch):
+    store, workspace = _create_ecommerce_workspace(tmp_path)
+    shell = create_workspace_analysis_run_shell(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="帮我看看销售情况",
+    )
+
+    def wait_for_clarification(*, run_id, workspace_root, trace_dir, user_question, **kwargs):
+        return {
+            "status": "waiting_for_clarification",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "original_question": user_question,
+            "question_understanding": {"missing_slots": ["time_range"]},
+            "clarification_result": {
+                "requires_clarification": True,
+                "missing_slots": ["time_range"],
+                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+            },
+            "clarification_questions": ["请补充时间范围，例如最近90天。"],
+            "final_answer": "需要补充信息后才能继续分析。",
+            "execution_result": {},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", wait_for_clarification)
+
+    result = execute_workspace_analysis_job(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        run_id=shell["run_id"],
+        user_question="帮我看看销售情况",
+    )
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], shell["run_id"])
+
+    assert result["status"] == "waiting_for_clarification"
+    assert result["run_id"] == shell["run_id"]
+    assert result["pending_run_id"].startswith("pending_")
+    assert stored["result"]["status"] == "waiting_for_clarification"
+    assert stored["product_result"]["question_thread"]["pending_run_id"] == result["pending_run_id"]
+    assert stored["product_result"]["question_thread"]["clarification_question"] == "请补充时间范围，例如最近90天。"
+
+
+def test_submit_workspace_analysis_run_cache_candidate_does_not_create_background_shell(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Recoverable Cache Workspace")
+    run_id = "run_completed"
+    run_dir = Path(workspace["root_path"]) / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / f"{run_id}.json").write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": "completed",
+                "workspace_id": workspace["workspace_id"],
+                "data_version": 1,
+                "normalized_question": "最近90天销售额最高的门店是谁?",
+                "original_question": "最近90天销售额最高的门店是谁？",
+                "saved_at": "2026-07-02T10:00:00Z",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = submit_workspace_analysis_run(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天销售额最高的门店是谁？",
+    )
+
+    assert result["status"] == "cache_candidate"
+    assert result["matched_run_id"] == run_id
+    assert len(WorkspaceRunStore(store).list_runs(workspace["workspace_id"])) == 1
 
 
 def test_workspace_analysis_persists_pending_clarification_run(tmp_path):

@@ -129,7 +129,7 @@ def test_get_workspace_run_returns_result_and_product_result(tmp_path):
                 "business_answer": {
                     "headline": "邮件渠道收入最高",
                     "direct_answer": "邮件渠道收入最高。",
-                    "why": "证据表第一行显示：channel 为 email，revenue 为 100.0。",
+                    "why": "当前数据中，channel 为 email，revenue 为 100.0。",
                     "evidence_bullets": ["邮件渠道收入为 100.0。"],
                     "recommendations": [],
                     "caveats": [],
@@ -150,6 +150,87 @@ def test_get_workspace_run_returns_result_and_product_result(tmp_path):
     assert payload["result"]["generated_sql"].startswith("SELECT channel")
     assert payload["result"]["execution_result"]["rows"] == [["email", 100.0]]
     assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高"
+
+
+def test_create_workspace_run_returns_cache_candidate_for_completed_same_version_question(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_failedsame",
+        {
+            "status": "failed",
+            "data_version": workspace["data_version"],
+            "normalized_question": "最近90天销售额最高的门店是谁?",
+            "original_question": "最近90天销售额最高的门店是谁？",
+        },
+    )
+    _write_run(
+        workspace,
+        "run_oldversion",
+        {
+            "status": "completed",
+            "data_version": workspace["data_version"] - 1,
+            "normalized_question": "最近90天销售额最高的门店是谁?",
+            "original_question": "最近90天销售额最高的门店是谁？",
+        },
+    )
+    _write_run(
+        workspace,
+        "run_completed",
+        {
+            "status": "completed",
+            "data_version": workspace["data_version"],
+            "normalized_question": "最近90天销售额最高的门店是谁?",
+            "original_question": "最近90天销售额最高的门店是谁？",
+        },
+    )
+
+    response = client.post(
+        f"/api/workspaces/{workspace_id}/runs",
+        json={"user_question": "  最近90天销售额最高的门店是谁？  "},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["status"] == "cache_candidate"
+    assert payload["matched_run_id"] == "run_completed"
+    assert payload["message"] == "已找到同一数据版本下的历史分析"
+    assert payload["result"]["status"] == "cache_candidate"
+    assert payload["result"]["data_version"] == workspace["data_version"]
+
+
+def test_create_workspace_run_can_return_recoverable_running_shell_before_background_execution(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    app = create_app(workspace_store=store, start_background_analysis=False)
+    client = TestClient(app)
+    workspace = client.post("/api/workspaces", json={"name": "Recoverable API Workspace"}).json()
+    workspace_id = workspace["workspace_id"]
+
+    response = client.post(
+        f"/api/workspaces/{workspace_id}/runs",
+        json={"user_question": "最近90天销售额最高的门店是谁？"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["status"] == "running"
+    assert payload["run_id"].startswith("run_")
+    assert payload["product_result"]["status"] == "running"
+    assert payload["data_version"] == 1
+    assert payload["normalized_question"] == "最近90天销售额最高的门店是谁?"
+
+    detail = client.get(f"/api/workspaces/{workspace_id}/runs/{payload['run_id']}")
+    history = client.get(f"/api/workspaces/{workspace_id}/runs")
+
+    assert detail.status_code == 200
+    assert detail.json()["result"]["status"] == "running"
+    assert detail.json()["product_result"]["progress_steps"][2]["status"] == "running"
+    assert history.status_code == 200
+    assert history.json()["runs"][0]["run_id"] == payload["run_id"]
+    assert history.json()["runs"][0]["status"] == "running"
 
 
 def test_get_workspace_run_builds_product_result_for_older_run_json(tmp_path):
@@ -481,7 +562,7 @@ def test_completed_chinese_run_with_english_final_answer_is_built_as_chinese_p16
     assert detail.status_code == 200
     answer = detail.json()["product_result"]["business_answer"]
     assert answer["direct_answer"].startswith("已完成本轮查询")
-    assert "证据表第一行显示" in answer["why"]
+    assert "当前数据中" in answer["why"]
     assert "Based on the data" not in answer["direct_answer"]
 
 

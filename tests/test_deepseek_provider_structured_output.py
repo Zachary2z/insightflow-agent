@@ -221,7 +221,7 @@ def test_insight_drafter_validation_rejects_budget_action_from_single_row_eviden
             "business_answer": {
                 "headline": "自然流量 ROI 最高，付费渠道应减少预算",
                 "direct_answer": "当前返回结果显示自然流量 ROI 最高，因此应减少付费渠道预算。",
-                "why": "证据表第一行显示自然流量 ROI 为 16.22。",
+                "why": "当前数据中自然流量 ROI 为 16.22。",
                 "evidence_bullets": ["自然流量 ROI 为 16.22。"],
                 "recommendations": ["减少付费渠道预算，并把预算转向自然流量。"],
                 "caveats": [],
@@ -254,7 +254,7 @@ def test_insight_drafter_validation_allows_evidence_gathering_recommendation_fro
             "business_answer": {
                 "headline": "仅能确认自然流量的当前 ROI，不能判断预算减少对象",
                 "direct_answer": "当前返回结果只显示自然流量一行，不能据此确定哪个渠道应该减少预算。",
-                "why": "证据表第一行显示自然流量 ROI 为 16.22，但缺少其他渠道的同口径对比。",
+                "why": "当前数据中自然流量 ROI 为 16.22，但缺少其他渠道的同口径对比。",
                 "evidence_bullets": ["自然流量 ROI 为 16.22。"],
                 "recommendations": ["补充完整渠道对比数据后，再判断预算调整对象。"],
                 "caveats": ["仅返回 1 行，比较证据不足，不足以判断哪个渠道应该减少预算。"],

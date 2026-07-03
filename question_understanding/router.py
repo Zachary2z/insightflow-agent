@@ -14,7 +14,7 @@ from question_understanding.task_contract import (
 
 
 def _compact(text: str) -> str:
-    return text.lower().replace(" ", "")
+    return re.sub(r"[\s_\-（）()。,.，:：]+", "", text.lower())
 
 
 def _contains(text: str, *keywords: str) -> bool:
@@ -38,6 +38,8 @@ def _extract_time_range(question: str) -> dict[str, Any]:
 
 
 def _extract_metric(question: str) -> str:
+    if _contains(question, "净投放回报率", "净回报率", "net return", "net_return", "net roi", "netroi"):
+        return "net_return"
     if _contains(question, "复购率", "复购"):
         return "repurchase_rate"
     if _contains(question, "客单价", "aov", "平均订单金额"):
@@ -48,7 +50,9 @@ def _extract_metric(question: str) -> str:
         return "gmv"
     if _contains(question, "花费", "费用", "成本", "投放成本", "spend", "cost"):
         return "spend"
-    if _contains(question, "roi", "roas"):
+    if _contains(question, "roas"):
+        return "roas"
+    if _contains(question, "roi"):
         return "roi"
     if _contains(question, "销量", "销售量"):
         return "product_sales"

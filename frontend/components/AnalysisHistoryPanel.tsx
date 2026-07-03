@@ -13,6 +13,7 @@ function statusLabel(status: string) {
   const labels: Record<string, string> = {
     completed: "已完成",
     failed: "失败",
+    queued: "排队中",
     waiting_for_clarification: "等待补充",
     running: "分析中",
   };

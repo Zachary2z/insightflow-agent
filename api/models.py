@@ -18,6 +18,7 @@ class WorkspaceResponse(BaseModel):
     analysis_db_path: str
     profile_path: str
     semantic_layer_path: str
+    data_version: int = 1
     sources: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -25,6 +26,7 @@ class WorkspaceSourceImportResponse(BaseModel):
     success: bool
     source: dict[str, Any]
     imported_tables: list[str]
+    data_version: int | None = None
 
 
 class WorkspaceSourcesResponse(BaseModel):
@@ -60,6 +62,7 @@ class WorkspaceRunCreateRequest(BaseModel):
     initial_sql: str | None = None
     pending_run_id: str | None = None
     clarification_answer: str | None = None
+    force_reanalysis: bool = False
 
     @model_validator(mode="after")
     def validate_run_mode(self) -> "WorkspaceRunCreateRequest":
@@ -85,6 +88,11 @@ class WorkspaceRunResponse(BaseModel):
     success: bool
     workspace_id: str
     run_id: str | None = None
+    status: str | None = None
+    matched_run_id: str | None = None
+    message: str | None = None
+    data_version: int | None = None
+    normalized_question: str | None = None
     result: dict[str, Any]
     product_result: dict[str, Any] | None = None
 

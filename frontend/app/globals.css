@@ -331,6 +331,71 @@ th {
   margin-top: 2px;
 }
 
+.run-task-card {
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 8px;
+  color: var(--product-ink);
+  display: grid;
+  gap: 10px;
+  max-height: 132px;
+  min-height: 92px;
+  overflow: hidden;
+  padding: 14px 16px;
+  text-decoration: none;
+}
+
+.run-task-card:hover {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  text-decoration: none;
+}
+
+.run-task-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.run-task-label {
+  color: var(--product-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.run-task-question {
+  color: var(--product-ink);
+  display: -webkit-box;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.45;
+  max-height: 44px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.run-task-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.run-task-progress {
+  color: var(--product-muted);
+  flex: 1 1 220px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .advanced-options,
 .technical-details {
   border: 1px solid #d9e1ee;
@@ -359,6 +424,88 @@ th {
 
 .analysis-thread {
   padding: 16px;
+}
+
+.progress-timeline {
+  padding: 14px 16px;
+}
+
+.compact-heading {
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.progress-step-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.progress-step {
+  align-items: flex-start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 12px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.progress-marker {
+  background: #cbd5e1;
+  border-radius: 999px;
+  height: 9px;
+  margin-top: 7px;
+  width: 9px;
+}
+
+.progress-step-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.progress-step-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  line-height: 1.3;
+}
+
+.progress-step-head strong {
+  color: var(--product-ink);
+  font-size: 14px;
+}
+
+.progress-step-head span {
+  color: var(--product-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.progress-step-copy p {
+  color: var(--product-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.progress-step-completed .progress-marker {
+  background: var(--product-green);
+}
+
+.progress-step-running .progress-marker {
+  background: var(--product-blue);
+}
+
+.progress-step-failed .progress-marker {
+  background: #b42318;
+}
+
+.progress-step-skipped .progress-marker {
+  background: #94a3b8;
 }
 
 .workbench-readiness-card {
@@ -1068,6 +1215,48 @@ th {
 .report-section-card header {
   display: grid;
   gap: 10px;
+}
+
+.report-section-charts,
+.report-evidence-tables {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.report-chart-artifact,
+.report-chart-intent,
+.report-evidence-table {
+  border: 1px solid var(--product-line);
+  border-radius: 8px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.report-chart-artifact img {
+  background: var(--product-surface-soft);
+  display: block;
+  max-height: 420px;
+  object-fit: contain;
+  width: 100%;
+}
+
+.report-chart-artifact figcaption,
+.report-chart-intent,
+.report-evidence-table {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.report-chart-intent {
+  background: var(--product-blue-soft);
+  color: #244072;
+}
+
+.report-chart-intent p,
+.report-evidence-table p {
+  margin: 0;
 }
 
 .business-qa,

@@ -90,6 +90,54 @@ def test_chart_renderer_uses_only_real_execution_rows(tmp_path):
     assert result["fabricated_data"] is False
 
 
+def test_visualization_fallback_chooses_chart_type_from_task_intent():
+    from agents.visualization_agent import decide_visualization
+
+    ranking = decide_visualization(
+        "最近90天哪个门店销售额最高？",
+        analysis_steps=[],
+        execution_result=_execution_result(
+            ["门店", "销售额"],
+            [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+        ),
+        provider=None,
+        run_id="run_rank_chart",
+    )
+    trend = decide_visualization(
+        "最近90天销售额趋势如何？",
+        analysis_steps=[],
+        execution_result=_execution_result(
+            ["月份", "销售额"],
+            [["2026-04", 12000.0], ["2026-05", 15000.0], ["2026-06", 18000.0]],
+        ),
+        provider=None,
+        run_id="run_trend_chart",
+    )
+    comparison = decide_visualization(
+        "比较各门店销售额和满意度，看看哪个最值得关注。",
+        analysis_steps=[],
+        execution_result=_execution_result(
+            ["门店", "销售额", "满意度"],
+            [["上海旗舰店", 26255.44, 4.8], ["北京国贸店", 18400.0, 4.4]],
+        ),
+        provider=None,
+        run_id="run_compare_chart",
+    )
+
+    assert ranking["chart_spec"]["chart_type"] == "ranked_bar"
+    assert trend["chart_spec"]["chart_type"] == "line"
+    assert comparison["chart_spec"]["chart_type"] == "scatter"
+    assert comparison["chart_spec"]["x"] == "销售额"
+    assert comparison["chart_spec"]["y"] == "满意度"
+    assert "门店" not in (comparison["chart_spec"]["x"], comparison["chart_spec"]["y"])
+    assert set(comparison["chart_spec"]["required_columns"]) >= {"销售额", "满意度"}
+    for decision in (ranking, trend, comparison):
+        spec = decision["chart_spec"]
+        assert spec["title"]
+        assert any("\u4e00" <= char <= "\u9fff" for char in spec["title"])
+        assert spec["business_annotation"]
+
+
 def test_unsupported_chart_type_falls_back_to_safe_table_or_basic_bar(tmp_path):
     from visualization.chart_renderer import render_chart
 

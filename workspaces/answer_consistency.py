@@ -222,8 +222,6 @@ def _single_row_budget_answer(
 def _multi_metric_conflict(question: str, rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     if len(rows) < 2 or not _is_decision_question(question):
         return None
-    if _is_budget_question(question):
-        return None
     entity_key = _entity_key(rows)
     if not entity_key:
         return None
@@ -402,8 +400,8 @@ def _ranked_evidence_answer(
         answer.update(
             {
                 "headline": f"当前证据最支持优先评估 {primary_entity}",
-                "direct_answer": f"本轮排序证据中，{primary_entity} 位于第一；{row_summary}。因此本次建议优先评估 {primary_entity}。",
-                "why": f"证据表第一行显示：{row_summary}。",
+                "direct_answer": f"当前数据支持优先评估 {primary_entity}；{row_summary}。因此本次建议先围绕 {primary_entity} 复盘。",
+                "why": f"当前数据中，{row_summary}。",
                 "evidence_bullets": evidence_bullets,
                 "recommendations": [f"围绕 {primary_entity} 做下一步资源评估，并用相同指标继续跟踪。"],
                 "caveats": caveats,
@@ -416,10 +414,10 @@ def _ranked_evidence_answer(
         {
             "headline": f"The current evidence most supports prioritizing {primary_entity}",
             "direct_answer": (
-                f"In the ranked evidence for this run, {primary_entity} is first; {row_summary}. "
+                f"The current data most supports prioritizing {primary_entity}; {row_summary}. "
                 f"So the recommendation should prioritize {primary_entity}."
             ),
-            "why": f"The first evidence row shows: {row_summary}.",
+            "why": f"The current data shows: {row_summary}.",
             "evidence_bullets": evidence_bullets,
             "recommendations": [f"Evaluate the next resource decision around {primary_entity} using the same metrics."],
             "caveats": caveats,
@@ -568,7 +566,7 @@ def _tradeoff_answer(
         for metric, (name, value) in leaders.items()
     ]
     leader_summary = "；".join(sentence.rstrip("。.") for sentence in leader_sentences)
-    caveat = "不同数值指标指向不同对象，不能只用单一最高值下结论。"
+    caveat = "不同数值指标指向不同对象，需要先明确决策口径，不能只用单一最高值下结论。"
 
     if chinese:
         answer.update(

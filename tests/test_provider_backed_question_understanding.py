@@ -135,6 +135,46 @@ def test_provider_backed_question_understanding_preserves_unsafe_risk_flags_as_r
     assert result["rejection_reason"] == "Request asks for sensitive fields or unsafe data access."
 
 
+def test_provider_backed_question_understanding_keeps_business_caveats_without_rejecting():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": ["销售额", "毛利率", "满意度"],
+        "dimension": "门店",
+        "operation": "比较",
+        "risk_flags": ["数据量有限", "时间窗口覆盖所有数据"],
+    }
+    payload["risk_flags"] = ["数据量有限", "时间窗口覆盖所有数据"]
+    payload["analysis_task"] = {
+        "task_type": "compare",
+        "dimensions": ["门店"],
+        "metrics": ["销售额", "毛利率", "满意度"],
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+        "filters": [],
+        "decision_goal": "找出最值得优先复盘的门店",
+        "missing_slots": [],
+        "defaults_applied": [],
+        "resolved_question": "比较各门店最近90天的销售额、毛利率和满意度",
+        "output_language": "zh",
+        "confidence": "high",
+    }
+
+    result = understand_question_with_provider(
+        "比较各门店最近90天的销售额、毛利率和满意度，推荐最值得复盘的门店",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["provider_called"] is True
+    assert result["strategy"] == "llm_candidate"
+    assert result["risk_flags"] == ["数据量有限", "时间窗口覆盖所有数据"]
+    assert result["rejection_reason"] == ""
+
+
 def test_provider_backed_question_understanding_never_returns_sql_or_planning_fields():
     from llm_ops.provider import MockLLMProvider
     from question_understanding.provider_backed import understand_question_with_provider
@@ -180,6 +220,149 @@ def test_provider_backed_question_understanding_normalizes_provider_slot_aliases
     assert result["intent"]["metric"] == "gmv"
     assert result["intent"]["dimension"] == "product"
     assert result["intent"]["operation"] == "top_n"
+
+
+def test_provider_backed_question_understanding_keeps_roas_separate_from_roi():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": "roas",
+        "dimension": "渠道",
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+        "operation": "排名",
+        "limit": None,
+    }
+
+    result = understand_question_with_provider(
+        "最近90天各渠道 ROAS 最高的是谁？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["intent"]["metric"] == "roas"
+    assert result["analysis_task"]["metrics"] == ["ROAS"]
+    assert "ROI" not in result["analysis_task"]["metrics"]
+    assert result["missing_slots"] == []
+
+
+def test_provider_backed_question_understanding_normalizes_net_return_aliases():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    for provider_metric in ("net_return", "net ROI", "net_roi", "netroi", "净投放回报率"):
+        payload = _valid_provider_payload()
+        payload["strategy"] = "llm_candidate"
+        payload["intent"] = {
+            **payload["intent"],
+            "metric": provider_metric,
+            "dimension": "渠道",
+            "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+            "operation": "排名",
+            "limit": None,
+        }
+
+        result = understand_question_with_provider(
+            "最近90天各渠道净投放回报率最高的是谁？",
+            provider=MockLLMProvider(payload),
+        )
+
+        assert result["source"] == "provider"
+        assert result["intent"]["metric"] == "net_return"
+        assert result["analysis_task"]["metrics"] == ["净投放回报率"]
+        assert "ROI" not in result["analysis_task"]["metrics"]
+        assert result["missing_slots"] == []
+
+
+def test_provider_backed_question_understanding_does_not_double_count_net_roi_question_aliases():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    for provider_metric, question in (
+        ("net ROI", "最近90天各渠道 net ROI 最高的是谁？"),
+        ("net_roi", "最近90天各渠道 net_roi 最高的是谁？"),
+        ("netroi", "最近90天各渠道 netroi 最高的是谁？"),
+    ):
+        payload = _valid_provider_payload()
+        payload["strategy"] = "llm_candidate"
+        payload["intent"] = {
+            **payload["intent"],
+            "metric": provider_metric,
+            "dimension": "渠道",
+            "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+            "operation": "排名",
+            "limit": None,
+        }
+
+        result = understand_question_with_provider(
+            question,
+            provider=MockLLMProvider(payload),
+        )
+
+        assert result["source"] == "provider"
+        assert result["intent"]["metric"] == "net_return"
+        assert result["analysis_task"]["metrics"] == ["净投放回报率"]
+        assert "ROI" not in result["analysis_task"]["metrics"]
+        assert result["missing_slots"] == []
+
+
+def test_provider_backed_question_understanding_keeps_explicit_net_return_and_roi_metric_string():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": "net_return, ROI",
+        "dimension": "渠道",
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+        "operation": "排名",
+        "limit": None,
+    }
+
+    result = understand_question_with_provider(
+        "最近90天各渠道净投放回报率和 ROI 分别最高的是谁？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["analysis_task"]["metrics"] == ["净投放回报率", "ROI"]
+    assert result["missing_slots"] == []
+
+
+def test_provider_backed_question_understanding_keeps_explicit_net_return_roas_and_roi_provider_task():
+    from llm_ops.provider import MockLLMProvider
+    from question_understanding.provider_backed import understand_question_with_provider
+
+    payload = _valid_provider_payload()
+    payload["strategy"] = "llm_candidate"
+    payload["intent"] = {
+        **payload["intent"],
+        "metric": "net_return",
+        "dimension": "渠道",
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+        "operation": "排名",
+        "limit": None,
+    }
+    payload["analysis_task"] = {
+        "task_type": "rank",
+        "dimensions": ["渠道"],
+        "metrics": ["net_return", "ROAS", "ROI"],
+        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"},
+    }
+
+    result = understand_question_with_provider(
+        "最近90天各渠道净投放回报率、ROAS 和 ROI 分别最高的是谁？",
+        provider=MockLLMProvider(payload),
+    )
+
+    assert result["source"] == "provider"
+    assert result["analysis_task"]["metrics"] == ["净投放回报率", "ROAS", "ROI"]
+    assert result["missing_slots"] == []
 
 
 def test_provider_backed_question_understanding_treats_missing_intent_risk_flags_as_empty():

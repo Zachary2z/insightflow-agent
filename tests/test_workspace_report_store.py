@@ -6,6 +6,7 @@ from workspaces.report_models import (
     ReportDocument,
     ReportDocumentSection,
     ReportEvidenceFact,
+    ReportEvidenceChart,
     ReportEvidencePack,
     ReportPlan,
     ReportRecord,
@@ -39,7 +40,28 @@ def _sample_report(workspace_id: str) -> ReportRecord:
                 evidence_ref="profile_table",
             )
         ],
+        charts=[
+            ReportEvidenceChart(
+                chart_id="revenue_structure_intent",
+                title="收入结构图表",
+                source_chapter_id="overview",
+                chart_type="bar",
+                description="图表意图：展示主要收入来源。",
+                evidence_ref="query_revenue_by_dimension",
+            )
+        ],
         data_limits=["当前缺少 ROI、利润和转化率，不能直接推导预算加码。"],
+        technical_details={
+            "queries": [
+                {
+                    "query_id": "query_revenue_by_dimension",
+                    "sql": "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+                    "raw_rows": [["paid_search", 300.0]],
+                    "provider_metadata": {"model": "deepseek"},
+                    "trace": ["sql_reviewer"],
+                }
+            ]
+        },
     )
     validation = ReportValidationResult(status="passed", checked_facts=["revenue_total"])
     document = ReportDocument(
@@ -53,6 +75,7 @@ def _sample_report(workspace_id: str) -> ReportRecord:
                 title="经营概览",
                 body="付费搜索和邮件贡献主要收入，后续应补齐效率和利润证据。",
                 evidence_refs=["revenue_total"],
+                chart_refs=["revenue_structure_intent"],
             )
         ],
         action_recommendations=["优先补齐 ROI、利润和转化率后再判断预算。"],
@@ -133,6 +156,8 @@ def test_report_store_renders_document_markdown_without_stitched_section_body(tm
     assert "## 报告正文" in markdown
     assert "### 经营概览" in markdown
     assert "付费搜索和邮件贡献主要收入" in markdown
+    assert "待生成图表：收入结构图表" in markdown
+    assert "图表意图：展示主要收入来源。" in markdown
     assert "## 行动建议" in markdown
     assert "优先补齐 ROI、利润和转化率后再判断预算。" in markdown
     assert "## 数据边界" in markdown
@@ -148,8 +173,13 @@ def test_report_store_renders_document_markdown_without_stitched_section_body(tm
     assert "```sql" not in business_body
     assert "<details>" in appendix
     assert "ReportPlan" not in business_body
-    assert "evidence_pack" in appendix
-    assert "revenue_total" in appendix
+    assert "evidence_pack" not in appendix
+    assert "revenue_total" not in appendix
+    assert "query_revenue_by_dimension" not in markdown
+    assert "SELECT channel" not in markdown
+    assert "raw_rows" not in markdown
+    assert "provider_metadata" not in markdown
+    assert "trace" not in markdown
 
 
 def test_report_store_rejects_report_paths_outside_report_directory(tmp_path):

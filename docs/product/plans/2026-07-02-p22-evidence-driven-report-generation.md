@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 
-**Status:** In progress; P22-H1 and P22-H2 closeout complete
+**Status:** Complete; P22-H1 through P22-H4 closeout complete
 
 **Product Direction:** P22 turns Report Center from stitched analysis answers into a Chinese business report generator. The report path should collect evidence with tools, let the model write one coherent report from that evidence, validate key facts, and render a clean report page. Old report-section answer stitching should be deleted instead of preserved.
 
@@ -341,7 +341,7 @@ Implemented H2 notes:
 - Missing requested evidence is kept as a planned chapter with missing evidence requirements and as warnings/data limits in the evidence pack.
 - H2 repair makes report titles, plan `time_range`, and evidence SQL consistent. 最近90天、最近30天、本月、本周 filters are anchored on the maximum date in each relevant table. If a table has no time field, the evidence pack states that time filtering was not applied instead of silently using full data.
 - `run_workspace_report()` no longer accepts the old removed compatibility parameter and keeps the current plan -> evidence -> compose -> validate -> render -> save flow.
-- Markdown and frontend main views render business-readable evidence summaries and small tables, while internal evidence ids, SQL, raw rows, provider metadata, and trace details stay in the technical appendix.
+- Markdown and frontend main views render business-readable evidence summaries and small tables. As of H4, downloaded Markdown and the report reader appendix summarize validation and evidence counts instead of dumping internal evidence ids, SQL, raw rows, provider metadata, trace details, or report contracts.
 
 ## P22-H3: Report Composer And Fact Validator
 
@@ -363,6 +363,15 @@ Acceptance:
 - unsupported numbers or top-ranked entities are caught by validation;
 - reasonable qualitative judgments are allowed when grounded in evidence.
 
+Implemented H3 notes:
+
+- Added `workspaces/report_composer.py` as the current report writing step. It receives `ReportPlan` and `ReportEvidencePack`, sends a safe evidence-only JSON prompt to a provider when available, parses provider JSON into `ReportDocument`, rejects technical/raw/old-answer-block leakage, and falls back to deterministic Chinese composition in no-key mode or when provider output is invalid.
+- Added `workspaces/report_validator.py` for lightweight deterministic checks over title, time range, evidence refs, key numbers, data sources, and top-ranked entities within the relevant chapter. The validator records only clear factual conflicts in `unsupported_claims` and allows reasonable evidence-backed recommendations.
+- `workspaces/report_runner.py` delegates composition and validation to the new modules, keeping the main path as `plan -> collect evidence -> compose document -> validate -> render/save`.
+- Added the current provider entry in `llm_ops/runtime_provider.py`: `INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER`; `INSIGHTFLOW_PRODUCT_LIVE_MODE=1` also enables it. The FastAPI report endpoint builds and passes `providers={"report_composer": provider}` to `run_workspace_report()` when DeepSeek is configured. If the provider cannot be built, the API still runs through the deterministic fallback.
+- Workspace settings include the `report_composer` provider feature with Chinese display label `报告撰写`.
+- Tests cover fake-provider composition without network calls, no-key fallback, technical leak prevention, old answer-block prevention, validator conflict detection, validator allowance for reasonable recommendations, runner delegation, API provider wiring, no-key API behavior, and runtime provider flags.
+
 ## P22-H4: Renderer, Frontend Report Page, And Closeout
 
 Goal: Make Report Center display the new report format cleanly and complete the cleanup.
@@ -383,6 +392,15 @@ Acceptance:
 - Markdown download matches the clean report structure;
 - old stitched report path is not reachable;
 - focused and full regressions pass.
+
+Implemented H4 notes:
+
+- `workspaces/report_markdown.py` now renders Markdown downloads as clean Chinese business reports rather than debug artifacts. The file includes report metadata, opening summary, chapters, inline chart artifacts or clear 待生成图表 prompts, compact evidence tables, action recommendations, data boundaries, and a collapsed appendix with only validation/evidence summary lines.
+- `frontend/components/ReportViewer.tsx` now presents the report detail page in business-report order: title and generation metadata, opening summary, body chapters, charts or chart-intent placeholders, evidence tables, final action recommendations, data boundaries, and the appendix. It does not show the report goal, local paths, SQL, raw rows, query ids, provider metadata, trace details, or old analysis-answer fields in the reading area.
+- `frontend/components/ReportTechnicalAppendix.tsx` stays collapsed by default and expands to a compact evidence/validation summary instead of JSON dumps.
+- Real chart artifacts render as images near their related section with a `下载图表` action. When the evidence pack only has a chart intent, the UI and Markdown label it as待生成图表 and do not pretend an artifact exists.
+- Backend and frontend tests now cover clean Markdown downloads, chart artifact display, no-artifact chart-intent prompts, collapsed appendix behavior, and old/debug field hiding.
+- Focused H4 verification passed with `python3 -m pytest tests/test_workspace_report_api.py tests/test_workspace_report_runner.py tests/test_workspace_report_store.py tests/test_report_composer_validator.py -q` and `cd frontend && npm test -- --run tests/api-client.test.ts tests/workspace-flow.test.tsx`.
 
 ## Testing Strategy
 

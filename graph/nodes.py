@@ -6,6 +6,7 @@ from typing import Any
 from agents.analysis_planner import run_analysis_planner_agent
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
+from agents.evidence_validator import run_evidence_validator_agent
 from agents.insight_claim_typer import run_insight_claim_typer_agent
 from agents.insight_agent import run_insight_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
@@ -18,6 +19,9 @@ from agents.sql_reviewer import run_sql_reviewer
 from agents.visualization_agent import run_visualization_agent
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
+from workspaces.context_pack_builder import build_fast_fact_context_pack
+from workspaces.fast_fact_composer import build_fast_fact_claims, compose_fast_fact_answer
+from workspaces.product_result_builder import build_evidence
 
 from graph.state import AgentState
 
@@ -179,6 +183,68 @@ def sql_executor_node(state: AgentState) -> AgentState:
     return append_trace(updated, trace_event)
 
 
+def fast_fact_node(state: AgentState) -> AgentState:
+    evidence = build_evidence(dict(state))
+    fact_payload = evidence.get("fact_payload") if isinstance(evidence.get("fact_payload"), dict) else {}
+    claims = build_fast_fact_claims(
+        analysis_task=state.get("analysis_task") or {},
+        execution_result=state.get("execution_result") or {},
+        fact_payload=fact_payload,
+    )
+    validated = run_evidence_validator_agent({**dict(state), "claims_to_validate": claims})
+    evidence_result = dict(validated.get("evidence_result") or {})
+    if evidence_result.get("success"):
+        evidence_result.setdefault("validation_status", "validated")
+
+    fast_fact_context_pack = build_fast_fact_context_pack(
+        user_question=state.get("user_question", ""),
+        analysis_route=state.get("analysis_route") or {},
+        analysis_task=state.get("analysis_task") or {},
+        fact_payload=fact_payload,
+        evidence_result=evidence_result,
+        execution_result=state.get("execution_result") or {},
+        metric_registry=state.get("metric_registry") or state.get("metric_context") or {},
+    )
+    business_answer = compose_fast_fact_answer(
+        user_question=state.get("user_question", ""),
+        analysis_route=state.get("analysis_route") or {},
+        analysis_task=state.get("analysis_task") or {},
+        execution_result=state.get("execution_result") or {},
+        evidence_result=evidence_result,
+        fact_payload=fact_payload,
+        context_pack=fast_fact_context_pack,
+    )
+    final_answer = business_answer.get("direct_answer") or business_answer.get("headline") or ""
+    updated = {
+        **validated,
+        "status": "completed",
+        "data_used": True,
+        "business_answer": business_answer,
+        "final_answer": final_answer,
+        "fast_fact_context_pack": fast_fact_context_pack,
+        "fast_fact_result": {
+            "success": True,
+            "business_answer": business_answer,
+            "fact_payload": fact_payload,
+            "context_pack": fast_fact_context_pack,
+            "claims_to_validate": claims,
+        },
+    }
+    return append_trace(
+        updated,
+        {
+            "node": "fast_fact_composer",
+            "tool_name": "",
+            "tool_input_summary": f"route={(state.get('analysis_route') or {}).get('route', '')}",
+            "tool_output_summary": final_answer[:200],
+            "status": "success",
+            "latency_ms": 0,
+            "provider_called": False,
+            "fallback_used": False,
+        },
+    )
+
+
 def error_fix_node(state: AgentState) -> AgentState:
     fixed = run_error_fix_agent(dict(state))
     if fixed.get("fixed_sql"):
@@ -294,6 +360,8 @@ def route_after_schema_repair(state: AgentState) -> str:
 
 def route_after_execute(state: AgentState) -> str:
     if state.get("execution_result", {}).get("success"):
+        if (state.get("analysis_route") or {}).get("route") == "fast_fact":
+            return "fast_fact"
         return "insight"
     if int(state.get("retry_count") or 0) < 1:
         return "fix"

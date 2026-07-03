@@ -11,6 +11,7 @@ from llm_ops.runtime_provider import (
     provider_clarification_router_enabled,
     provider_insight_drafting_enabled,
     provider_question_understanding_enabled,
+    provider_report_composer_enabled,
     provider_sql_candidate_enabled,
     provider_sql_planning_enabled,
     provider_visualization_agent_enabled,
@@ -80,6 +81,17 @@ def _model_mode_status() -> dict[str, Any]:
         "insight_drafting": provider_insight_drafting_enabled(env_path=env_path),
         "claim_typing": provider_claim_typing_enabled(env_path=env_path),
         "visualization": provider_visualization_agent_enabled(env_path=env_path),
+        "report_composer": provider_report_composer_enabled(env_path=env_path),
+    }
+    provider_feature_labels = {
+        "question_understanding": "问题理解",
+        "clarification": "澄清路由",
+        "sql_planning": "SQL 规划",
+        "sql_candidate": "SQL 候选生成",
+        "insight_drafting": "洞察起草",
+        "claim_typing": "事实声明识别",
+        "visualization": "图表建议",
+        "report_composer": "报告撰写",
     }
     enabled_count = sum(1 for enabled in provider_features.values() if enabled)
     if live_mode:
@@ -98,6 +110,7 @@ def _model_mode_status() -> dict[str, Any]:
             "api_key_present": bool(config.api_key),
         },
         "provider_features": provider_features,
+        "provider_feature_labels": provider_feature_labels,
         "coverage": {
             "enabled": enabled_count,
             "total": len(provider_features),

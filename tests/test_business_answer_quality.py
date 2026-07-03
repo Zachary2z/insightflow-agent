@@ -402,7 +402,7 @@ def test_insight_drafter_validation_allows_english_business_terms_inside_chinese
                 "why": "证据显示 email 在当前结果中 ROI 领先，且 paid_search 可作为对比渠道。",
                 "evidence_bullets": ["email 的 ROI 为 0.38。", "paid_search 的 ROI 低于 email。"],
                 "recommendations": ["继续观察 email 的预算效率，并对比 paid_search 的转化质量。"],
-                "caveats": ["当前结论只覆盖本次 execution_result 返回的数据。"],
+                "caveats": ["当前结论只覆盖本次返回数据。"],
                 "confidence": "medium",
             },
         },

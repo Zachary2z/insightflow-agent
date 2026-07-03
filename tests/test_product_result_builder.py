@@ -102,7 +102,8 @@ def test_product_result_builder_splits_business_and_technical_fields():
     assert answer["direct_answer"] == raw["final_answer"]
     assert "paid_search" in answer["why"]
     assert answer["evidence_bullets"] == ["第 1 行：渠道 为 paid_search，收入 为 200.0。"]
-    assert answer["recommendations"] == [raw["final_answer"]]
+    assert answer["recommendations"]
+    assert raw["final_answer"] not in answer["recommendations"]
     assert "raw_rows" not in product["business_answer"]
     assert "summary" not in answer
     assert "next_actions" not in answer
@@ -830,6 +831,34 @@ def test_product_result_builder_rejects_provider_business_answer_with_technical_
     assert answer["direct_answer"].startswith("已完成本轮查询")
 
 
+def test_product_result_builder_uses_business_boundaries_for_unsafe_model_text():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道收入最高？为什么？该不该加预算？",
+            "final_answer": "channel=微信私域, total_revenue=977000, provider_metadata={model: deepseek}",
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue"],
+                "rows": [["微信私域", 977000.0], ["抖音投放", 640000.0]],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    text = _business_answer_text(answer)
+    _assert_new_business_answer_shape(answer)
+    assert "微信私域" in text
+    assert "977000" in text
+    assert "channel=" not in text
+    assert "provider_metadata" not in text
+    assert "模型原始回答" not in text
+    assert "技术参数格式" not in text
+    assert "证据表第一行显示" not in text
+    assert any("当前结论" in caveat or "数据" in caveat for caveat in answer["caveats"])
+
+
 def test_product_result_builder_rewrites_english_answer_for_chinese_question_from_evidence():
     from workspaces.product_result_builder import build_product_analysis_result
 
@@ -864,7 +893,7 @@ def test_product_result_builder_rewrites_english_answer_for_chinese_question_fro
     _assert_new_business_answer_shape(answer)
     assert answer["headline"].startswith("已完成本轮查询")
     assert answer["direct_answer"].startswith("已完成本轮查询")
-    assert "证据表第一行显示" in answer["why"]
+    assert "证据表第一行显示" not in _business_answer_text(answer)
     assert "Based on the data" not in answer["headline"]
     assert "Based on the data" not in answer["direct_answer"]
     assert "Based on the data" not in answer["why"]
@@ -981,7 +1010,7 @@ def test_product_result_builder_uses_english_fallback_for_english_question():
 
     text = _business_answer_text(answer)
     assert answer["direct_answer"].startswith("The query returned 1 row")
-    assert "The first evidence row shows:" in answer["why"]
+    assert "The current data shows:" in answer["why"]
     assert answer["evidence_bullets"] == [
         "Row 1: channel is email, total revenue is 44548.53, order count is 120, average order value is 371.24."
     ]

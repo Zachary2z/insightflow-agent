@@ -73,6 +73,13 @@ def provider_final_answer_composer_enabled(
     return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER", env, env_path)
 
 
+def provider_report_composer_enabled(
+    env: dict[str, str] | None = None,
+    env_path: str | Path | None = None,
+) -> bool:
+    return _product_safe_provider_enabled("INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER", env, env_path)
+
+
 def provider_analysis_planner_enabled(env: dict[str, str] | None = None, env_path: str | Path | None = None) -> bool:
     return _flag_enabled("INSIGHTFLOW_USE_PROVIDER_ANALYSIS_PLANNER", env, env_path)
 
@@ -188,6 +195,23 @@ def build_final_answer_composer_provider(
     env: dict[str, str] | None = None,
 ) -> LLMProvider | None:
     if not provider_final_answer_composer_enabled(env, env_path):
+        return None
+
+    config = load_deepseek_config(env_path=env_path, require_api_key=True)
+    if not config.success:
+        return None
+
+    try:
+        return DeepSeekProvider(config)
+    except Exception:
+        return None
+
+
+def build_report_composer_provider(
+    env_path: str | Path = ".env",
+    env: dict[str, str] | None = None,
+) -> LLMProvider | None:
+    if not provider_report_composer_enabled(env, env_path):
         return None
 
     config = load_deepseek_config(env_path=env_path, require_api_key=True)

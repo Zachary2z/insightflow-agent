@@ -14,6 +14,7 @@ from graph.nodes import (
     early_response_node,
     error_fix_node,
     fail_response_node,
+    fast_fact_node,
     guarded_sql_candidate_node,
     insight_node,
     metric_node,
@@ -91,6 +92,7 @@ def build_workflow(
         lambda state: schema_repair_node(dict(state), provider=sql_candidate_provider),
     )
     workflow.add_node("execute", sql_executor_node)
+    workflow.add_node("fast_fact", fast_fact_node)
     workflow.add_node("fix", error_fix_node)
     workflow.add_node(
         "insight",
@@ -140,8 +142,13 @@ def build_workflow(
         {"execute": "execute", "schema_repair": "schema_repair", "fail": "fail"},
     )
     workflow.add_conditional_edges("schema_repair", route_after_schema_repair, {"review": "review", "fail": "fail"})
-    workflow.add_conditional_edges("execute", route_after_execute, {"insight": "insight", "fix": "fix", "fail": "fail"})
+    workflow.add_conditional_edges(
+        "execute",
+        route_after_execute,
+        {"insight": "insight", "fast_fact": "fast_fact", "fix": "fix", "fail": "fail"},
+    )
     workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
+    workflow.add_edge("fast_fact", "save_trace")
     workflow.add_edge("insight", "claim_typing")
     workflow.add_edge("claim_typing", "visualization_agent")
     workflow.add_edge("visualization_agent", "save_trace")

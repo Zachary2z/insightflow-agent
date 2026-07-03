@@ -309,7 +309,7 @@ def test_workflow_visualization_trace_records_provider_fallback_when_mock_saas_i
     from graph.workflow import run_workflow
 
     result = run_workflow(
-        "最近 30 天销售额最高的 5 个商品是什么？",
+        "最近 30 天各品类销售额表现有什么差异，哪个品类最值得关注？",
         db_path=Path(__file__).resolve().parents[1] / "data" / "ecommerce.db",
         trace_dir=tmp_path,
         run_id="run_workflow_visualization_trace",

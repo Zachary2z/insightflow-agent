@@ -571,7 +571,7 @@ describe("workspace product components", () => {
           business_answer: {
             headline: "Email produced the most revenue.",
             direct_answer: "Email 贡献最高收入。",
-            why: "证据表第一行显示：channel 为 email，revenue 为 100。",
+            why: "当前数据中，channel 为 email，revenue 为 100。",
             evidence_bullets: ["email revenue is 100"],
             recommendations: ["复核 email 投放预算"],
             caveats: [],
@@ -762,7 +762,7 @@ describe("workspace product components", () => {
             business_answer: {
               headline: "上海旗舰店销售额最高",
               direct_answer: "最近90天上海旗舰店销售额最高。",
-              why: "证据表第一行显示上海旗舰店排第一。",
+              why: "当前数据中上海旗舰店排第一。",
               evidence_bullets: ["上海旗舰店销售额最高。"],
               recommendations: [],
               caveats: [],
@@ -784,7 +784,7 @@ describe("workspace product components", () => {
           business_answer: {
             headline: "上海旗舰店销售额最高",
             direct_answer: "最近90天上海旗舰店销售额最高。",
-            why: "证据表第一行显示上海旗舰店排第一。",
+            why: "当前数据中上海旗舰店排第一。",
             evidence_bullets: ["上海旗舰店销售额最高。"],
             recommendations: [],
             caveats: [],
@@ -1033,7 +1033,7 @@ describe("workspace product components", () => {
         business_answer: {
           headline: "Email produced the most revenue.",
           direct_answer: "Email 贡献最高收入。",
-          why: "证据表第一行显示：channel 为 email，revenue 为 100。",
+          why: "当前数据中，channel 为 email，revenue 为 100。",
           evidence_bullets: ["email revenue is 100"],
           recommendations: ["复核 email 投放预算"],
           caveats: [],
@@ -1128,7 +1128,7 @@ describe("workspace product components", () => {
           business_answer: {
             headline: "优先加码 paid_search，同时观察转化成本。",
             direct_answer: "paid_search 贡献更高收入，但需要结合成本观察。",
-            why: "证据表第一行显示：channel 为 paid_search，revenue 为 200。",
+            why: "当前数据中，channel 为 paid_search，revenue 为 200。",
             evidence_bullets: ["paid_search revenue is 200"],
             recommendations: ["先提高 paid_search 预算"],
             caveats: [],
@@ -1206,7 +1206,7 @@ describe("workspace product components", () => {
             business_answer: {
               headline: "建议优先加码 paid_search",
               direct_answer: "paid_search 收入最高。",
-              why: "证据表第一行显示：channel 为 paid_search，revenue 为 200。",
+              why: "当前数据中，channel 为 paid_search，revenue 为 200。",
               evidence_bullets: ["paid_search revenue is 200"],
               recommendations: ["提高预算"],
               caveats: [],
@@ -1254,7 +1254,7 @@ describe("workspace product components", () => {
             business_answer: {
               headline: "上海旗舰店销售额最高",
               direct_answer: "最近90天上海旗舰店销售额最高。",
-              why: "证据表第一行显示：门店为上海旗舰店。",
+              why: "当前数据中，门店为上海旗舰店。",
               evidence_bullets: ["上海旗舰店销售额最高。"],
               recommendations: [],
               caveats: [],
@@ -1303,7 +1303,7 @@ describe("workspace product components", () => {
             business_answer: {
               headline: "收入稳定",
               direct_answer: "收入保持稳定。",
-              why: "证据表第一行显示：channel 为 email。",
+              why: "当前数据中，channel 为 email。",
               evidence_bullets: ["email 渠道有收入记录。"],
               recommendations: [],
               caveats: [],
@@ -1593,10 +1593,10 @@ describe("workspace product components", () => {
             business_answer: {
               headline: "先看业务结论",
               direct_answer: "这是业务摘要。",
-              why: "证据表第一行显示：channel 为 email。",
+              why: "当前数据支持先看 email 渠道，但成因还需要结合转化率和复购数据验证。",
               evidence_bullets: ["email 渠道有收入记录。"],
-              recommendations: [],
-              caveats: [],
+              recommendations: ["先复核 email 的成本和转化数据，再判断是否扩大投入。"],
+              caveats: ["当前主结论只基于收入数据，不能单独证明 ROI 领先。"],
               confidence: "medium",
             },
             evidence: { table_preview: { columns: ["channel"], rows: [["email"]] } },
@@ -1611,6 +1611,9 @@ describe("workspace product components", () => {
     expect(text).toContain("业务结论");
     expect(text.indexOf("先看业务结论")).toBeLessThan(text.indexOf("证据表"));
     expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术详情"));
+    expect(text).not.toContain("证据表第一行显示");
+    expect(screen.queryByText(/SELECT 1/)).toBeNull();
+    expect(screen.queryByText(/raw_rows/)).toBeNull();
   });
 
   it("renders only the P16 business answer contract fields in business order", () => {
@@ -1769,6 +1772,7 @@ describe("workspace product components", () => {
     expect(screen.getByText("正在加载报告")).toBeTruthy();
     expect(await screen.findByText("还没有生成报告")).toBeTruthy();
     expect(screen.getByText("生成第一份管理层复盘，之后会在这里按创建时间展示。")).toBeTruthy();
+    expect(screen.queryByText("Report Library")).toBeNull();
   });
 
   it("submits a report generation form and opens the created report", async () => {
@@ -1794,6 +1798,7 @@ describe("workspace product components", () => {
 
     render(<ReportGenerator workspaceId="ws_1" />);
     expect(screen.getByText("新建报告")).toBeTruthy();
+    expect(screen.queryByText("Create Report")).toBeNull();
     expect(screen.getByText("生成最近 90 天渠道表现复盘")).toBeTruthy();
     expect(screen.getByText("生成管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("生成客户增长与留存报告")).toBeTruthy();
@@ -1838,9 +1843,12 @@ describe("workspace product components", () => {
 
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("报告列表")).toBeTruthy();
+    expect(screen.queryByText("Report Library")).toBeNull();
+    expect(screen.queryByText("目标：生成管理层收入复盘报告")).toBeNull();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
-    expect(screen.getByText(/创建时间：2026-06-23/)).toBeTruthy();
+    expect(screen.getByText("摘要：Revenue grew.")).toBeTruthy();
+    expect(screen.getByText("更新时间：2026-06-23")).toBeTruthy();
     expect(screen.getByRole("link", { name: "打开报告" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/reports/report_1",
     );
@@ -1890,7 +1898,18 @@ describe("workspace product components", () => {
               evidence_ref: "query_revenue_by_category",
             },
           ],
-          charts: [],
+          charts: [
+            {
+              chart_id: "revenue_structure_chart",
+              title: "收入结构图表",
+              source_chapter_id: "revenue_by_channel",
+              chart_type: "bar",
+              path: "reports/report_1/artifacts/revenue_structure.png",
+              url: "/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.png",
+              description: "按产品品类展示收入贡献。",
+              evidence_ref: "query_revenue_by_category",
+            },
+          ],
         },
         document: {
           title: "管理层收入复盘报告",
@@ -1903,6 +1922,7 @@ describe("workspace product components", () => {
               title: "渠道收入复盘",
               body: "付费搜索贡献主要收入，邮件渠道提供稳定补充；当前报告应继续补齐 ROI、利润和转化率后再做预算判断。",
               evidence_refs: ["revenue_total"],
+              chart_refs: ["revenue_structure_chart"],
             },
           ],
           action_recommendations: ["先复盘付费搜索投放效率。"],
@@ -1922,6 +1942,7 @@ describe("workspace product components", () => {
         json_path: "workspaces/ws_1/reports/report_1/report.json",
         trace_path: "workspaces/ws_1/reports/report_1/trace.json",
         artifact_dir: "workspaces/ws_1/reports/report_1/artifacts",
+        updated_at: "2026-07-02T15:30:00Z",
         provider_metadata: { generation_flow: "evidence_driven_report_center" },
       },
     });
@@ -1930,11 +1951,20 @@ describe("workspace product components", () => {
 
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
+    expect(screen.getByText("生成时间：2026-07-02")).toBeTruthy();
+    expect(screen.getByText("时间范围：最近90天")).toBeTruthy();
+    expect(screen.getByText("数据来源：orders")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
     expect(screen.getByText("开篇摘要")).toBeTruthy();
     expect(screen.getByText("行动建议")).toBeTruthy();
     expect(screen.getByText("数据边界")).toBeTruthy();
     expect(screen.getByText("报告正文")).toBeTruthy();
+    expect(screen.getByAltText("收入结构图表").getAttribute("src")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.png",
+    );
+    expect(screen.getByRole("link", { name: "下载图表" }).getAttribute("href")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.png",
+    );
     expect(screen.getByText("收入结构")).toBeTruthy();
     expect(screen.getByText("证据来自订单表按产品品类汇总。")).toBeTruthy();
     expect(screen.getByText("企业SaaS订阅")).toBeTruthy();
@@ -1961,13 +1991,16 @@ describe("workspace product components", () => {
     expect(screen.queryByText(/provider_called/)).toBeNull();
     expect(screen.queryByText(/sql_reviewer/)).toBeNull();
     expect(screen.queryByText(/trace.json/)).toBeNull();
+    expect(screen.queryByText("reports/report_1/artifacts/revenue_structure.png")).toBeNull();
 
     const appendix = screen.getByText("技术附录").closest("details");
     expect(appendix?.hasAttribute("open")).toBe(false);
     fireEvent.click(screen.getByText("技术附录"));
-    expect(screen.getByText(/SELECT channel/)).toBeTruthy();
-    expect(screen.getByText(/provider_called/)).toBeTruthy();
-    expect(screen.getByText(/sql_reviewer/)).toBeTruthy();
+    expect(screen.getByText("证据概况")).toBeTruthy();
+    expect(screen.getByText("校验状态：passed")).toBeTruthy();
+    expect(screen.queryByText(/SELECT channel/)).toBeNull();
+    expect(screen.queryByText(/provider_called/)).toBeNull();
+    expect(screen.queryByText(/sql_reviewer/)).toBeNull();
     expect(screen.getByRole("link", { name: "下载 Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
@@ -1997,6 +2030,7 @@ describe("workspace product components", () => {
               section_id: "trend",
               title: "收入趋势",
               body: "当前收入趋势没有明显异常，后续可补充利润和转化率做进一步判断。",
+              chart_refs: ["trend_chart_intent"],
             },
           ],
           action_recommendations: ["继续观察收入变化。"],
@@ -2008,6 +2042,17 @@ describe("workspace product components", () => {
             },
           },
         },
+        evidence_pack: {
+          charts: [
+            {
+              chart_id: "trend_chart_intent",
+              title: "收入趋势图表",
+              source_chapter_id: "trend",
+              chart_type: "line",
+              description: "建议生成图表：按时间展示收入变化。",
+            },
+          ],
+        },
         sections: [],
       },
     });
@@ -2015,6 +2060,9 @@ describe("workspace product components", () => {
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
     expect(await screen.findByText("当前没有生成可展示图表。")).toBeTruthy();
+    expect(screen.getByText("待生成图表：收入趋势图表")).toBeTruthy();
+    expect(screen.getByText("建议生成图表：按时间展示收入变化。")).toBeTruthy();
+    expect(screen.queryByAltText("收入趋势图表")).toBeNull();
     expect(screen.queryByText(/matplotlib backend error/)).toBeNull();
     expect(screen.queryByText(/internal-trace/)).toBeNull();
   });
@@ -2058,7 +2106,7 @@ describe("workspace product components", () => {
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
     expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
-    expect(screen.getByText("报告目标：Create an English leadership report about revenue.")).toBeTruthy();
+    expect(screen.queryByText("报告目标：Create an English leadership report about revenue.")).toBeNull();
     expect(screen.getByText("开篇摘要")).toBeTruthy();
     expect(screen.getByText("报告正文")).toBeTruthy();
     expect(screen.getByText("收入结构")).toBeTruthy();

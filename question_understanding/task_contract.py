@@ -130,6 +130,12 @@ def strategy_for_task(task: dict[str, Any], *, risk_flags: list[str] | None = No
 
 def legacy_metric_id(metric_label: str) -> str:
     compact = compact_text(metric_label)
+    if compact in {"roas"}:
+        return "roas"
+    if compact in {"roi"}:
+        return "roi"
+    if compact in {"netreturn", "netroi", "净投放回报率", "净回报率", "净投放回报"}:
+        return "net_return"
     if compact in {"销售额", "收入", "营收", "成交额", "gmv", "sales", "salesamount", "revenue"}:
         return "gmv"
     if compact in {"订单量", "订单数", "订单数量", "ordercount"}:
@@ -211,7 +217,7 @@ def _missing_slots(
     missing = []
     if not metrics:
         missing.append("metric")
-    if task_type in {"compare", "rank", "trend", "anomaly", "recommendation", "summary"} and not dimensions:
+    if task_type in {"compare", "rank", "anomaly", "recommendation", "summary"} and not dimensions:
         missing.append("dimension")
     if not time_range:
         missing.append("time_range")
@@ -274,17 +280,32 @@ def _normalize_string_list(value: Any) -> list[str]:
 
 
 def _question_metric_matches(question: str) -> list[str]:
+    net_return_keywords = ("净投放回报率", "净回报率", "net return", "net_return", "net roi", "netroi")
     candidates = [
+        (("roas",), "ROAS"),
+        (("roi",), "ROI"),
         (("销售额", "成交额", "收入", "营收", "gmv", "sales amount", "sales", "revenue"), "销售额"),
         (("花费", "费用", "成本", "投放成本", "spend", "cost"), "花费"),
-        (("roi", "roas"), "ROI"),
         (("订单量", "订单数", "订单数量", "order count"), "订单量"),
         (("客单价", "平均订单金额", "aov"), "客单价"),
         (("复购率", "复购"), "复购率"),
         (("满意度", "评分", "nps", "score"), "满意度"),
         (("销量", "销售量"), "销量"),
     ]
-    return [label for keywords, label in candidates if contains_any(question, keywords)]
+    has_net_return = contains_any(question, net_return_keywords)
+    matches = ["净投放回报率"] if has_net_return else []
+    for keywords, label in candidates:
+        if label == "ROI" and has_net_return and not _question_contains_plain_roi(question):
+            continue
+        if contains_any(question, keywords):
+            matches.append(label)
+    return matches
+
+
+def _question_contains_plain_roi(question: str) -> bool:
+    compact = compact_text(question)
+    compact = compact.replace(compact_text("net roi"), "")
+    return "roi" in compact
 
 
 def _question_dimension_matches(question: str) -> list[str]:
@@ -302,6 +323,13 @@ def _question_dimension_matches(question: str) -> list[str]:
 def _metric_label(value: Any) -> str:
     compact = compact_text(value)
     mapping = {
+        "roas": "ROAS",
+        "roi": "ROI",
+        "netreturn": "净投放回报率",
+        "netroi": "净投放回报率",
+        "净投放回报率": "净投放回报率",
+        "净回报率": "净投放回报率",
+        "净投放回报": "净投放回报率",
         "gmv": "销售额",
         "sales": "销售额",
         "salesamount": "销售额",
@@ -325,8 +353,6 @@ def _metric_label(value: Any) -> str:
         "复购率": "复购率",
         "productsales": "销量",
         "销量": "销量",
-        "roi": "ROI",
-        "roas": "ROI",
         "scorenps": "满意度",
         "nps": "满意度",
     }

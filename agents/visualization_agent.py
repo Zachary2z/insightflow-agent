@@ -11,6 +11,7 @@ from tools.trace_logger import append_trace
 from visualization.chart_validator import validate_chart_spec
 from visualization_delivery.policy import validate_delivery_tool
 from visualization_delivery.tool_catalog import DELIVERY_TOOL_CATALOG
+from workspaces.answer_evidence import business_field_label
 
 
 PROMPT_ID = "visualization_agent"
@@ -37,7 +38,36 @@ def _first_numeric_column(execution_result: dict[str, Any]) -> str:
     return columns[1] if len(columns) > 1 else ""
 
 
+def _numeric_columns(execution_result: dict[str, Any]) -> list[str]:
+    columns = _columns(execution_result)
+    rows = _rows(execution_result)
+    numeric: list[str] = []
+    for index, column in enumerate(columns):
+        if any(len(row) > index and _is_number(row[index]) for row in rows):
+            numeric.append(column)
+    return numeric
+
+
+def _chart_type_for_question(question: str, execution_result: dict[str, Any]) -> str:
+    text = str(question or "").lower()
+    if any(marker in text for marker in ("趋势", "走势", "变化", "trend")):
+        return "line"
+    if (
+        any(marker in text for marker in ("比较", "对比", "建议", "推荐", "值得", "关注", "recommend", "compare"))
+        and len(_numeric_columns(execution_result)) >= 2
+    ):
+        return "scatter"
+    if any(marker in text for marker in ("最高", "最低", "排名", "top", "rank", "哪个")):
+        return "ranked_bar"
+    return "ranked_bar"
+
+
+def _business_label(column: str) -> str:
+    return business_field_label(column, chinese=True)
+
+
 def _fallback_chart_spec(
+    question: str,
     execution_result: dict[str, Any],
     *,
     run_id: str,
@@ -47,20 +77,27 @@ def _fallback_chart_spec(
 ) -> dict[str, Any]:
     columns = _columns(execution_result)
     x = columns[0] if columns else ""
-    y = _first_numeric_column(execution_result)
+    numeric_columns = _numeric_columns(execution_result)
+    y = numeric_columns[0] if numeric_columns else _first_numeric_column(execution_result)
+    y_secondary = numeric_columns[1] if len(numeric_columns) >= 2 else ""
     if y == x and len(columns) > 1:
         y = columns[1]
+    chart_type = _chart_type_for_question(question, execution_result)
+    if chart_type == "scatter" and len(numeric_columns) >= 2:
+        x = numeric_columns[0]
+        y = numeric_columns[1]
     spec = {
         "success": True,
         "source": "fallback",
-        "chart_type": "ranked_bar",
-        "title": f"Ranked Bar: {y} by {x}".strip(),
+        "chart_type": chart_type,
+        "title": _fallback_chart_title(chart_type=chart_type, x=x, y=y, y_secondary=y_secondary),
         "x": x,
         "y": y,
-        "y_secondary": "",
+        "y_secondary": y_secondary if chart_type in {"dual_axis_line", "risk_matrix"} else "",
         "series": "",
         "required_columns": [column for column in [x, y] if column],
         "explanation_basis": ["supported_findings"],
+        "business_annotation": _fallback_business_annotation(chart_type=chart_type),
         "provider_called": provider_called,
         "fallback_used": True,
         "prompt_id": PROMPT_ID if provider_called else "",
@@ -86,6 +123,25 @@ def _fallback_chart_spec(
     }
 
 
+def _fallback_chart_title(*, chart_type: str, x: str, y: str, y_secondary: str) -> str:
+    x_label = _business_label(x)
+    y_label = _business_label(y)
+    secondary_label = _business_label(y_secondary)
+    if chart_type == "line":
+        return f"{y_label}趋势"
+    if chart_type == "scatter":
+        return f"{x_label}与{y_label}对比"
+    return f"{x_label}{y_label}对比"
+
+
+def _fallback_business_annotation(*, chart_type: str) -> str:
+    if chart_type == "line":
+        return "图表展示本轮查询返回的指标变化趋势，请结合业务结论判断异常或拐点。"
+    if chart_type == "scatter":
+        return "图表展示本轮查询返回对象在两个指标上的相对位置，请结合业务目标判断优先级。"
+    return "图表展示本轮查询返回对象的指标排序，请结合业务结论解读。"
+
+
 def _tool_catalog_for_prompt() -> list[dict[str, Any]]:
     return [
         {
@@ -101,6 +157,7 @@ def _tool_catalog_for_prompt() -> list[dict[str, Any]]:
 
 
 def _decision_from_fallback(
+    question: str,
     execution_result: dict[str, Any],
     *,
     run_id: str,
@@ -109,6 +166,7 @@ def _decision_from_fallback(
     validation_error: str = "",
 ) -> dict[str, Any]:
     chart_spec = _fallback_chart_spec(
+        question,
         execution_result,
         run_id=run_id,
         provider_called=provider_called,
@@ -142,6 +200,7 @@ def decide_visualization(
 ) -> dict[str, Any]:
     if provider is None:
         return _decision_from_fallback(
+            question,
             execution_result,
             run_id=run_id,
             provider_called=False,
@@ -161,6 +220,7 @@ def decide_visualization(
     )
     if not rendered.get("success"):
         return _decision_from_fallback(
+            question,
             execution_result,
             run_id=run_id,
             provider_called=False,
@@ -186,6 +246,7 @@ def decide_visualization(
         error = provider_response.get("error", "")
         error_type = provider_response.get("error_type", "")
         return _decision_from_fallback(
+            question,
             execution_result,
             run_id=run_id,
             provider_called=True,
@@ -212,6 +273,7 @@ def decide_visualization(
     chart_validation = validate_chart_spec(chart_spec, execution_result)
     if not chart_validation.get("success"):
         return _decision_from_fallback(
+            question,
             execution_result,
             run_id=run_id,
             provider_called=True,
@@ -221,6 +283,7 @@ def decide_visualization(
     policy = validate_delivery_tool(content["delivery_tool_id"], execution_result=execution_result)
     if not policy.get("success"):
         return _decision_from_fallback(
+            question,
             execution_result,
             run_id=run_id,
             provider_called=True,

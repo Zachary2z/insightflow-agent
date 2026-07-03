@@ -221,6 +221,60 @@ def test_report_main_path_does_not_call_run_workspace_analysis_for_sections(tmp_
     assert result["report"]["document"]["sections"]
 
 
+def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, monkeypatch):
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = {"composer": 0, "validator": 0}
+
+    def fake_compose_report_document(*, plan, evidence_pack, provider=None):
+        calls["composer"] += 1
+        assert plan.title == "最近90天经营复盘报告"
+        assert evidence_pack.facts
+        assert provider == "fake-report-provider"
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="这是由新报告撰写器生成的完整中文摘要。",
+            sections=[
+                ReportDocumentSection(
+                    section_id="overview",
+                    title="经营概览",
+                    body="新报告撰写器基于证据生成正文。",
+                    evidence_refs=["workspace_table_count"],
+                )
+            ],
+            action_recommendations=["继续沿用证据驱动报告链路。"],
+            data_boundaries=["当前为 runner 调用链测试。"],
+        )
+
+    def fake_validate_report_document(*, document, plan, evidence_pack):
+        calls["validator"] += 1
+        assert document.opening_summary.startswith("这是由新报告撰写器")
+        assert plan.title == document.title
+        assert evidence_pack.facts
+        return ReportValidationResult(
+            status="passed",
+            checked_facts=["workspace_table_count"],
+        )
+
+    monkeypatch.setattr(report_runner, "compose_report_document", fake_compose_report_document)
+    monkeypatch.setattr(report_runner, "validate_report_document", fake_validate_report_document)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+        providers={"report_composer": "fake-report-provider"},
+    )
+
+    assert result["success"] is True
+    assert calls == {"composer": 1, "validator": 1}
+    assert result["report"]["document"]["opening_summary"].startswith("这是由新报告撰写器")
+
+
 def test_existing_semantic_layer_is_not_overwritten(tmp_path):
     store, workspace = _create_workspace_with_orders(tmp_path)
     existing_semantic = {

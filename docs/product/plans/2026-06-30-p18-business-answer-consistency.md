@@ -421,7 +421,7 @@ python3 -m pytest tests/test_answer_consistency.py tests/test_product_result_bui
 - [x] Run current cleanup boundaries:
 
 ```bash
-python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
 ```
 
 - [x] Run full backend regression:

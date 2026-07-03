@@ -4,6 +4,19 @@ from typing import Any
 
 
 BUSINESS_FIELD_LABELS_ZH = {
+    "store_name": "门店",
+    "store": "门店",
+    "shop_name": "门店",
+    "sales_amount": "销售额",
+    "total_sales": "总销售额",
+    "satisfaction_score": "满意度",
+    "score_nps": "满意度",
+    "team_name": "团队",
+    "ticket_count": "工单数",
+    "avg_response_minutes": "平均响应时长",
+    "response_minutes": "响应时长",
+    "avg_resolution_hours": "平均解决时长",
+    "resolution_hours": "解决时长",
     "total_revenue": "总收入",
     "sum_revenue": "总收入",
     "revenue": "收入",
@@ -30,6 +43,19 @@ BUSINESS_FIELD_LABELS_ZH = {
 }
 
 BUSINESS_FIELD_LABELS_EN = {
+    "store_name": "store",
+    "store": "store",
+    "shop_name": "store",
+    "sales_amount": "sales amount",
+    "total_sales": "total sales",
+    "satisfaction_score": "satisfaction score",
+    "score_nps": "satisfaction score",
+    "team_name": "team",
+    "ticket_count": "ticket count",
+    "avg_response_minutes": "average response time",
+    "response_minutes": "response time",
+    "avg_resolution_hours": "average resolution time",
+    "resolution_hours": "resolution time",
     "total_revenue": "total revenue",
     "sum_revenue": "total revenue",
     "revenue": "revenue",

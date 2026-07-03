@@ -20,8 +20,11 @@ _CHINESE_ALIASES_BY_MEANING = {
 
 _CHINESE_ALIASES_BY_NAME = (
     (("store", "shop", "branch", "门店", "店铺"), ["门店", "店铺"]),
+    (("team", "group", "团队", "小组", "客服组"), ["团队", "客服团队"]),
     (("customer", "client", "user", "客户", "用户"), ["客户", "用户"]),
     (("product", "sku", "商品", "产品"), ["产品", "商品"]),
+    (("ticket", "case", "工单", "客服"), ["工单", "客服工单"]),
+    (("response", "resolution", "handle", "响应", "解决", "处理"), ["响应时长", "处理时长"]),
     (("city", "城市"), ["城市"]),
     (("region", "area", "地区", "区域"), ["区域", "地区"]),
     (("sales", "revenue", "income", "turnover", "营业额", "营收", "收入", "销售额"), ["销售额", "收入", "营收", "营业额", "成交额"]),

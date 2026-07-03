@@ -8,6 +8,7 @@ from workspaces.report_models import (
     ReportDocument,
     ReportDocumentSection,
     ReportEvidenceFact,
+    ReportEvidenceChart,
     ReportEvidencePack,
     ReportPlan,
     ReportValidationResult,
@@ -54,7 +55,28 @@ def _client_with_fake_report_runner(tmp_path):
                     source_chapter_id="overview",
                     evidence_ref="table_revenue",
                 )
-            ]
+            ],
+            charts=[
+                ReportEvidenceChart(
+                    chart_id="revenue_chart_intent",
+                    title="收入结构图表",
+                    source_chapter_id="overview",
+                    chart_type="bar",
+                    description="图表意图：展示收入结构。",
+                    evidence_ref="query_revenue_by_dimension",
+                )
+            ],
+            technical_details={
+                "queries": [
+                    {
+                        "query_id": "query_revenue_by_dimension",
+                        "sql": "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+                        "raw_rows": [["paid_search", 200.0]],
+                        "provider_metadata": {"model": "deepseek"},
+                        "trace": ["sql_reviewer"],
+                    }
+                ]
+            },
         )
         validation = ReportValidationResult(status="passed", checked_facts=["revenue_total"])
         document = ReportDocument(
@@ -68,6 +90,7 @@ def _client_with_fake_report_runner(tmp_path):
                     title="经营概览",
                     body="付费搜索贡献了当前样例收入，是后续复盘的证据线索。",
                     evidence_refs=["revenue_total"],
+                    chart_refs=["revenue_chart_intent"],
                 )
             ],
             action_recommendations=["先补齐成本和转化率后再判断预算。"],
@@ -151,6 +174,33 @@ def test_create_report_returns_persisted_report_document(tmp_path):
     ]
 
 
+def test_create_report_passes_report_composer_provider_to_runner(tmp_path, monkeypatch):
+    import api.app as api_app
+
+    fake_provider = object()
+    monkeypatch.setattr(api_app, "build_report_composer_provider", lambda: fake_provider)
+    client, _, calls = _client_with_fake_report_runner(tmp_path)
+    workspace_id = _create_workspace(client)
+
+    payload = _create_report(client, workspace_id)
+
+    assert payload["success"] is True
+    assert calls[0]["providers"] == {"report_composer": fake_provider}
+
+
+def test_create_report_keeps_no_key_mode_when_report_composer_provider_unavailable(tmp_path, monkeypatch):
+    import api.app as api_app
+
+    monkeypatch.setattr(api_app, "build_report_composer_provider", lambda: None)
+    client, _, calls = _client_with_fake_report_runner(tmp_path)
+    workspace_id = _create_workspace(client)
+
+    payload = _create_report(client, workspace_id)
+
+    assert payload["success"] is True
+    assert calls[0]["providers"] is None
+
+
 def test_list_reports_returns_workspace_reports(tmp_path):
     client, _, _ = _client_with_fake_report_runner(tmp_path)
     workspace_id = _create_workspace(client)
@@ -199,12 +249,18 @@ def test_download_report_markdown_returns_document_markdown_file(tmp_path):
     assert "## 开篇摘要" in response.text
     assert "## 报告正文" in response.text
     assert "### 经营概览" in response.text
+    assert "待生成图表：收入结构图表" in response.text
     assert "## 行动建议" in response.text
     assert "## 数据边界" in response.text
     assert "## 技术附录" in response.text
     assert "章节业务答案" not in response.text
     assert "#### 直接回答" not in response.text
     assert "```sql" not in response.text
+    assert "query_revenue_by_dimension" not in response.text
+    assert "SELECT channel" not in response.text
+    assert "raw_rows" not in response.text
+    assert "provider_metadata" not in response.text
+    assert "trace" not in response.text
 
 
 @pytest.mark.parametrize(

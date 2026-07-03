@@ -115,7 +115,14 @@ def _provider_compose(
         },
     )
     content = response.get("content")
-    return content if response.get("success") and isinstance(content, dict) else {}
+    if response.get("success") and isinstance(content, dict):
+        return _polish_answer(
+            content,
+            user_question=user_question,
+            execution_result=execution_result,
+            reviewer_result=reviewer_result,
+        )
+    return {}
 
 
 def _deterministic_compose(
@@ -137,6 +144,16 @@ def _deterministic_compose(
     if status == "accept" and not _has_blocked_text(normalized) and not _contains_any(_answer_text(normalized), unsupported_values):
         return _validate_or_rebuild(normalized, user_question=user_question, execution_result=execution_result)
     if status == "downgrade_to_insufficient_evidence":
+        if _can_rebuild_supported_answer_from_rows(
+            execution_result=execution_result,
+            reviewer_result=reviewer_result,
+        ):
+            return _evidence_based_answer(
+                user_question=user_question,
+                execution_result=execution_result,
+                reviewer_result={**reviewer_result, "status": "revise", "confidence": "medium"},
+                chinese=chinese,
+            )
         return _insufficient_answer(
             user_question=user_question,
             execution_result=execution_result,
@@ -151,6 +168,19 @@ def _deterministic_compose(
     )
 
 
+def _can_rebuild_supported_answer_from_rows(
+    *,
+    execution_result: dict[str, Any],
+    reviewer_result: dict[str, Any],
+) -> bool:
+    if reviewer_result.get("unsupported_entities") or reviewer_result.get("unsupported_metrics"):
+        return False
+    rows = rows_as_dicts(execution_result)
+    if len(rows) < 2:
+        return False
+    return bool(entity_key(rows) and metric_keys(rows))
+
+
 def _validate_or_rebuild(answer: dict[str, Any], *, user_question: str, execution_result: dict[str, Any]) -> dict[str, Any]:
     validation = validate_prompt_output(
         "final_answer_composer",
@@ -158,7 +188,12 @@ def _validate_or_rebuild(answer: dict[str, Any], *, user_question: str, executio
         schema_context={"user_question": user_question, "execution_result": execution_result},
     )
     if validation.get("success"):
-        return validation["content"]
+        return _polish_answer(
+            validation["content"],
+            user_question=user_question,
+            execution_result=execution_result,
+            reviewer_result={},
+        )
     return _evidence_based_answer(
         user_question=user_question,
         execution_result=execution_result,
@@ -212,13 +247,48 @@ def _evidence_based_answer(
 
     if chinese:
         entity_text = primary or "当前第一行对象"
+        wants_recommendations = _should_include_recommendations(user_question)
+        metric_labels = _metric_labels(metric_key_values, chinese=True)
+        metric_text = "、".join(metric_labels) if metric_labels else "可用指标"
+        why_text = (
+            f"当前证据显示，{entity_text} 在本次返回的{metric_text}中表现靠前。"
+            "如果要解释背后的业务原因，可以把它作为合理假设：可能与触达效率、需求规模、客户信任或运营承接有关，"
+            "但这些原因仍需要转化率、复购、成本或更细分过程数据进一步验证。"
+            if _asks_why(user_question)
+            else f"当前数据中，{entity_text} 的结果靠前：{first_row_summary}。"
+        )
+        recommendations = (
+            _composer_recommendations(
+                entity_text,
+                user_question=user_question,
+                execution_result=execution_result,
+                chinese=True,
+            )
+            if wants_recommendations
+            else []
+        )
+        direct_answer = (
+            f"在当前证据下，建议优先关注 {entity_text}；它在本次返回的{metric_text}中表现靠前。"
+            if wants_recommendations
+            else f"本轮结果显示 {entity_text} 排在第一，因为它在本次查询返回的{metric_text}中表现靠前。"
+        )
+        headline = (
+            f"当前证据支持优先关注 {entity_text}"
+            if wants_recommendations
+            else f"当前证据显示 {entity_text} 排名靠前"
+        )
         answer = {
-            "headline": f"当前证据支持优先关注 {entity_text}",
-            "direct_answer": f"当前证据支持优先关注 {entity_text}，因为本轮返回结果中它的可用指标表现靠前。",
-            "why": f"执行结果第一行显示：{first_row_summary}。",
+            "headline": headline,
+            "direct_answer": direct_answer,
+            "why": why_text,
             "evidence_bullets": evidence_bullets,
-            "recommendations": [f"围绕 {entity_text} 做下一步复盘，并继续跟踪本轮返回的同口径指标。"],
-            "caveats": _composer_caveats(reviewer_result, chinese=True),
+            "recommendations": recommendations,
+            "caveats": _composer_caveats(
+                reviewer_result,
+                user_question=user_question,
+                execution_result=execution_result,
+                chinese=True,
+            ),
             "confidence": confidence,
         }
     else:
@@ -228,13 +298,45 @@ def _evidence_based_answer(
             "direct_answer": (
                 f"Focus on {entity_text} for now because the returned evidence ranks it first on the available metrics."
             ),
-            "why": f"The first result row shows: {first_row_summary}.",
+            "why": f"The current data puts {entity_text} ahead on the returned metrics: {first_row_summary}.",
             "evidence_bullets": evidence_bullets,
             "recommendations": [f"Use {entity_text} as the next review focus and keep tracking the returned metrics."],
-            "caveats": _composer_caveats(reviewer_result, chinese=False),
+            "caveats": _composer_caveats(
+                reviewer_result,
+                user_question=user_question,
+                execution_result=execution_result,
+                chinese=False,
+            ),
             "confidence": confidence,
         }
     return _validate_or_empty(answer, user_question=user_question)
+
+
+def _should_include_recommendations(user_question: str) -> bool:
+    text = str(user_question or "").lower()
+    if any(marker in text for marker in ("只回答事实", "不用建议", "不需要建议", "不要建议", "只看事实")):
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "建议",
+            "推荐",
+            "应该",
+            "该",
+            "值得",
+            "优先",
+            "加预算",
+            "减少预算",
+            "优化",
+            "关注",
+            "下一步",
+            "action",
+            "recommend",
+            "should",
+            "prioritize",
+            "budget",
+        )
+    )
 
 
 def _tradeoff_answer(
@@ -341,7 +443,7 @@ def _insufficient_answer(
         answer = {
             "headline": "当前证据不足以支持该结论",
             "direct_answer": "当前证据不足以支持该结论，需要补充可验证的同口径数据后再判断。",
-            "why": "Reviewer 发现原草稿中的关键对象、指标或判断没有足够执行结果支撑。",
+            "why": "当前返回数据不足以支撑原草稿里的关键对象、指标或判断，因此需要补充同口径证据后再下结论。",
             "evidence_bullets": bullets,
             "recommendations": ["先补充能够覆盖目标对象和指标的同口径证据，再生成确定性建议。"],
             "caveats": [caveat],
@@ -397,7 +499,13 @@ def _metric_value(rows: list[dict[str, Any]], *, entity_key_value: str, entity: 
     return ""
 
 
-def _composer_caveats(reviewer_result: dict[str, Any], *, chinese: bool) -> list[str]:
+def _composer_caveats(
+    reviewer_result: dict[str, Any],
+    *,
+    user_question: str = "",
+    execution_result: dict[str, Any] | None = None,
+    chinese: bool,
+) -> list[str]:
     caveats = []
     if reviewer_result.get("unsupported_entities"):
         caveats.append(
@@ -411,6 +519,7 @@ def _composer_caveats(reviewer_result: dict[str, Any], *, chinese: bool) -> list
             if chinese
             else "Some decision metrics are not present in the returned result."
         )
+    caveats.extend(_missing_data_caveats(user_question, execution_result or {}, chinese=chinese))
     if not caveats:
         caveats.append(
             "当前结论只基于本次查询返回的数据。"
@@ -448,6 +557,31 @@ def _normalize_answer(answer: dict[str, Any], *, chinese: bool) -> dict[str, Any
     if normalized["confidence"] not in {"low", "medium", "high"}:
         normalized["confidence"] = "medium"
     return normalized
+
+
+def _polish_answer(
+    answer: dict[str, Any],
+    *,
+    user_question: str,
+    execution_result: dict[str, Any],
+    reviewer_result: dict[str, Any],
+) -> dict[str, Any]:
+    chinese = _needs_chinese_response(user_question) or str(reviewer_result.get("language") or "") == "zh"
+    polished = _normalize_answer(answer, chinese=chinese)
+    caveats = polished["caveats"] + _missing_data_caveats(user_question, execution_result, chinese=chinese)
+    if not caveats:
+        caveats = _composer_caveats(
+            reviewer_result,
+            user_question=user_question,
+            execution_result=execution_result,
+            chinese=chinese,
+        )
+    polished["caveats"] = _dedupe(caveats)
+    polished["recommendations"] = _remove_repeated_recommendations(
+        polished["direct_answer"],
+        polished["recommendations"],
+    )
+    return polished
 
 
 def _validate_or_empty(answer: dict[str, Any], *, user_question: str) -> dict[str, Any]:
@@ -497,9 +631,103 @@ def _clean_text(value: Any, *, chinese: bool) -> str:
     text = re.sub(r"```sql\s*.*?```", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"\b(?:SELECT|WITH|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA)\b.+", "", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"\b(?:trace_id|trace_path|prompt_id|provider_metadata)\s*=\s*\S+", "", text, flags=re.IGNORECASE)
+    text = _remove_template_debug_phrases(text, chinese=chinese)
     for raw_key, label in sorted(business_field_labels(chinese=chinese).items(), key=lambda item: len(item[0]), reverse=True):
         text = re.sub(rf"\b{re.escape(raw_key)}\b", label, text, flags=re.IGNORECASE)
     return " ".join(text.split())
+
+
+def _remove_template_debug_phrases(text: str, *, chinese: bool) -> str:
+    cleaned = str(text or "")
+    if chinese:
+        cleaned = cleaned.replace("证据表" + "第一行显示：", "当前数据中，")
+        cleaned = cleaned.replace("执行结果第一行显示：", "当前数据中，")
+        cleaned = cleaned.replace("本轮排序" + "证据中，", "")
+        cleaned = re.sub(r"基于\s*" + r"execution_result[。；;,.，]*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = cleaned.replace("execution_result", "本次返回数据")
+    else:
+        cleaned = cleaned.replace("The first evidence row shows:", "The current data shows:")
+        cleaned = cleaned.replace("The first result row shows:", "The current data shows:")
+        cleaned = re.sub(r"based on\s*execution_result[.;, ]*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = cleaned.replace("execution_result", "returned data")
+    return cleaned.strip()
+
+
+def _metric_labels(metrics: list[str], *, chinese: bool) -> list[str]:
+    labels = []
+    for metric in metrics:
+        label = business_field_label(metric, chinese=chinese)
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
+def _asks_why(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(marker in lowered for marker in ("为什么", "原因", "why", "because"))
+
+
+def _composer_recommendations(
+    entity: str,
+    *,
+    user_question: str,
+    execution_result: dict[str, Any],
+    chinese: bool,
+) -> list[str]:
+    missing = _missing_data_caveats(user_question, execution_result, chinese=chinese)
+    lowered = str(user_question or "").lower()
+    if chinese:
+        if any(marker in lowered for marker in ("预算", "投放", "加码")):
+            if missing:
+                return [
+                    f"短期不建议只凭当前收入结果直接大幅加预算；如要继续加码 {entity}，先补充成本、转化率、复购或 ROI 数据后再判断投入效率。"
+                ]
+            return [f"可以把 {entity} 作为预算复盘对象，并继续监控同口径收入、成本和转化表现。"]
+        return [f"建议将 {entity} 作为优先复盘对象，并继续用同口径数据跟踪后续变化。"]
+    if missing:
+        return [f"Treat {entity} as the review focus, but add cost, conversion, repeat-purchase, or ROI data before scaling budget."]
+    return [f"Use {entity} as the next review focus and keep tracking the returned metrics."]
+
+
+def _missing_data_caveats(
+    user_question: str,
+    execution_result: dict[str, Any],
+    *,
+    chinese: bool,
+) -> list[str]:
+    question = str(user_question or "").lower()
+    columns = {str(column).lower() for column in execution_result.get("columns") or []}
+    joined_columns = " ".join(columns)
+    caveats: list[str] = []
+    asks_roi = "roi" in question or "roas" in question or "投产" in question or "回报" in question
+    has_cost = any(marker in joined_columns for marker in ("cost", "spend", "花费", "成本", "投放"))
+    if asks_roi and not has_cost:
+        caveats.append(
+            "当前证据没有成本或投放花费数据，因此不能直接判断 ROI 或投放效率是否领先。"
+            if chinese
+            else "The returned evidence does not include cost or spend, so ROI or efficiency leadership cannot be concluded."
+        )
+    asks_conversion = any(marker in question for marker in ("转化率", "conversion", "复购", "repeat"))
+    has_conversion = any(marker in joined_columns for marker in ("conversion", "repeat", "retention", "转化", "复购"))
+    if asks_conversion and not has_conversion:
+        caveats.append(
+            "当前证据没有转化率、复购或留存数据，相关原因判断只能作为假设，需要进一步验证。"
+            if chinese
+            else "The returned evidence does not include conversion, repeat-purchase, or retention data, so causal interpretation is a hypothesis."
+        )
+    return _dedupe(caveats)
+
+
+def _remove_repeated_recommendations(direct_answer: str, recommendations: list[str]) -> list[str]:
+    direct = " ".join(str(direct_answer or "").split())
+    kept: list[str] = []
+    for item in recommendations:
+        text = " ".join(str(item or "").split())
+        if not text or text == direct:
+            continue
+        if text not in kept:
+            kept.append(text)
+    return kept
 
 
 def _has_blocked_text(answer: dict[str, Any]) -> bool:

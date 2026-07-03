@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from workspaces.product_result_builder import build_product_analysis_result, business_answer_is_usable
+from workspaces.progress_steps import build_progress_steps
 from workspaces.store import WorkspaceStore
 
 
@@ -78,6 +80,41 @@ class WorkspaceRunStore:
             "product_result": product_result,
         }
 
+    def find_reusable_run(
+        self,
+        workspace_id: str,
+        *,
+        data_version: int,
+        normalized_question: str,
+    ) -> dict[str, Any] | None:
+        workspace_root = self._workspace_root(workspace_id)
+        runs_dir = self._runs_dir(workspace_id)
+        if not runs_dir.exists() or not normalized_question:
+            return None
+
+        candidates: list[tuple[str, str, dict[str, Any]]] = []
+        for path in runs_dir.glob("run_*/run_*.json"):
+            if not self._is_safe_run_file(path, workspace_root):
+                continue
+            try:
+                raw = self._read_run_payload(path)
+            except (OSError, json.JSONDecodeError, ValueError):
+                continue
+            result = raw.get("result") if isinstance(raw.get("result"), dict) else raw
+            if str(result.get("status") or raw.get("status") or "") != "completed":
+                continue
+            if int(result.get("data_version") or raw.get("data_version") or 0) != data_version:
+                continue
+            candidate_question = _text(result.get("normalized_question") or raw.get("normalized_question"))
+            if candidate_question != normalized_question:
+                continue
+            run_id = str(result.get("run_id") or raw.get("run_id") or path.parent.name)
+            sort_time = _text(result.get("saved_at") or raw.get("saved_at") or result.get("created_at") or raw.get("created_at"))
+            candidates.append((sort_time, run_id, {"run_id": run_id, "path": str(path)}))
+        if not candidates:
+            return None
+        return sorted(candidates, key=lambda item: (item[0], item[1]), reverse=True)[0][2]
+
     def _build_summary(
         self,
         raw: dict[str, Any],
@@ -118,7 +155,7 @@ class WorkspaceRunStore:
         elif isinstance(result.get("product_result"), dict):
             existing = result["product_result"]
         if existing is not None and _is_current_product_result(existing, result):
-            return existing
+            return _ensure_progress_steps(existing, raw=raw, result=result)
         return build_product_analysis_result(result, workspace_id=workspace_id, workspace_root=workspace_root)
 
     def _run_path(self, workspace_id: str, run_id: str) -> Path:
@@ -257,6 +294,35 @@ def _execution_context(result: dict[str, Any], product_result: dict[str, Any]) -
     return None
 
 
+def _ensure_progress_steps(existing: dict[str, Any], *, raw: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    if _valid_progress_steps(existing.get("progress_steps")):
+        return existing
+    enriched = dict(existing)
+    merged = {**raw, **result}
+    route = existing.get("analysis_route") if isinstance(existing.get("analysis_route"), dict) else None
+    charts = existing.get("chart_artifacts") if isinstance(existing.get("chart_artifacts"), list) else []
+    enriched["progress_steps"] = build_progress_steps(merged, analysis_route=route, chart_artifacts=charts)
+    return enriched
+
+
+def _valid_progress_steps(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    allowed = {"pending", "running", "completed", "failed", "skipped"}
+    for item in value:
+        if not isinstance(item, dict):
+            return False
+        if not str(item.get("key") or "").strip():
+            return False
+        if not str(item.get("label") or "").strip():
+            return False
+        if str(item.get("status") or "") not in allowed:
+            return False
+        if not str(item.get("summary") or "").strip():
+            return False
+    return True
+
+
 def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
     charts = product_result.get("chart_artifacts")
     if isinstance(charts, list) and any(isinstance(chart, dict) and (chart.get("path") or chart.get("url")) for chart in charts):
@@ -307,6 +373,33 @@ def _text(value: Any) -> str:
         return ""
     text = str(value).strip()
     return " ".join(text.split())
+
+
+_PUNCTUATION_TRANSLATION = str.maketrans(
+    {
+        "。": ".",
+        "？": "?",
+        "！": "!",
+        "，": ",",
+        "、": ",",
+        "；": ";",
+        "：": ":",
+        "（": "(",
+        "）": ")",
+        "【": "[",
+        "】": "]",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+    }
+)
+
+
+def normalize_question_for_reuse(question: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(question or ""))
+    normalized = normalized.translate(_PUNCTUATION_TRANSLATION)
+    return " ".join(normalized.strip().split())
 
 
 def _mtime_iso(path: Path) -> str:

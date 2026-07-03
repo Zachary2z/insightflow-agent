@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable
@@ -27,7 +28,12 @@ from api.models import (
     WorkspaceSourcesResponse,
     WorkspaceSqliteSourceRequest,
 )
-from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_continuation
+from llm_ops.runtime_provider import build_report_composer_provider
+from workspaces.analysis_runner import (
+    execute_workspace_analysis_job,
+    run_workspace_analysis_continuation,
+    submit_workspace_analysis_run,
+)
 from workspaces.importers import import_csv, import_excel, import_sqlite
 from workspaces.pending_clarification_store import PendingClarificationNotFoundError
 from workspaces.profiler import profile_workspace_database
@@ -49,12 +55,15 @@ def _workspace_not_found(workspace_id: str) -> HTTPException:
 def create_app(
     workspace_store: WorkspaceStore | None = None,
     report_runner: ReportRunner | None = None,
+    start_background_analysis: bool = True,
 ) -> FastAPI:
     store = workspace_store or WorkspaceStore()
     selected_report_runner = report_runner or run_workspace_report
     report_store = WorkspaceReportStore(store)
     run_store = WorkspaceRunStore(store)
     app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
+    analysis_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="insightflow-analysis")
+    app.state.analysis_executor = analysis_executor
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -159,12 +168,22 @@ def create_app(
                     clarification_answer=request.clarification_answer or "",
                 )
             else:
-                result = run_workspace_analysis(
+                result = submit_workspace_analysis_run(
                     store=store,
                     workspace_id=workspace_id,
                     user_question=request.user_question or "",
                     initial_sql=request.initial_sql,
+                    force_reanalysis=request.force_reanalysis,
                 )
+                if start_background_analysis and result.get("status") == "running" and result.get("run_id"):
+                    analysis_executor.submit(
+                        execute_workspace_analysis_job,
+                        store,
+                        workspace_id,
+                        str(result["run_id"]),
+                        request.user_question or "",
+                        request.initial_sql,
+                    )
         except PendingClarificationNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except FileNotFoundError:
@@ -175,6 +194,11 @@ def create_app(
             "success": result.get("status") != "failed",
             "workspace_id": workspace_id,
             "run_id": result.get("run_id"),
+            "status": result.get("status"),
+            "matched_run_id": result.get("matched_run_id"),
+            "message": result.get("message"),
+            "data_version": result.get("data_version"),
+            "normalized_question": result.get("normalized_question"),
             "result": result,
             "product_result": result.get("product_result"),
         }
@@ -216,11 +240,18 @@ def create_app(
     @app.post("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportCreateResponse)
     def create_workspace_report(workspace_id: str, request: WorkspaceReportCreateRequest) -> dict:
         try:
+            report_composer_provider = build_report_composer_provider()
+            providers = (
+                {"report_composer": report_composer_provider}
+                if report_composer_provider is not None
+                else None
+            )
             return selected_report_runner(
                 store=store,
                 workspace_id=workspace_id,
                 report_type=request.report_type,
                 report_goal=request.report_goal,
+                providers=providers,
             )
         except FileNotFoundError:
             raise _workspace_not_found(workspace_id)

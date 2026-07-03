@@ -107,6 +107,101 @@ def test_question_understanding_builds_complete_chinese_analysis_task_contract()
     assert result["clarification_questions"] == []
 
 
+def test_question_understanding_keeps_roas_as_independent_metric():
+    from question_understanding.router import understand_question
+
+    result = understand_question("最近90天各渠道 ROAS 最高的是谁？")
+
+    assert result["success"] is True
+    assert result["intent"]["metric"] == "roas"
+    assert result["analysis_task"]["metrics"] == ["ROAS"]
+    assert "ROI" not in result["analysis_task"]["metrics"]
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["missing_slots"] == []
+
+
+def test_question_understanding_keeps_roi_as_roi_metric():
+    from question_understanding.router import understand_question
+
+    result = understand_question("最近90天各渠道 ROI 最高的是谁？")
+
+    assert result["success"] is True
+    assert result["intent"]["metric"] == "roi"
+    assert result["analysis_task"]["metrics"] == ["ROI"]
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["missing_slots"] == []
+
+
+def test_question_understanding_maps_net_return_without_metric_clarification():
+    from question_understanding.router import understand_question
+
+    result = understand_question("最近90天各渠道净投放回报率最高的是谁？")
+
+    assert result["success"] is True
+    assert result["strategy"] in {"template", "llm_candidate"}
+    assert result["intent"]["metric"] == "net_return"
+    assert result["analysis_task"]["metrics"] == ["净投放回报率"]
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["missing_slots"] == []
+    assert result["missing_slots"] == []
+
+
+def test_question_understanding_maps_net_roi_aliases_without_plain_roi_duplicate():
+    from question_understanding.router import understand_question
+
+    for question in (
+        "最近90天各渠道 net ROI 最高的是谁？",
+        "最近90天各渠道 netroi 最高的是谁？",
+        "最近90天各渠道 net_roi 最高的是谁？",
+        "最近90天各渠道 net_return 最高的是谁？",
+        "最近90天各渠道 net return 最高的是谁？",
+    ):
+        result = understand_question(question)
+
+        assert result["success"] is True
+        assert result["intent"]["metric"] == "net_return"
+        assert result["analysis_task"]["metrics"] == ["净投放回报率"]
+        assert "ROI" not in result["analysis_task"]["metrics"]
+        assert result["analysis_task"]["missing_slots"] == []
+
+
+def test_question_understanding_keeps_explicit_roas_and_roi_multi_metric_question():
+    from question_understanding.router import understand_question
+
+    result = understand_question("最近90天各渠道 ROAS 和 ROI 分别最高的是谁？")
+
+    assert result["success"] is True
+    assert result["analysis_task"]["metrics"] == ["ROAS", "ROI"]
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["missing_slots"] == []
+
+
+def test_question_understanding_keeps_explicit_net_return_and_roi_multi_metric_question():
+    from question_understanding.router import understand_question
+
+    for question in (
+        "最近90天各渠道净投放回报率和 ROI 分别最高的是谁？",
+        "最近90天各渠道 net_roi 和 ROI 分别最高的是谁？",
+    ):
+        result = understand_question(question)
+
+        assert result["success"] is True
+        assert result["analysis_task"]["metrics"] == ["净投放回报率", "ROI"]
+        assert result["analysis_task"]["dimensions"] == ["渠道"]
+        assert result["analysis_task"]["missing_slots"] == []
+
+
+def test_question_understanding_keeps_explicit_net_return_roas_and_roi_multi_metric_question():
+    from question_understanding.router import understand_question
+
+    result = understand_question("最近90天各渠道净投放回报率、ROAS 和 ROI 分别最高的是谁？")
+
+    assert result["success"] is True
+    assert result["analysis_task"]["metrics"] == ["净投放回报率", "ROAS", "ROI"]
+    assert result["analysis_task"]["dimensions"] == ["渠道"]
+    assert result["analysis_task"]["missing_slots"] == []
+
+
 def test_question_understanding_clarifies_incomplete_recommendation_task_without_rejecting():
     from question_understanding.router import understand_question
 

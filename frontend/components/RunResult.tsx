@@ -1,5 +1,6 @@
 import React from "react";
 import type { BusinessAnswer, ProductAnalysisResult } from "../lib/api";
+import AnalysisProgressTimeline from "./AnalysisProgressTimeline";
 import AnalysisThreadCard from "./AnalysisThreadCard";
 import BusinessAnswerCard from "./BusinessAnswerCard";
 import ChartArtifactGallery from "./ChartArtifactGallery";
@@ -110,6 +111,7 @@ export default function RunResult({
         isContinuing={isContinuing}
         continuationError={continuationError}
       />
+      <AnalysisProgressTimeline steps={product.progress_steps} />
       <BusinessAnswerCard answer={product.business_answer} />
       <EvidencePanel evidence={product.evidence} />
       <ChartArtifactGallery artifacts={product.chart_artifacts} />

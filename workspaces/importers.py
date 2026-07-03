@@ -32,10 +32,11 @@ def _copy_raw_file(store: WorkspaceStore, workspace: dict, file_path: Path) -> s
     return str(target)
 
 
-def _append_source(store: WorkspaceStore, workspace_id: str, source: DataSourceRecord) -> None:
+def _append_source(store: WorkspaceStore, workspace_id: str, source: DataSourceRecord) -> dict:
     workspace = store.get_workspace(workspace_id)
     workspace.setdefault("sources", []).append(source.to_dict())
     store.save_workspace(workspace)
+    return store.increment_data_version(workspace_id)
 
 
 def _write_frame(db_path: str, table_name: str, frame: pd.DataFrame) -> None:
@@ -58,8 +59,13 @@ def import_csv(store: WorkspaceStore, workspace_id: str, csv_path: str | Path) -
         original_path=raw_path,
         imported_tables=[table_name],
     )
-    _append_source(store, workspace_id, source)
-    return {"success": True, "source": source.to_dict(), "imported_tables": [table_name]}
+    workspace = _append_source(store, workspace_id, source)
+    return {
+        "success": True,
+        "source": source.to_dict(),
+        "imported_tables": [table_name],
+        "data_version": workspace["data_version"],
+    }
 
 
 def import_excel(store: WorkspaceStore, workspace_id: str, excel_path: str | Path) -> dict:
@@ -79,8 +85,13 @@ def import_excel(store: WorkspaceStore, workspace_id: str, excel_path: str | Pat
         original_path=raw_path,
         imported_tables=imported_tables,
     )
-    _append_source(store, workspace_id, source)
-    return {"success": True, "source": source.to_dict(), "imported_tables": imported_tables}
+    workspace = _append_source(store, workspace_id, source)
+    return {
+        "success": True,
+        "source": source.to_dict(),
+        "imported_tables": imported_tables,
+        "data_version": workspace["data_version"],
+    }
 
 
 def import_sqlite(store: WorkspaceStore, workspace_id: str, sqlite_path: str | Path) -> dict:
@@ -103,5 +114,10 @@ def import_sqlite(store: WorkspaceStore, workspace_id: str, sqlite_path: str | P
         original_path=str(source_path),
         imported_tables=imported_tables,
     )
-    _append_source(store, workspace_id, source)
-    return {"success": True, "source": source.to_dict(), "imported_tables": imported_tables}
+    workspace = _append_source(store, workspace_id, source)
+    return {
+        "success": True,
+        "source": source.to_dict(),
+        "imported_tables": imported_tables,
+        "data_version": workspace["data_version"],
+    }

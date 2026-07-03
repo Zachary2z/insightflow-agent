@@ -254,6 +254,164 @@ def test_composer_downgrade_says_evidence_is_insufficient():
     assert answer["confidence"] == "low"
 
 
+def test_composer_does_not_downgrade_supported_recommendation_when_rows_are_sufficient():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="哪个门店最值得优先关注？请给出建议和风险边界。",
+        execution_result={
+            "success": True,
+            "columns": ["store_name", "sales_amount", "satisfaction_score"],
+            "rows": [["上海旗舰店", 26255.44, 4.8], ["北京国贸店", 18400.0, 4.4]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(
+            headline="上海旗舰店最值得优先关注",
+            direct_answer="建议优先关注上海旗舰店，因为它在销售额和满意度上都领先。",
+            why="证据显示上海旗舰店销售额为 26255.44，满意度为 4.8。",
+            evidence_bullets=["上海旗舰店销售额为 26255.44。", "北京国贸店销售额为 18400.0。"],
+            recommendations=["优先复盘上海旗舰店的可复制运营动作。"],
+            caveats=["当前只基于本次查询返回的数据。"],
+        ),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["上海旗舰店", "北京国贸店"],
+            supported_metrics=["sales_amount", "satisfaction_score"],
+            issues=[
+                {
+                    "type": "insufficient_evidence",
+                    "message": "旧审核逻辑误判为证据不足。",
+                    "affected_fields": ["direct_answer"],
+                }
+            ],
+            confidence="low",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "当前证据不足以支持该结论" not in text
+    assert "上海旗舰店" in text
+    assert "建议" in text
+    assert answer["recommendations"]
+    assert answer["caveats"]
+
+
+def test_composer_rebuilds_fact_answer_without_forcing_recommendations():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个门店销售额最高？",
+        execution_result={
+            "success": True,
+            "columns": ["store_name", "sales_amount"],
+            "rows": [["上海旗舰店", 26255.44], ["北京国贸店", 18400.0]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(
+            headline="上海旗舰店销售额最高",
+            direct_answer="上海旗舰店销售额最高。",
+            why="证据显示上海旗舰店销售额为 26255.44。",
+            evidence_bullets=["上海旗舰店销售额为 26255.44。"],
+            recommendations=[],
+            caveats=["当前只基于本次查询返回的数据。"],
+        ),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["上海旗舰店", "北京国贸店"],
+            supported_metrics=["sales_amount"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="low",
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "当前证据不足以支持该结论" not in text
+    assert "优先关注" not in text
+    assert "上海旗舰店" in answer["direct_answer"]
+    assert answer["recommendations"] == []
+    assert answer["caveats"]
+
+
+def test_composer_rebuilds_natural_chinese_answer_with_missing_roi_boundary():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个渠道收入最高？为什么？该不该加预算，ROI 怎么样？",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["微信私域", 977000.0], ["抖音投放", 640000.0], ["小红书", 380000.0]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer=_draft_answer(
+            headline="微信私域收入最高",
+            direct_answer="最近90天微信私域收入最高。",
+            why="证据表第一行显示：channel 为 微信私域，total_revenue 为 977000.0。",
+            recommendations=["建议加预算。"],
+            caveats=[],
+        ),
+        reviewer_result=_review(
+            "downgrade_to_insufficient_evidence",
+            language="zh",
+            supported_entities=["微信私域", "抖音投放", "小红书"],
+            supported_metrics=["total_revenue"],
+            issues=[{"type": "insufficient_evidence", "message": "旧审核逻辑误判为证据不足。"}],
+            confidence="low",
+        ),
+    )
+
+    text = _answer_text(answer)
+    _assert_shape(answer)
+    assert "微信私域" in text
+    assert "977000" in text
+    assert "当前证据不足以支持该结论" not in text
+    assert "证据表第一行显示" not in text
+    assert "本轮排序证据中" not in text
+    assert "execution_result" not in text
+    assert any(marker in answer["why"] for marker in ("可能", "需要进一步验证", "当前证据"))
+    assert any("ROI" in caveat and ("成本" in caveat or "花费" in caveat) for caveat in answer["caveats"])
+    assert answer["recommendations"]
+    assert answer["direct_answer"] not in answer["recommendations"]
+
+
+def test_composer_accept_sanitizes_provider_template_debug_phrases():
+    from agents.final_answer_composer import compose_final_answer
+
+    answer = compose_final_answer(
+        user_question="最近90天哪个渠道收入最高？为什么？",
+        execution_result={
+            "success": True,
+            "columns": ["channel", "total_revenue"],
+            "rows": [["微信私域", 977000.0], ["抖音投放", 640000.0]],
+        },
+        evidence_result={"validation_status": "validated"},
+        draft_business_answer={
+            "headline": "微信私域收入最高",
+            "direct_answer": "最近90天微信私域收入最高，收入为 977000.0。",
+            "why": "证据表第一行显示：channel 为 微信私域，total_revenue 为 977000.0。",
+            "evidence_bullets": ["本轮排序证据中，微信私域 total_revenue 为 977000.0。"],
+            "recommendations": [],
+            "caveats": ["基于 execution_result。"],
+            "confidence": "high",
+        },
+        reviewer_result=_review(
+            "accept",
+            language="zh",
+            supported_entities=["微信私域", "抖音投放"],
+            supported_metrics=["total_revenue"],
+        ),
+    )
+
+    text = _answer_text(answer)
+    assert "微信私域" in text
+    assert "977000" in text
+    assert "证据表第一行显示" not in text
+    assert "本轮排序证据中" not in text
+    assert "execution_result" not in text
+
+
 def test_composer_uses_chinese_for_chinese_question():
     from agents.final_answer_composer import compose_final_answer
 

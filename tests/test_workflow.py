@@ -10,7 +10,7 @@ def test_workflow_completes_success_path_and_saves_trace(tmp_path):
     from graph.workflow import run_workflow
 
     result = run_workflow(
-        "最近 30 天销售额最高的 5 个商品是什么？",
+        "最近 30 天销售额最高的 5 个商品为什么值得复盘？",
         db_path=DB_PATH,
         trace_dir=tmp_path,
         run_id="run_success",

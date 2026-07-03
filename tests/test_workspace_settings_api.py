@@ -153,6 +153,8 @@ def test_workspace_settings_key_only_does_not_enable_product_live_mode(tmp_path,
     assert model_mode["coverage"]["enabled"] == 0
     assert model_mode["coverage"]["total"] == len(model_mode["provider_features"])
     assert all(enabled is False for enabled in model_mode["provider_features"].values())
+    assert model_mode["provider_features"]["report_composer"] is False
+    assert model_mode["provider_feature_labels"]["report_composer"] == "报告撰写"
 
 
 def test_workspace_settings_live_mode_enables_provider_feature_coverage(tmp_path, monkeypatch):
@@ -183,3 +185,5 @@ def test_workspace_settings_live_mode_enables_provider_feature_coverage(tmp_path
     assert model_mode["coverage"]["enabled"] == model_mode["coverage"]["total"]
     assert model_mode["coverage"]["total"] == len(model_mode["provider_features"])
     assert all(enabled is True for enabled in model_mode["provider_features"].values())
+    assert model_mode["provider_features"]["report_composer"] is True
+    assert model_mode["provider_feature_labels"]["report_composer"] == "报告撰写"

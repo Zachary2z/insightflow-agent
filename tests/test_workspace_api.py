@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from io import BytesIO
 
 import pandas as pd
@@ -8,6 +9,20 @@ from api.app import create_app
 from workspaces.profiler import profile_workspace_database
 from workspaces.semantic_draft import generate_semantic_layer_draft
 from workspaces.store import WorkspaceStore
+
+
+def _wait_for_run_status(client: TestClient, workspace_id: str, run_id: str, statuses: set[str]) -> dict:
+    deadline = time.time() + 5
+    last_payload: dict | None = None
+    while time.time() < deadline:
+        response = client.get(f"/api/workspaces/{workspace_id}/runs/{run_id}")
+        assert response.status_code == 200
+        last_payload = response.json()
+        status = str(last_payload["product_result"]["status"])
+        if status in statuses:
+            return last_payload
+        time.sleep(0.05)
+    raise AssertionError(f"Run {run_id} did not reach {statuses}; last payload: {last_payload}")
 
 
 def _seed_ecommerce_workspace(store: WorkspaceStore, workspace_id: str) -> None:
@@ -52,9 +67,13 @@ def test_workspace_api_create_profile_semantic_and_run(tmp_path):
     ).json()
     assert run["success"] is True
     assert run["workspace_id"] == workspace_id
-    assert run["result"]["final_answer"]
-    assert run["product_result"]["business_answer"]["headline"]
-    assert run["product_result"]["technical_details"]["sql"] == run["result"]["generated_sql"]
+    assert run["status"] == "running"
+    assert run["run_id"].startswith("run_")
+
+    detail = _wait_for_run_status(client, workspace_id, run["run_id"], {"completed"})
+    assert detail["result"]["final_answer"]
+    assert detail["product_result"]["business_answer"]["headline"]
+    assert detail["product_result"]["technical_details"]["sql"] == detail["result"]["generated_sql"]
 
 
 def test_workspace_api_returns_pending_clarification_and_continues_with_answer(tmp_path):
@@ -72,6 +91,8 @@ def test_workspace_api_returns_pending_clarification_and_continues_with_answer(t
     assert pending_response.status_code == 200
     pending = pending_response.json()
     assert pending["success"] is True
+    assert pending["status"] == "running"
+    pending = _wait_for_run_status(client, workspace_id, pending["run_id"], {"waiting_for_clarification"})
     assert pending["product_result"]["status"] == "waiting_for_clarification"
     pending_run_id = pending["product_result"]["question_thread"]["pending_run_id"]
     assert pending_run_id.startswith("pending_")

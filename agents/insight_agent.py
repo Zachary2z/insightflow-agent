@@ -25,7 +25,7 @@ def _row_claims(execution_result: dict[str, Any], limit: int = 5) -> list[str]:
 def _answer_from_result(question: str, execution_result: dict[str, Any]) -> str:
     rows = execution_result.get("rows", [])
     if not rows:
-        return "查询已执行成功，但 execution_result 没有返回数据行。"
+        return "查询已执行成功，但本次返回结果没有可用于回答的数据行。"
 
     columns = execution_result.get("columns", [])
     lines = [f"已完成问题「{question}」的查询，共返回 {len(rows)} 行结果。"]
@@ -66,7 +66,7 @@ def _evidence_anchor(execution_result: dict[str, Any]) -> str:
     parts = [f"{column} 为 {value}" for column, value in pairs[:3] if value is not None and str(value).strip()]
     if not parts:
         return ""
-    return "证据表第一行显示：" + "，".join(parts) + "。"
+    return "当前数据中，" + "，".join(parts) + "。"
 
 
 def _ensure_evidence_anchor(answer: str, execution_result: dict[str, Any]) -> str:
@@ -90,7 +90,7 @@ def _fallback_output(
         business_answer = build_business_answer(
             {
                 "user_question": state.get("user_question", ""),
-                "final_answer": "缺少 execution_result，无法生成基于数据的回答。",
+                "final_answer": "缺少可验证的数据结果，无法生成基于数据的回答。",
                 "execution_result": {},
                 "evidence_result": state.get("evidence_result") or {},
             }

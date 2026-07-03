@@ -48,7 +48,7 @@ def test_multi_metric_best_question_returns_tradeoff_instead_of_conflicting_sing
     provider_answer = {
         "headline": "高价值企业最值得重点运营",
         "direct_answer": "高价值企业最值得重点运营，因为它的客单价最高。",
-        "why": "证据表第一行显示：segment 为 成长型团队，total_revenue 为 2798216.93，order_count 为 628。",
+        "why": "当前数据中，segment 为 成长型团队，total_revenue 为 2798216.93，order_count 为 628。",
         "evidence_bullets": [
             "成长型团队收入为 2798216.93，订单量为 628。",
             "高价值企业客单价为 6348.56。",
@@ -84,7 +84,7 @@ def test_multi_metric_best_question_returns_tradeoff_instead_of_conflicting_sing
     assert any(marker in text for marker in ("客单价", "avg_revenue_per_order"))
     assert not (
         "高价值企业最值得重点运营" in answer["headline"] + answer["direct_answer"]
-        and "证据表第一行显示：segment 为 成长型团队" in answer["why"]
+        and "当前数据中，segment 为 成长型团队" in answer["why"]
         and not any(marker in text for marker in ("取舍", "权衡", "口径", "如果目标"))
     )
 
@@ -147,7 +147,7 @@ def test_budget_reduction_question_with_single_row_does_not_generate_unsupported
     provider_answer = {
         "headline": "自然流量 ROI 最高，付费渠道应减少预算",
         "direct_answer": "当前返回结果显示自然流量 ROI 最高，因此应减少付费渠道预算。",
-        "why": "证据表第一行显示：channel 为 自然流量，roi 为 16.22。",
+        "why": "当前数据中，channel 为 自然流量，roi 为 16.22。",
         "evidence_bullets": ["自然流量 ROI 为 16.22。"],
         "recommendations": ["减少付费渠道预算，并把预算转向自然流量。"],
         "caveats": [],
@@ -188,7 +188,7 @@ def test_recommendation_entity_realigns_to_ranked_evidence_entity_for_chinese_qu
     provider_answer = {
         "headline": "建议优先投入南区",
         "direct_answer": "建议优先投入南区，因为它最值得加资源。",
-        "why": "证据表第一行显示：market 为 北区，total_value 为 980000.0，conversion_rate 为 0.18。",
+        "why": "当前数据中，market 为 北区，total_value 为 980000.0，conversion_rate 为 0.18。",
         "evidence_bullets": [
             "北区 total_value 为 980000.0，conversion_rate 为 0.18。",
             "南区 total_value 为 420000.0，conversion_rate 为 0.11。",
@@ -231,7 +231,7 @@ def test_unsupported_recommendation_entity_is_downgraded_to_insufficient_evidenc
     provider_answer = {
         "headline": "建议优先投入华东",
         "direct_answer": "建议优先投入华东，因为它表现最好。",
-        "why": "证据表第一行显示：region 为 华北，score_value 为 91.0。",
+        "why": "当前数据中，region 为 华北，score_value 为 91.0。",
         "evidence_bullets": ["华北 score_value 为 91.0。", "华南 score_value 为 83.0。"],
         "recommendations": ["把预算加到华东。"],
         "caveats": [],
@@ -320,7 +320,7 @@ def test_plain_why_and_evidence_entity_conflict_is_corrected_or_downgraded():
     provider_answer = {
         "headline": "建议优先投入北区",
         "direct_answer": "建议优先投入北区，因为它在当前结果中表现最好。",
-        "why": "证据表第一行显示：market 为 南区，score_value 为 72.0。",
+        "why": "当前数据中，market 为 南区，score_value 为 72.0。",
         "evidence_bullets": ["南区 score_value 为 72.0。"],
         "recommendations": ["把下一轮资源优先给北区。"],
         "caveats": [],

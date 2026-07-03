@@ -54,7 +54,7 @@ export default function ReportList({ workspaceId }: ReportListProps) {
       <ProductCard className="report-list-card">
         <div className="product-section-title">
           <div>
-            <p className="product-eyebrow">Report Library</p>
+            <p className="product-eyebrow">报告库</p>
             <h2>报告列表</h2>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function ReportList({ workspaceId }: ReportListProps) {
     <ProductCard className="report-list-card">
       <div className="product-section-title">
         <div>
-          <p className="product-eyebrow">Report Library</p>
+          <p className="product-eyebrow">报告库</p>
           <h2>报告列表</h2>
           <p className="panel-help">按创建时间查看已生成报告，打开后可阅读正文、图表和技术附录。</p>
         </div>
@@ -83,9 +83,10 @@ export default function ReportList({ workspaceId }: ReportListProps) {
             <div className="report-meta-row">
               <StatusPill tone={statusTone(report.status)}>生成状态：{statusLabel(report.status)}</StatusPill>
               <span>报告类型：{reportTypeLabel(report.report_type)}</span>
-              {report.created_at ? <span>创建时间：{formatCreatedAt(report.created_at)}</span> : null}
+              <span>时间范围：{reportTimeRange(report)}</span>
+              <span>更新时间：{formatReportDate(report.updated_at || report.created_at)}</span>
             </div>
-            {report.report_goal ? <p className="panel-help">目标：{report.report_goal}</p> : null}
+            <p className="panel-help">摘要：{reportSummary(report)}</p>
           </div>
           <Link className="button" href={`/workspaces/${workspaceId}/reports/${report.report_id}`}>
             打开报告
@@ -130,6 +131,21 @@ function reportTypeLabel(reportType: string) {
   return labels[reportType] ?? reportType;
 }
 
-function formatCreatedAt(value: string) {
+function formatReportDate(value?: string) {
+  if (!value) {
+    return "未知";
+  }
   return value.includes("T") ? value.split("T")[0] : value;
+}
+
+function reportTimeRange(report: WorkspaceReport) {
+  return report.document?.time_range || report.plan?.time_range || "当前工作区可用数据";
+}
+
+function reportSummary(report: WorkspaceReport) {
+  return (
+    report.document?.opening_summary ||
+    report.executive_summary?.find((item) => item.trim()) ||
+    "打开报告查看正文、图表和行动建议。"
+  );
 }

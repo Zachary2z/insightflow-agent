@@ -209,8 +209,8 @@ P17-H4 closed the old eval/demo/Streamlit cleanup boundary:
 
 TDD result:
 
-- RED: `python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p11_cleanup_boundaries.py -q` failed with `2 failed, 15 passed` because H4 docs still showed Planned and the P12 superpowers spec was not marked Historical / Superseded.
-- GREEN: the same focused suite passed after H4 docs cleanup.
+- RED: the focused cleanup boundary suite failed because H4 docs still showed Planned and the P12 superpowers spec was not marked Historical / Superseded.
+- GREEN: the focused cleanup boundary suite passed after H4 docs cleanup. The duplicated P11 cleanup-boundary file was later removed during P20 test cleanup.
 
 ## P17-H5 Product Docs And Status Surface Result
 

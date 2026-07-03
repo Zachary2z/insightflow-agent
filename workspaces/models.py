@@ -31,6 +31,7 @@ class WorkspaceRecord:
     analysis_db_path: str
     profile_path: str
     semantic_layer_path: str
+    data_version: int = 1
     sources: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

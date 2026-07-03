@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getWorkspaceReport, type WorkspaceReport } from "../lib/api";
+import {
+  getWorkspaceArtifactUrl,
+  getWorkspaceReport,
+  resolveApiUrl,
+  type WorkspaceReport,
+} from "../lib/api";
 import ProductCard from "./ProductCard";
 import { StatusPill } from "./ProductStatus";
 import ReportDownloadLink from "./ReportDownloadLink";
@@ -22,7 +27,9 @@ const REPORT_LABELS = {
     progressComplete: "个章节已完成",
     progressRunning: "仍在生成",
     reportTypePrefix: "报告类型",
-    reportGoalPrefix: "报告目标",
+    generatedAtPrefix: "生成时间",
+    timeRangePrefix: "时间范围",
+    dataSourcesPrefix: "数据来源",
     openingSummary: "开篇摘要",
     bodyEyebrow: "正文",
     reportBody: "报告正文",
@@ -40,7 +47,9 @@ const REPORT_LABELS = {
     progressComplete: "sections complete",
     progressRunning: "still running",
     reportTypePrefix: "Report type",
-    reportGoalPrefix: "Report goal",
+    generatedAtPrefix: "Generated",
+    timeRangePrefix: "Time range",
+    dataSourcesPrefix: "Data sources",
     openingSummary: "Opening Summary",
     bodyEyebrow: "Body",
     reportBody: "Report Body",
@@ -122,11 +131,20 @@ function TextList({ title, items }: { title: string; items?: string[] }) {
   );
 }
 
-function ReportDocumentBody({ report, language }: { report: WorkspaceReport; language: ReportLanguage }) {
+function ReportDocumentBody({
+  report,
+  language,
+  workspaceId,
+}: {
+  report: WorkspaceReport;
+  language: ReportLanguage;
+  workspaceId: string;
+}) {
   const labels = REPORT_LABELS[language];
   const document = report.document;
   const sections = document?.sections ?? [];
   const evidenceTables = report.evidence_pack?.tables ?? [];
+  const evidenceCharts = report.evidence_pack?.charts ?? [];
   if (!sections.length) {
     return (
       <ProductCard>
@@ -146,12 +164,51 @@ function ReportDocumentBody({ report, language }: { report: WorkspaceReport; lan
         <ProductCard key={section.section_id} className="report-section-card">
           <h3>{section.title}</h3>
           <p>{section.body}</p>
+          <SectionCharts
+            charts={chartsForSection(evidenceCharts, section.section_id, section.chart_refs ?? [])}
+            workspaceId={workspaceId}
+          />
           <SectionEvidenceTables
             tables={evidenceTables.filter((table) => table.source_chapter_id === section.section_id)}
           />
         </ProductCard>
       ))}
     </section>
+  );
+}
+
+function SectionCharts({ charts, workspaceId }: { charts: Array<Record<string, unknown>>; workspaceId: string }) {
+  if (!charts.length) {
+    return null;
+  }
+  return (
+    <div className="report-section-charts">
+      {charts.map((chart, index) => {
+        const title = textValue(chart.title, "报告图表");
+        const description = textValue(chart.description, "建议基于本章节证据生成图表后再用于汇报展示。");
+        const url = chartArtifactUrl(chart, workspaceId);
+        if (!url) {
+          return (
+            <div className="report-chart-intent" key={`${title}-${index}`}>
+              <strong>待生成图表：{title}</strong>
+              <p>{description}</p>
+            </div>
+          );
+        }
+        return (
+          <figure className="report-chart-artifact" key={`${title}-${index}`}>
+            <img src={url} alt={title} />
+            <figcaption>
+              <strong>{title}</strong>
+              {description ? <span>{description}</span> : null}
+              <a className="secondary-button" href={url} download>
+                下载图表
+              </a>
+            </figcaption>
+          </figure>
+        );
+      })}
+    </div>
   );
 }
 
@@ -199,6 +256,42 @@ function SectionEvidenceTables({ tables }: { tables: Array<Record<string, unknow
       })}
     </div>
   );
+}
+
+function chartsForSection(charts: Array<Record<string, unknown>>, sectionId: string, chartRefs: string[]) {
+  const refs = new Set(chartRefs);
+  const selected = charts.filter((chart) => {
+    const chartId = typeof chart.chart_id === "string" ? chart.chart_id : "";
+    return chart.source_chapter_id === sectionId || refs.has(chartId);
+  });
+  const unique = new Map<string, Record<string, unknown>>();
+  selected.forEach((chart, index) => {
+    const key = typeof chart.chart_id === "string" && chart.chart_id ? chart.chart_id : `${textValue(chart.title, "")}-${index}`;
+    unique.set(key, chart);
+  });
+  return Array.from(unique.values());
+}
+
+function chartArtifactUrl(chart: Record<string, unknown>, workspaceId: string) {
+  const url = textValue(chart.url, "");
+  if (url) {
+    return resolveApiUrl(url);
+  }
+  const path = textValue(chart.path, "");
+  if (!path) {
+    return "";
+  }
+  if (/^https?:\/\//.test(path) || path.startsWith("/api/")) {
+    return resolveApiUrl(path);
+  }
+  if (path.startsWith("/")) {
+    return "";
+  }
+  return getWorkspaceArtifactUrl(workspaceId, path);
+}
+
+function textValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
 function cellValue(row: unknown, column: string) {
@@ -280,14 +373,10 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
                 {language === "zh" ? "：" : ": "}
                 {reportTypeLabel(report.report_type, language)}
               </span>
+              <span>{metaText(labels.generatedAtPrefix, formatReportDate(report.updated_at || report.created_at), language)}</span>
+              <span>{metaText(labels.timeRangePrefix, report.document?.time_range || "当前工作区可用数据", language)}</span>
+              <span>{metaText(labels.dataSourcesPrefix, joinText(report.document?.data_sources), language)}</span>
             </div>
-            {report.report_goal ? (
-              <p className="report-goal-copy">
-                {labels.reportGoalPrefix}
-                {language === "zh" ? "：" : ": "}
-                {report.report_goal}
-              </p>
-            ) : null}
           </div>
           <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} label={labels.downloadMarkdown} />
         </div>
@@ -297,10 +386,10 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
             <p>{report.document.opening_summary}</p>
           </section>
         ) : null}
-        <TextList title={labels.actionRecommendations} items={report.document?.action_recommendations} />
-        <TextList title={labels.dataBoundaries} items={report.document?.data_boundaries} />
       </ProductCard>
-      <ReportDocumentBody report={report} language={language} />
+      <ReportDocumentBody report={report} language={language} workspaceId={workspaceId} />
+      <TextList title={labels.actionRecommendations} items={report.document?.action_recommendations} />
+      <TextList title={labels.dataBoundaries} items={report.document?.data_boundaries} />
       <ReportTechnicalAppendix report={report} />
     </section>
   );
@@ -333,4 +422,17 @@ function reportTypeLabel(reportType: string, language: ReportLanguage) {
     },
   };
   return labels[language][reportType] ?? reportType;
+}
+
+function metaText(label: string, value: string, language: ReportLanguage) {
+  return `${label}${language === "zh" ? "：" : ": "}${value}`;
+}
+
+function formatReportDate(value?: string) {
+  return value ? value.slice(0, 10) : "未知";
+}
+
+function joinText(items?: string[]) {
+  const visible = items?.filter((item) => item.trim()) ?? [];
+  return visible.length ? visible.join("、") : "当前工作区数据";
 }
