@@ -11,7 +11,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
 | Current task | P23-H5 Artifact And Tool-Calling Readiness next |
 | Next planned task | P23-H5 Artifact And Tool-Calling Readiness |
-| Last completed task | P23-H4 Evidence Ledger And Report Self-Repair |
+| Last completed task | P23-H4 Evidence Ledger And Report Self-Repair evidence-aware coverage repair |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -82,11 +82,25 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 | P23-H1 | `[x]` Complete | Shared EvidencePack foundation: analysis `fact_payload` and report `ReportEvidencePack.evidence_payloads` now share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references |
 | P23-H2 | `[x]` Complete | Chinese Business Answer Writer: natural Chinese business answers preserve model explanations/recommendations while binding hard facts and missing-data boundaries to shared evidence |
 | P23-H3 | `[x]` Complete | One-Pass Report Center With Shared Evidence |
-| P23-H4 | `[x]` Complete | Evidence Ledger And Report Self-Repair: replaced prose-number validator patching with tool-built evidence ledger, ledger-backed report writing, factual-claim validation, and one automatic repair pass |
+| P23-H4 | `[x]` Complete | Evidence Ledger And Report Self-Repair: replaced prose-number validator patching with tool-built evidence ledger, ledger-backed report writing, factual-claim validation, one automatic repair pass, evidence-aware coverage, and metric-role-based contribution metric selection |
 | P23-H5 | `[ ]` Next | Artifact And Tool-Calling Readiness on top of EvidenceLedger references, so charts/reports/future exports can cite ledger evidence ids instead of raw rows or model-recomputed facts |
 | P23-H6 | `[ ]` Planned | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, and live DeepSeek analysis/report acceptance |
 
 ## Latest P23-H4 Result
+
+P23-H4 evidence-aware ledger repair completed on 2026-07-03:
+
+- Fixed chapter coverage so `revenue_structure` checks actual evidence fields/facts before reporting missing成本、利润、ROI. When only part of that evidence is missing, the ledger now names only the missing inputs instead of emitting a fixed boundary.
+- Removed fixed optional coverage gaps for `customer_segments` and `support_issues`; those chapters now become partial only when real warnings/data limits or missing minimum evidence justify it.
+- Added compact metric role selection for report ledger tables. Additive business metrics such as收入、销售额、金额、订单数、工单量 are preferred for contribution totals, shares, combined shares, and rankings; ROI/rates/averages/satisfaction/duration fields stay available as row facts but are not default contribution-share denominators.
+- Added fail-first regression coverage for revenue tables containing收入、成本、ROI, revenue-only tables, and support/customer tables with valid evidence fields.
+- Verified that Report Center still uses one-pass composition plus optional one repair and did not restore Analysis Workbench section-answer stitching or prose-number validator patching.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`42 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`25 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_final_answer_composer.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`86 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`9 passed`)
 
 P23-H4 Evidence Ledger And Report Self-Repair completed on 2026-07-03:
 

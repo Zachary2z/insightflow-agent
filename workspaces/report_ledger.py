@@ -72,7 +72,7 @@ class CoverageChecker:
                 data_boundaries=limits,
             )
 
-        optional_missing = _optional_missing(chapter_id)
+        optional_missing = _optional_missing(chapter_id, tables=tables, facts=facts)
         coverage = "partial" if optional_missing or limits else "strong"
         return ReportChapterCoverage(
             chapter_id=chapter_id,
@@ -81,7 +81,7 @@ class CoverageChecker:
             available_evidence=list(dict.fromkeys(available + _available_derived_claims(chapter_id, tables))),
             missing_evidence=optional_missing,
             allowed_claims=_allowed_claims(chapter_id),
-            blocked_claims=_blocked_claims(chapter_id) if coverage != "strong" else [],
+            blocked_claims=_blocked_claims(chapter_id, missing_evidence=optional_missing, limits=limits) if coverage != "strong" else [],
             data_boundaries=limits + optional_missing,
         )
 
@@ -161,7 +161,7 @@ def _table_derived_items(
     if not table.rows:
         return []
     entity_col = _entity_column(table)
-    metric_col = _metric_column(table)
+    metric_col = _contribution_metric_column(table)
     if not entity_col or not metric_col:
         return []
     rows = [
@@ -368,9 +368,60 @@ def _entity_column(table: ReportEvidenceTable) -> str:
     return table.columns[0] if table.columns else ""
 
 
-def _metric_column(table: ReportEvidenceTable) -> str:
+def _contribution_metric_column(table: ReportEvidenceTable) -> str:
     columns = _metric_columns(table)
-    return columns[-1] if columns else ""
+    if not columns:
+        return ""
+    return min(columns, key=_contribution_metric_sort_key)
+
+
+def _contribution_metric_sort_key(column: str) -> tuple[int, int, str]:
+    role = _metric_role(column)
+    if role == "additive":
+        return (0, _metric_priority(column), column)
+    if role == "count":
+        return (1, _metric_priority(column), column)
+    if role == "unknown":
+        return (2, _metric_priority(column), column)
+    return (3, _metric_priority(column), column)
+
+
+def _metric_role(label: str) -> str:
+    normalized = _normalize_metric_label(label)
+    if _contains_any(normalized, ("roi", "roas", "投产比", "回报率", "转化率", "率", "占比", "比例", "ratio", "rate")):
+        return "rate"
+    if _contains_any(normalized, ("响应时长", "处理时长", "等待时长", "时长", "分钟", "minute", "duration", "latency")):
+        return "duration"
+    if _contains_any(normalized, ("满意度", "评分", "客单价", "均价", "平均", "avg", "average", "score")):
+        return "average"
+    if _contains_any(normalized, ("收入", "销售额", "营收", "gmv", "成交额", "流水", "金额", "成本", "利润", "花费", "支出", "revenue", "sales", "amount", "cost", "profit", "spend")):
+        return "additive"
+    if _contains_any(normalized, ("订单数", "工单数", "工单量", "数量", "次数", "人数", "客户数", "count", "orders", "tickets")):
+        return "count"
+    return "unknown"
+
+
+def _metric_priority(label: str) -> int:
+    normalized = _normalize_metric_label(label)
+    priority_tokens = (
+        ("收入", "销售额", "营收", "revenue", "sales", "gmv"),
+        ("成交额", "流水", "金额", "amount"),
+        ("订单数", "工单数", "工单量", "数量", "count", "orders", "tickets"),
+        ("利润", "profit"),
+        ("成本", "花费", "支出", "cost", "spend"),
+    )
+    for index, tokens in enumerate(priority_tokens):
+        if _contains_any(normalized, tokens):
+            return index
+    return len(priority_tokens)
+
+
+def _normalize_metric_label(label: str) -> str:
+    return re.sub(r"\s+", "", str(label or "").lower())
+
+
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token.lower() in text for token in tokens)
 
 
 def _metric_columns(table: ReportEvidenceTable) -> list[str]:
@@ -448,14 +499,39 @@ def _minimum_evidence(chapter_id: str) -> list[str]:
     }.get(chapter_id, ["章节所需结构化证据"])
 
 
-def _optional_missing(chapter_id: str) -> list[str]:
+def _optional_missing(
+    chapter_id: str,
+    *,
+    tables: list[ReportEvidenceTable],
+    facts: list[Any],
+) -> list[str]:
     if chapter_id == "revenue_structure":
-        return ["缺少成本、利润或 ROI 字段，不能判断投入产出和盈利质量。"]
-    if chapter_id == "customer_segments":
-        return ["缺少复购、留存或利润字段，不能判断客户长期价值。"]
-    if chapter_id == "support_issues":
-        return ["缺少成本或流失字段，不能量化客服问题的经营损失。"]
+        return _revenue_optional_missing(tables=tables, facts=facts)
     return []
+
+
+def _revenue_optional_missing(*, tables: list[ReportEvidenceTable], facts: list[Any]) -> list[str]:
+    text = _evidence_field_text(tables=tables, facts=facts)
+    missing: list[str] = []
+    if not _contains_any(text, ("成本", "花费", "支出", "投放", "cost", "spend", "expense")):
+        missing.append("成本")
+    if not _contains_any(text, ("利润", "毛利", "profit")):
+        missing.append("利润")
+    if not _contains_any(text, ("roi", "roas", "投产比", "回报率")):
+        missing.append("ROI")
+    if not missing:
+        return []
+    return [f"缺少{'、'.join(missing)}字段，不能完整判断投入产出和盈利质量。"]
+
+
+def _evidence_field_text(*, tables: list[ReportEvidenceTable], facts: list[Any]) -> str:
+    parts: list[str] = []
+    for fact in facts:
+        parts.extend([str(getattr(fact, "fact_id", "")), str(getattr(fact, "label", "")), str(getattr(fact, "unit", ""))])
+    for table in tables:
+        parts.extend([table.table_id, table.title, table.description])
+        parts.extend(table.columns)
+    return _normalize_metric_label(" ".join(part for part in parts if part))
 
 
 def _available_derived_claims(chapter_id: str, tables: list[ReportEvidenceTable]) -> list[str]:
@@ -476,7 +552,19 @@ def _allowed_claims(chapter_id: str) -> list[str]:
     }.get(chapter_id, ["可以说明已采集证据覆盖的事实"])
 
 
-def _blocked_claims(chapter_id: str) -> list[str]:
+def _blocked_claims(
+    chapter_id: str,
+    *,
+    missing_evidence: list[str] | None = None,
+    limits: list[str] | None = None,
+) -> list[str]:
+    if missing_evidence:
+        if chapter_id == "revenue_structure":
+            missing_text = "、".join(_missing_metric_labels(missing_evidence))
+            return [f"不能声称{missing_text}相关结论已经验证"] if missing_text else []
+        return [f"不能声称缺失证据已经验证：{item}" for item in missing_evidence]
+    if limits:
+        return [f"不能越过数据边界声称已验证：{item}" for item in limits[:3]]
     return {
         "revenue_structure": ["不能声称利润率、ROI、成本效率或转化率已经验证"],
         "trend_changes": ["不能声称未覆盖周期、同比或预测结果已经验证"],
@@ -484,6 +572,15 @@ def _blocked_claims(chapter_id: str) -> list[str]:
         "customer_segments": ["不能声称未采集的复购率、留存率或客户生命周期价值已经验证"],
         "actions": ["不能把建议目标写成已经发生的历史事实"],
     }.get(chapter_id, ["不能声称账本外事实已经验证"])
+
+
+def _missing_metric_labels(items: list[str]) -> list[str]:
+    labels: list[str] = []
+    for item in items:
+        for label in ("成本", "利润", "ROI", "转化率"):
+            if label in item and label not in labels:
+                labels.append(label)
+    return labels
 
 
 def _data_boundaries(

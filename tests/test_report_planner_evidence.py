@@ -5,6 +5,10 @@ from pathlib import Path
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_markdown import render_report_markdown
 from workspaces.report_models import (
+    ReportChapterPlan,
+    ReportEvidenceTable,
+    ReportEvidencePack,
+    ReportPlan,
     ReportDocument,
     ReportDocumentSection,
     ReportRecord,
@@ -261,6 +265,150 @@ def test_evidence_ledger_derives_totals_shares_rankings_period_changes_and_cover
     assert any(coverage.chapter_id == "revenue_structure" for coverage in ledger.chapter_coverages)
     assert any("利润" in boundary or "ROI" in boundary for boundary in ledger.data_boundaries)
     assert not any("SELECT" in json.dumps(item.to_dict(), ensure_ascii=False).upper() for item in ledger.facts + ledger.derived_metrics)
+
+
+def _ledger_fix_plan() -> ReportPlan:
+    return ReportPlan(
+        title="最近90天经营复盘报告",
+        report_style="经营复盘",
+        time_range="最近90天",
+        data_sources=["订单明细", "客服工单"],
+        chapters=[
+            ReportChapterPlan(
+                chapter_id="revenue_structure",
+                title="收入结构",
+                purpose="说明收入来源和投入产出。",
+                evidence_requirements=[],
+            ),
+            ReportChapterPlan(
+                chapter_id="customer_segments",
+                title="客户分群",
+                purpose="说明客户分群贡献。",
+                evidence_requirements=[],
+            ),
+            ReportChapterPlan(
+                chapter_id="support_issues",
+                title="客服问题",
+                purpose="说明客服问题规模和体验。",
+                evidence_requirements=[],
+            ),
+        ],
+    )
+
+
+def test_evidence_ledger_coverage_and_derived_metrics_use_revenue_not_roi_when_cost_roi_exist():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_unit_economics",
+                title="渠道经营表现",
+                columns=["渠道", "收入", "成本", "ROI"],
+                rows=[
+                    {"渠道": "自然流量", "收入": "30.0 万", "成本": "4.0 万", "ROI": "7.5"},
+                    {"渠道": "付费投放", "收入": "20.0 万", "成本": "10.0 万", "ROI": "2.0"},
+                    {"渠道": "私域", "收入": "10.0 万", "成本": "2.0 万", "ROI": "5.0"},
+                ],
+                source_chapter_id="revenue_structure",
+                description="按渠道汇总收入、成本和 ROI。",
+                evidence_ref="query_channel_unit_economics",
+            )
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    coverage = next(item for item in ledger.chapter_coverages if item.chapter_id == "revenue_structure")
+    coverage_text = "\n".join(coverage.missing_evidence + coverage.blocked_claims + coverage.data_boundaries)
+    derived = json.dumps([item.to_dict() for item in ledger.derived_metrics], ensure_ascii=False)
+
+    assert "缺少成本" not in coverage_text
+    assert "ROI" not in coverage_text
+    assert "利润" in coverage_text
+    assert "收入合计" in derived
+    assert "收入占比" in derived
+    assert "收入排名" in derived
+    assert "ROI合计" not in derived
+    assert "ROI占比" not in derived
+    assert "top2_ROI_combined_share" not in derived
+
+
+def test_evidence_ledger_revenue_coverage_reports_only_actually_missing_inputs():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="channel_revenue",
+                title="渠道收入结构",
+                columns=["渠道", "收入"],
+                rows=[
+                    {"渠道": "自然流量", "收入": "30.0 万"},
+                    {"渠道": "付费投放", "收入": "20.0 万"},
+                ],
+                source_chapter_id="revenue_structure",
+                description="按渠道汇总收入。",
+                evidence_ref="query_channel_revenue",
+            )
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    coverage = next(item for item in ledger.chapter_coverages if item.chapter_id == "revenue_structure")
+    coverage_text = "\n".join(coverage.missing_evidence + coverage.blocked_claims + coverage.data_boundaries)
+
+    assert coverage.coverage == "partial"
+    assert "成本" in coverage_text
+    assert "利润" in coverage_text
+    assert "ROI" in coverage_text
+
+
+def test_evidence_ledger_support_and_customer_coverage_does_not_emit_fixed_optional_gaps():
+    evidence_pack = ReportEvidencePack(
+        tables=[
+            ReportEvidenceTable(
+                table_id="customer_segment_metrics",
+                title="客户分群贡献",
+                columns=["客户分群", "收入", "订单数"],
+                rows=[
+                    {"客户分群": "成长型团队", "收入": "19.6 万", "订单数": "18"},
+                    {"客户分群": "高价值企业", "收入": "14.8 万", "订单数": "11"},
+                ],
+                source_chapter_id="customer_segments",
+                description="按客户分群汇总收入和订单。",
+                evidence_ref="query_customer_segment_metrics",
+            ),
+            ReportEvidenceTable(
+                table_id="support_issue_metrics",
+                title="客服问题概览",
+                columns=["问题类型", "工单量", "满意度", "平均响应时长"],
+                rows=[
+                    {"问题类型": "交付延期", "工单量": "42", "满意度": "4.1", "平均响应时长": "38"},
+                    {"问题类型": "使用咨询", "工单量": "66", "满意度": "4.7", "平均响应时长": "16"},
+                ],
+                source_chapter_id="support_issues",
+                description="按问题类型汇总工单、满意度和响应时长。",
+                evidence_ref="query_support_issue_metrics",
+            ),
+        ]
+    )
+
+    ledger = build_evidence_ledger(plan=_ledger_fix_plan(), evidence_pack=evidence_pack)
+    coverages = {item.chapter_id: item for item in ledger.chapter_coverages}
+    customer_text = "\n".join(
+        coverages["customer_segments"].missing_evidence
+        + coverages["customer_segments"].blocked_claims
+        + coverages["customer_segments"].data_boundaries
+    )
+    support_text = "\n".join(
+        coverages["support_issues"].missing_evidence
+        + coverages["support_issues"].blocked_claims
+        + coverages["support_issues"].data_boundaries
+    )
+
+    assert coverages["customer_segments"].coverage == "strong"
+    assert coverages["support_issues"].coverage == "strong"
+    assert "复购" not in customer_text
+    assert "留存" not in customer_text
+    assert "生命周期价值" not in customer_text
+    assert "成本或流失" not in support_text
+    assert "经营损失" not in support_text
 
 
 def test_coverage_checker_marks_strong_partial_and_missing_without_table_name_rules(tmp_path):
