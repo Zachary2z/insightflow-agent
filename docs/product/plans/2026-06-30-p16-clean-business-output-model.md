@@ -1,8 +1,10 @@
-# P16 Clean Business Output Model
+# Historical / Superseded: P16 Clean Business Output Model
+
+This document is retained as the P16 completion record. Its early report-section wording is historical: P22/P23 superseded the old section-business-answer report path with one-pass `ReportDocument` generation, `EvidenceLedger` validation, and ledger-referenced artifacts/tool calls. Current report guidance lives in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md` and `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`.
 
 P16 is complete. It is a clean product-direction reset for answer and report presentation, not a compatibility layer for old generated runs. P16-H1, P16-H2, P16-H3, P16-H4, P16-H5, and P16-H6 are complete: the backend product answer model, insight drafting prompt, structured-output validation, provider-backed insight agent, product-result builder, run-history restoration, frontend analysis rendering path, report section JSON, report reader, Markdown renderer, final cleanup, artifact hygiene, full regression, and real DeepSeek acceptance now use and protect the single clean `business_answer` contract.
 
-The project should optimize for the current target product:
+Historical P16 target at the time:
 
 ```text
 business question

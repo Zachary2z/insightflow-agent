@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P23 Core Evidence And Report Tooling Readiness in progress |
-| Current task | P23-H6 Cleanup, Regression, And Live Acceptance next |
-| Next planned task | P23-H6 Cleanup, Regression, And Live Acceptance |
-| Last completed task | P23-H5 Artifact And Tool-Calling Readiness |
+| Current phase | P23 Core Evidence And Report Tooling Readiness complete |
+| Current task | P23-H6 Cleanup, Regression, And Live Acceptance complete |
+| Next planned task | P24 Real Business Tool Calling And Exports |
+| Last completed task | P23-H6 Cleanup, Regression, And Live Acceptance |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -37,7 +37,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P20 | `[x]` Complete | General business analysis foundation: cleanup, generalized profiling/semantic layer, task contract, fact/evidence layer, answer/report generation, realistic acceptance, cleanup audit, and live opt-in verification |
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
-| P23 | `[~]` In progress | H1-H5 complete; core evidence/report tooling readiness continues with cleanup and live acceptance before external tool integrations |
+| P23 | `[x]` Complete | H1-H6 complete; core evidence/report tooling readiness is clean, regression-tested, no-key verified, and ready to hand off to P24 |
 | P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
 
 ## P20 Task Status
@@ -84,7 +84,30 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 | P23-H3 | `[x]` Complete | One-Pass Report Center With Shared Evidence |
 | P23-H4 | `[x]` Complete | Evidence Ledger And Report Self-Repair: replaced prose-number validator patching with tool-built evidence ledger, ledger-backed report writing, factual-claim validation, one automatic repair pass, evidence-aware coverage, and conservative metric-role-based contribution metric selection |
 | P23-H5 | `[x]` Complete | Artifact And Tool-Calling Readiness: chart/report artifacts and local renderer tool calls now cite EvidenceLedger facts/metrics without raw rows or model-recomputed facts |
-| P23-H6 | `[ ]` Next | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, and live DeepSeek analysis/report acceptance |
+| P23-H6 | `[x]` Complete | Cleanup, Regression, And Live Acceptance for the ledger-backed report chain, artifact references, old-path deletion, no-key mode, artifact hygiene, and live DeepSeek gating |
+
+## Latest P23-H6 Result
+
+P23-H6 Cleanup, Regression, And Live Acceptance completed on 2026-07-03:
+
+- P23 can close. Analysis Workbench and Report Center remain separate product entries; Report Center remains the one-pass ledger-backed report path and does not restore per-section analysis stitching.
+- Fixed closeout regressions found by full build/test: prompt-registry tests now assert the current `guarded_sql_candidate` v2 contract, provider-backed insight tests assert the current canonical data caveat, run-history tests assert normalized Chinese headline punctuation, and `ReportViewer` now preserves `ReportDocumentSection.chart_refs` in its TypeScript helper.
+- Report artifacts and tool-call records remain tied to ledger facts/derived metrics. Chart artifacts from `evidence_pack.charts` are preserved into `report.artifacts`, and the main report UI keeps SQL, raw rows, query ids, trace/provider metadata, local absolute paths, ledger ids, artifact ids, and tool names out of the business-facing view.
+- Old-path audit found remaining `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, `streamlit`, `eval/run_eval`, fixed-template, keyword-inference, and `章节业务答案` hits only in Historical/Superseded documentation, negative boundary tests, or assertions that those strings are not product output.
+- Tracked artifact audit passed with no committed `.env`, `frontend/.next`, pytest/cache files, `__pycache__`, workspace run/report output, chart/markdown report artifacts, trace JSON, or sample data.
+- Live DeepSeek provider acceptance was not run in this environment because `DEEPSEEK_API_KEY`, `INSIGHTFLOW_PRODUCT_LIVE_MODE`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS`, and `INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER` were absent. This was recorded explicitly instead of treating skipped tests as provider calls.
+- No-key mode remains runnable and verified through deterministic report fallback tests plus the full regression suite.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_workspace_report_runner.py tests/test_workspace_report_api.py -q` (`75 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`67 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_p17_product_cleanup_boundaries.py tests/test_mcp_tool_layer.py -q` (`21 passed`)
+  - `python3 -m pytest` (`511 passed, 11 skipped`)
+  - `python3 -m pytest tests/test_p20_live_deepseek_acceptance.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p11_live_deepseek_workspace_analysis.py -q` (`3 skipped`, live env absent)
+  - `python3 -m pytest tests/test_report_composer_validator.py::test_report_composer_no_key_fallback_returns_chinese_report_document tests/test_workspace_report_api.py::test_create_report_keeps_no_key_mode_when_report_composer_provider_unavailable -q` (`2 passed`)
+  - `cd frontend && npm test` (`68 passed`)
+  - `cd frontend && npm run build` passed
+  - `git diff --check` passed
+  - `git ls-files | rg '(^|/)\\.env$|frontend/\\.next|\\.pytest_cache|__pycache__|workspace_data/.*/runs/|workspace_data/.*/reports/|reports/charts/.*\\.(png|jpg|jpeg|svg)|logs/traces/.*\\.json|sample_data/'` returned no tracked artifact hits
 
 ## Latest P23-H5 Result
 

@@ -149,7 +149,7 @@ def test_get_workspace_run_returns_result_and_product_result(tmp_path):
     assert payload["run_id"] == "run_detail1"
     assert payload["result"]["generated_sql"].startswith("SELECT channel")
     assert payload["result"]["execution_result"]["rows"] == [["email", 100.0]]
-    assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高"
+    assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高。"
 
 
 def test_create_workspace_run_returns_cache_candidate_for_completed_same_version_question(tmp_path):

@@ -15,7 +15,7 @@ def test_prompt_registry_renders_versioned_prompt_with_safety_contract():
 
     assert result["success"] is True
     assert result["prompt_id"] == "guarded_sql_candidate"
-    assert result["prompt_version"] == "v1"
+    assert result["prompt_version"] == "v2"
     assert "最近 30 天" in result["prompt"]
     assert "orders" in result["prompt"]
     assert "validate_sql" in result["prompt"]
@@ -82,7 +82,7 @@ def test_prompt_registry_returns_structured_error_for_missing_variables():
 
     assert result["success"] is False
     assert result["prompt_id"] == "guarded_sql_candidate"
-    assert result["prompt_version"] == "v1"
+    assert result["prompt_version"] == "v2"
     assert "missing required variables" in result["error"]
     assert "schema_text" in result["missing_variables"]
 

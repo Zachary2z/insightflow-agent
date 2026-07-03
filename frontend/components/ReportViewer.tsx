@@ -5,6 +5,7 @@ import {
   getWorkspaceArtifactUrl,
   getWorkspaceReport,
   resolveApiUrl,
+  type ReportDocumentSection,
   type WorkspaceReport,
 } from "../lib/api";
 import ProductCard from "./ProductCard";
@@ -311,7 +312,7 @@ function chartsForSection(charts: Array<Record<string, unknown>>, sectionId: str
   return Array.from(unique.values());
 }
 
-function reportBodySections(sections: Array<{ section_id: string; title: string; body: string }>) {
+function reportBodySections(sections: ReportDocumentSection[]) {
   return sections.filter((section) => !isActionSection(section.section_id, section.title));
 }
 

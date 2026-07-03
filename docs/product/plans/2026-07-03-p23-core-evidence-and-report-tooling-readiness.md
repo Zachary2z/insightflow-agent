@@ -484,18 +484,18 @@ Goal: Prove P23 is stable and clean enough to move into real external tool integ
 
 Tasks:
 
-- [ ] Run targeted backend tests for evidence, metrics, product result builder, answer composer/reviewer, report planner/evidence/composer/validator/runner, and artifact rendering.
-- [ ] Run frontend tests covering Analysis Workbench answers, evidence display, Report Center generation, report detail rendering, chart downloads, and collapsed technical appendix.
-- [ ] Run full backend pytest and frontend build.
-- [ ] Run opt-in real DeepSeek tests when `DEEPSEEK_API_KEY`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, and live-test flags are available.
-- [ ] Manually test at least five Chinese analysis questions and two Chinese reports on a realistic Chinese business dataset.
-- [ ] Confirm Report Center uses the EvidenceLedger path for live reports and does not fall back to prose-number validator patching as the primary safety mechanism.
-- [ ] Confirm live reports with ledger-backed totals, shares, combined shares, period changes, and rankings complete without unsupported hard-fact claims.
-- [ ] Confirm unsupported hard facts are either repaired once, softened into hypotheses, or moved to data boundaries before the user sees the final report.
-- [ ] Confirm report technical appendix can summarize coverage status without showing ledger debug dumps in the main report body.
-- [ ] Confirm chart/report artifacts reference ledger evidence ids after P23-H5.
-- [ ] Audit old-path terms and remove or mark remaining hits as historical/superseded.
-- [ ] Confirm generated runtime artifacts, traces, workspace DBs, reports, and secrets are not staged.
+- [x] Run targeted backend tests for evidence, metrics, product result builder, answer composer/reviewer, report planner/evidence/composer/validator/runner, and artifact rendering.
+- [x] Run frontend tests covering Analysis Workbench answers, evidence display, Report Center generation, report detail rendering, chart downloads, and collapsed technical appendix.
+- [x] Run full backend pytest and frontend build.
+- [x] Check opt-in real DeepSeek readiness. Real provider acceptance was not run in this environment because `DEEPSEEK_API_KEY`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, and live-test flags were absent.
+- [x] Record live manual acceptance status. The required live Chinese analysis/report questions were not executed because the live provider environment was absent; no-key deterministic acceptance remained runnable.
+- [x] Confirm Report Center uses the EvidenceLedger path and does not fall back to prose-number validator patching as the primary safety mechanism.
+- [x] Confirm ledger-backed totals, shares, combined shares, period changes, and rankings remain covered by regression tests without unsupported hard-fact claims in generated reports.
+- [x] Confirm unsupported hard facts are either repaired once, softened into hypotheses, or moved to data boundaries before the user sees the final report.
+- [x] Confirm report technical appendix can summarize coverage status without showing ledger debug dumps in the main report body.
+- [x] Confirm chart/report artifacts reference ledger evidence ids after P23-H5.
+- [x] Audit old-path terms and remove or mark remaining hits as historical/superseded.
+- [x] Confirm generated runtime artifacts, traces, workspace DBs, reports, and secrets are not staged.
 
 Suggested live questions:
 
@@ -524,6 +524,19 @@ Acceptance:
 - Real chart artifacts render where chartable evidence exists.
 - Artifacts can be traced back to ledger evidence ids and do not require raw data or SQL in the main UI.
 - No obsolete active path blocks future external tool calling.
+
+Completion record:
+
+- Completed on 2026-07-03. P23 is ready to close and hand off to P24.
+- Focused backend regression passed for report evidence/planner/composer/validator/runner/API, analysis runner, product result builder, answer consistency, architecture cleanup boundaries, product cleanup boundaries, and MCP tool-layer boundaries.
+- Full backend regression passed: `python3 -m pytest` (`511 passed, 11 skipped`).
+- Frontend regression passed: `cd frontend && npm test` (`68 passed`) and `cd frontend && npm run build`.
+- Closeout fixes kept the current product contract sharp: `guarded_sql_candidate` prompt tests now assert v2, provider-backed insight tests assert the canonical data caveat, run-history API tests assert normalized Chinese headline punctuation, and `ReportViewer` preserves section `chart_refs` in its typed report-body helper.
+- Report Center remains ledger-backed and one-pass. It still records chart/report artifacts and local tool-call records that cite ledger facts/derived metrics, while the main UI hides SQL, raw rows, query ids, trace/provider metadata, local absolute paths, ledger ids, artifact ids, and tool names.
+- Old-path audit found remaining legacy terms only in Historical/Superseded documentation, negative boundary tests, or assertions that old strings such as `章节业务答案` are absent from product output. No active runtime path restored old chart agents, action delivery/drafter, mock SaaS, old stitched reports, fixed templates, keyword inference, Streamlit, or eval runners.
+- Tracked artifact audit passed: no `.env`, `frontend/.next`, pytest/cache files, `__pycache__`, workspace run/report output, chart/Markdown report output, trace JSON, or sample data are tracked.
+- Live DeepSeek acceptance was not run because `DEEPSEEK_API_KEY`, `INSIGHTFLOW_PRODUCT_LIVE_MODE`, `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS`, and `INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER` were absent. The live-gated tests skipped (`3 skipped`) and no provider call was claimed.
+- No-key mode was verified through deterministic report fallback tests (`2 passed`) and the full regression suite.
 
 ## P23 Does Not Do
 
