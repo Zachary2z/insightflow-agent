@@ -710,10 +710,19 @@ def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
     if isinstance(row, (list, tuple)):
         return [
             (str(column), row[index])
-            for index, column in enumerate(columns)
+            for index, column in enumerate(_unique_columns(columns))
             if str(column).strip() and index < len(row)
         ]
     return []
+
+
+def _unique_columns(columns: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        counts[column] = counts.get(column, 0) + 1
+        unique.append(column if counts[column] == 1 else f"{column}_{counts[column]}")
+    return unique
 
 
 def _business_pairs_text(pairs: list[tuple[str, Any]], *, chinese: bool) -> str:
@@ -940,6 +949,7 @@ def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
             "raw_rows": list(execution_result.get("rows") or []),
             "fact_payload": fact_payload,
             "question_evidence_pack": _question_evidence_pack(raw),
+            "audit_result": _audit_result(raw),
             "data_version": raw.get("data_version"),
             "normalized_question": str(raw.get("normalized_question") or ""),
             "trace_path": str(raw.get("trace_path") or ""),
@@ -956,6 +966,11 @@ def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _question_evidence_pack(raw: dict[str, Any]) -> dict[str, Any]:
     value = raw.get("question_evidence_pack")
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _audit_result(raw: dict[str, Any]) -> dict[str, Any]:
+    value = raw.get("audit_result")
     return dict(value) if isinstance(value, dict) else {}
 
 
@@ -1405,7 +1420,7 @@ def _provider_metadata(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _validation_logs(raw: dict[str, Any]) -> list[dict[str, Any]]:
     logs: list[dict[str, Any]] = []
-    for key in ("review_result", "schema_repair", "evidence_result", "trace_save_result"):
+    for key in ("review_result", "schema_repair", "evidence_result", "audit_result", "trace_save_result"):
         value = raw.get(key)
         if isinstance(value, dict):
             logs.append({"name": key, "value": value})

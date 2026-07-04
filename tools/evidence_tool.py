@@ -782,8 +782,17 @@ def _row_pairs_for_payload(row: Any, columns: list[str]) -> list[tuple[str, Any]
     if isinstance(row, dict):
         return [(str(key), value) for key, value in row.items()]
     if isinstance(row, (list, tuple)):
-        return [(column, row[index]) for index, column in enumerate(columns) if index < len(row)]
+        return [(column, row[index]) for index, column in enumerate(_unique_columns(columns)) if index < len(row)]
     return []
+
+
+def _unique_columns(columns: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        counts[column] = counts.get(column, 0) + 1
+        unique.append(column if counts[column] == 1 else f"{column}_{counts[column]}")
+    return unique
 
 
 def _format_business_value(value: Any, *, key: str, label: str = "", metric_registry: dict[str, Any]) -> str:

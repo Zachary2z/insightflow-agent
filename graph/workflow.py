@@ -8,13 +8,12 @@ from langgraph.graph import END, START, StateGraph
 from agents.question_understanding import run_question_understanding_agent
 from agents.supervisor import initialize_run
 from graph.nodes import (
+    business_answer_node,
     clarification_node,
-    claim_typing_node,
     early_response_node,
     evidence_agent_node,
     fail_response_node,
     fast_fact_node,
-    insight_node,
     route_after_evidence_agent,
     route_after_clarification,
     save_trace_node,
@@ -72,17 +71,14 @@ def build_workflow(
     )
     workflow.add_node("fast_fact", fast_fact_node)
     workflow.add_node(
-        "insight",
-        lambda state: insight_node(
+        "business_answer",
+        lambda state: business_answer_node(
             dict(state),
             provider=insight_drafting_provider,
             answer_reviewer_provider=answer_reviewer_provider,
             final_answer_composer_provider=final_answer_composer_provider,
+            evidence_auditor_provider=claim_typing_provider,
         ),
-    )
-    workflow.add_node(
-        "claim_typing",
-        lambda state: claim_typing_node(dict(state), provider=claim_typing_provider),
     )
     workflow.add_node(
         "visualization_agent",
@@ -102,11 +98,10 @@ def build_workflow(
     workflow.add_conditional_edges(
         "evidence_agent",
         route_after_evidence_agent,
-        {"insight": "insight", "fast_fact": "fast_fact", "fail": "fail", "early_response": "early_response"},
+        {"business_answer": "business_answer", "fast_fact": "fast_fact", "fail": "fail", "early_response": "early_response"},
     )
     workflow.add_edge("fast_fact", "save_trace")
-    workflow.add_edge("insight", "claim_typing")
-    workflow.add_edge("claim_typing", "visualization_agent")
+    workflow.add_edge("business_answer", "visualization_agent")
     workflow.add_edge("visualization_agent", "save_trace")
     workflow.add_edge("fail", "save_trace")
     workflow.add_edge("early_response", "save_trace")

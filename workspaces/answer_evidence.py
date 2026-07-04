@@ -139,7 +139,7 @@ def localize_business_field_names(text: Any, *, chinese: bool) -> str:
 
 
 def rows_as_dicts(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
-    columns = [str(column) for column in execution_result.get("columns") or []]
+    columns = _unique_columns([str(column) for column in execution_result.get("columns") or []])
     rows: list[dict[str, Any]] = []
     for row in execution_result.get("rows") or []:
         if isinstance(row, dict):
@@ -153,6 +153,15 @@ def rows_as_dicts(execution_result: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     return rows
+
+
+def _unique_columns(columns: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        counts[column] = counts.get(column, 0) + 1
+        unique.append(column if counts[column] == 1 else f"{column}_{counts[column]}")
+    return unique
 
 
 def entity_key(rows: list[dict[str, Any]]) -> str:

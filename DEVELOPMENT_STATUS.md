@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H3 complete; ready for H4 Evidence Auditor And Business Answer Agent |
-| Next planned task | P27-H4 Evidence Auditor And Business Answer Agent |
+| Current task | P27-H4 complete; ready for H5 latency optimization |
+| Next planned task | P27-H5 Latency Optimization |
 | Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -41,7 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
-| P27 | `[~]` In progress | H1-H3 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
+| P27 | `[~]` In progress | H1-H4 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
 
 ## P20 Task Status
 
@@ -93,7 +93,7 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 | P27-H1 | `[x]` Complete | Added Analysis Workbench contracts and no-key boundary tests proving Report Center stays independent |
 | P27-H2 | `[x]` Complete | Coordinator + Data Understanding: consolidated question understanding, clarification, continuation, H1 `AnalysisTask`, and `CoordinatorDecision` route output |
 | P27-H3 | `[x]` Complete | Evidence Agent question mode: consolidated analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and QuestionEvidencePack output |
-| P27-H4 | `[ ]` Planned | Evidence Auditor + Business Answer Agent: consolidate evidence validation/claim typing and answer drafting/review/composition |
+| P27-H4 | `[x]` Complete | Evidence Auditor + Business Answer Agent: consolidated evidence validation/claim typing and answer drafting/review/composition surfaces |
 | P27-H5 | `[ ]` Planned | Analysis Workbench latency optimization: early fast path, conditional model calls, evidence caching, and on-demand visualization |
 | P27-H6 | `[ ]` Planned | Cleanup, regression, docs closeout, and optional live DeepSeek acceptance |
 
@@ -136,6 +136,25 @@ P27-H3 Evidence Agent Question Mode completed on 2026-07-04:
 - SQL review remains non-bypassable: rejected SQL is not executed; schema repair and execution-fix candidates are re-reviewed before execution; schema repair remains one-pass.
 - Product results expose a safe `question_evidence` projection without raw SQL in the main evidence object, while full `question_evidence_pack` stays in technical details.
 - Report Center remains independent and does not call Analysis Workbench entrypoints for report sections.
+
+## Latest P27-H4 Result
+
+P27-H4 Evidence Auditor And Business Answer Agent completed on 2026-07-04:
+
+- Added `workspaces/evidence_auditor.py` as the Analysis Workbench Evidence Auditor surface. It emits H1 `AuditResult` with supported facts, reasonable inferences, unsupported claims, data limits, and confidence from `QuestionEvidencePack`, evidence validation, and optional claim typing.
+- Added `workspaces/business_answer_agent.py` as the Business Answer Agent surface. It wraps the existing insight drafting, answer reviewer, final answer composer, and `build_business_answer()` guardrail so complex answers keep provider-backed quality while still producing the P16 `business_answer` contract.
+- The Analysis Workbench graph now exposes `business_answer` instead of the older `insight -> claim_typing` product-level chain. Fast facts keep the lightweight fast-fact composer and do not call insight/reviewer/final composer, but still persist an `audit_result` proving hard facts come from evidence.
+- Product technical details now include `audit_result` and validation logs include the audit record. Product-facing `business_answer` fields remain free of SQL, raw rows, trace ids, provider metadata, and internal audit/provider details.
+- Report Center remains independent on its report planner/evidence/ledger/composer/validator/document path and does not call the Business Answer Agent for report chapters.
+- Verification passed:
+  - `python3 -m pytest tests/test_evidence_agent.py tests/test_analysis_contracts.py -q` (`8 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py -q` (`59 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`38 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py::test_report_center_runtime_does_not_depend_on_analysis_workbench_entrypoint -q` (`1 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py -q` (`103 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py tests/test_guarded_insight_claim_typing.py tests/test_p20_realistic_acceptance.py -q` (`110 passed`)
+  - `python3 -m pytest -q` (`579 passed, 12 skipped`)
 
 ## P25 Task Status
 

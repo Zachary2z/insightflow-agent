@@ -74,6 +74,7 @@ class AgentState(TypedDict, total=False):
     metric_context: dict[str, Any]
     business_context: dict[str, Any]
     evidence_result: dict[str, Any]
+    audit_result: dict[str, Any]
     claims_to_validate: list[str]
     chart_result: dict[str, Any]
     chart_path: str
@@ -106,6 +107,7 @@ class AgentState(TypedDict, total=False):
     insight: dict[str, Any]
     answer_review: dict[str, Any]
     answer_composition: dict[str, Any]
+    business_answer: dict[str, Any]
     final_answer: str
     data_used: bool
 

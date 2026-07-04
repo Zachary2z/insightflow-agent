@@ -210,6 +210,8 @@ Status: complete. H3 added `workspaces/evidence_agent.py` as the Evidence Agent 
 - Consolidate insight/reviewer/composer responsibilities into one Business Answer Agent surface.
 - Preserve natural Chinese business explanations and evidence-backed recommendations.
 
+Status: complete. H4 added `workspaces/evidence_auditor.py` and `workspaces/business_answer_agent.py`, routes standard/deep Analysis Workbench answers through the Business Answer Agent surface, emits H1 `AuditResult` on both fast_fact and standard/deep paths, keeps fast_fact on its lightweight answer path, keeps complex answers on the insight/reviewer/final-composer quality path, exposes audit details only in technical details/validation logs, and leaves Report Center on its independent report path.
+
 ### H5 Latency Optimization
 
 - Move fast path earlier.

@@ -309,7 +309,7 @@ def _analysis_task(state: dict[str, Any]) -> AnalysisTask:
 
 
 def _rows_as_dicts(execution: dict[str, Any]) -> list[dict[str, Any]]:
-    columns = [str(column) for column in execution.get("columns") or []]
+    columns = _unique_columns([str(column) for column in execution.get("columns") or []])
     rows: list[dict[str, Any]] = []
     for row in execution.get("rows") or []:
         if isinstance(row, dict):
@@ -317,6 +317,15 @@ def _rows_as_dicts(execution: dict[str, Any]) -> list[dict[str, Any]]:
         elif isinstance(row, (list, tuple)):
             rows.append({columns[index]: value for index, value in enumerate(row) if index < len(columns)})
     return rows
+
+
+def _unique_columns(columns: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        counts[column] = counts.get(column, 0) + 1
+        unique.append(column if counts[column] == 1 else f"{column}_{counts[column]}")
+    return unique
 
 
 def _pack_metrics(state: dict[str, Any], fact_payload: dict[str, Any]) -> list[str]:

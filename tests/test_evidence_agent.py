@@ -1,7 +1,7 @@
 import sqlite3
 
 from llm_ops.provider import MockLLMProvider
-from workspaces.analysis_contracts import AnalysisTask, QuestionEvidencePack
+from workspaces.analysis_contracts import AnalysisTask, AuditResult, QuestionEvidencePack
 from workspaces.evidence_agent import run_evidence_agent_question_mode
 
 
@@ -183,3 +183,111 @@ def test_evidence_agent_does_not_retry_schema_repair_indefinitely(tmp_path):
     assert _tool_names(pack).count("schema_repair") == 1
     assert _tool_names(pack).count("sql_review") == 2
     assert "sql_execution" not in _tool_names(pack)
+
+
+def test_evidence_auditor_builds_audit_result_from_question_evidence_pack():
+    from workspaces.evidence_auditor import audit_question_evidence
+
+    task = AnalysisTask(
+        resolved_question="哪个门店销售额最高？为什么？",
+        metrics=["销售额"],
+        dimensions=["门店"],
+        decision_goal="判断领先门店并解释边界",
+    )
+    pack = QuestionEvidencePack(
+        task=task,
+        rows=[
+            {"store_name": "上海旗舰店", "total_sales": 300000.0},
+            {"store_name": "北京国贸店", "total_sales": 100000.0},
+        ],
+        columns=["store_name", "total_sales"],
+        metrics=["销售额"],
+        data_limits=["当前数据只能确认销售额排名，不能直接证明原因。"],
+    )
+
+    audit = audit_question_evidence(
+        question="哪个门店销售额最高？为什么？",
+        task=task,
+        evidence_pack=pack,
+        candidate_claims=[
+            "上海旗舰店 total_sales 为 300000.0。",
+            "利润率为 40%。",
+            "基于当前证据，可能与门店客流和活动承接有关，需要进一步验证。",
+        ],
+    )
+
+    assert isinstance(audit, AuditResult)
+    assert any("上海旗舰店" in fact and "300000" in fact for fact in audit.supported_facts)
+    assert any("北京国贸店" in fact and "100000" in fact for fact in audit.supported_facts)
+    assert "利润率为 40%。" in audit.unsupported_claims
+    assert any("可能与门店客流" in item for item in audit.reasonable_inferences)
+    assert audit.data_limits == ["当前数据只能确认销售额排名，不能直接证明原因。"]
+    assert audit.confidence == "medium"
+
+
+def test_business_answer_agent_outputs_p16_answer_and_audit_boundary():
+    from workspaces.business_answer_agent import run_business_answer_agent
+
+    state = {
+        "run_id": "run_business_answer_agent",
+        "session_id": "session_business_answer_agent",
+        "user_question": "哪个门店最值得优先复盘，为什么？",
+        "analysis_task": {
+            "resolved_question": "哪个门店最值得优先复盘，为什么？",
+            "metrics": ["销售额"],
+            "dimensions": ["门店"],
+            "decision_goal": "判断复盘对象",
+        },
+        "execution_result": {
+            "success": True,
+            "columns": ["store_name", "total_sales"],
+            "rows": [["上海旗舰店", 300000.0], ["北京国贸店", 100000.0]],
+            "row_count": 2,
+        },
+        "question_evidence_pack": QuestionEvidencePack(
+            task=AnalysisTask(
+                resolved_question="哪个门店最值得优先复盘，为什么？",
+                metrics=["销售额"],
+                dimensions=["门店"],
+                decision_goal="判断复盘对象",
+            ),
+            rows=[
+                {"store_name": "上海旗舰店", "total_sales": 300000.0},
+                {"store_name": "北京国贸店", "total_sales": 100000.0},
+            ],
+            columns=["store_name", "total_sales"],
+            metrics=["销售额"],
+            data_limits=["当前数据不能直接证明原因。"],
+        ).to_dict(),
+        "trace": [],
+    }
+
+    result = run_business_answer_agent(state)
+    answer = result["business_answer"]
+    answer_text = " ".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
+
+    assert set(answer) == {
+        "headline",
+        "direct_answer",
+        "why",
+        "evidence_bullets",
+        "recommendations",
+        "caveats",
+        "confidence",
+    }
+    assert "上海旗舰店" in answer_text
+    assert "300000" in answer_text
+    assert "SELECT" not in answer_text.upper()
+    assert "raw_rows" not in answer_text
+    assert "provider_metadata" not in answer_text
+    assert result["audit_result"]["supported_facts"]
+    assert result["audit_result"]["data_limits"] == ["当前数据不能直接证明原因。"]

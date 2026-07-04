@@ -7,8 +7,6 @@ from agents.analysis_planner import run_analysis_planner_agent
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
 from agents.evidence_validator import run_evidence_validator_agent
-from agents.insight_claim_typer import run_insight_claim_typer_agent
-from agents.insight_agent import run_insight_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
@@ -20,6 +18,8 @@ from agents.visualization_agent import run_visualization_agent
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
 from workspaces.context_pack_builder import build_fast_fact_context_pack
+from workspaces.business_answer_agent import run_business_answer_agent
+from workspaces.evidence_auditor import run_evidence_auditor_agent
 from workspaces.evidence_agent import run_evidence_agent_question_mode
 from workspaces.fast_fact_composer import build_fast_fact_claims, compose_fast_fact_answer
 from workspaces.product_result_builder import build_evidence
@@ -245,6 +245,7 @@ def fast_fact_node(state: AgentState) -> AgentState:
             "claims_to_validate": claims,
         },
     }
+    updated = run_evidence_auditor_agent(updated)
     return append_trace(
         updated,
         {
@@ -267,27 +268,21 @@ def error_fix_node(state: AgentState) -> AgentState:
     return fixed
 
 
-def insight_node(
+def business_answer_node(
     state: AgentState,
     provider=None,
     answer_reviewer_provider=None,
     final_answer_composer_provider=None,
+    evidence_auditor_provider=None,
 ) -> AgentState:
-    updated = run_insight_agent(
+    updated = run_business_answer_agent(
         dict(state),
         provider=provider,
         answer_reviewer_provider=answer_reviewer_provider,
         final_answer_composer_provider=final_answer_composer_provider,
+        evidence_auditor_provider=evidence_auditor_provider,
     )
-    updated["status"] = "completed" if updated.get("insight", {}).get("success") else "failed"
-    updated["data_used"] = updated.get("insight", {}).get("data_used", False)
     return updated
-
-
-def claim_typing_node(state: AgentState, provider=None) -> AgentState:
-    if state.get("status") != "completed":
-        return dict(state)
-    return run_insight_claim_typer_agent(dict(state), provider=provider)
 
 
 def visualization_agent_node(state: AgentState, provider=None) -> AgentState:
@@ -393,7 +388,7 @@ def route_after_evidence_agent(state: AgentState) -> str:
     if state.get("execution_result", {}).get("success"):
         if (state.get("analysis_route") or {}).get("route") == "fast_fact":
             return "fast_fact"
-        return "insight"
+        return "business_answer"
     if state.get("evidence_agent_early_response"):
         return "early_response"
     return "fail"

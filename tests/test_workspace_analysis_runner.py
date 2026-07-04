@@ -283,6 +283,9 @@ def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path
     )
     assert result["insight"]["answer_review"]["status"] == "revise"
     assert result["insight"]["answer_composition"]["source"] == "provider"
+    assert result["audit_result"]["supported_facts"]
+    assert result["audit_result"]["unsupported_claims"] == []
+    assert result["product_result"]["technical_details"]["audit_result"] == result["audit_result"]
     assert "Alpha" in answer_text
     assert "Gamma" not in answer_text
     assert "margin_rate" not in answer_text
