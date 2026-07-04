@@ -16,14 +16,17 @@ def test_get_database_schema_reads_ecommerce_tables_and_columns():
     result = get_database_schema(DB_PATH)
 
     assert result["success"] is True
-    assert result["table_count"] == 5
-    assert [table["table_name"] for table in result["tables"]] == [
+    assert result["table_count"] >= 5
+    assert {
         "categories",
         "order_items",
         "orders",
         "products",
         "users",
-    ]
+    }.issubset({table["table_name"] for table in result["tables"]})
+    assert [table["table_name"] for table in result["tables"]] == sorted(
+        table["table_name"] for table in result["tables"]
+    )
 
     orders = table_by_name(result, "orders")
     assert orders["columns"] == [
@@ -53,7 +56,9 @@ def test_get_database_schema_formats_prompt_friendly_schema_text():
     assert "Foreign keys: user_id -> users.id" in result["schema_text"]
     assert result["trace_event"]["tool_name"] == "get_database_schema"
     assert result["trace_event"]["status"] == "success"
-    assert result["trace_event"]["tool_output_summary"] == "5 tables loaded"
+    assert result["trace_event"]["tool_output_summary"] == (
+        f"{result['table_count']} tables loaded"
+    )
 
 
 def test_get_database_schema_handles_empty_database(tmp_path):

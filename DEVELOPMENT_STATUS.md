@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P25 Real Usage Answer And Report Polish |
-| Current task | P25-H4 Default Full Data Time Range For Safe Cases complete |
-| Next planned task | Post-P25 planning |
-| Last completed task | P25-H4 Default Full Data Time Range For Safe Cases |
+| Current phase | P26 Repository Cleanup Before External Tools |
+| Current task | P26 complete; ready for P27 external business tool integration planning |
+| Next planned task | P27 external business tool integration planning |
+| Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -40,6 +40,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P23 | `[x]` Complete | H1-H6 complete; core evidence/report tooling readiness is clean, regression-tested, no-key verified, and ready to hand off to P24 |
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
+| P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
 
 ## P20 Task Status
 
@@ -79,6 +80,8 @@ P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and
 P24 planning is recorded in `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md`. P24 is complete. It re-scoped away from immediate external exports and strengthened the Chinese business data analysis foundation across generic field profiling, semantic-layer drafts, evidence requirements, safe evidence calculation, Analysis Workbench grounding, Report Center grounding, real DeepSeek acceptance, and cleanup across different business datasets. P24 has three implementation slices: H1 General Data Understanding, H2 General Evidence Chain, and H3 Real Acceptance And Cleanup; all are complete. Real Word/PPT/PDF/飞书/企业微信/钉钉/腾讯文档 integrations remain deferred until after P24.
 
 P25 planning is recorded in `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`. P25 is complete: H1 fixes Analysis Workbench directness, evidence-limit contradictions, and stale field fallbacks; H2 simplifies Report Center goal/title inference and removes the main report-type template feel; H3 runs realistic/live acceptance and cleanup; H4 makes missing time ranges use the full available data range when one safe time field exists, while still asking clarification when time fields are ambiguous or analysis trend windows lack grain. Old paths, stale compatibility code, obsolete tests, and unused files can be deleted instead of preserved when they conflict with the current Chinese-first product.
+
+P26 planning is recorded in `docs/product/plans/2026-07-04-p26-repository-cleanup-before-external-tools.md`. P26 is complete: it keeps historical development records, removes tracked generated artifacts, treats `data/ecommerce.db` as a generated local test fixture, and clarifies that the current product path is FastAPI + Next.js + workspace Analysis Workbench + Report Center.
 
 ## P25 Task Status
 
@@ -809,6 +812,6 @@ Latest P17-H6 closeout result on 2026-06-30:
 This section is historical cleanup context only, not current product guidance.
 
 - Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old cleanup terms.
-- Historical retained fixture: `data/ecommerce.db` remains for low-level tests that directly exercise schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is not the current product database.
+- Historical low-level fixture: `data/ecommerce.db` used to be tracked for schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is now generated locally by tests when missing and must not be committed.
 - Historical P11/P12/P13 specs under `docs/superpowers/specs/` must be treated as snapshots. Current guidance is `docs/product/plans/`, the P16 `business_answer` contract, and P17 cleanup.
 - Real China-oriented external tool calling remains deferred until the core answer/report chain and generic data understanding are stable. Current guidance is P24 for general business data understanding and evidence generation; external tools and exports move after P24.
