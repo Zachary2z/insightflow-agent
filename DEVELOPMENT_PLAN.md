@@ -13,6 +13,7 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md`
 - `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`
 - `docs/product/plans/2026-07-04-p26-repository-cleanup-before-external-tools.md`
+- `docs/product/plans/2026-07-04-p27-analysis-workbench-multi-agent-refactor.md`
 
 ## Current Product Direction
 
@@ -37,6 +38,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P24 is complete as the general business data understanding and evidence generation phase before external integrations. H1-H3 are complete: generic field profiling, semantic-layer drafting, explicit evidence requirements, semantic-layer-backed Analysis Workbench facts, Report Center evidence planning/collection, conservative investment-efficiency/data-limit handling, real DeepSeek acceptance, full cleanup, frontend verification, and artifact hygiene now work across common Chinese business datasets.
 - P25 is complete as a compact real-usage polish phase for Analysis Workbench and Report Center. H1-H4 addressed direct-answer decisiveness, contradictory evidence limits, stale field fallbacks, report goal/title inference, the visible report-type template feel, realistic/live acceptance, cleanup, documentation closeout, and safe full-data time defaults for missing-time questions/reports.
 - P26 is a cleanup-only phase before external business tool integrations. It keeps historical docs, removes tracked generated artifacts, makes the local SQLite test fixture generated on demand, and clarifies the current FastAPI/Next.js product path.
+- P27 is the active Analysis Workbench multi-agent architecture and latency phase. H1 is complete with stable Analysis Workbench contracts and Report Center boundary tests. It primarily refactors Analysis Workbench, not Report Center. It keeps Report Center on its independent `ReportEvidencePack + EvidenceLedger + ReportDocument` path while consolidating duplicated Analysis Workbench nodes into clearer Coordinator, Data Understanding, Evidence, Evidence Auditor, Business Answer, and on-demand Visualization responsibilities.
 
 Current runtime chain:
 
@@ -80,6 +82,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P24 | General business data understanding and evidence generation: common business dataset profiling, semantic-layer strengthening, generic evidence requirements, Analysis Workbench and Report Center grounding, real DeepSeek acceptance, and cleanup | Complete; H1-H3 complete |
 | P25 | Real usage answer/report polish: direct primary-metric answers, clean evidence limits, stale-field removal, report goal/title inference, simplified report UI, realistic/live acceptance, cleanup, and safe full-data time defaults | Complete; H1-H4 complete |
 | P26 | Repository cleanup before external tools: generated artifact hygiene, local fixture generation, current-path docs, historical-record retention | Complete |
+| P27 | Analysis Workbench multi-agent refactor: consolidate duplicated analysis nodes, make tool-calling/evidence boundaries clearer, lower latency, and protect the separate Report Center path | In progress; H1 complete |
 
 ## P16 Business Answer Contract
 
@@ -157,6 +160,8 @@ P25-H1 is complete. Analysis Workbench now prioritizes the primary metric in the
 
 P26 is complete in `docs/product/plans/2026-07-04-p26-repository-cleanup-before-external-tools.md`. P26 retained historical development docs while removing generated artifact tracking and stale fixture assumptions. `data/ecommerce.db` is now treated as a generated local fixture, recreated by tests when absent, not as source.
 
+P27 is in progress in `docs/product/plans/2026-07-04-p27-analysis-workbench-multi-agent-refactor.md`. H1 added `workspaces/analysis_contracts.py` and boundary tests for the separate Report Center path. P27 must focus on Analysis Workbench. It should consolidate duplicated analysis nodes rather than add more small agents: `question_understanding + clarification` become Data Understanding; `sql_planning + analysis_planner`, SQL candidate generation, SQL review/repair/execution/fix, and evidence payload construction become the Evidence Agent question mode; `evidence_validator + claim_typing` become the Evidence Auditor; `insight + answer_reviewer + final_answer_composer` become the Business Answer Agent; visualization becomes on-demand. Report Center must remain separate and should only receive guardrail tests proving it still uses `ReportEvidencePack + EvidenceLedger + ReportDocument`, not Analysis Workbench answer stitching.
+
 P23-H1 through P23-H6 are complete. The shared factual payload foundation now lives in `tools/evidence_tool.build_evidence_payload()` as `p23.shared.v1`, and both Analysis Workbench `fact_payload` and Report Center `ReportEvidencePack.evidence_payloads` use it for intent, time range, metrics, dimensions, result rows, derived metrics, formula metadata, chart-ready data, warnings/data limits, and technical-detail references. Unsupported requested metrics are recorded as data limits instead of being invented. H2 polished Analysis Workbench Chinese business answers so supported facts remain evidence-bound while model explanations, hypotheses, conditional recommendations, and missing-data caveats read like natural business analysis. H3 hardened the one-pass Report Center path with shared evidence. H4 added the `p23.report_ledger.v1` EvidenceLedger, chapter coverage metadata, ledger-backed report composition/validation, and one automatic repair pass for unsupported hard facts while keeping Report Center one-pass and free of old section-answer stitching. H4's post-acceptance repair made coverage evidence-aware and added metric role selection so tables with收入、成本、ROI use收入 for contribution totals/shares/rankings, ROI-only or average/duration-only tables keep row facts without misleading SUM/share derivatives, and coverage reports only truly missing cost/profit/ROI inputs. H5 added report artifact and tool-call readiness without external SaaS: chart artifacts reference ledger facts/derived metrics, Markdown/report-document artifacts summarize ledger references, and future export tools can use artifact ids plus ledger evidence ids instead of re-querying SQL or asking the model to recalculate. H6 closed the phase with cleanup, regression, no-key verification, tracked-artifact audit, and explicit live-provider gating.
 
 ## Current Entry Points
@@ -198,6 +203,8 @@ Use these commands for current product regression:
 ```bash
 python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
 python3 -m pytest tests/test_p26_repository_hygiene.py -q
+python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py tests/test_fast_fact_path.py tests/test_analysis_route_policy.py -q
+python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q
 python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q
 python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
 python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q

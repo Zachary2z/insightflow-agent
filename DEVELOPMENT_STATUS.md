@@ -8,9 +8,9 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P26 Repository Cleanup Before External Tools |
-| Current task | P26 complete; ready for P27 external business tool integration planning |
-| Next planned task | P27 external business tool integration planning |
+| Current phase | P27 Analysis Workbench Multi-Agent Refactor |
+| Current task | P27-H1 complete; ready for H2 Coordinator And Data Understanding |
+| Next planned task | P27-H2 Coordinator And Data Understanding |
 | Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -18,7 +18,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and coherent Chinese report documents |
-| Out of scope for P20 | Real external integrations, auth/RBAC, deployment, vector databases, scheduled reports, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
+| Out of scope for P27 | Report Center rewrite, external SaaS integrations, auth/RBAC, deployment, vector databases, scheduled reports, aggressive semantic search cache, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
 
 ## Phase Overview
 
@@ -41,6 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
+| P27 | `[~]` In progress | H1 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
 
 ## P20 Task Status
 
@@ -82,6 +83,33 @@ P24 planning is recorded in `docs/product/plans/2026-07-03-p24-general-business-
 P25 planning is recorded in `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`. P25 is complete: H1 fixes Analysis Workbench directness, evidence-limit contradictions, and stale field fallbacks; H2 simplifies Report Center goal/title inference and removes the main report-type template feel; H3 runs realistic/live acceptance and cleanup; H4 makes missing time ranges use the full available data range when one safe time field exists, while still asking clarification when time fields are ambiguous or analysis trend windows lack grain. Old paths, stale compatibility code, obsolete tests, and unused files can be deleted instead of preserved when they conflict with the current Chinese-first product.
 
 P26 planning is recorded in `docs/product/plans/2026-07-04-p26-repository-cleanup-before-external-tools.md`. P26 is complete: it keeps historical development records, removes tracked generated artifacts, treats `data/ecommerce.db` as a generated local test fixture, and clarifies that the current product path is FastAPI + Next.js + workspace Analysis Workbench + Report Center.
+
+P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbench-multi-agent-refactor.md`. P27 primarily refactors Analysis Workbench. The goal is to make the current workflow look and behave more like real multi-agent collaboration instead of a long list of small nodes: Coordinator handles route/state; Data Understanding handles question understanding, clarification, continuation, and `AnalysisTask`; Evidence Agent question mode handles schema/metric/SQL/evidence tool calls; Evidence Auditor handles facts, inferences, unsupported claims, and data limits; Business Answer Agent handles the final Chinese answer; Visualization is on-demand. Report Center remains on its independent report path and must not call Analysis Workbench nodes or stitch Analysis Workbench answers into report sections.
+
+## P27 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P27-H1 | `[x]` Complete | Added Analysis Workbench contracts and no-key boundary tests proving Report Center stays independent |
+| P27-H2 | `[ ]` Planned | Coordinator + Data Understanding: consolidate question understanding, clarification, continuation, and route output |
+| P27-H3 | `[ ]` Planned | Evidence Agent question mode: consolidate analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and evidence payload output |
+| P27-H4 | `[ ]` Planned | Evidence Auditor + Business Answer Agent: consolidate evidence validation/claim typing and answer drafting/review/composition |
+| P27-H5 | `[ ]` Planned | Analysis Workbench latency optimization: early fast path, conditional model calls, evidence caching, and on-demand visualization |
+| P27-H6 | `[ ]` Planned | Cleanup, regression, docs closeout, and optional live DeepSeek acceptance |
+
+## Latest P27-H1 Result
+
+P27-H1 Agent Contracts And Boundary Tests completed on 2026-07-04:
+
+- Added `workspaces/analysis_contracts.py` with stable `AnalysisTask`, `CoordinatorDecision`, `WorkbenchToolCall`, `QuestionEvidencePack`, and `AuditResult` contracts plus lightweight `to_dict/from_dict` serialization.
+- Added no-key contract tests proving the new Analysis Workbench contracts can be instantiated and serialized without DeepSeek/provider dependencies.
+- Added a runtime Report Center boundary test that makes `run_workspace_analysis()` fail if called, while Report Center still generates a ledger-backed `ReportDocument`.
+- Report Center remains on `ReportEvidencePack + EvidenceLedger + ReportDocument`; it does not stitch Analysis Workbench `final_answer` or `business_answer` into report sections.
+- Verification passed:
+  - `python3 -m pytest tests/test_analysis_contracts.py tests/test_workspace_report_runner.py -q` (`19 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py -q` (`30 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_workspace_analysis_runner.py tests/test_analysis_contracts.py -q` (`102 passed`)
 
 ## P25 Task Status
 

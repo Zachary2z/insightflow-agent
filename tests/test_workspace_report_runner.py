@@ -288,6 +288,33 @@ def test_report_main_path_does_not_call_run_workspace_analysis_for_sections(tmp_
     assert result["report"]["document"]["sections"]
 
 
+def test_report_center_runtime_does_not_depend_on_analysis_workbench_entrypoint(tmp_path, monkeypatch):
+    import workspaces.analysis_runner as analysis_runner
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("Report Center must not call Analysis Workbench run_workspace_analysis")
+
+    monkeypatch.setattr(analysis_runner, "run_workspace_analysis", fail_if_called)
+    monkeypatch.setattr(report_runner, "run_workspace_analysis", fail_if_called, raising=False)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+    )
+    report = result["report"]
+
+    assert result["success"] is True
+    assert report["evidence_pack"]["ledger"]["ledger_version"] == "p23.report_ledger.v1"
+    assert report["provider_metadata"]["generation_flow"] == "ledger_backed_report_center"
+    assert report["document"]["title"] == report["title"]
+    assert report["document"]["sections"]
+
+
 def test_report_runner_calls_report_composer_and_validator_modules(tmp_path, monkeypatch):
     import workspaces.report_runner as report_runner
 
