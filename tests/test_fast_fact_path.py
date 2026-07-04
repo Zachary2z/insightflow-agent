@@ -91,6 +91,18 @@ def test_fast_fact_total_uses_short_path_and_keeps_technical_details(tmp_path):
     assert "sql_executor_node" in nodes
     assert "evidence_validator_agent" in nodes
     assert "fast_fact_composer" in nodes
+    assert "question_evidence_pack" in result
+    assert result["question_evidence_pack"]["columns"] == result["execution_result"]["columns"]
+    assert result["question_evidence_pack"]["rows"][0]["total_sales"] == 56655.44
+    assert {call["tool_name"] for call in result["question_evidence_pack"]["tool_calls"]} >= {
+        "schema_lookup",
+        "metric_lookup",
+        "sql_review",
+        "sql_execution",
+    }
+    assert result["product_result"]["technical_details"]["question_evidence_pack"]["columns"] == [
+        "total_sales"
+    ]
     assert "insight_agent" not in nodes
     assert "claim_typing_agent" not in nodes
     assert "visualization_agent" not in nodes

@@ -20,6 +20,7 @@ from agents.visualization_agent import run_visualization_agent
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
 from workspaces.context_pack_builder import build_fast_fact_context_pack
+from workspaces.evidence_agent import run_evidence_agent_question_mode
 from workspaces.fast_fact_composer import build_fast_fact_claims, compose_fast_fact_answer
 from workspaces.product_result_builder import build_evidence
 
@@ -60,6 +61,20 @@ def sql_planning_node(state: AgentState, provider=None) -> AgentState:
 
 def analysis_planner_node(state: AgentState, provider=None) -> AgentState:
     return run_analysis_planner_agent(dict(state), provider=provider)
+
+
+def evidence_agent_node(
+    state: AgentState,
+    sql_planning_provider=None,
+    analysis_planner_provider=None,
+    sql_candidate_provider=None,
+) -> AgentState:
+    return run_evidence_agent_question_mode(
+        dict(state),
+        sql_planning_provider=sql_planning_provider,
+        analysis_planner_provider=analysis_planner_provider,
+        sql_candidate_provider=sql_candidate_provider,
+    )
 
 
 def early_response_node(state: AgentState) -> AgentState:
@@ -371,6 +386,16 @@ def route_after_execute(state: AgentState) -> str:
 def route_after_fix(state: AgentState) -> str:
     if state.get("sql_fix", {}).get("success"):
         return "review"
+    return "fail"
+
+
+def route_after_evidence_agent(state: AgentState) -> str:
+    if state.get("execution_result", {}).get("success"):
+        if (state.get("analysis_route") or {}).get("route") == "fast_fact":
+            return "fast_fact"
+        return "insight"
+    if state.get("evidence_agent_early_response"):
+        return "early_response"
     return "fail"
 
 

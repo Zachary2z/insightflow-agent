@@ -27,7 +27,11 @@ class AgentState(TypedDict, total=False):
     claim_typing_result: dict[str, Any]
     question_understanding: dict[str, Any]
     analysis_task: dict[str, Any]
+    analysis_task_contract: dict[str, Any]
     analysis_route: dict[str, Any]
+    question_evidence_pack: dict[str, Any]
+    workbench_tool_calls: list[dict[str, Any]]
+    evidence_agent_early_response: bool
     fast_fact_context_pack: dict[str, Any]
     intent_slots: dict[str, Any]
     routing_strategy: str

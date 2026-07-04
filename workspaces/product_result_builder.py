@@ -856,6 +856,16 @@ def build_evidence(
         or ("validated" if evidence_result.get("success") else "not_validated")
     )
     evidence["fact_payload"] = _fact_payload(raw=raw, execution_result=execution_result)
+    question_pack = _question_evidence_pack(raw)
+    if question_pack:
+        evidence["question_evidence"] = {
+            "columns": list(question_pack.get("columns") or []),
+            "rows": list(question_pack.get("rows") or [])[:20],
+            "metrics": list(question_pack.get("metrics") or []),
+            "chart_candidates": list(question_pack.get("chart_candidates") or []),
+            "data_limits": list(question_pack.get("data_limits") or []),
+            "tool_calls": list(question_pack.get("tool_calls") or []),
+        }
     return evidence
 
 
@@ -929,6 +939,7 @@ def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
             "sql": str(raw.get("generated_sql") or ""),
             "raw_rows": list(execution_result.get("rows") or []),
             "fact_payload": fact_payload,
+            "question_evidence_pack": _question_evidence_pack(raw),
             "data_version": raw.get("data_version"),
             "normalized_question": str(raw.get("normalized_question") or ""),
             "trace_path": str(raw.get("trace_path") or ""),
@@ -941,6 +952,11 @@ def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
     if fast_fact_pack:
         details["fast_fact_context_pack"] = fast_fact_pack
     return details
+
+
+def _question_evidence_pack(raw: dict[str, Any]) -> dict[str, Any]:
+    value = raw.get("question_evidence_pack")
+    return dict(value) if isinstance(value, dict) else {}
 
 
 def _fact_payload(*, raw: dict[str, Any], execution_result: dict[str, Any]) -> dict[str, Any]:

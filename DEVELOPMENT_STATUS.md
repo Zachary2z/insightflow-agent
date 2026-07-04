@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H2 complete; ready for H3 Evidence Agent Question Mode |
-| Next planned task | P27-H3 Evidence Agent Question Mode |
+| Current task | P27-H3 complete; ready for H4 Evidence Auditor And Business Answer Agent |
+| Next planned task | P27-H4 Evidence Auditor And Business Answer Agent |
 | Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -41,7 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
-| P27 | `[~]` In progress | H1-H2 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
+| P27 | `[~]` In progress | H1-H3 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
 
 ## P20 Task Status
 
@@ -92,7 +92,7 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 |---|---|---|
 | P27-H1 | `[x]` Complete | Added Analysis Workbench contracts and no-key boundary tests proving Report Center stays independent |
 | P27-H2 | `[x]` Complete | Coordinator + Data Understanding: consolidated question understanding, clarification, continuation, H1 `AnalysisTask`, and `CoordinatorDecision` route output |
-| P27-H3 | `[ ]` Planned | Evidence Agent question mode: consolidate analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and evidence payload output |
+| P27-H3 | `[x]` Complete | Evidence Agent question mode: consolidated analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and QuestionEvidencePack output |
 | P27-H4 | `[ ]` Planned | Evidence Auditor + Business Answer Agent: consolidate evidence validation/claim typing and answer drafting/review/composition |
 | P27-H5 | `[ ]` Planned | Analysis Workbench latency optimization: early fast path, conditional model calls, evidence caching, and on-demand visualization |
 | P27-H6 | `[ ]` Planned | Cleanup, regression, docs closeout, and optional live DeepSeek acceptance |
@@ -125,6 +125,17 @@ P27-H2 Coordinator And Data Understanding completed on 2026-07-04:
   - `python3 -m pytest tests/test_analysis_contracts.py tests/test_analysis_route_policy.py tests/test_question_understanding_router.py -q` (`31 passed`)
   - `python3 -m pytest tests/test_provider_backed_question_understanding.py tests/test_workspace_analysis_runner.py -q` (`51 passed`)
   - `python3 -m pytest tests/test_workspace_report_runner.py::test_report_center_runtime_does_not_depend_on_analysis_workbench_entrypoint -q` (`1 passed`)
+
+## Latest P27-H3 Result
+
+P27-H3 Evidence Agent Question Mode completed on 2026-07-04:
+
+- Added `workspaces/evidence_agent.py` as the Analysis Workbench Evidence Agent question-mode surface. It wraps the existing evidence planning, schema lookup, metric lookup, SQL candidate building, SQL review, one-pass schema repair, SQL execution, and one-pass execution fix helpers into a single surface.
+- The Analysis Workbench graph now routes the evidence acquisition segment through `evidence_agent` while preserving downstream `fast_fact`, standard insight, claim typing, visualization, product result, and trace behavior.
+- Evidence Agent emits H1 `QuestionEvidencePack` plus `WorkbenchToolCall` records for schema lookup, metric lookup, SQL planning, SQL candidate building, SQL review, schema repair, SQL execution, and SQL fix where applicable.
+- SQL review remains non-bypassable: rejected SQL is not executed; schema repair and execution-fix candidates are re-reviewed before execution; schema repair remains one-pass.
+- Product results expose a safe `question_evidence` projection without raw SQL in the main evidence object, while full `question_evidence_pack` stays in technical details.
+- Report Center remains independent and does not call Analysis Workbench entrypoints for report sections.
 
 ## P25 Task Status
 

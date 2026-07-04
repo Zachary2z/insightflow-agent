@@ -8,30 +8,16 @@ from langgraph.graph import END, START, StateGraph
 from agents.question_understanding import run_question_understanding_agent
 from agents.supervisor import initialize_run
 from graph.nodes import (
-    analysis_planner_node,
     clarification_node,
     claim_typing_node,
     early_response_node,
-    error_fix_node,
+    evidence_agent_node,
     fail_response_node,
     fast_fact_node,
-    guarded_sql_candidate_node,
     insight_node,
-    metric_node,
-    route_after_metric,
-    route_after_execute,
-    route_after_fix,
+    route_after_evidence_agent,
     route_after_clarification,
-    route_after_sql_planning,
-    route_after_review,
-    route_after_schema_repair,
     save_trace_node,
-    schema_node,
-    schema_repair_node,
-    sql_planning_node,
-    sql_executor_node,
-    sql_generator_node,
-    sql_reviewer_node,
     visualization_agent_node,
 )
 from graph.state import AgentState
@@ -76,28 +62,15 @@ def build_workflow(
         lambda state: clarification_node(dict(state), provider=clarification_provider),
     )
     workflow.add_node(
-        "sql_planning",
-        lambda state: sql_planning_node(dict(state), provider=sql_planning_provider),
+        "evidence_agent",
+        lambda state: evidence_agent_node(
+            dict(state),
+            sql_planning_provider=sql_planning_provider,
+            analysis_planner_provider=analysis_planner_provider,
+            sql_candidate_provider=sql_candidate_provider,
+        ),
     )
-    workflow.add_node(
-        "analysis_planner",
-        lambda state: analysis_planner_node(dict(state), provider=analysis_planner_provider),
-    )
-    workflow.add_node("schema", schema_node)
-    workflow.add_node("metric", metric_node)
-    workflow.add_node("generate", sql_generator_node)
-    workflow.add_node(
-        "guarded_candidate",
-        lambda state: guarded_sql_candidate_node(dict(state), provider=sql_candidate_provider),
-    )
-    workflow.add_node("review", sql_reviewer_node)
-    workflow.add_node(
-        "schema_repair",
-        lambda state: schema_repair_node(dict(state), provider=sql_candidate_provider),
-    )
-    workflow.add_node("execute", sql_executor_node)
     workflow.add_node("fast_fact", fast_fact_node)
-    workflow.add_node("fix", error_fix_node)
     workflow.add_node(
         "insight",
         lambda state: insight_node(
@@ -124,34 +97,13 @@ def build_workflow(
     workflow.add_conditional_edges(
         "clarification",
         route_after_clarification,
-        {"early_response": "early_response", "schema": "sql_planning"},
+        {"early_response": "early_response", "schema": "evidence_agent"},
     )
     workflow.add_conditional_edges(
-        "sql_planning",
-        route_after_sql_planning,
-        {"early_response": "early_response", "schema": "analysis_planner"},
+        "evidence_agent",
+        route_after_evidence_agent,
+        {"insight": "insight", "fast_fact": "fast_fact", "fail": "fail", "early_response": "early_response"},
     )
-    workflow.add_edge("analysis_planner", "schema")
-    workflow.add_edge("schema", "metric")
-    workflow.add_conditional_edges(
-        "metric",
-        route_after_metric,
-        {"guarded_candidate": "guarded_candidate", "generate": "generate"},
-    )
-    workflow.add_edge("generate", "guarded_candidate")
-    workflow.add_edge("guarded_candidate", "review")
-    workflow.add_conditional_edges(
-        "review",
-        route_after_review,
-        {"execute": "execute", "schema_repair": "schema_repair", "fail": "fail"},
-    )
-    workflow.add_conditional_edges("schema_repair", route_after_schema_repair, {"review": "review", "fail": "fail"})
-    workflow.add_conditional_edges(
-        "execute",
-        route_after_execute,
-        {"insight": "insight", "fast_fact": "fast_fact", "fix": "fix", "fail": "fail"},
-    )
-    workflow.add_conditional_edges("fix", route_after_fix, {"review": "review", "fail": "fail"})
     workflow.add_edge("fast_fact", "save_trace")
     workflow.add_edge("insight", "claim_typing")
     workflow.add_edge("claim_typing", "visualization_agent")

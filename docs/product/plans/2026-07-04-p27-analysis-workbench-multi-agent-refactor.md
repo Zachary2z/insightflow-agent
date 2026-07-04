@@ -202,6 +202,8 @@ Status: complete. H2 added `workspaces/data_understanding_agent.py` and `workspa
 - Record clear tool calls.
 - Keep SQL review non-bypassable.
 
+Status: complete. H3 added `workspaces/evidence_agent.py` as the Evidence Agent question-mode surface, routed the Analysis Workbench evidence acquisition segment through it, emits H1 `QuestionEvidencePack` plus `WorkbenchToolCall` records, keeps SQL review non-bypassable, keeps schema repair and execution fix to one pass with re-review before execution, and leaves Report Center on its independent report path.
+
 ### H4 Evidence Auditor And Business Answer Agent
 
 - Consolidate evidence validation and claim typing into `AuditResult`.
