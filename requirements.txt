@@ -2,9 +2,9 @@ langgraph
 langchain-core
 langchain-openai
 fastapi
+python-multipart
 httpx2
 uvicorn
-streamlit
 python-dotenv
 pydantic
 sqlparse

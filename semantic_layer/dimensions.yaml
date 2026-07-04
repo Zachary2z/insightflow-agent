@@ -1,0 +1,89 @@
+product:
+  name: "Product"
+  aliases:
+    - "商品"
+    - "产品"
+    - "product"
+  column: "products.product_name"
+  entities:
+    - "product"
+
+category:
+  name: "Category"
+  aliases:
+    - "品类"
+    - "类目"
+    - "category"
+    - "category_name"
+  column: "categories.category_name"
+  entities:
+    - "category"
+    - "product"
+
+city:
+  name: "City"
+  aliases:
+    - "城市"
+    - "地区"
+    - "city"
+    - "上海"
+    - "Shanghai"
+  column: "users.city"
+  entities:
+    - "city"
+    - "customer"
+
+channel:
+  name: "Channel"
+  aliases:
+    - "渠道"
+    - "channel"
+    - "Paid Search"
+    - "付费搜索"
+  column: "marketing_campaigns.channel"
+  entities:
+    - "channel"
+    - "campaign"
+
+campaign:
+  name: "Campaign"
+  aliases:
+    - "campaign"
+    - "营销活动"
+    - "投放"
+  column: "marketing_campaigns.campaign_name"
+  entities:
+    - "campaign"
+
+customer_segment:
+  name: "Customer Segment"
+  aliases:
+    - "客户分层"
+    - "用户分群"
+    - "customer segment"
+  column: "users.city"
+  entities:
+    - "customer"
+
+time:
+  name: "Time"
+  aliases:
+    - "时间"
+    - "日期"
+    - "最近"
+    - "趋势"
+    - "time"
+  column: "orders.order_date"
+  entities:
+    - "order"
+
+promotion:
+  name: "Promotion"
+  aliases:
+    - "促销"
+    - "promotion"
+    - "618"
+    - "discount"
+  column: "promotion_events.promotion_name"
+  entities:
+    - "promotion"

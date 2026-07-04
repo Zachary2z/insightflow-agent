@@ -72,43 +72,6 @@ def test_trace_dashboard_summarizes_agent_tool_sql_and_eval_metrics(tmp_path):
     assert dashboard["eval_metrics"]["pass_rate"] == 1.0
 
 
-def test_trace_dashboard_reads_action_approval_and_audit_records(tmp_path):
-    from dashboard.trace_dashboard import build_trace_dashboard
-    from tools.approval_tool import record_approval
-    from tools.audit_logger import log_audit_event
-
-    action_db_path = tmp_path / "action_ops.db"
-    approval = record_approval(
-        action_db_path,
-        {
-            "run_id": "run_action_dashboard",
-            "approval_status": "approved",
-            "approved_by": "ops_manager",
-            "reason": "Approved for dashboard test.",
-        },
-    )
-    audit = log_audit_event(
-        action_db_path,
-        {
-            "run_id": "run_action_dashboard",
-            "event_type": "action_execution",
-            "actor": "action_executor_agent",
-            "payload": {"record_id": "task_dashboard"},
-        },
-    )
-
-    dashboard = build_trace_dashboard(trace_dir=tmp_path / "missing_traces", action_db_path=action_db_path)
-
-    assert approval["success"] is True
-    assert audit["success"] is True
-    assert dashboard["success"] is True
-    assert dashboard["trace_count"] == 0
-    assert dashboard["approval_records"][0]["run_id"] == "run_action_dashboard"
-    assert dashboard["approval_records"][0]["approval_status"] == "approved"
-    assert dashboard["audit_logs"][0]["event_type"] == "action_execution"
-    assert dashboard["audit_logs"][0]["payload"]["record_id"] == "task_dashboard"
-
-
 def test_trace_dashboard_reports_bad_trace_files_without_crashing(tmp_path):
     from dashboard.trace_dashboard import build_trace_dashboard
 

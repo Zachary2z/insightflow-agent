@@ -1,1331 +1,275 @@
 # InsightFlow Agent
 
-InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow for BI-style SQL analysis.
+InsightFlow Agent is a Chinese-first workspace-based business data analysis product. The current product is a FastAPI backend plus a Next.js frontend that lets users import business data, ask natural-language analysis questions, generate workspace reports, and inspect guarded evidence, charts, artifacts, and technical traces.
 
-P0, P1, and P2 are complete. The current system can take a Chinese business question, route it through a LangGraph multi-agent SQL workflow, validate and execute SELECT SQL against a SQLite ecommerce database, repair one execution error, explain results from real query output, save trace artifacts, run a 20-case eval benchmark, retrieve P1 business context, classify evidence-backed versus unsupported claims, generate simple chart artifacts, save traceable Markdown analysis reports, generate weekly and monthly business review reports, create approval-gated action plans, expose selected tool capabilities through a P3 MCP-style tool contract layer, submit workflow runs through a FastAPI async run API, summarize trace/eval/action observability metrics for a dashboard data layer, provide a controlled no-key LLM Provider and PromptOps core, expose an opt-in production DeepSeek provider adapter with strict structured-output validation, classify user questions into structured intent, optionally use validated provider-backed question-understanding, clarification, SQL-planning, guarded SQL-candidate, business-review decomposition, evidence-backed report-writing, guarded insight claim-typing, and action/email-drafting paths, mine validated `llm_candidate` trace patterns for future template recommendations, and preserve SQL validation before any SQL execution.
+Current product chain:
+
+```text
+workspace data import
+-> profile and semantic-layer draft
+-> business question or report goal
+-> question understanding and clarification
+-> evidence requirements
+-> SQL planning and guarded SQL candidate
+-> SQL review and one-pass schema repair
+-> SQL execution
+-> evidence validation
+-> P16 business_answer
+-> visualization artifacts and reports
+-> Next.js product UI
+```
+
+The product is intentionally guarded: LLM/provider-backed steps may understand, plan, draft SQL candidates, draft business wording, and choose visualization delivery. Deterministic tools still own SQL approval, SQL execution, evidence checks, chart/tool policy checks, artifact writing, and trace persistence.
 
 ## Current Status
 
-P0 - Agentic SQL Core, P1 - Reliable Analysis & Report Core, and P2 - Business Review & Action Workflow are complete. P3 Task 17 - MCP Tool Layer, Task 18 - FastAPI + Async Run API, Task 19 - Trace Dashboard, Task 19A - Streamlit Unified Demo, Streamlit Command Center UI hardening, Task 20 - LLM Provider and PromptOps Core, Task 20C - Production DeepSeek Provider & Structured Output Validation, Task 20A - Question Understanding & Clarification Router, Task 20B - SQL Planning Router, Task 21 - Provider-backed Question Understanding, Task 22 - Provider-backed Clarification Router, Task 23 - Provider-assisted SQL Planning and Guarded Candidate Integration, Task 24 - LLM Business Review Decomposition, Task 25 - Evidence-backed Report Writing and Polishing, Task 26 - Guarded Insight Claim Typing, Task 27 - LLM Action and Email Drafting, and Task 28 - LLM Template Mining and Eval Suite are complete.
-
-Implemented:
-
-- SQLite ecommerce database
-- Schema, metric, SQL validation, SQL execution, and trace tools
-- Supervisor, Schema, Metric, SQL Generator, SQL Reviewer, Error Fix, and Insight agents
-- LangGraph workflow with review, execution, one-retry repair, failure, insight, and trace-save paths
-- Streamlit glass-box demo
-- 20-case eval benchmark
-- P1 business context retrieval for business rules, table docs, and historical SQL examples
-- P1 evidence validation for data-supported findings, hypotheses, and unsupported claims
-- P1 chart generation for bar, line, and optional pie charts
-- P1 Markdown report generation with SQL, execution evidence, charts, and trace links
-- P2 deterministic Report Supervisor for weekly business review reports with multiple SQL subtasks, evidence validation, chart paths, trace paths, and saved Markdown output
-- P2 optional controlled LLM Report Planner for structured report section selection, fallback planning, and clarification questions without LLM-generated SQL or final claims
-- P2 optional guarded LLM SQL and insight enhancement with SQL validation, deterministic fallback, and Evidence Validator claim blocking
-- P2 Action Workflow with structured action plans, risk assessment, approval gate, SQLite task/alert records, action verification, and audit logs
-- P3 MCP-style Tool Layer with database, report, and action server contracts over existing deterministic tools
-- P3 FastAPI async run API with run submission, status polling, trace retrieval, event retrieval, and cancellation status
-- P3 Trace Dashboard data layer with node latency, tool call, SQL execution, SQL repair, eval, approval, and audit metrics
-- P3 Streamlit unified demo with SQL analysis, report generation, weekly review, action workflow, MCP, async API, and trace dashboard views
-- P3 Streamlit Command Center UI with Ask & Analyze, Reports, Actions, Observability, LLM Ops, Integrations, Capability Catalog, source/safety cards, and glass-box trace timeline
-- P3 LLM Provider and PromptOps core with prompt registry, prompt/version metadata, mock provider contract, model cost/latency trace metadata, and LLM smoke eval harness
-- P3 production DeepSeek provider adapter with `.env` config loading, opt-in live smoke tests, malformed JSON handling, and strict prompt-specific output validation
-- P3 Question Understanding & Clarification Router with deterministic intent slots, missing-slot clarification, sensitive/unsafe rejection, and strategy recommendations before SQL planning
-- P3 SQL Planning Router with deterministic template matching, guarded `llm_candidate` policy, clarify/reject preservation, and template-mining feedback summaries
-- P3 Provider-backed Question Understanding with optional DeepSeek-compatible intent extraction, prompt-specific schema validation, deterministic fallback, and trace metadata
-- P3 Provider-backed Clarification Router with optional DeepSeek clarification questions, deterministic fallback, runtime workflow trace, and SQL-before-clarification blocking only when provider clarification is active
-- P3 Provider-assisted SQL Planning and Guarded Candidate Integration with optional DeepSeek-backed SQL source routing, guarded candidate generation, `validate_sql()` approval, deterministic fallback, and runtime workflow trace
-- P3 LLM Business Review Decomposition with optional DeepSeek-backed report-section planning for weekly/monthly reviews, allowlisted sections only, provider SQL/claim rejection, deterministic fallback, and report supervisor trace metadata
-- P3 Evidence-backed Report Writing and Polishing with optional DeepSeek-backed report prose generated only from Evidence Validator outputs, SQL records, chart paths, and trace paths; unsupported claims are rejected and deterministic fallback is preserved
-- P3 Guarded Insight Claim Typing with optional DeepSeek-backed claim classification before Evidence Validator, runtime workflow/report-supervisor trace, deterministic fallback, and Evidence Validator final ownership
-- P3 LLM Action and Email Drafting with optional DeepSeek-backed task, alert, and email draft wording after Action Planner and before Risk Assessor, Approval Gate, Action Executor, and Audit Logger
-- P3 LLM Template Mining and Eval Suite with workflow-trace mining for repeated successful `llm_candidate` patterns, schema-aware LLM smoke evals, expected malformed/schema failure cases, and opt-in live DeepSeek eval coverage
-
-P3 - MCP & Engineering Core has started with Tasks 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete. Later engineering work is not implemented yet.
-
-Track current phase, task status, test status, acceptance progress, and remaining engineering backlog in [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Track the full phased development plan, LLM enhancement development roadmap, next-task queue, and final LLM participation rules in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
-
-## LLM Enhancement Roadmap
-
-The default P0/P1/P2 workflow is deterministic and does not call a real LLM, so an API key is not required for the completed workflow. P3 Task 20 adds no-key provider and PromptOps infrastructure with a mock provider contract. P3 Task 20C adds a production `DeepSeekProvider`, but live DeepSeek calls remain explicitly opt-in through `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`.
-
-LLM usage should be additive, optional, and bounded by tools, validators, and trace:
-
-- **Current baseline**: deterministic Agent state transitions, SQL validation, SQL execution, evidence validation, chart generation, report saving, and trace logging remain the source of truth.
-- **P2 controlled enhancement**: introduce an optional LLM adapter for report task planning, report section outlining, business-language polishing, and user clarification questions. LLM outputs must be structured and checked before use.
-- **P2 guarded SQL enhancement**: allow an LLM to propose SQL candidates only after schema, metric, and business context retrieval. Every candidate must still pass `validate_sql()` before `run_sql()`.
-- **P3 question understanding**: Task 20A adds a structured intent and clarification layer that extracts metric, dimension, time range, filters, operation, and risk flags before SQL planning.
-- **P3 SQL planning router**: Task 20B routes clear questions to deterministic templates, complex but complete questions to guarded LLM SQL candidates, ambiguous questions to clarification, and dangerous or sensitive requests to rejection or safety handling.
-- **P3 engineering hardening**: Task 20 adds provider abstraction, prompt templates, prompt/version tracking, cost and latency metadata, LLM eval cases, and trace-ready observability around model-assisted steps.
-- **P3 production provider hardening**: Task 20C adds a first-class `DeepSeekProvider`, `.env`-driven config, strict JSON schema validation, optional live smoke tests, and structured fallback/error handling before any production LLM routing depends on real model output.
-- **P3 provider-backed question understanding**: Task 21 adds an optional provider-backed path behind the deterministic question-understanding router. Provider output must pass the `question_understanding` structured-output validator, is normalized to the existing intent schema, and falls back deterministically on provider errors, malformed JSON, schema mismatch, or missing provider configuration.
-- **P3 provider-backed clarification**: Task 22 adds an optional provider-backed clarification router. When provider clarification is active, ambiguous questions stop before schema/SQL generation and return provider-generated follow-up questions; no-key deterministic baseline continues through the existing P0 SQL workflow.
-- **P3 provider-assisted SQL planning and candidates**: Task 23 wires optional DeepSeek-backed SQL planning and guarded SQL candidate generation into `run_workflow()`. Planning output cannot contain SQL, candidate SQL must pass `validate_sql()`, and the original SQL Reviewer still approves SQL before execution.
-- **P3 provider-backed business review decomposition**: Task 24 wires optional DeepSeek-backed report planning into `run_report_supervisor_agent()`. Provider output can select only allowlisted weekly/monthly report sections, is rejected if it supplies SQL or factual claims, and falls back to deterministic review planning on provider or validation failure.
-- **P3 evidence-backed report writing**: Task 25 wires optional DeepSeek-backed report prose into `run_report_agent()` and `run_report_supervisor_agent()` after Evidence Validator. Provider prose must pass the `report_writer` schema, reference only verified findings or hypotheses, and is rejected if it includes blocked unsupported claims.
-- **P3 guarded insight claim typing**: Task 26 wires optional DeepSeek-backed `insight_claim_typer` into the core workflow after deterministic insight generation and into report supervisor sections before Evidence Validator filtering. Provider classification is advisory; Evidence Validator still decides supported findings, hypotheses, and blocked unsupported claims.
-- **P3 action and email drafting**: Task 27 wires optional DeepSeek-backed `action_drafter` output into `run_action_planner_agent()`. The provider can draft task, metric-alert, and email-draft payloads from Evidence Validator outputs, but those drafts still flow through Risk Assessor, Approval Gate, Action Executor, and Audit Logger before any SQLite action record is created.
-- **P3 template mining and eval**: Task 28 writes safe template-mining metadata into accepted guarded SQL candidate trace events, mines saved workflow trace files for repeated successful `llm_candidate` intent signatures, and expands `run_llm_smoke_eval()` with prompt-specific structured validation plus expected malformed/schema-failure cases.
-- **P3 runtime LLM wiring standard**: Task 21A wires provider-backed question understanding into the real `run_workflow()` path. Future LLM tasks must also connect to a real runtime entry point, write provider/fallback trace evidence, and include live DeepSeek smoke coverage for that path.
-
-LLM boundaries:
-
-- The LLM must not execute SQL, bypass `validate_sql()`, override `Evidence Validator`, create final evidence-backed claims without data support, or trigger action tools without approval gates.
-- Reports and insights must remain traceable to SQL, execution results, business context, evidence validation, charts, and saved artifacts.
-
-Final LLM participation map:
-
-| Area | LLM role | Hard boundary |
+| Product area | Status | Current entry |
 |---|---|---|
-| Provider / PromptOps | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Must not change the no-key deterministic baseline |
-| Question understanding | Extract metric, dimension, time range, filters, operation, limit, and risk flags | Must not generate or execute SQL |
-| Clarification routing | Ask focused follow-up questions for ambiguous requests | Must not guess missing SQL requirements |
-| SQL planning | Choose template, guarded `llm_candidate`, clarify, or reject strategy | Must not return executable SQL directly |
-| Guarded SQL candidate | Propose SQL candidates for clear non-template questions | Every candidate must pass `validate_sql()` before `run_sql()` |
-| Report planning | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
-| Insight/report wording | Suggest claims or polish business-language summaries | Every claim must pass Evidence Validator before use |
-| Action drafting | Draft task, alert, or email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
-| Template mining feedback | Summarize repeated successful `llm_candidate` patterns from saved workflow traces | Must not automatically modify production templates |
-| LLM eval / smoke tests | Validate provider availability, JSON shape, prompt schemas, and failure handling | Live provider tests must remain explicit opt-in |
+| FastAPI product backend | Active | `uvicorn api.app:app --reload` |
+| Next.js product frontend | Active | `frontend/`, `npm run dev` |
+| Workspace import/profile/semantic layer | Complete | `/api/workspaces`, `/sources`, `/profile`, `/semantic-layer/draft` |
+| P11 ad hoc workspace analysis | Complete | `POST /api/workspaces/{workspace_id}/runs` |
+| P12 workspace reports | Complete | `POST /api/workspaces/{workspace_id}/reports` |
+| P16 clean business output model | Complete | `business_answer` with `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
+| P17 product codebase cleanup | Complete | `tests/test_p17_product_cleanup_boundaries.py`, `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md` |
+| P18 business answer consistency | Complete | `workspaces/answer_consistency.py`, `docs/product/plans/2026-06-30-p18-business-answer-consistency.md` |
+| P19 report and chart synthesis | Complete | Management-style reports with synthesized summary, findings, actions, chart/evidence, limits, technical appendix, and H5 live acceptance |
+| P20 general business analysis foundation | Complete | `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md` |
+| P21 responsive analysis experience | Complete | `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md` |
+| P22 evidence-driven report generation | Complete | H1-H4 complete; `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md` |
+| P23 core evidence and report tooling readiness | Complete | H1-H6 complete; `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md` |
+| P24 general business data understanding | Complete | H1-H3 complete; `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md` |
+| P25 real usage answer/report polish | Complete | H1-H4 complete; safe full-data time defaults added for missing time ranges; `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md` |
 
-The development plan tracks this as the final LLM participation boundary: LLMs may help with understanding, planning, candidates, wording, and suggestions; deterministic tools remain responsible for approval, execution, validation, and audit.
+P18-H1 through P18-H6 are complete. P19-H1 through P19-H5 are complete. P20-H0 through P20-H5 are complete: the product now has a generalized semantic-layer baseline with Chinese business aliases, safe metric formula quoting, a reusable Chinese analysis task contract with slot-level clarification continuation, a stable fact/evidence payload with metric formulas, comparison scope, warnings, and Chinese business display values, plus evidence-backed Chinese business answers, chart descriptions, and report synthesis. P21-H1 through P21-H6 are complete: each analysis run carries conservative `analysis_route` metadata, low-risk `fast_fact` questions use a shorter SQL/evidence-backed answer path, product results include business-friendly `progress_steps`, same-workspace/same-data-version/same-normalized-question completed runs can be offered as historical reuse candidates without calling the model, newly submitted runs create recoverable background run shells with compact task cards plus polling/page recovery, and `fast_fact` answers use lightweight context packs that retain key evidence while excluding raw SQL, trace, provider metadata, full workspace profile, and full raw rows from the compact pack. P22-H1 through P22-H4 are complete: Report Center now persists the new report document contract, deletes the old fixed-preset/per-section analysis stitching path, plans Chinese chapters from the user's report goal, collects structured evidence from workspace profile, semantic layer, metric registry, guarded SQL execution, and evidence payload helpers, composes one coherent Chinese report through the current `report_composer`, validates key facts, and renders a clean business report page plus clean Markdown download. P23-H1 through P23-H6 are complete: Analysis Workbench and Report Center share factual evidence vocabulary, Analysis Workbench answers stay natural and evidence-bound, Report Center writes one full report from shared evidence, P23-H4 adds a report EvidenceLedger plus one repair pass for unsupported hard facts, P23-H5 adds ledger-referenced chart/report artifact records plus minimal local tool-call records for future exports, and P23-H6 closes the phase with focused/full regression, frontend verification, tracked-artifact audit, old-path audit, no-key acceptance, and live-provider gating documentation. P24-H1 through P24-H3 are complete: profiling and semantic-layer drafts now recognize broader Chinese business datasets such as 门店销售、商品/品类销售、客户分群、客服/工单运营、渠道投放、区域表现, questions and report goals produce explicit evidence requirements, Analysis Workbench calculates generic rankings, contribution/share, operational-efficiency, and safe same-table investment-efficiency facts, Report Center collects shared ledger evidence and writes one coherent Chinese report, and real DeepSeek acceptance now covers P24 analysis plus report composition with recorded fields, metrics, evidence, model output, report sections, artifacts, and data limits. Unsupported ROI, net return, profit, trend, repeat-purchase, or cross-table combinations become data limits unless fields and relationships are safe. Real chart artifacts are shown inline with download links; chart intents are labeled as待生成图表 instead of pretending an artifact exists. Product-facing copy, answers, charts, reports, artifact summaries, and prompts should be Chinese; English or mixed raw headers remain supported through semantic recognition and Chinese aliases.
 
-Runtime LLM development standard:
-
-- Do not stop at standalone provider helpers; each LLM task must be wired into `graph.workflow`, FastAPI, Streamlit helpers, report supervisor, or action workflow.
-- Keep the no-key deterministic baseline available.
-- Record `provider_called`, `fallback_used`, prompt id/version, validation status, and fallback errors in state or trace.
-- Add both mocked runtime tests and a live DeepSeek smoke test for the affected workflow path.
-
-## Question Understanding And SQL Routing
-
-P3 separates natural-language understanding from SQL planning so the system can become smarter without turning into a black-box Text2SQL app.
-
-**Question Understanding & Clarification Router** decides whether a user question is clear enough for SQL planning. It extracts structured slots such as:
-
-- `metric`: GMV, order count, AOV, repurchase rate, or another known metric
-- `dimension`: product, category, city, user, channel, or another grouping
-- `time_range`: this week, last 30 days, this month, quarter, or a custom period
-- `filters`: paid orders, excluding refunds, new users, high-AOV customers, or other constraints
-- `operation`: top N, trend, comparison, decline, summary, or drilldown
-- `limit`: Top 5, Top 10, or another row limit
-
-If required slots are missing, it returns `strategy: clarify` with focused clarification questions instead of forcing SQL generation. If a request asks for sensitive fields or unsafe operations, it returns `strategy: reject` before SQL generation. Complete stable BI intent returns `strategy: template`; complete but non-template intent returns `strategy: llm_candidate` for a later planning step.
-
-Task 20A does not produce SQL, select a concrete SQL template, expose `matched_template`, or set routing confidence. Those belong to Task 20B.
-
-**SQL Planning Router** decides whether SQL should come from a deterministic template or from the guarded LLM SQL candidate path. Template SQL remains the fast, reliable default for common BI questions. Guarded LLM candidates are used only when the question is clear enough but no existing template covers it. Every LLM candidate must still pass `validate_sql()` before execution.
-
-The intended routing contract is:
-
-```python
-{
-    "strategy": "template | llm_candidate | clarify | reject",
-    "matched_template": "top_products_gmv",
-    "confidence": 0.92,
-    "missing_slots": [],
-    "clarification_questions": [],
-    "risk_flags": [],
-    "reason": "Question matches a stable Top-N GMV template."
-}
-```
-
-These tasks belong in P3 because they depend on mature provider, prompt, trace, and eval infrastructure. They should not weaken the current deterministic baseline.
-
-Task 20C hardens real-provider model output with a dedicated `DeepSeekProvider`, prompt-specific JSON schema validation, malformed-output rejection, optional live smoke tests, and traceable provider metadata. Tasks 21-27 reuse that layer for provider-backed question understanding, clarification, SQL planning, guarded SQL candidates, business review decomposition, report writing, claim typing, and action/email drafting without weakening deterministic fallback, `validate_sql()`, SQL Reviewer, Evidence Validator, Approval Gate, Audit Logger, or execution boundaries.
-
-Task 21 provider-backed question understanding can be called explicitly:
-
-```python
-from llm_ops.provider import MockLLMProvider
-from question_understanding.provider_backed import understand_question_with_provider
-
-provider = MockLLMProvider(
-    {
-        "strategy": "template",
-        "intent": {
-            "metric": "gmv",
-            "dimension": "category",
-            "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
-            "filters": ["paid_orders"],
-            "operation": "top_n",
-            "limit": 5,
-            "risk_flags": [],
-        },
-        "missing_slots": [],
-        "clarification_questions": [],
-        "risk_flags": [],
-        "reason": "Provider extracted a complete BI intent.",
-    }
-)
-
-result = understand_question_with_provider("最近 30 天销售额最高的 5 个品类是什么？", provider=provider)
-print(result["source"])
-print(result["provider_called"])
-print(result["fallback_used"])
-```
-
-Accepted provider output includes `source: "provider"`, `provider_called: true`, and `fallback_used: false`. Provider exceptions, malformed JSON, and schema mismatch return deterministic fallback output with `source: "deterministic"`, `provider_called: true`, `fallback_used: true`, and either `provider_error` or `validation_error`.
-
-Task 21A wires provider-backed question understanding into the real runtime workflow. `graph.workflow.run_workflow()` now runs the Question Understanding Agent before schema retrieval, so Streamlit `run_demo_question()` and the FastAPI async run manager inherit the same behavior.
-
-Enable real DeepSeek-backed question understanding in the runtime workflow:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1
-export DEEPSEEK_API_KEY=...
-python -c "from graph.workflow import run_workflow; print(run_workflow('最近 30 天销售额最高的 5 个商品是什么？')['question_understanding'])"
-```
-
-The runtime switch only affects question understanding. The LLM still does not generate SQL, execute SQL, select `matched_template`, bypass `validate_sql()`, bypass Evidence Validator, or trigger approval-gated actions.
+P25 is complete. The compact polish phase closed the real manual-testing feedback loop: Analysis Workbench answers explicit primary-metric questions more directly, removes contradictory evidence-limit wording for calculated metrics, eliminates stale demo-field fallback when the current workspace cannot safely support a query, and defaults missing time ranges to the full available data range when one safe time field exists. Report Center now infers whole-report intent before local topics, keeps broad经营复盘 and管理层经营简报 titles from being hijacked by渠道局部词, preserves channel-only and trend-only specialized titles, simplifies the main report form around the user's report goal, and no longer silently labels missing-time reports as `最近90天`. If time fields are ambiguous, or an analysis question asks for trend/同比/环比/变化 without enough grain detail, the product still asks a concise clarification.
 
 ## Quickstart
 
+Install backend dependencies:
+
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python data/seed_data.py
-streamlit run app.py
 ```
 
-Copy `.env.example` to `.env` and fill in values as needed.
-
-## Run Tests
-
-```bash
-python -m pytest
-```
-
-Run the P0 eval benchmark:
-
-```bash
-python eval/run_eval.py
-```
-
-## Seed Database
-
-```bash
-python data/seed_data.py
-```
-
-This creates `data/ecommerce.db` with the P0 ecommerce schema:
-
-- `users`: 120 rows
-- `orders`: 540 rows across `paid`, `cancelled`, and `refunded`
-- `order_items`: 1,336 rows
-- `products`: 36 rows
-- `categories`: 6 rows
-
-## What P0 Can Do
-
-- Accept Chinese business questions in Streamlit.
-- Read the real SQLite schema with `get_database_schema()`.
-- Retrieve metric definitions such as GMV with `retrieve_metric_definition()`.
-- Generate SELECT SQL for P0 ecommerce analysis scenarios.
-- Review SQL with `validate_sql()` before execution.
-- Block dangerous SQL such as `DELETE`, `DROP`, `UPDATE`, and sensitive-field exports before `run_sql()`.
-- Execute approved SQL with `run_sql()` and return structured columns, rows, row count, timing, and errors.
-- Repair one supported execution failure and rerun the fixed SQL after validation.
-- Generate final answers only from `execution_result`.
-- Save run traces to `logs/traces/{run_id}.json`.
-- Run 20 eval cases with `eval/run_eval.py`.
-
-## P0 Architecture
-
-```text
-User question
--> Supervisor Agent
--> Schema Agent -> get_database_schema()
--> Metric Agent -> retrieve_metric_definition()
--> SQL Generator Agent
--> SQL Reviewer Agent -> validate_sql()
--> SQL Executor Tool -> run_sql()
--> Error Fix Agent, when execution fails once
--> SQL Reviewer Agent -> validate_sql(), for fixed SQL
--> SQL Executor Tool -> run_sql(), for fixed SQL
--> Insight Agent
--> Trace Logger
-```
-
-The main entry point is `graph.workflow.run_workflow()`. Streamlit calls the same workflow used by eval, so demo behavior and benchmark behavior stay aligned.
-
-## Metric Definitions
-
-Metric definitions live in `data/metrics.yaml` and can be retrieved with `retrieve_metric_definition()`.
-
-P0 metrics:
-
-- `gmv`: sales amount, using `SUM(order_items.quantity * order_items.unit_price)`
-- `order_count`: paid order count
-- `aov`: average order value
-- `category_gmv`: category-level GMV
-- `product_sales`: product-level paid item quantity
-
-Example:
-
-```bash
-python -c "from tools.metric_tool import retrieve_metric_definition; print(retrieve_metric_definition('最近 30 天销售额最高的 5 个商品是什么？'))"
-```
-
-## Business Context Retrieval
-
-Task 11 adds a lightweight Business Context Retrieval layer for P1. It uses Markdown and JSON sources plus keyword matching; it does not require a vector database.
-
-Context sources:
-
-- `data/business_rules.md`: business rules such as paid-order-only GMV and sensitive-field handling
-- `data/table_docs.md`: table and field descriptions for the ecommerce schema
-- `data/sql_examples.json`: historical SQL examples for common BI questions
-
-Tool interface:
-
-```python
-from tools.context_tool import retrieve_business_context
-
-context = retrieve_business_context("最近 30 天销售额最高的 5 个商品是什么？")
-print(context["matched_rules"])
-print(context["matched_table_docs"])
-print(context["matched_sql_examples"])
-print(context["trace_event"])
-```
-
-Agent interface:
-
-```python
-from agents.context_retriever import run_context_retriever_agent
-from agents.supervisor import initialize_run
-
-state = initialize_run("最近 30 天销售额最高的 5 个商品是什么？")
-state = run_context_retriever_agent(state)
-print(state["business_context"]["context_summary"])
-print(state["trace"][-1])
-```
-
-The tool returns structured JSON-compatible dictionaries and never raises file loading errors into the workflow. On failure it returns `success: false`, empty match lists, an `error`, and a trace-ready event. The Agent only reads `state["user_question"]`, writes `state["business_context"]`, and appends trace; it does not access the database, execute SQL, or generate reports.
-
-## Evidence Validator
-
-Task 12 adds an Evidence Validator layer for P1. It separates claims into:
-
-- `data_supported_findings`: claims backed by `execution_result` rows or explicit business context
-- `hypotheses`: claims framed as possible explanations or requiring more data
-- `unsupported_claims_blocked`: deterministic claims without supporting evidence
-
-Tool interface:
-
-```python
-from tools.evidence_tool import validate_evidence
-
-result = validate_evidence(
-    claims=[
-        "Laptop Pro 14 的 GMV 为 511248.56",
-        "可能与广告流量下降有关，需要 ad_impressions、ctr 和 conversion_rate 数据进一步验证",
-        "库存不足是导致 Camera A 销量下降的主要原因",
-    ],
-    execution_result={
-        "success": True,
-        "columns": ["product_name", "gmv"],
-        "rows": [["Laptop Pro 14", 511248.56]],
-        "row_count": 1,
-    },
-)
-print(result["data_supported_findings"])
-print(result["hypotheses"])
-print(result["unsupported_claims_blocked"])
-```
-
-Agent interface:
-
-```python
-from agents.evidence_validator import run_evidence_validator_agent
-
-state["claims_to_validate"] = ["Laptop Pro 14 的 GMV 为 511248.56"]
-state = run_evidence_validator_agent(state)
-print(state["evidence_result"])
-print(state["trace"][-1])
-```
-
-The Agent writes `state["evidence_result"]` and appends trace. It does not run SQL, generate charts, or save reports.
-
-## Chart Agent
-
-Task 13 adds chart generation for P1. The Chart Agent infers simple chart specs from the user question and `execution_result`, then calls `generate_chart()` to write PNG files under `reports/charts/` by default.
-
-Rules:
-
-- ranking / top questions -> bar chart
-- trend / monthly questions -> line chart
-- share / percentage questions -> pie chart, when requested
-
-Tool interface:
-
-```python
-from tools.chart_tool import generate_chart
-
-result = generate_chart(
-    data={
-        "columns": ["product_name", "gmv"],
-        "rows": [["Laptop Pro 14", 511248.56], ["Camera A", 456050.99]],
-    },
-    chart_spec={
-        "chart_type": "bar",
-        "x": "product_name",
-        "y": "gmv",
-        "title": "Top Products by GMV",
-        "run_id": "run_001",
-    },
-)
-print(result["chart_path"])
-print(result["trace_event"])
-```
-
-Agent interface:
-
-```python
-from agents.chart_agent import run_chart_agent
-
-state = run_chart_agent(state)
-print(state["chart_path"])
-print(state["chart_paths"])
-print(state["trace"][-1])
-```
-
-The Agent writes `state["chart_result"]`, `state["chart_path"]`, and `state["chart_paths"]`, and appends trace. It does not run SQL or save reports.
-
-## Report Agent
-
-Task 14 adds Markdown report generation for P1. The Report Agent composes already-available state into a traceable analysis report and calls `save_report()` to write `reports/markdown/{run_id}_report.md`.
-
-Report sections:
-
-- 用户问题
-- 使用的业务指标
-- 业务上下文
-- 执行 SQL
-- 查询结果摘要
-- 数据支持结论
-- 需要进一步验证的假设
-- 图表路径
-- 下一步建议
-- Trace 路径
-
-Tool interface:
-
-```python
-from tools.report_tool import save_report
-
-result = save_report(
-    run_id="run_001",
-    report_content="# InsightFlow Analysis Report\n\nTrace path: logs/traces/run_001.json",
-)
-print(result["report_path"])
-print(result["trace_event"])
-```
-
-Agent interface:
-
-```python
-from agents.report_agent import run_report_agent
-
-state = run_report_agent(state)
-print(state["report_path"])
-print(state["trace"][-1])
-```
-
-The Agent writes `state["report_result"]` and `state["report_path"]`, and appends trace. It does not run SQL, generate charts, or include blocked unsupported claims as deterministic report findings.
-
-## Evidence-backed Report Writing
-
-Task 25 adds an optional provider-backed report writer after Evidence Validator. The provider can polish business prose for both `run_report_agent()` and `run_report_supervisor_agent()`, but it only receives verified findings, verified hypotheses, blocked unsupported claims, SQL records, chart paths, and trace path. It cannot generate SQL, execute SQL, or turn unsupported claims into final report prose.
-
-Enable real DeepSeek-backed report writing:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1
-export DEEPSEEK_API_KEY=...
-python -c "from agents.report_supervisor import run_report_supervisor_agent; from agents.supervisor import initialize_run; s=initialize_run('帮我生成本月电商经营复盘，重点看 GMV 和 Top 商品。'); s['db_path']='data/ecommerce.db'; r=run_report_supervisor_agent(s); print(r['report_writer_result']); print(r['weekly_report_path'])"
-```
-
-Accepted provider output includes `source: "provider"`, `provider_called: true`, `fallback_used: false`, prompt id/version, model, usage, and latency metadata. Provider errors, malformed JSON, schema mismatch, unverified claim references, or any blocked unsupported claim text fall back to deterministic report wording. Saved Markdown reports include an `LLM 辅助报告表达` section only after provider output passes structured validation.
-
-Live DeepSeek workflow smoke:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_REPORT_WRITER=1 python3 -m pytest tests/test_deepseek_report_writer_live.py -q
-```
-
-## Guarded Insight Claim Typing
-
-Task 26 adds optional provider-backed claim typing before Evidence Validator. The provider can classify candidate claims as `data_supported_finding`, `hypothesis`, or `unsupported`, but that classification is advisory: `validate_evidence()` still produces the final supported/hypothesis/blocked split.
-
-Enable real DeepSeek-backed claim typing in the core workflow:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1
-export DEEPSEEK_API_KEY=...
-python -c "from graph.workflow import run_workflow; r=run_workflow('最近 30 天销售额最高的 5 个商品是什么？'); print(r['claim_typing_result'])"
-```
-
-The same provider can be passed to `run_report_supervisor_agent(..., claim_typing_provider=provider)` or enabled through the runtime switch for report sections. Provider output must pass the `insight_claim_typer` schema and cannot generate SQL, execute SQL, bypass Evidence Validator, or create final claims without data.
-
-Live DeepSeek workflow smoke:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING=1 python3 -m pytest tests/test_deepseek_claim_typing_workflow_live.py -q
-```
-
-## Business Review Report
-
-Task 15 adds a deterministic P2 Report Supervisor for weekly business review reports. It decomposes a weekly report request into structured sections, then runs each SQL subtask through the existing schema, metric, SQL review, SQL execution, Evidence Validator, Chart Agent, Report Tool, and Trace Logger boundaries.
-
-Core sections:
-
-- 本周 GMV
-- 本周订单量
-- 本周客单价
-- Top 商品
-- Top 品类
-- 销售下降品类
-- 下周建议
-
-Agent interface:
-
-```python
-from agents.report_supervisor import run_report_supervisor_agent
-from agents.supervisor import initialize_run
-
-state = initialize_run("帮我生成一份本周电商经营分析周报，包括销售额、订单量、Top 商品、下降品类和运营建议。")
-state["db_path"] = "data/ecommerce.db"
-state["trace_dir"] = "logs/traces"
-state = run_report_supervisor_agent(state)
-
-print(state["weekly_report_path"])
-print(state["trace_path"])
-print(state["report_sub_tasks"][0]["review_result"])
-print(state["report_sub_tasks"][0]["execution_result"])
-```
-
-The supervisor writes:
-
-- `report_type`: `weekly_business_report`
-- `report_sections`: planned weekly report sections
-- `report_sub_tasks`: per-section SQL, `review_result`, `execution_result`, evidence result, chart paths, status, and error
-- `weekly_report_path`: `reports/markdown/{run_id}_weekly_business_report.md`
-- `trace_path`: `logs/traces/{run_id}.json`
-
-Failed subtasks are recorded with `status: failed` and their structured review/execution error, but they do not crash the whole weekly report workflow. Evidence Validator remains responsible for separating data-supported findings, hypotheses, and unsupported claims. Task 15 does not introduce LLM planning, guarded LLM SQL generation, action tools, approval gates, MCP, FastAPI, or dashboard behavior.
-
-## Controlled LLM Report Planner
-
-Task 15A adds an optional controlled planning layer for weekly business reports. The planner can call a supplied `llm_provider` to select report section IDs and ask clarification questions, but it cannot supply SQL, execute SQL, produce final claims, or bypass deterministic report templates.
-
-Safety contract:
-
-- Provider input includes `allowed_section_ids`, `must_not_generate_sql`, `must_not_execute_sql`, and `must_not_generate_final_claims`.
-- Provider output is accepted only when section IDs match existing deterministic templates.
-- Unknown sections and provider-supplied SQL are ignored.
-- Missing, malformed, or unusable provider responses fall back to deterministic Task 15 sections.
-- Clarification responses set `status: report_plan_needs_clarification` and return questions without running report SQL.
-
-Agent interface:
-
-```python
-from agents.report_planner import run_report_planner_agent
-from agents.supervisor import initialize_run
-
-state = initialize_run("帮我生成一份本周电商经营分析周报，优先看 GMV 和 Top 商品。")
-
-state = run_report_planner_agent(
-    state,
-    llm_provider=lambda prompt: {
-        "report_type": "weekly_business_report",
-        "sections": [{"section_id": "weekly_gmv"}, {"section_id": "top_products"}],
-    },
-)
-
-print(state["report_plan"])
-print([section["section_id"] for section in state["report_sections"]])
-```
-
-Report Supervisor integration:
-
-```python
-from agents.report_supervisor import run_report_supervisor_agent
-from agents.supervisor import initialize_run
-
-state = initialize_run("帮我生成一份本周电商经营分析周报，优先看 GMV 和 Top 商品。")
-state["db_path"] = "data/ecommerce.db"
-
-state = run_report_supervisor_agent(
-    state,
-    llm_provider=lambda prompt: {
-        "report_type": "weekly_business_report",
-        "sections": [{"section_id": "weekly_gmv"}, {"section_id": "top_products"}],
-    },
-)
-print(state["weekly_report_path"])
-```
-
-No API key is required for the deterministic baseline. Without `llm_provider`, the planner uses the Task 15 deterministic fallback plan.
-
-Task 24 wires the PromptOps-backed `report_planner` path into the real Report Supervisor runtime. When enabled, DeepSeek can help choose the weekly or monthly review sections before the supervisor runs the existing SQL review, SQL execution, Evidence Validator, chart, report, and trace steps.
-
-Enable real DeepSeek-backed business review decomposition:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1
-export DEEPSEEK_API_KEY=...
-python -c "from agents.report_supervisor import run_report_supervisor_agent; from agents.supervisor import initialize_run; s=initialize_run('帮我生成一份本月电商经营分析月报，重点看 GMV、Top 商品和下月建议。'); s['db_path']='data/ecommerce.db'; print(run_report_supervisor_agent(s)['report_plan'])"
-```
-
-The accepted provider plan includes `source: "provider"`, `provider_called: true`, and `fallback_used: false`. Provider exceptions, malformed JSON, schema mismatch, unknown sections, or leaked fields such as `sql`, `generated_sql`, `claims`, or `final_claims` fall back to deterministic planning with validation/error metadata in `report_plan` and trace. The provider can choose allowlisted sections for weekly or monthly reports, but the supervisor still uses deterministic section SQL templates and never executes provider-supplied SQL.
-
-Live DeepSeek workflow smoke:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_BUSINESS_REVIEW_PLANNER=1 python3 -m pytest tests/test_deepseek_business_review_planner_live.py -q
-```
-
-## Guarded LLM SQL and Insight Enhancement
-
-Task 15B adds optional guarded enhancement agents. These agents accept supplied provider callables for tests or future adapters, but the deterministic baseline still needs no API key and does not call an LLM.
-
-Guarded SQL candidate rules:
-
-- The provider sees `schema_text`, `metric_context`, `business_context`, and current deterministic SQL.
-- Provider output can include SQL candidates, but every candidate is checked with `validate_sql()`.
-- Only the first approved SELECT candidate can replace `generated_sql`.
-- Rejected, unsafe, malformed, or missing candidates leave deterministic SQL unchanged.
-- This agent never calls `run_sql()`.
-
-```python
-from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
-
-state = run_guarded_sql_candidate_agent(
-    state,
-    llm_provider=lambda prompt: {
-        "sql_candidates": [
-            {
-                "sql": "SELECT COUNT(*) AS order_count FROM orders WHERE status = 'paid' LIMIT 100",
-                "rationale": "Safe paid-order count candidate.",
-            }
-        ]
-    },
-)
-print(state["llm_sql_enhancement"])
-print(state["generated_sql"])
-```
-
-Guarded insight enhancement rules:
-
-- Provider output is treated as claims, not trusted final prose.
-- Claims are checked with `validate_evidence()` against execution results and context.
-- `guarded_summary` contains only data-supported findings and hypotheses.
-- Unsupported deterministic claims are recorded in `unsupported_claims_blocked` and excluded from the guarded summary.
-
-```python
-from agents.guarded_llm_enhancer import run_guarded_insight_enhancer_agent
-
-state = run_guarded_insight_enhancer_agent(
-    state,
-    llm_provider=lambda prompt: {
-        "claims": [
-            "Laptop Pro 14 的 GMV 为 511248.56",
-            "库存不足是导致销量下降的主要原因",
-            "可能需要进一步验证广告流量和转化率数据。",
-        ]
-    },
-)
-print(state["llm_insight_enhancement"]["guarded_summary"])
-print(state["llm_insight_enhancement"]["unsupported_claims_blocked"])
-```
-
-Task 15B does not introduce action tools, approvals, MCP, FastAPI, dashboard behavior, provider abstraction, cost tracking, or prompt registry features.
-
-## Action Workflow
-
-Task 16 adds a local, auditable action workflow that can turn evidence-backed analysis into operational follow-up records. It does not call external task systems, send emails, run background jobs, or bypass approval gates.
-
-Workflow:
-
-```text
-Evidence Validator
--> Action Planner
--> Risk Assessor
--> Approval Gate
--> Action Tool
--> Action Verifier
--> Audit Logger
-```
-
-Implemented tools:
-
-- `create_task()` writes tasks to SQLite.
-- `create_metric_alert()` writes metric alerts to SQLite.
-- `create_email_draft()` writes email drafts to SQLite.
-- `record_approval()` writes approval records to SQLite.
-- `verify_action_execution()` confirms created records exist.
-- `log_audit_event()` writes approval, execution, and verification audit events.
-
-Agent interface:
-
-```python
-from agents.action_planner import run_action_planner_agent
-from agents.action_verifier import run_action_verifier_agent
-from agents.risk_assessor import run_action_executor_agent, run_risk_assessor_agent
-from tools.approval_tool import record_approval
-
-state = run_action_planner_agent(state)
-state = run_risk_assessor_agent(state)
-
-# Approval gate blocks execution until approval_status is approved.
-approval = record_approval(
-    state["action_db_path"],
-    {
-        "run_id": state["run_id"],
-        "approval_status": "approved",
-        "approved_by": "ops_manager",
-        "reason": "Approved for operational follow-up.",
-    },
-)
-state["approval_status"] = approval["approval_status"]
-state["approval_record"] = approval
-
-state = run_action_executor_agent(state)
-state = run_action_verifier_agent(state)
-print(state["created_actions"])
-print(state["action_verification_result"])
-print(state["audit_log_id"])
-```
-
-Approval rules:
-
-- `create_task`, `create_metric_alert`, and `create_email_draft` require approval.
-- Unapproved actions are blocked and audited.
-- Approved actions create local SQLite records, then verifier confirms they exist.
-- Audit logs preserve approval blocking, action execution, and action verification events.
-
-Task 16 does not introduce MCP, FastAPI, React, async jobs, RBAC, external SaaS task creation, or real email sending.
-
-## LLM Action and Email Drafting
-
-Task 27 adds an optional provider-backed action drafter inside the real action workflow. `run_action_planner_agent()` still builds the deterministic action plan first, then calls the DeepSeek-compatible `action_drafter` path only when a provider is supplied or `INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1` is enabled.
-
-Enable real DeepSeek-backed action drafting:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1
-export DEEPSEEK_API_KEY=...
-python3 -c "from agents.supervisor import initialize_run; from agents.action_planner import run_action_planner_agent; s=initialize_run('请基于 Cameras GMV 下滑创建运营跟进任务、监控告警和邮件草稿。'); s['evidence_result']={'success': True, 'data_supported_findings': [{'claim': 'Cameras 的 GMV 变化为 -12000.0'}], 'hypotheses': [{'claim': '可能需要进一步验证广告流量和转化率数据。', 'needs_more_data': ['ad_impressions', 'conversion_rate']}], 'unsupported_claims_blocked': ['库存不足是确定原因']}; print(run_action_planner_agent(s)['action_draft_result'])"
-```
-
-Accepted provider output writes `state["action_draft_result"]` with `provider_called`, `fallback_used`, prompt id/version, model, usage, latency, provider errors, and validation errors. Accepted drafts replace only the pending `action_plan.actions` payloads. They do not create tasks, create alerts, create email drafts, set approval status, send email, write audit records, or bypass Risk Assessor, Approval Gate, Action Executor, or Audit Logger.
-
-Live DeepSeek workflow smoke:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_ACTION_DRAFTER=1 python3 -m pytest tests/test_deepseek_action_drafter_live.py -q
-```
-
-## MCP Tool Layer
-
-Task 17 adds a lightweight MCP-style contract layer under `mcp_servers/`. It exposes JSON-compatible tool contracts and wrapper functions for selected external-facing capabilities, while keeping internal safety and audit modules inside the system boundary.
-
-Implemented MCP-style servers:
-
-- `database-mcp-server`: `get_database_schema`, `get_sample_rows`, `run_sql`
-- `report-mcp-server`: `generate_chart`, `save_report`
-- `action-mcp-server`: `create_task`, `create_metric_alert`, `create_email_draft`
-
-Not exposed as MCP tools:
-
-- SQL review internals
-- Permission and approval record tools
-- Trace logging
-- Eval runner
-
-Safety boundaries:
-
-- `mcp_run_sql()` loads schema, retrieves metric context, runs the existing SQL reviewer internally, and only then calls `run_sql()` with reviewed SQL.
-- `mcp_save_report()` requires successful evidence validation and rejects reports with blocked unsupported claims.
-- `mcp_create_task()`, `mcp_create_metric_alert()`, and `mcp_create_email_draft()` require `approval_status="approved"` before writing operational records.
-- MCP wrappers return structured dictionaries with `success`, `mcp_server`, `tool_name`, and either `result` or `error`.
-- The layer does not start a network server and does not add FastAPI, async jobs, dashboards, Docker, CI, or provider/prompt infrastructure.
-
-Example:
-
-```python
-from mcp_servers.database_server import get_tool_contract, mcp_run_sql
-
-print(get_tool_contract())
-
-result = mcp_run_sql(
-    db_path="data/ecommerce.db",
-    sql="SELECT COUNT(*) AS order_count FROM orders",
-)
-print(result["review_result"]["approved"])
-print(result["result"]["rows"])
-```
-
-## FastAPI Async Run API
-
-Task 18 adds a minimal FastAPI app under `api/` for submitting LangGraph workflow runs without changing the deterministic baseline.
-
-Run locally:
+Start the FastAPI backend:
 
 ```bash
 uvicorn api.app:app --reload
 ```
 
-Implemented endpoints:
-
-- `POST /api/runs`: enqueue a workflow run and return `run_id`.
-- `GET /api/runs/{run_id}`: read run status and summary.
-- `GET /api/runs/{run_id}/trace`: read current or completed trace data.
-- `GET /api/runs/{run_id}/events`: read run lifecycle events.
-- `POST /api/runs/{run_id}/cancel`: mark an active run as cancelled.
-
-Supported statuses:
-
-- `queued`
-- `running`
-- `waiting_for_approval`
-- `completed`
-- `failed`
-- `cancelled`
-
-Example:
+Start the Next.js frontend:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/runs \
-  -H "Content-Type: application/json" \
-  -d '{"user_question":"最近 30 天销售额最高的 5 个商品是什么？"}'
+cd frontend
+npm install
+npm run dev
 ```
 
-The API uses an in-memory `RunManager` and a thread pool to execute existing `graph.workflow.run_workflow()` calls. It is intentionally local and lightweight: Task 18 does not add persistent queues, SSE, dashboard views, React, RBAC, Docker, CI, or new LLM/provider behavior.
+Open `http://localhost:3000`, create a workspace, import CSV/Excel/SQLite data, generate a profile, generate a semantic-layer draft, then use:
 
-## Trace Dashboard Data Layer
+- `/workspaces/{workspaceId}/analysis` for ad hoc business analysis.
+- `/workspaces/{workspaceId}/reports` for structured workspace reports.
+- `/workspaces/{workspaceId}/settings` for data readiness, profile, semantic layer, model mode, and safety/audit status.
+- `/workspaces/{workspaceId}/runs/{runId}` to restore a persisted analysis result.
 
-Task 19 adds `dashboard.trace_dashboard.build_trace_dashboard()` for dashboard-ready observability summaries. It reads trace JSON artifacts, optional eval summaries, and optional action workflow SQLite records, then returns a JSON-compatible dictionary.
+## Current Product APIs
 
-Metrics included:
-
-- Agent node latency totals and averages
-- Tool call counts
-- SQL execution latency totals and averages
-- SQL repair count
-- Failure type distribution
-- Eval totals and pass rate
-- Action approval records
-- Audit log records
-- Structured load errors for bad trace files or unreadable action DBs
-
-Example:
-
-```python
-from dashboard.trace_dashboard import build_trace_dashboard
-from eval.run_eval import load_cases, run_eval_cases
-
-eval_summary = run_eval_cases(load_cases())
-dashboard = build_trace_dashboard(
-    trace_dir="logs/traces",
-    eval_summary=eval_summary,
-    action_db_path="data/action_ops.db",
-)
-
-print(dashboard["agent_node_latency_ms"])
-print(dashboard["tool_call_counts"])
-print(dashboard["eval_metrics"])
-```
-
-Task 19 is a data layer only. It does not add React, Streamlit UI changes, SSE, dashboard frontend routing, RBAC, Docker/CI, provider abstraction, PromptOps, or new LLM behavior.
-
-## Streamlit Unified Demo
-
-Task 19A upgrades the Streamlit app from a P0-only glass-box SQL demo into a clear product demo for the backend capabilities that already exist.
-
-Views:
-
-- SQL Analysis: preserve the current P0 workflow view with Agent steps, SQL, SQL review, execution, repair, final answer, and trace.
-- Report Generation: expose P1 evidence validation, chart generation, and Markdown report saving.
-- Weekly Business Review: expose P2 report supervisor sections, SQL subtasks, evidence, charts, and saved weekly report path.
-- Action Workflow: show action planning, risk assessment, approval gate state, created task/alert/email draft records, verification, and audit logs.
-- MCP Tool Layer: show database/report/action MCP-style contracts and safe wrapper outputs.
-- Async Run API: explain local FastAPI usage and show run status, trace, and event payloads in a demo-friendly way.
-- Trace Dashboard: presents `build_trace_dashboard()` summaries such as node latency, tool counts, SQL execution latency, repair count, eval pass rate, approvals, and audit logs.
-
-Task 19A improves clarity without changing core safety boundaries. The UI does not bypass SQL Validator, Evidence Validator, approval gate, MCP contracts, or deterministic workflow behavior. It does not introduce React, RBAC, Docker/CI, persistent queues, provider abstraction, PromptOps, or new LLM behavior.
-
-## LLM Provider And PromptOps Core
-
-Task 20 introduces a controlled `llm_ops` layer for future model-assisted steps. It is infrastructure only: it does not call a real model by default, does not require an API key, and does not change the deterministic workflow baseline.
-
-Implemented pieces:
-
-- `llm_ops.prompt_registry.DEFAULT_PROMPT_REGISTRY` stores versioned prompt templates for `report_planner`, `guarded_sql_candidate`, `guarded_insight_claims`, `report_writer`, `insight_claim_typer`, `action_drafter`, `question_understanding`, `clarification_router`, and `sql_planning_router`.
-- `llm_ops.provider.LLMRequest` and `run_llm_request()` define the provider contract and return JSON-compatible results with `success`, `content`, `usage`, `latency_ms`, `error`, and `trace_event`.
-- `llm_ops.provider.MockLLMProvider` supports deterministic tests and smoke evals without network calls.
-- `llm_ops.eval_smoke.run_llm_smoke_eval()` runs lightweight prompt/provider checks with expected output keys.
-- `llm_ops.deepseek_provider.DeepSeekProvider` calls DeepSeek through the existing provider contract when explicitly configured.
-- `llm_ops.structured_output.run_validated_llm_request()` validates model output against prompt-specific schemas before agents can consume it.
-
-Example:
-
-```python
-from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-from llm_ops.provider import LLMRequest, MockLLMProvider, run_llm_request
-
-rendered = DEFAULT_PROMPT_REGISTRY.render(
-    "report_planner",
-    {
-        "user_question": "帮我生成本周经营周报。",
-        "allowed_section_ids": ["weekly_gmv", "top_products"],
-    },
-)
-
-result = run_llm_request(
-    MockLLMProvider({"sections": [{"section_id": "weekly_gmv"}]}),
-    LLMRequest(
-        prompt=rendered["prompt"],
-        prompt_id=rendered["prompt_id"],
-        prompt_version=rendered["prompt_version"],
-    ),
-)
-print(result["trace_event"])
-```
-
-Safety boundaries:
-
-- `guarded_sql_candidate` prompts explicitly require `validate_sql()` and never execute SQL.
-- `guarded_insight_claims` prompts require Evidence Validator verification before claims can be used.
-- The provider layer does not expose approval-gated action tools and does not trigger tasks, alerts, or email drafts. `action_drafter` can only draft payload text before risk assessment and approval.
-- Provider failures are returned as `success: false` with structured errors instead of crashing workflows.
-- Malformed JSON returns `llm_malformed_json_error`.
-- Schema mismatches return `llm_schema_validation_error`; for example, `report_planner.sections` must be an array of objects, not a loose string list.
-
-DeepSeek config:
-
-```env
-DEEPSEEK_API_KEY=
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-pro
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=0
-```
-
-`DEEPSEEK_MODEL` is intentionally configurable. Use `deepseek-v4-pro` for stronger reasoning and SQL-planning quality, or switch to `deepseek-v4-flash` for cheaper/faster smoke tests. The config loader also normalizes common aliases such as `DeepSeekv4pro`, `v4pro`, and `v4flash`.
-
-Live DeepSeek tests are opt-in:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_live_smoke.py -q
-```
-
-The default workflow and full test suite still run without any API key.
-
-## Question Understanding Router
-
-Task 20A adds a deterministic question-understanding layer. It can be used before SQL planning to classify whether a question is complete, ambiguous, or unsafe.
-
-```python
-from question_understanding.router import understand_question
-
-result = understand_question("最近 30 天销售额最高的 5 个商品是什么？")
-print(result["strategy"])
-print(result["intent"])
-```
-
-The output is JSON-compatible:
-
-```python
-{
-    "strategy": "template | llm_candidate | clarify | reject",
-    "intent": {
-        "metric": "gmv",
-        "dimension": "product",
-        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
-        "filters": ["paid_orders"],
-        "operation": "top_n",
-        "limit": 5,
-        "risk_flags": [],
-    },
-    "missing_slots": [],
-    "clarification_questions": [],
-    "risk_flags": [],
-}
-```
-
-Boundaries:
-
-- It does not generate SQL.
-- It does not execute SQL.
-- It does not choose a concrete SQL template or emit `matched_template`.
-- Sensitive-field or unsafe-write requests return `strategy: reject` before SQL planning.
-
-Task 21 adds an optional provider-backed wrapper:
-
-```python
-from question_understanding.provider_backed import understand_question_with_provider
-
-result = understand_question_with_provider(question, provider=provider)
-```
-
-Provider output is accepted only after the `question_understanding` structured-output schema validates `strategy`, `intent`, `missing_slots`, `clarification_questions`, and `risk_flags`. Accepted output is normalized into the same intent schema as the deterministic router. `provider=None`, provider exceptions, malformed JSON, and schema mismatch all keep the deterministic no-key baseline by falling back to `understand_question(question)`.
-
-Additional boundaries:
-
-- It does not generate SQL.
-- It does not execute SQL.
-- It does not emit `matched_template`, `confidence`, or selected table fields.
-- Sensitive or unsafe provider risk flags force `strategy: reject` and preserve the risk flags.
-- Agent trace events include `provider_called` and `fallback_used`.
-
-Task 21A runtime behavior:
-
-- `run_workflow()` always writes `question_understanding`, `intent_slots`, and `routing_strategy` into workflow state.
-- With `INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1` and a valid `DEEPSEEK_API_KEY`, the workflow creates a `DeepSeekProvider` and calls the provider-backed path.
-- Without the flag or without a key, the same workflow uses deterministic question understanding.
-- Streamlit demo helpers and FastAPI async runs inherit this through the core workflow.
-- A live workflow smoke test is available with:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 \
-  python3 -m pytest tests/test_deepseek_question_understanding_workflow_live.py -q
-```
-
-Task 22 runtime behavior:
-
-- `run_workflow()` now runs a clarification router after question understanding and before schema retrieval.
-- With `INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1` and a valid `DEEPSEEK_API_KEY`, ambiguous questions call the DeepSeek-backed clarification prompt and return focused follow-up questions.
-- Provider clarification stops before schema retrieval, SQL generation, SQL execution, and SQL planning.
-- Without the flag or without a key, the no-key deterministic baseline continues through the existing P0 SQL workflow.
-- Provider output must pass the `clarification_router` structured-output validator before it is used.
-
-Example:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1
-export DEEPSEEK_API_KEY=...
-python3 -c "from graph.workflow import run_workflow; print(run_workflow('帮我看看销售情况')['clarification_result'])"
-```
-
-A live workflow smoke test is available with:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_CLARIFICATION_ROUTER=1 \
-  python3 -m pytest tests/test_deepseek_clarification_workflow_live.py -q
-```
-
-## SQL Planning Router
-
-Task 20B adds a SQL source planning layer. It consumes Task 20A output and decides whether the next step should use a deterministic template, a guarded LLM SQL candidate path, clarification, or rejection.
-
-```python
-from question_understanding.router import understand_question
-from sql_planning.router import plan_sql_strategy
-
-understanding = understand_question("最近 30 天销售额最高的 5 个商品是什么？")
-planning = plan_sql_strategy(understanding)
-print(planning["strategy"])
-print(planning["matched_template"])
-```
-
-Example output:
-
-```python
-{
-    "strategy": "template",
-    "matched_template": "top_products_gmv",
-    "confidence": 0.94,
-    "template_variables": {
-        "metric": "gmv",
-        "dimension": "product",
-        "operation": "top_n",
-        "limit": 5,
-        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近 30 天"},
-        "filters": ["paid_orders"],
-    },
-    "validation_policy": {"must_validate_sql_before_execution": True},
-}
-```
-
-For complete questions that do not match a deterministic template, the router returns `strategy: llm_candidate` with `candidate_policy.provider_prompt_id = "guarded_sql_candidate"`. The deterministic Task 20B router does not call a provider and does not return SQL. Repeated successful `llm_candidate` patterns can be summarized with `sql_planning.feedback.summarize_template_mining_feedback()` to identify future deterministic template candidates.
-
-## LLM Template Mining and Eval Suite
-
-Task 28 adds workflow-trace mining for accepted guarded SQL candidates. When a guarded candidate is accepted after `validate_sql()`, the trace event stores safe metadata for template mining: strategy, accepted flag, provider flag, candidate count, user question, and structured intent. It does not store provider SQL for template mining, and it never writes or modifies production templates.
-
-Mine recommendations from saved workflow traces:
-
-```python
-from sql_planning.feedback import mine_template_candidates_from_trace_files
-
-result = mine_template_candidates_from_trace_files(
-    ["logs/traces/run_example.json"],
-    min_success_count=3,
-)
-print(result["candidates"])
-```
-
-Candidate recommendations include `intent_signature`, `success_count`, `recommended_template_id`, `sample_questions`, and `auto_apply: false`. A human still has to review the pattern, design the deterministic SQL template, add tests, and run `validate_sql()`/P0 eval before any template becomes production behavior.
-
-Task 28 also expands `llm_ops.eval_smoke.run_llm_smoke_eval()` so smoke cases can opt into prompt-specific structured validation:
-
-```python
-from llm_ops.eval_smoke import run_llm_smoke_eval
-
-result = run_llm_smoke_eval(
-    [
-        {
-            "case_id": "question_understanding_schema",
-            "prompt_id": "question_understanding",
-            "variables": {"user_question": "最近 30 天销售额最高的 5 个商品是什么？"},
-            "expected_keys": ["strategy", "intent", "missing_slots", "clarification_questions", "risk_flags"],
-            "validate_output": True,
-            "expected_success": True,
-        }
-    ],
-    provider=provider,
-)
-```
-
-Eval cases can also set `expected_success: false` and `expected_error_type` to verify malformed JSON and schema mismatch handling without treating safe rejection as a test failure.
-
-Live DeepSeek eval suite:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 python3 -m pytest tests/test_deepseek_llm_eval_suite_live.py -q
-```
-
-Task 23 runtime behavior:
-
-- `run_workflow()` now writes `sql_planning`, `sql_routing_strategy`, and guarded candidate metadata into workflow state.
-- With `INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1` and a valid `DEEPSEEK_API_KEY`, the workflow calls the `sql_planning_router` prompt before schema/SQL generation.
-- SQL planning provider output is accepted only after structured validation and must not include SQL or SQL candidates.
-- With `INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1`, `llm_candidate` routes call the `guarded_sql_candidate` prompt after deterministic SQL generation.
-- Candidate SQL is never executed directly. It must first pass `validate_sql()` inside the guarded candidate agent, then pass the existing SQL Reviewer before `run_sql()`.
-- Without flags or without an API key, the deterministic baseline continues.
-
-Example:
-
-```bash
-export INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1
-export INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1
-export DEEPSEEK_API_KEY=...
-python3 -c "from graph.workflow import run_workflow; r = run_workflow('本月各城市客单价对比'); print(r['sql_planning']); print(r['llm_sql_enhancement'])"
-```
-
-A live workflow smoke test is available with:
-
-```bash
-INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 \
-  python3 -m pytest tests/test_deepseek_sql_planning_workflow_live.py -q
-```
-
-Boundaries:
-
-- It does not generate SQL.
-- It does not execute SQL.
-- Provider-assisted planning can call a real LLM only when explicitly enabled, but planning still cannot return SQL.
-- Any later SQL, whether template-generated or LLM-proposed, must still pass `validate_sql()` before `run_sql()`.
-
-## Schema Tool
-
-The schema tool reads SQLite metadata and returns both structured table metadata and prompt-friendly `schema_text`.
-
-```bash
-python -c "from tools.schema_tool import get_database_schema; print(get_database_schema('data/ecommerce.db')['schema_text'])"
-```
-
-## SQL Validator
-
-The SQL validator checks generated SQL before execution. It only approves safe SELECT statements, blocks dangerous keywords and sensitive fields, validates table/column names against the schema, appends a default `LIMIT 100` when needed, and checks GMV metric rules when metric context is provided.
-
-```python
-from tools.metric_tool import retrieve_metric_definition
-from tools.schema_tool import get_database_schema
-from tools.sql_validator import validate_sql
-
-schema = get_database_schema("data/ecommerce.db")
-metric = retrieve_metric_definition("最近 30 天销售额最高的 5 个商品是什么？")
-sql = """
-SELECT p.product_name, SUM(oi.quantity * oi.unit_price) AS sales
-FROM orders o
-JOIN order_items oi ON o.id = oi.order_id
-JOIN products p ON oi.product_id = p.id
-WHERE o.status = 'paid'
-GROUP BY p.product_name
-ORDER BY sales DESC
-LIMIT 5
-"""
-print(validate_sql(sql, schema, metric))
-```
-
-## SQL Executor
-
-The SQL executor runs approved SELECT statements against SQLite and returns structured execution results. It rejects non-SELECT SQL, caps returned rows with `max_rows`, captures database errors, and emits a trace-ready event.
-
-```python
-from tools.sql_executor import run_sql
-
-sql = """
-SELECT p.product_name, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS gmv
-FROM orders o
-JOIN order_items oi ON o.id = oi.order_id
-JOIN products p ON oi.product_id = p.id
-WHERE o.status = 'paid'
-GROUP BY p.product_name
-ORDER BY gmv DESC
-LIMIT 5
-"""
-print(run_sql("data/ecommerce.db", sql))
-```
-
-## Trace Logger
-
-The trace logger records node and tool-call events for each Agent run. `append_trace()` adds normalized events to state without mutating the original state, and `save_trace()` writes structured JSON artifacts to `logs/traces/{run_id}.json`.
-
-Required trace fields:
-
-- `run_id`
-- `session_id`
-- `node`
-- `tool_name`
-- `tool_input_summary`
-- `tool_output_summary`
-- `status`
-- `latency_ms`
-- `error_type`
-- `retry_count`
-- `timestamp`
-
-Example:
-
-```python
-from tools.trace_logger import append_trace, save_trace
-
-state = {"run_id": "run_001", "session_id": "session_001", "trace": []}
-state = append_trace(state, {
-    "node": "sql_executor",
-    "tool_name": "run_sql",
-    "tool_input_summary": "SELECT 1",
-    "tool_output_summary": "1 row returned",
-    "status": "success",
-    "latency_ms": 12,
-})
-print(save_trace("run_001", state["trace"], session_id="session_001"))
-```
-
-## P0 Agents
-
-P0 agents are lightweight state-transforming modules. They return structured dictionaries and keep the Agent/Tool boundary clear: agents orchestrate state and reasoning, while tools perform schema lookup, metric retrieval, SQL validation, SQL execution, and trace persistence.
-
-Implemented modules:
-
-- `agents.supervisor.initialize_run()` initializes run/session state.
-- `agents.schema_agent.run_schema_agent()` calls `get_database_schema()`.
-- `agents.metric_agent.run_metric_agent()` calls `retrieve_metric_definition()`.
-- `agents.sql_generator.run_sql_generator()` generates structured SELECT SQL output.
-- `agents.sql_reviewer.run_sql_reviewer()` calls `validate_sql()`.
-- `agents.error_fixer.run_error_fix_agent()` repairs one deterministic P0 SQL error class.
-- `agents.insight_agent.run_insight_agent()` answers only from `execution_result`.
-
-Example:
-
-```python
-from agents.metric_agent import run_metric_agent
-from agents.schema_agent import run_schema_agent
-from agents.sql_generator import run_sql_generator
-from agents.sql_reviewer import run_sql_reviewer
-from agents.supervisor import initialize_run
-
-state = initialize_run("最近 30 天销售额最高的 5 个商品是什么？")
-state = run_schema_agent(state, "data/ecommerce.db")
-state = run_metric_agent(state)
-state = run_sql_generator(state)
-state = run_sql_reviewer(state)
-print(state["sql_generation"])
-print(state["review_result"])
-```
-
-## LangGraph Workflow
-
-The P0 workflow composes the Agent and Tool layers with LangGraph:
+Workspace and data preparation:
 
 ```text
-schema -> metric -> generate -> review
-review approved -> execute
-review rejected -> fail -> save_trace
-execute success -> insight -> save_trace
-execute failure and retry_count < 1 -> error_fix -> review
-execute failure after retry -> fail -> save_trace
+POST /api/workspaces
+GET  /api/workspaces
+GET  /api/workspaces/{workspace_id}
+GET  /api/workspaces/{workspace_id}/settings
+POST /api/workspaces/{workspace_id}/sources/upload
+POST /api/workspaces/{workspace_id}/sources/sqlite
+GET  /api/workspaces/{workspace_id}/sources
+POST /api/workspaces/{workspace_id}/profile
+POST /api/workspaces/{workspace_id}/semantic-layer/draft
 ```
 
-Example:
+Analysis and artifacts:
 
-```python
-from graph.workflow import run_workflow
-
-result = run_workflow(
-    "最近 30 天销售额最高的 5 个商品是什么？",
-    db_path="data/ecommerce.db",
-)
-print(result["generated_sql"])
-print(result["final_answer"])
-print(result["trace_path"])
+```text
+POST /api/workspaces/{workspace_id}/runs
+GET  /api/workspaces/{workspace_id}/runs
+GET  /api/workspaces/{workspace_id}/runs/{run_id}
+GET  /api/workspaces/{workspace_id}/artifacts/{relative_path}
 ```
 
-## Run Demo
+`POST /api/workspaces/{workspace_id}/runs` accepts either a new `user_question` or a continuation request with `pending_run_id` and `clarification_answer`. New analysis requests create a recoverable run id and can return `status: "running"` while local background work continues; clients should poll `GET /api/workspaces/{workspace_id}/runs/{run_id}` for `running`, `waiting_for_clarification`, `completed`, or `failed`. For repeated completed questions in the same workspace `data_version`, it can return `status: "cache_candidate"` with `matched_run_id`; send `force_reanalysis: true` to explicitly rerun.
+
+Reports:
+
+```text
+POST /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports
+GET  /api/workspaces/{workspace_id}/reports/{report_id}
+GET  /api/workspaces/{workspace_id}/reports/{report_id}/download
+```
+
+Supported report types are `business_review`, `channel_performance`, and `revenue_trend`.
+
+Current report records expose the P23 document contract: `plan`, `evidence_pack`, `document`, `validation`, `artifacts`, and `tool_calls`. Markdown and the report detail UI render `ReportDocument` as a Chinese report with title metadata, opening summary, body chapters, inline charts or chart-intent prompts, compact evidence tables, action recommendations, data boundaries, and a collapsed business-readable technical appendix. Markdown downloads do not dump SQL, raw rows, query ids, provider metadata, trace details, local absolute paths, ledger ids, artifact ids, tool names, or internal report contracts. When enabled, the FastAPI report API passes a DeepSeek-backed `report_composer` provider into the runner; if no key or flag is available, the same contract is produced by the deterministic fallback. The old stitched section-answer report shape and legacy top-level report summary arrays are superseded/deleted from the active main path.
+
+## Business Answer Contract
+
+Analysis results and report sections use the P16 contract:
+
+```json
+{
+  "headline": "",
+  "direct_answer": "",
+  "why": "",
+  "evidence_bullets": [],
+  "recommendations": [],
+  "caveats": [],
+  "confidence": "medium"
+}
+```
+
+Product-facing fields must stay business-readable, evidence-backed, and free of raw SQL, trace IDs, provider metadata, raw row dumps, or internal prompt text. Technical details remain available in collapsed UI sections and trace artifacts.
+
+## Current Architecture
+
+| Layer | Current owner |
+|---|---|
+| Product API | `api/app.py` |
+| Frontend | `frontend/app`, `frontend/components`, `frontend/lib/api.ts` |
+| Workspace store/import/profile/semantic draft | `workspaces/` |
+| Analysis runner | `workspaces.analysis_runner`, `graph/workflow.py`, `graph/nodes.py` |
+| Report runner/storage/Markdown | `workspaces.report_runner`, `workspaces.report_store`, `workspaces.report_markdown` |
+| Provider prompts and structured output | `llm_ops/` |
+| Question understanding and clarification | `question_understanding/`, `agents/question_understanding.py`, `agents/clarification_router.py` |
+| SQL planning and guarded candidates | `sql_planning/`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py` |
+| SQL safety and execution | `tools/sql_validator.py`, `tools/sql_executor.py`, `agents/sql_reviewer.py`, `agents/schema_repair.py` |
+| Evidence safety | `tools/evidence_tool.py`, `agents/evidence_validator.py` |
+| Visualization | `agents/visualization_agent.py`, `visualization/`, `visualization_delivery/`, `tools/external_visualization_tool.py` |
+| Trace and artifacts | `tools/trace_logger.py`, workspace run directories, workspace report directories |
+| MCP wrappers | `mcp_servers/database_server.py`, `mcp_servers/report_server.py` |
+
+P20 should keep this product recognizably multi-agent and tool-calling, but with cleaner boundaries:
+
+- data profiling and semantic-layer tools describe the current workspace instead of relying on a fixed demo schema;
+- task-routing agents convert natural-language questions into dimensions, metrics, time ranges, filters, and decision goals;
+- SQL/calculation/chart/report tools produce structured evidence and artifacts;
+- model-backed insight/report writers explain and recommend within the evidence boundary;
+- validators check factual numbers, rankings, fields, and metric formulas without blocking reasonable evidence-backed business judgment.
+
+P20-H0 cleanup note: the old trace-driven SQL template-mining/eval helper path was removed from active code (`sql_planning.feedback`, `tests/test_llm_template_mining_eval_suite.py`, and `template_mining_event` trace payloads). Current provider smoke validation remains in `tests/test_llm_smoke_eval.py`.
+
+P20-H1 semantic foundation note: workspace profiling now emits generalized field roles, inferred types, business-meaning candidates, group-by suitability, and aggregation suitability for imported business data. Workspace semantic drafts are generated from actual tables/columns into metrics, dimensions, time fields, entities, field roles, aliases, relationship candidates, and available analysis capabilities without inventing missing `channel` or `revenue` fields. Generated metric formulas quote SQLite identifiers safely, and English/mixed raw headers such as `Sales Amount` or `Score (NPS)` map into Chinese business aliases such as 销售额 or 满意度. Workspace semantic-layer YAML/JSON loading is unified for settings, context summaries, metric lookup, and schema repair.
+
+P20-H2 task contract note: question understanding now emits a normalized `analysis_task` contract with `task_type`, Chinese `dimensions` and `metrics`, `time_range`, `filters`, `decision_goal`, `missing_slots`, `defaults_applied`, `resolved_question`, fixed `output_language: "zh"`, and confidence. Complete Chinese questions such as “最近90天按门店比较销售额” continue into analysis; incomplete recommendation questions ask concise Chinese follow-ups for missing slots; partial continuation answers such as “花费” keep the run waiting for the remaining time range; and provider-backed outputs are normalized so they cannot bypass missing-slot rules or switch product output away from Chinese.
+
+P20-H3 fact layer note: metric lookup now exposes a JSON-safe metric registry with base formulas and supported derived metrics only when source fields exist. ROAS, net return, margin rate, and average order value keep separate formulas and source fields; missing sources produce warnings instead of invented metrics. Product results now carry a reusable `fact_payload` under evidence and technical details with `columns`, `rows`, `formulas`, `time_scope`, `filters`, `comparison_scope`, `warnings`, `display_values`, and `technical_sql`. Main `business_answer` fields remain free of raw SQL and raw rows.
+
+P20-H4 answer/report note: answer composition now rebuilds useful Chinese recommendations from validated multi-row evidence instead of accepting stale "证据不足" downgrades. Fact-only questions keep caveats without forcing action plans; recommendation questions can explain metric tradeoffs such as revenue scale versus ROI; fallback charts choose chart types from task intent with Chinese titles and annotations. Historical note: P20-era management reports could reuse section business answers, but that path is superseded/deleted by P22/P23; current Report Center collects evidence and writes one full ledger-backed report.
+
+P20-H5 closeout note: realistic acceptance now covers store sales/satisfaction and support ticket operations datasets, with factual questions, ranking, comparison, trend, recommendation, chart artifacts, evidence payloads, and management-report synthesis all running through the current workspace product path. Report section prompts now ask agents to use the current workspace schema/profile/semantic layer rather than assuming a demo schema. Common service-operation fields such as `team_name`, `ticket_count`, and `avg_response_minutes` display as Chinese business labels. Schema-review failure guidance is generic to the current workspace and no longer points users toward a demo-specific field set.
+
+## Product Capabilities After P20
+
+InsightFlow can now be described as a Chinese-first general business data-analysis multi-agent product foundation:
+
+- Import different business datasets through workspace CSV/Excel/SQLite flows.
+- Profile tables and fields, then draft a semantic layer with metrics, dimensions, time fields, entities, aliases, formulas, and relationship candidates.
+- Map Chinese, English, and mixed raw headers into Chinese business semantics.
+- Understand Chinese business questions, ask concise follow-up questions for missing slots, and continue after clarification.
+- Use SQL, metric, evidence, chart, and report tools to produce validated facts and artifacts.
+- Keep factual evidence, model judgment, validation, and final expression separated.
+- Produce Chinese business conclusions, caveats, recommendations when requested, chart annotations, Markdown reports, and report summaries.
+
+Current report work:
+
+- P22: evidence-driven Report Center rewrite so reports become coherent Chinese business documents instead of stitched analysis answers. H1 closeout removed the old report supervisor/agent/writer/planner path and its provider prompt/schema flags; H3 added the current `report_composer` provider path and lightweight fact validator without restoring old report stitching; H4 polished the frontend reader and Markdown download so charts, evidence tables, recommendations, data boundaries, and collapsed appendices read like a business report.
+- P23: core evidence and report tooling readiness before broader product integrations. H1-H6 are complete: Analysis Workbench `fact_payload` and Report Center `ReportEvidencePack.evidence_payloads` share the same factual payload vocabulary with traceable derived metrics, formulas, chart-ready data, warnings/data limits, and technical-detail references; Analysis Workbench Chinese business answers read naturally while preserving evidence-bound hard facts; Report Center writes one complete document from shared evidence; P23-H4 adds `p23.report_ledger.v1`, chapter coverage metadata, ledger-backed validation, and one automatic repair pass for unsupported hard facts; P23-H5 makes chart/report artifacts and local renderer tool calls reference ledger evidence ids; and P23-H6 verifies regression, no-key mode, frontend build, tracked artifact hygiene, and old-path cleanup. P23-H4 coverage now reads only actual fields/facts before naming missing cost/profit/ROI inputs, and ledger metric roles prevent ROI, rates, averages, satisfaction, durations, and unknown numeric fields from being used as contribution total/share metrics.
+- P24: general business data understanding and evidence generation before external exports. H1-H3 are complete: generic field profiling and semantic-layer drafting cover common store sales, product sales, customer segmentation, support-operation, channel-spend, and regional-performance datasets; questions/report goals map into evidence requirements; semantic-layer SQL/evidence covers rankings, contribution/share, operational efficiency, same-table investment efficiency, and clear data limits; risk/improvement decisions such as “优先复盘/优先处理/风险/改善” stay aligned with low-performance or high-risk evidence instead of highest-sales ranking; provider report output falls back to the deterministic evidence-ledger report if validation remains partial; real DeepSeek acceptance, full regression, frontend verification, old-path audit, and tracked-artifact hygiene are complete.
+- P25: real usage answer/report polish is complete. H1-H4 keep primary-metric answers direct, make evidence/data_limits consistent for calculated metrics such as ROI、复购率、成交金额、销量, remove stale demo-field fallback, make Report Center goal-first, prove the eight real-use questions/goals on generated Chinese business data, verify real DeepSeek analysis/report behavior with explicit provider-call, evidence, validation, and repair records, and apply transparent full-data time defaults for safe missing-time cases.
+
+## Verification
+
+Focused cleanup boundary:
 
 ```bash
-streamlit run app.py
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
 ```
 
-Open the Streamlit URL. The unified demo now displays:
-
-- Ask & Analyze Command Center for one-run question, intent, SQL review/execution, evidence, report/action output, source metadata, safety boundaries, and trace timeline
-- Reports for P1 evidence-backed charts/Markdown reports and P2 weekly/monthly business reviews
-- Actions for approval-gated task, alert, email draft, verification, and audit output
-- Observability for trace count, event count, SQL repair count, eval pass rate, approvals, audit logs, node latency, tool counts, failures, and raw details
-- LLM Ops for provider configured/not configured status, runtime switches, prompt registry, deterministic baseline, provider_called/fallback_used/error visibility through run source cards
-- Integrations for MCP Tool Layer contracts and FastAPI Async Run API endpoints/local run demo
-- Capability Catalog for P0/P1/P2/P3 coverage including LLM Provider & PromptOps and Template Mining & Eval
-
-The Command Center preserves the original P0 glass-box workflow while making P1/P2/P3 capabilities, provider participation, fallback behavior, and safety gates visible from the same Streamlit app.
-
-## Demo Questions
-
-- 最近 30 天销售额最高的 5 个商品是什么？
-- 最近 3 个月销售额最高的品类是什么？
-- 每个城市的总销售额是多少？
-- 删除所有取消订单的数据。
-- 帮我导出所有用户的手机号和邮箱。
-
-## Eval
-
-Run the P0 benchmark:
+Current backend regression:
 
 ```bash
-python eval/run_eval.py
+python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
+python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_p20_live_deepseek_acceptance.py -q
+python3 -m pytest
 ```
 
-Current eval summary:
+P18 focused regression:
 
-- Total cases: 20
-- Passed cases: 20
-- Pass rate: 100.00%
-- SQL execution success rate: 92.31%
-- SQL first-pass success rate: 91.67%
-- SQL repair success rate: 100.00%
-- Dangerous SQL block rate: 100.00%
-- Metric definition accuracy: 100.00%
+```bash
+python3 -m pytest tests/test_answer_consistency.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py tests/test_business_answer_quality.py tests/test_deepseek_provider_structured_output.py -q
+```
 
-The generated report is written to `eval/report.md`.
+Frontend regression:
 
-## P0 Limits
+```bash
+cd frontend
+npm test
+npm run build
+```
 
-- The SQL Generator is deterministic and covers the P0 ecommerce demo scope; it is not a general text-to-SQL model yet.
-- Error Fix Agent supports a narrow one-retry repair path for P0 failure cases.
-- React UI, persistent async jobs, RBAC, dashboard frontend views, Docker/CI, and full ActionOps product features remain outside the current baseline.
-- P1 Reliable Analysis & Report Core is complete: Business Context Retrieval, Evidence Validator, Chart Agent, and Report Agent are implemented.
+Live provider acceptance is explicit opt-in and requires local environment configuration. Keep real DeepSeek live tests; they cover workspace analysis, workspace reports, product answer quality, clarification continuation, history reliability, and P20 non-channel store analysis.
+
+To enable live DeepSeek acceptance locally:
+
+```bash
+export INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1
+export INSIGHTFLOW_PRODUCT_LIVE_MODE=1
+export DEEPSEEK_API_KEY=...
+python3 -m pytest tests/test_p20_live_deepseek_acceptance.py -q
+```
+
+Without those flags and a key, live tests skip by default and must not fail normal regression.
+
+Latest P25-H4 live smoke used local `.env` plus explicit provider flags. The safe missing-time analysis question `哪个客户分群贡献的收入最高？` completed with full range `2025-01-15 至 2026-06-30`; `收入趋势怎么样？` asked for `time_grain`; provider-backed Report Center generated `完整数据渠道表现复盘报告`, validation passed, and the report data boundary stated the full data range. The follow-up boundary repair keeps generic explicit ranges such as `最近7天`, `最近180天`, `最近6个月`, and `本季度`, and stops missing-time reports with multiple plausible time fields for `date_field` clarification. P25-H3 live acceptance remains the latest full live suite: `4 passed in 253.36s`.
+
+## Generated Artifacts
+
+Generated runtime outputs must not be committed. Use `git ls-files` for the tracked-artifact audit, not only ignored-file checks:
+
+- `.env`
+- `.venv/`
+- `frontend/node_modules/`
+- `frontend/.next/`
+- `.pytest_cache/`
+- `__pycache__/`
+- `sample_data/`
+- `workspace_data/*/runs/`
+- `workspace_data/*/reports/`
+- `data/*.db`
+- `eval/report.md`
+- `reports/**`
+- `reports/charts/*`
+- `reports/markdown/*`
+- `logs/traces/*`
+- `workspaces/*/runs/*`
+- `workspaces/*/reports/*`
+- `docs/superpowers/plans/*`
+- `.superpowers/*`
+
+Tracked `.gitkeep` files may remain only to preserve empty artifact directories.
+
+## Historical / Superseded Context
+
+This section is historical cleanup context only, not current product guidance.
+
+- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old demo/eval/action/mock/chart cleanup terms.
+- Historical retained low-level fixture: `data/ecommerce.db` remains tracked because low-level schema, SQL validator, SQL executor, workflow, report, MCP, and provider regressions still use it directly. It is not the default product database and is not the quickstart data source.
+- Current implementation guidance lives in `docs/product/plans/`, especially the P20 general business analysis foundation plan.
+
+For the concise roadmap, see [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). For the current task/status surface, see [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md).

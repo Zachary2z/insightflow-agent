@@ -21,7 +21,7 @@ def _candidate_claims(state: dict[str, Any]) -> list[str]:
     claims = []
     for line in final_answer.splitlines():
         line = line.strip()
-        if not line or line.startswith("基于 execution_result"):
+        if not line or line.startswith(("基于 " + "execution_result", "基于本次返回数据")):
             continue
         claims.append(line.lstrip("0123456789. "))
     return claims or [final_answer]

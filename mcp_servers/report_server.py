@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from mcp_servers.contracts import build_contract, tool_contract, wrap_failure, wrap_success
-from tools.chart_tool import generate_chart
+from tools.external_visualization_tool import call_external_visualization_tool
 from tools.report_tool import save_report
 
 
@@ -38,10 +38,21 @@ def mcp_generate_chart(
     chart_spec: dict[str, Any],
     output_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    kwargs: dict[str, Any] = {}
+    execution_result = {
+        "success": True,
+        "columns": list(data.get("columns") or []),
+        "rows": list(data.get("rows") or []),
+        "row_count": len(data.get("rows") or []),
+    }
+    kwargs: dict[str, Any] = {
+        "delivery_tool_id": "local_renderer",
+        "chart_spec": chart_spec,
+        "execution_result": execution_result,
+        "run_id": str(chart_spec.get("run_id") or "mcp_generate_chart"),
+    }
     if output_dir is not None:
         kwargs["output_dir"] = output_dir
-    result = generate_chart(data=data, chart_spec=chart_spec, **kwargs)
+    result = call_external_visualization_tool(**kwargs)
     if not result.get("success"):
         return wrap_failure(SERVER_NAME, "generate_chart", str(result.get("error", "chart generation failed")), result)
     return wrap_success(SERVER_NAME, "generate_chart", result)
@@ -73,4 +84,3 @@ def mcp_save_report(
     if not result.get("success"):
         return wrap_failure(SERVER_NAME, "save_report", str(result.get("error", "report save failed")), result)
     return wrap_success(SERVER_NAME, "save_report", result, evidence_result=evidence_result)
-

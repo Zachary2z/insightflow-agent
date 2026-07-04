@@ -1,0 +1,116 @@
+order:
+  name: "Order"
+  aliases:
+    - "订单"
+    - "order"
+    - "paid order"
+  primary_table: "orders"
+
+product:
+  name: "Product"
+  aliases:
+    - "商品"
+    - "产品"
+    - "product"
+    - "Mirrorless Camera A"
+  primary_table: "products"
+
+category:
+  name: "Category"
+  aliases:
+    - "品类"
+    - "类目"
+    - "category"
+    - "Cameras"
+  primary_table: "categories"
+
+city:
+  name: "City"
+  aliases:
+    - "城市"
+    - "city"
+    - "上海"
+    - "Shanghai"
+  primary_table: "users"
+
+channel:
+  name: "Channel"
+  aliases:
+    - "渠道"
+    - "channel"
+    - "Paid Search"
+    - "付费搜索"
+  primary_table: "marketing_campaigns"
+
+campaign:
+  name: "Campaign"
+  aliases:
+    - "campaign"
+    - "投放"
+    - "营销"
+    - "营销活动"
+    - "Paid Search"
+  primary_table: "marketing_campaigns"
+
+promotion:
+  name: "Promotion"
+  aliases:
+    - "促销"
+    - "promotion"
+    - "618"
+    - "discount"
+  primary_table: "promotion_events"
+
+inventory:
+  name: "Inventory"
+  aliases:
+    - "库存"
+    - "缺货"
+    - "inventory"
+    - "stockout"
+  primary_table: "inventory_snapshots"
+
+refund:
+  name: "Refund"
+  aliases:
+    - "退款"
+    - "售后"
+    - "refund"
+    - "refund request"
+  primary_table: "refund_requests"
+
+review:
+  name: "Review"
+  aliases:
+    - "评价"
+    - "评论"
+    - "review"
+    - "negative review"
+  primary_table: "product_reviews"
+
+traffic_session:
+  name: "Traffic Session"
+  aliases:
+    - "traffic session"
+    - "sessions"
+    - "流量"
+    - "访问"
+    - "checkout"
+  primary_table: "traffic_sessions"
+
+customer:
+  name: "Customer"
+  aliases:
+    - "用户"
+    - "客户"
+    - "customer"
+  primary_table: "users"
+
+fulfillment:
+  name: "Fulfillment"
+  aliases:
+    - "履约"
+    - "配送"
+    - "delivery"
+    - "fulfillment"
+  primary_table: "fulfillment_events"

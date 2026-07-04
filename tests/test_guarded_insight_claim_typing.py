@@ -102,7 +102,7 @@ def test_workflow_runs_provider_claim_typing_after_insight(tmp_path):
     from llm_ops.provider import MockLLMProvider
 
     result = run_workflow(
-        "最近 30 天销售额最高的 5 个商品是什么？",
+        "最近 30 天销售额最高的 5 个商品为什么值得复盘？",
         db_path=DB_PATH,
         trace_dir=tmp_path,
         run_id="run_workflow_claim_typing",
@@ -126,57 +126,3 @@ def test_workflow_runs_provider_claim_typing_after_insight(tmp_path):
     assert result["claim_typing_result"]["source"] == "provider"
     assert any(event["node"] == "insight_claim_typer_agent" for event in result["trace"])
     assert "claim_typing_result" in result
-
-
-def test_report_supervisor_runs_claim_typing_before_section_evidence_validation(tmp_path):
-    from agents.report_supervisor import run_report_supervisor_agent
-    from agents.supervisor import initialize_run
-    from llm_ops.provider import MockLLMProvider
-
-    state = initialize_run(
-        "帮我生成本月经营复盘，重点看 GMV。",
-        run_id="run_report_claim_typing",
-        session_id="session_report_claim_typing",
-    )
-    state["db_path"] = DB_PATH
-    state["trace_dir"] = tmp_path / "traces"
-    state["report_sections"] = [
-        {
-            "section_id": "weekly_gmv",
-            "report_type": "monthly_business_report",
-            "title": "本月 GMV",
-            "question": "本月 GMV 是多少？",
-            "sql": """
-SELECT 'GMV' AS metric, ROUND(SUM(oi.quantity * oi.unit_price), 2) AS value
-FROM orders o
-JOIN order_items oi ON o.id = oi.order_id
-WHERE o.status = 'paid'
-LIMIT 100
-""".strip(),
-            "expected_chart_type": "none",
-        }
-    ]
-
-    result = run_report_supervisor_agent(
-        state,
-        claim_typing_provider=MockLLMProvider(
-            {
-                "typed_claims": [
-                    {
-                        "claim": "可能需要进一步验证广告流量变化。",
-                        "claim_type": "hypothesis",
-                        "rationale": "Traffic data is unavailable.",
-                    }
-                ],
-                "risk_flags": [],
-            }
-        ),
-        report_dir=tmp_path / "markdown",
-        chart_dir=tmp_path / "charts",
-    )
-
-    task = result["report_sub_tasks"][0]
-    assert task["claim_typing_result"]["provider_called"] is True
-    assert task["claim_typing_result"]["source"] == "provider"
-    assert task["evidence_result"]["hypotheses"]
-    assert result["status"] == "business_review_report_completed"

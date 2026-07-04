@@ -1,319 +1,211 @@
 # InsightFlow Agent Development Plan
 
-This document is the tracked development plan for InsightFlow Agent. It consolidates the phased roadmap, task boundaries, acceptance criteria, and final LLM participation rules that were previously spread across local extracted planning notes under `tmp/pdfs/`.
+This document tracks the active product direction, not the full historical build log. Current implementation guidance lives in `docs/product/plans/`, especially:
 
-## 1. Project Positioning
+- `docs/product/plans/2026-06-30-p16-clean-business-output-model.md`
+- `docs/product/plans/2026-06-30-p17-product-codebase-cleanup.md`
+- `docs/product/plans/2026-06-30-p18-business-answer-consistency.md`
+- `docs/product/plans/2026-07-01-p19-business-output-and-report-quality.md`
+- `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`
+- `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md`
+- `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`
+- `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`
+- `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md`
+- `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`
 
-InsightFlow Agent is a LangGraph-based multi-agent tool-calling BI workflow.
+## Current Product Direction
 
-The project is not intended to be a generic Text2SQL demo or a generic data-analysis chatbot. Its core product identity is:
+InsightFlow is a Chinese business data-analysis product with:
 
-- Multi-agent collaboration
-- Tool calling
-- Real SQL execution
-- Execution feedback and repair
-- Traceability
-- Eval-driven development
-- Evidence-backed reporting
-- Approval-gated action workflow
+- FastAPI backend in `api/app.py`.
+- Next.js frontend in `frontend/`.
+- Workspace data import for CSV, Excel, and SQLite.
+- Workspace profile and semantic-layer draft.
+- P11 ad hoc workspace analysis.
+- P12 structured workspace reports.
+- P15 analysis history, run restoration, schema repair, and business-friendly failures.
+- P16 single `business_answer` contract for analysis and report sections.
+- P17 cleanup that removes non-current historical paths while preserving the real multi-agent/tool-calling chain.
+- P18 consistency checks across conclusions, evidence, recommendations, chart annotations, and reports.
+- P19 business-output/report quality work that moves from one-off consistency patches toward an Answer Reviewer Agent, Final Answer Composer, and small deterministic safety guardrail.
+- P20 general business analysis foundation work that cleans old paths and separates factual tools, model judgment, fact validation, and expression/report writing so the product can handle different uploaded business datasets.
+- P20 Chinese-first product scope: product-facing UI copy, clarifications, answers, charts, reports, and prompts should be Chinese; English or mixed raw headers are supported through semantic recognition and Chinese aliases, not bilingual output branches.
+- P21 responsive analysis experience work added conservative route classification, fast factual paths, progress states, exact historical reuse, page recovery, compact task cards, and lightweight context packs without weakening the P20 evidence chain.
+- P22 evidence-driven report generation work replaced stitched Analysis Workbench report sections with a clean report document contract, Chinese goal-driven report planning, structured report evidence collection, model-backed report composition, lightweight fact validation, and clean report reader/Markdown rendering.
+- P23 core evidence and report tooling readiness is complete. It keeps Analysis Workbench and Report Center as separate product experiences, unifies their factual `EvidencePack`/artifact standards, preserves model-written explanations and recommendations inside evidence boundaries, hardens one-pass full-report generation, and removes old paths before the next product-hardening phase. P23-H4 replaced brittle prose-number validator patching with a tool-built report evidence ledger plus one automatic report repair pass; its coverage and metric-role selection are evidence-aware, so actual fact fields/table columns control missing-evidence boundaries and only additive/count business metrics are chosen for totals/shares. Rate, average, duration, satisfaction, and unknown numeric fields stay as row facts instead of contribution denominators. P23-H5 adds ledger-referenced artifact records and minimal local tool-call records so charts, Markdown reports, report documents, and future exports can consume trusted facts without raw SQL rows or model recalculation. P23-H6 completed cleanup, focused/full regression, frontend tests/build, tracked-artifact audit, old-path audit, no-key acceptance, and live-provider gating documentation.
+- P24 is complete as the general business data understanding and evidence generation phase before external integrations. H1-H3 are complete: generic field profiling, semantic-layer drafting, explicit evidence requirements, semantic-layer-backed Analysis Workbench facts, Report Center evidence planning/collection, conservative investment-efficiency/data-limit handling, real DeepSeek acceptance, full cleanup, frontend verification, and artifact hygiene now work across common Chinese business datasets.
+- P25 is complete as a compact real-usage polish phase for Analysis Workbench and Report Center. H1-H4 addressed direct-answer decisiveness, contradictory evidence limits, stale field fallbacks, report goal/title inference, the visible report-type template feel, realistic/live acceptance, cleanup, documentation closeout, and safe full-data time defaults for missing-time questions/reports.
 
-Development principle:
-
-- P0 builds a small, stable Agentic SQL Core.
-- P1 adds reliable analysis and traceable reporting.
-- P2 adds business review and action workflow.
-- P3 adds MCP, API, dashboard, LLM provider hardening, and engineering core.
-
-## 2. Reference Strategy
-
-Use reference projects selectively. InsightFlow should borrow engineering ideas, not copy project structure wholesale.
-
-| Reference | Use for | Avoid copying |
-|---|---|---|
-| `adamfaik/sql-agent` | LangGraph SQL workflow, SQLite execution, execution failure repair, glass-box demo, eval benchmark, ecommerce questions | Single-file style, Text2SQL-only framing, weak Agent/Tool separation |
-| `mallahyari/langgraph-sql-agent` | Multi-agent modularization, router/table selector/validator/executor/visualization planner, graph conditional edges, later FastAPI/SSE ideas | Starting with heavy React/FastAPI architecture, weaker SQL validation |
-| `azain47/Multi-Agent-Text2SQL-System` | Parser-based SQL validation, feedback formatting, iterative repair loop, max retry/history ideas | Full complex system shape; use only local validation/feedback patterns |
-
-## 3. Current Phase Status
-
-| Phase | Status | Summary |
-|---|---|---|
-| P0 - Agentic SQL Core | Complete | SQLite ecommerce DB, schema/metric/sql tools, validator, executor, trace, agents, LangGraph workflow, Streamlit demo, 20-case eval |
-| P1 - Reliable Analysis & Report Core | Complete | Business context retrieval, evidence validation, chart generation, Markdown report generation |
-| P2 - Business Review & Action Workflow | Complete | Weekly business review, controlled LLM report planner, guarded LLM SQL/insight enhancement, approval-gated actions |
-| P3 - MCP & Engineering Core | In progress | Task 17, 18, 19, 19A, Streamlit Command Center UI hardening, 20, 20C, 20A, 20B, 21, 21A, 22, 23, 24, 25, 26, 27, and 28 complete; Docker/CI and later hardening not started |
-
-## 4. LLM Enhancement Development Roadmap
-
-This section is the product-facing list of where the project should use a large model. It separates already implemented controlled LLM pieces from future enhancements that still need development.
-
-LLM participation rule: the model helps with understanding, planning, candidates, wording, and suggestions. Deterministic tools keep ownership of validation, execution, approval, trace, and audit.
-
-### 4.1 Implemented LLM-Related Capabilities
-
-| Capability | Current implementation | Files | Status |
-|---|---|---|---|
-| Controlled report planning | Optional provider hook selects allowlisted weekly report sections and can ask clarification questions | `agents/report_planner.py` | Complete |
-| Guarded SQL candidate enhancement | Optional provider proposes SQL candidates; accepted SQL must pass `validate_sql()` | `agents/guarded_llm_enhancer.py` | Complete |
-| Guarded insight enhancement | Optional provider proposes claims; claims must pass Evidence Validator before use | `agents/guarded_llm_enhancer.py` | Complete |
-| Provider and PromptOps layer | Provider contract, prompt registry, prompt versions, usage/cost/latency trace metadata, smoke eval | `llm_ops/` | Complete |
-| Production DeepSeek adapter | `.env` config, opt-in live test, provider errors, malformed JSON handling, strict prompt schemas | `llm_ops/deepseek_provider.py`, `llm_ops/structured_output.py` | Complete |
-| Question understanding router | Deterministic extraction of metric, dimension, time range, filters, operation, limit, risk flags | `question_understanding/`, `agents/question_understanding.py` | Complete |
-| SQL planning router | Deterministic routing to template, guarded `llm_candidate`, clarify, or reject | `sql_planning/`, `agents/sql_planning_router.py` | Complete |
-| Provider-backed question understanding | Optional provider-backed intent extraction with prompt-specific validation and deterministic fallback | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete |
-| Runtime provider-backed question understanding wiring | Core workflow runs question understanding before schema retrieval; env-gated DeepSeek provider can participate in workflow state and trace | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete |
-| Provider-backed clarification router | Optional provider-backed clarification questions with prompt-specific validation, deterministic fallback, runtime workflow state, and trace metadata | `question_understanding/clarification.py`, `agents/clarification_router.py`, `graph/workflow.py`, `llm_ops/structured_output.py` | Complete |
-| Provider-assisted SQL planning and guarded candidates | Optional provider-backed SQL source routing plus guarded candidate SQL generation in the core workflow; accepted candidates still require `validate_sql()` and SQL Reviewer approval | `sql_planning/provider_backed.py`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py`, `graph/workflow.py` | Complete |
-| Provider-backed business review decomposition | Optional provider-backed weekly/monthly report section planning in the report supervisor runtime; accepted plans can only select allowlisted sections and cannot provide SQL or claims | `agents/report_planner.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
-| Provider-backed report writing | Optional provider-backed prose polishing after Evidence Validator for analysis reports and business review reports; accepted prose can only use verified findings/hypotheses and traceable artifacts | `agents/report_writer.py`, `agents/report_agent.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
-| Provider-backed insight claim typing | Optional provider-backed claim classification before Evidence Validator in the core workflow and report supervisor; Evidence Validator keeps final authority | `agents/insight_claim_typer.py`, `graph/workflow.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
-| Provider-backed action and email drafting | Optional provider-backed task, alert, and email draft payload drafting inside the action workflow before Risk Assessor and Approval Gate; accepted drafts cannot create records or set approval state | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete |
-| Template mining and LLM eval suite | Saved workflow trace mining for successful `llm_candidate` patterns plus schema-aware smoke evals for valid output, malformed JSON, and schema mismatch | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete |
-
-### 4.2 Remaining LLM Enhancement Targets
-
-The concrete LLM enhancement backlog through Task 28 is complete. Future work should focus on engineering hardening unless a new model-assisted product capability is explicitly scoped.
-
-| Target | Why the LLM is useful | Future development task | Safety boundary |
-|---|---|---|---|
-| New LLM capability proposals | Extend model participation only where validators, traces, and deterministic fallback are already defined | Future scoped task | Must not affect no-key baseline or bypass deterministic safety gates |
-
-### 4.3 Areas That Must Stay Deterministic
-
-| Area | Reason |
-|---|---|
-| `validate_sql()` | SQL safety boundary; the model cannot self-approve SQL |
-| `run_sql()` | Execution boundary; only deterministic tools execute SQL |
-| Evidence Validator | Fact boundary; model claims must be independently checked |
-| Approval Gate | Action boundary; model output cannot bypass approval |
-| Audit Logger / Trace Logger | Audit boundary; model output cannot decide whether to record events |
-| MCP tool wrappers | External contracts must not bypass internal validator, evidence, approval, or trace requirements |
-| P0 eval baseline | Core demo must remain provider-independent and 20/20 passing |
-
-### 4.4 LLM Enhancement Acceptance Checklist
-
-- Every real-provider output is validated by a prompt-specific schema before an agent consumes it.
-- Every LLM enhancement must be wired into a real runtime path, not stop at standalone helper support.
-- Every LLM enhancement must leave trace/state evidence of `provider_called`, `fallback_used`, prompt id/version, and validation/fallback status.
-- Every LLM enhancement must include a live DeepSeek smoke test for the affected runtime path.
-- Every LLM-assisted SQL candidate goes through `validate_sql()`.
-- Every LLM-assisted insight/report claim goes through Evidence Validator.
-- Every LLM-assisted action draft goes through Risk Assessor, Approval Gate, Action Executor, and Audit Logger.
-- Provider failures return structured `success: false` errors and do not crash the workflow.
-- Deterministic fallback remains available without an API key.
-- `python3 eval/run_eval.py` remains 20/20 passed.
-
-## 5. Target Repository Structure
-
-The project should continue to preserve clear Agent/Tool/Graph boundaries.
+Current runtime chain:
 
 ```text
-insightflow-agent/
-├── agents/
-├── api/
-├── dashboard/
-├── data/
-├── eval/
-├── graph/
-├── llm_ops/
-├── mcp_servers/
-├── question_understanding/
-├── reports/
-├── sql_planning/
-├── tests/
-├── tools/
-├── app.py
-├── DEVELOPMENT_PLAN.md
-├── DEVELOPMENT_STATUS.md
-├── README.md
-└── requirements.txt
+workspace import
+-> profile and semantic layer
+-> question understanding
+-> clarification router
+-> SQL planning
+-> guarded SQL candidate
+-> SQL review
+-> schema repair
+-> SQL execution
+-> evidence validation
+-> insight/business answer
+-> visualization
+-> report
+-> Next.js product UI
 ```
 
-## 6. P0 - Agentic SQL Core
+LLM/provider-backed components may understand intent, plan, draft guarded candidates, draft business wording, and choose visualization delivery. Deterministic code still owns safety gates, execution, evidence checks, artifact policy, and trace persistence.
 
-Goal: prove that InsightFlow is a multi-agent tool-calling SQL execution workflow, not a black-box Text2SQL wrapper.
+## Phase Summary
 
-### P0 Tasks
-
-| Task | Name | Core files | Acceptance |
-|---|---|---|---|
-| Task 0 | Project initialization | `requirements.txt`, `README.md`, `app.py`, base folders | Dependencies install, pytest runs, Streamlit starts, folders exist |
-| Task 1 | Ecommerce SQLite database | `data/seed_data.py`, `data/ecommerce.db` | Database has users/orders/order_items/products/categories with realistic sample data |
-| Task 2 | Metric definition | `data/metrics.yaml`, `tools/metric_tool.py` | GMV/order/AOV definitions return formula and required filters |
-| Task 3 | Schema tool | `tools/schema_tool.py` | Reads tables/columns/types and produces prompt-friendly schema text |
-| Task 4 | SQL validator | `tools/sql_validator.py` | Blocks unsafe SQL, unknown tables/columns, sensitive fields, and bad metric definitions |
-| Task 5 | SQL executor | `tools/sql_executor.py` | Executes real SELECT SQL with timeout/row cap and structured errors |
-| Task 6 | Trace logger | `tools/trace_logger.py` | Saves node/tool/status/error/retry/latency trace events |
-| Task 7 | P0 agents | `agents/supervisor.py`, `schema_agent.py`, `metric_agent.py`, `sql_generator.py`, `sql_reviewer.py`, `error_fixer.py`, `insight_agent.py` | Agents call tools instead of directly accessing external resources |
-| Task 8 | LangGraph workflow | `graph/state.py`, `graph/nodes.py`, `graph/workflow.py` | Review -> execute -> repair/fail -> insight -> trace path works end to end |
-| Task 9 | Streamlit glass-box demo | `app.py` | User can see agent steps, SQL, review, execution, repair, final answer, trace |
-| Task 10 | P0 eval | `eval/test_questions.json`, `eval/run_eval.py`, `eval/report.md` | 20-case benchmark runs and reports success/repair/safety metrics |
-
-### P0 Acceptance Standard
-
-- Chinese business questions can run through the full workflow.
-- SQL is generated as SELECT-only and reviewed before execution.
-- Dangerous SQL does not enter `run_sql()`.
-- Execution failures can be repaired once.
-- Final answers are based on `execution_result`.
-- Every run has a trace artifact.
-- `python3 eval/run_eval.py` remains 20/20 passed.
-
-## 7. P1 - Reliable Analysis & Report Core
-
-Goal: produce traceable business analysis artifacts, not just SQL answers.
-
-| Task | Name | Core files | Acceptance |
-|---|---|---|---|
-| Task 11 | Business context retrieval | `data/business_rules.md`, `data/table_docs.md`, `data/sql_examples.json`, `tools/context_tool.py`, `agents/context_retriever.py` | Returns relevant rules, examples, and field docs into state |
-| Task 12 | Evidence Validator | `tools/evidence_tool.py`, `agents/evidence_validator.py` | Separates data-supported findings, hypotheses, and unsupported claims |
-| Task 13 | Chart Agent | `tools/chart_tool.py`, `agents/chart_agent.py` | Ranking -> bar, trend -> line, optional share -> pie, paths written to state |
-| Task 14 | Report Agent | `tools/report_tool.py`, `agents/report_agent.py` | Saves Markdown report with SQL, execution result, evidence, chart paths, trace path |
-
-### P1 Acceptance Standard
-
-- Reports are traceable to SQL and execution results.
-- Unsupported claims are blocked or separated.
-- Chart/report generation never bypasses evidence validation.
-- P0 eval remains passing.
-
-## 8. P2 - Business Review & Action Workflow
-
-Goal: support weekly business reviews, retrospectives, and lightweight operational actions.
-
-| Task | Name | Core files | Acceptance |
-|---|---|---|---|
-| Task 15 | Business Review Report | `agents/report_supervisor.py` | Weekly review decomposes into multiple SQL subtasks with review, execution, evidence, chart, and Markdown output |
-| Task 15A | Controlled LLM Report Planner | `agents/report_planner.py` | Optional LLM selects only allowlisted report sections and can ask clarification questions |
-| Task 15B | Guarded LLM SQL and Insight Enhancement | `agents/guarded_llm_enhancer.py` | SQL candidates require `validate_sql()`; insight claims require Evidence Validator |
-| Task 16 | Action Workflow | `agents/action_planner.py`, `agents/risk_assessor.py`, `agents/action_verifier.py`, `tools/action_tool.py`, `tools/approval_tool.py`, `tools/audit_logger.py` | Action plans, risk assessment, approval gate, task/alert/email draft records, verification, audit logs |
-
-### P2 Acceptance Standard
-
-- Weekly reports can run multiple SQL subtasks.
-- Failed subtasks are recorded structurally and do not crash the full report.
-- Action creation requires approval.
-- Audit logs preserve approval blocking, execution, and verification.
-- LLM-assisted P2 features are optional and never replace deterministic fallback.
-
-## 9. P3 - MCP & Engineering Core
-
-Goal: standardize tool access, expose engineering interfaces, improve observability, and harden controlled LLM usage.
-
-| Task | Name | Core files | Status | Acceptance |
-|---|---|---|---|---|
-| Task 17 | MCP Tool Layer | `mcp_servers/database_server.py`, `report_server.py`, `action_server.py`, `contracts.py` | Complete | Exposes database/report/action MCP-style wrappers without exposing internal validators/audit/eval |
-| Task 18 | FastAPI + Async Run API | `api/app.py`, `api/run_manager.py`, `api/models.py` | Complete | Submit run, poll status, fetch trace/events, cancel active runs |
-| Task 19 | Trace Dashboard data layer | `dashboard/trace_dashboard.py` | Complete | Summarizes trace, SQL repair, tool, eval, approval, and audit metrics |
-| Task 19A | Streamlit Unified Demo | `app.py` | Complete | Shows P0/P1/P2/P3 capabilities clearly in one product demo |
-| Hardening | Streamlit Command Center UI | `app.py`, `ui/view_models.py`, `ui/components.py` | Complete | First-level Command Center navigation, one-run detail, LLM Ops, Observability/Audit, Integrations, and Capability Catalog without changing backend safety boundaries |
-| Task 20 | LLM Provider and PromptOps Core | `llm_ops/provider.py`, `prompt_registry.py`, `eval_smoke.py` | Complete | Provider contract, prompt versions, cost/latency metadata, smoke eval |
-| Task 20C | Production DeepSeek Provider & Structured Output Validation | `llm_ops/deepseek_provider.py`, `structured_output.py` | Complete | `.env` config, opt-in live tests, malformed JSON and schema mismatch failures |
-| Task 20A | Question Understanding & Clarification Router | `question_understanding/router.py`, `agents/question_understanding.py` | Complete | Extracts intent slots, returns clarify/reject/template/llm_candidate, does not generate SQL |
-| Task 20B | SQL Planning Router | `sql_planning/router.py`, `feedback.py`, `agents/sql_planning_router.py` | Complete | Routes to deterministic template or guarded LLM candidate, preserves clarify/reject, does not call provider |
-| Task 21 | Provider-backed Question Understanding | `question_understanding/provider_backed.py`, `llm_ops/prompt_registry.py`, `llm_ops/structured_output.py`, `agents/question_understanding.py` | Complete | Optional provider-backed intent extraction, structured validation, deterministic fallback, no SQL generation or execution |
-| Task 21A | Runtime Provider-backed Question Understanding Wiring | `graph/workflow.py`, `graph/state.py`, `llm_ops/runtime_provider.py` | Complete | Env-gated DeepSeek provider can participate in core workflow question understanding without changing SQL validation or execution boundaries |
-| Task 22 | Provider-backed Clarification Router | `question_understanding/clarification.py`, `agents/clarification_router.py`, `graph/workflow.py`, `llm_ops/runtime_provider.py` | Complete | Env-gated DeepSeek provider can participate in runtime clarification; ambiguous provider-backed clarification stops before schema retrieval and SQL generation |
-| Task 23 | Provider-assisted SQL Planning and Guarded Candidate Integration | `sql_planning/provider_backed.py`, `agents/sql_planning_router.py`, `agents/guarded_llm_enhancer.py`, `graph/workflow.py` | Complete | Env-gated DeepSeek provider can participate in runtime SQL planning and guarded SQL candidates; planning cannot return SQL and candidate SQL still requires validation/review |
-| Task 24 | LLM Business Review Decomposition | `agents/report_planner.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can participate in weekly/monthly business review decomposition; provider can only select allowlisted sections and cannot return SQL or final claims |
-| Task 25 | Evidence-backed Report Writing and Polishing | `agents/report_writer.py`, `agents/report_agent.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can participate in report prose after Evidence Validator; provider cannot add unsupported claims, generate SQL, or bypass traceability |
-| Task 26 | Guarded Insight Claim Typing | `agents/insight_claim_typer.py`, `graph/workflow.py`, `agents/report_supervisor.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can classify candidate claims before Evidence Validator; classification is advisory and cannot bypass evidence filtering |
-| Task 27 | LLM Action and Email Drafting | `agents/action_drafter.py`, `agents/action_planner.py`, `llm_ops/runtime_provider.py`, `llm_ops/structured_output.py` | Complete | Env-gated DeepSeek provider can draft pending task, alert, and email payloads before Risk Assessor and Approval Gate; provider cannot create records, set approval state, or send email |
-| Task 28 | LLM Template Mining and Eval Suite | `sql_planning/feedback.py`, `llm_ops/eval_smoke.py`, `agents/guarded_llm_enhancer.py` | Complete | Mines saved workflow traces for repeated successful `llm_candidate` intent signatures and validates prompt outputs in smoke evals; recommendations are never auto-applied |
-| Future | Docker / CI | `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Not started | Repeatable local/dev setup and CI test workflow |
-
-### P3 Acceptance Standard
-
-- MCP contracts return JSON-compatible dictionaries and structured errors.
-- API failures return structured failed responses instead of crashing.
-- Dashboard data layer does not introduce frontend or provider behavior.
-- Streamlit demo makes P1/P2/P3 visible, not just P0.
-- Streamlit Command Center shows one-run intent, SQL, evidence, report/action, provider/fallback, safety, and trace details without bypassing workflow helpers.
-- LLM provider usage is opt-in, structured, traceable, and provider-independent by default.
-- P0 eval remains 20/20 passed.
-
-## 10. Current Next-Task Queue
-
-The next task should be selected from the remaining P3 engineering backlog. Do not start multiple future tasks at once.
-
-| Priority | Candidate task | Notes |
+| Phase | Current meaning | Status |
 |---|---|---|
-| Next | Docker / CI | Add repeatable environment and GitHub Actions while preserving current no-key baseline |
-| Later | Production run persistence | Consider persistent async job storage only after API semantics are stable |
-| Later | React dashboard | Only after dashboard data contracts are stable |
-| Later | RBAC / permissions | Only after action and MCP surfaces require real multi-user controls |
-| Later | Full ActionOps | External task/email integrations require stricter approval, audit, and secrets handling |
+| P0-P10 | Historical foundations for SQL safety, evidence validation, MCP wrappers, semantic context, visualization, provider plumbing, and trace/artifact hygiene | Complete; historical context only |
+| P11 | General workspace analysis product: FastAPI workspace APIs, Next.js product frontend, user data import, profile, semantic layer, ad hoc analysis | Complete |
+| P12 | Workspace report product: report APIs, synchronous report runner, report storage, Markdown download, Next.js report UI | Complete |
+| P13 | Business-facing answer/product UX: clarification continuation, business answer presentation, reports UI polish, Data Settings, chart display | Complete |
+| P14 | Unified Chinese product shell and workflow: shared frontend shell, 数据源管理, 分析工作台, 报告中心, 数据设置, 业务问答 preview | Complete |
+| P15 | Analysis reliability and history: persisted run history/detail, one-pass schema repair, business-friendly failures, real DeepSeek regression | Complete |
+| P16 | Clean business output model: one `business_answer` shape across backend, frontend, reports, Markdown, and run restoration | Complete |
+| P17 | Product codebase cleanup: remove historical non-current paths and simplify product docs/status surfaces | Complete |
+| P18 | Business answer consistency: align conclusions, evidence, recommendations, chart annotations, and report summaries across general datasets | Complete |
+| P19 | Business output and report quality: Answer Reviewer Agent, Final Answer Composer, decision-ready replies, synthesized reports, chart narrative, cleanup, and live acceptance | Complete |
+| P20 | Chinese-first general business analysis foundation: project cleanup, generalized data profiling/semantic layer, task contract, fact/evidence layer, business answer/report generation, realistic acceptance, cleanup audit, and live DeepSeek opt-in verification | Complete |
+| P21 | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs | Complete |
+| P22 | Evidence-driven report generation: replace stitched report sections with a coherent Chinese report document path and delete old report paths | Complete; H1-H4 complete |
+| P23 | Core evidence and report tooling readiness: shared factual evidence/artifact contracts for Analysis Workbench and Report Center, natural Chinese business answers, one-pass report hardening, evidence-ledger report self-repair, artifact/tool-call readiness, cleanup, and live acceptance gating before external tool integrations | Complete; H1-H6 complete |
+| P24 | General business data understanding and evidence generation: common business dataset profiling, semantic-layer strengthening, generic evidence requirements, Analysis Workbench and Report Center grounding, real DeepSeek acceptance, and cleanup | Complete; H1-H3 complete |
+| P25 | Real usage answer/report polish: direct primary-metric answers, clean evidence limits, stale-field removal, report goal/title inference, simplified report UI, realistic/live acceptance, cleanup, and safe full-data time defaults | Complete; H1-H4 complete |
 
-## 11. Final LLM Participation Boundary
+## P16 Business Answer Contract
 
-InsightFlow treats LLMs as a controlled enhancement layer. The model can help with understanding, planning, candidate generation, wording, and suggestions, but deterministic tools remain responsible for approval, execution, validation, and audit.
+Current analysis results and report sections use:
 
-The no-key deterministic baseline must continue to run without a provider, and P0 eval must remain 20/20 passing.
+```json
+{
+  "headline": "",
+  "direct_answer": "",
+  "why": "",
+  "evidence_bullets": [],
+  "recommendations": [],
+  "caveats": [],
+  "confidence": "medium"
+}
+```
 
-### Where The LLM Should Participate
+Report sections reuse this same shape. Main product fields must not contain raw SQL, trace IDs, provider metadata, raw row dumps, internal prompt text, or unsupported claims. Technical details remain available under collapsed UI/appendix sections.
 
-| Area | Phase / task | Intended role | Boundary |
-|---|---|---|---|
-| Provider / PromptOps | P3 Task 20 / 20C | DeepSeek adapter, prompt registry, prompt versions, structured output validation, usage/cost/latency trace metadata | Must not replace deterministic fallback |
-| Question understanding | P3 Task 20A / 21 / 21A | Extract metric, dimension, time range, filters, operation, limit, and risk flags | Must not generate or execute SQL |
-| Clarification routing | P3 Task 20A / 22 | Ask focused follow-up questions for ambiguous requests | Must not guess missing SQL requirements |
-| SQL planning | P3 Task 20B / 23 | Choose deterministic template, guarded `llm_candidate`, clarify, or reject strategy | Must not return executable SQL directly |
-| Guarded SQL candidate | P2 Task 15B, hardened and wired by P3 Task 20 / 20C / 23 | Propose SQL candidates for clear non-template questions | Every candidate must pass `validate_sql()` and SQL Reviewer before `run_sql()` |
-| Controlled report planning | P2 Task 15A / P3 Task 24 | Select allowlisted report sections and help decompose review tasks | Must not provide SQL or final factual claims |
-| Business review decomposition | P3 Task 24 | Break weekly/monthly reviews, retrospectives, anomaly analysis, channel analysis, and Top/Decline analysis into allowlisted subtasks | Each subtask still goes through SQL review, SQL execution, Evidence Validator, chart, and report tools |
-| Guarded insight claims | P2 Task 15B / P3 Task 26 | Suggest or classify claims from execution results, metric context, and business context | Evidence Validator decides which claims can be used |
-| Report writing / polishing | P3 Task 25 | Turn verified findings, hypotheses, SQL, chart paths, and trace paths into clearer business prose | Must not invent unsupported data or conclusions |
-| Action drafting | P3 Task 27 | Draft task, alert, and email wording from evidence-backed findings | Must not create actions without Risk Assessor, Approval Gate, Action Executor, and Audit Logger |
-| Email draft content | P3 Task 27 | Draft stakeholder-facing email text | Must create drafts only; no sending and no approval bypass |
-| Template mining feedback | P3 Task 28 | Summarize repeated successful `llm_candidate` intent patterns from saved workflow traces for future deterministic templates | Must not automatically modify production templates |
-| LLM eval / smoke tests | P3 Task 20 / 20C / 28 | Validate provider availability, JSON shape, prompt schemas, malformed JSON handling, schema mismatch, and provider errors | Live provider tests must remain explicit opt-in |
+## P17/P18/P19/P20 Roadmap
 
-### Where The LLM Must Not Take Ownership
+| Task | Scope | Status |
+|---|---|---|
+| P17-H1 | Dependency inventory and boundary tests for current product entry points | Complete |
+| P17-H2 | Remove legacy action-path code that is not part of current API/UI dependencies | Complete |
+| P17-H3 | Remove unsupported external-placeholder visualization runtime entries | Complete |
+| P17-H4 | Delete obsolete eval/demo files and mark old design snapshots historical | Complete |
+| P17-H5 | Product docs/status simplification | Complete |
+| P17-H6 | Final artifact hygiene, legacy audit, backend/frontend regression, and real DeepSeek acceptance | Complete |
+| P18-H1 | Add failing tests for multi-metric conflict, insufficient comparison evidence, and chart annotation conflict | Complete |
+| P18-H2 | Implement lightweight answer consistency helpers and apply them in product result builder | Complete |
+| P18-H3 | Align chart annotations with the final business answer | Complete |
+| P18-H4 | Make report sections and executive summaries reuse consistency-checked answers | Complete |
+| P18-H5 | Tighten provider prompt/validation only where deterministic consistency is insufficient | Complete |
+| P18-H6 | Focused/full regression, real DeepSeek acceptance gating, artifact hygiene, and documentation closeout | Complete |
+| P19-H1 | Close the current deterministic answer/evidence alignment hole without expanding keyword-heavy rules | Complete |
+| P19-H2 | Add reviewer/composer foundation with structured contracts and deterministic tests | Complete |
+| P19-H3 | Polish business answer quality: vocabulary, units, grounded recommendations, tradeoffs, and concise one-screen answers | Complete |
+| P19-H4 | Synthesize reports and chart narrative from reviewed business answers, with language-aware report labels and business-readable evidence summaries | Complete |
+| P19-H5 | Quality closeout: focused/full regression, frontend build, live DeepSeek acceptance, cleanup, and artifact hygiene | Complete |
+| P20-H0 | Architecture cleanup and main path inventory; remove old paths and conflicting compatibility code | Complete |
+| P20-H1 | General data profiling and semantic layer for arbitrary uploaded business datasets | Complete |
+| P20-H2 | General Chinese analysis task contract and clarification continuation | Complete |
+| P20-H3 | Fact layer, metric registry, and evidence payload with stable formulas and comparison scope | Complete |
+| P20-H4 | Business insight, answer, chart, and report generation from validated evidence | Complete |
+| P20-H5 | Realistic acceptance, cleanup audit, documentation closeout, and live DeepSeek verification when enabled | Complete |
+| P21-H1 | Conservative route policy for clarify, fast_fact, standard_analysis, deep_judgment, and report routes | Complete |
+| P21-H2 | Fast fact path for low-risk factual, ranking, summary, and simple trend questions | Complete |
+| P21-H3 | Business-friendly progress steps and frontend progress timeline | Complete |
+| P21-H4 | Exact historical reuse using workspace data_version and normalized_question | Complete |
+| P21-H5 | Page recovery, lightweight background work, and compact task cards | Complete |
+| P21-H6 | Lightweight context packs for fast_fact without starving complex routes of evidence | Complete |
 
-| Deterministic owner | Reason |
-|---|---|
-| `validate_sql()` | SQL safety boundary; LLM must not self-approve SQL |
-| `run_sql()` | Execution boundary; only deterministic tools execute SQL |
-| `Evidence Validator` | Fact boundary; LLM claims must be independently checked |
-| `Approval Gate` | Action boundary; LLM must not bypass human or rule approval |
-| `Audit Logger` / `Trace Logger` | Audit boundary; LLM must not decide whether events are recorded |
-| MCP database / report / action wrappers | External contracts must not bypass validators, approval, evidence, or trace requirements |
-| P0 eval baseline | Core workflow must remain deterministic and provider-independent |
+P17 must keep current workspace analysis, workspace reports, SQL review, SQL execution, evidence validation, schema repair, visualization, trace logging, MCP database/report wrappers, P16 product output, Next.js product pages, and real DeepSeek live tests.
 
-### Target LLM-Assisted Flow
+P17 progress summary: H1-H6 are complete. The current product codebase keeps the FastAPI/Next.js workspace analysis and report product, removes historical demo/action/mock/eval paths from active entry points, and preserves real DeepSeek live acceptance.
+
+P18 and P19 are complete. P19-H1 closed the immediate deterministic alignment hole, P19-H2 added the reviewer/composer foundation, P19-H3 polished language-aware business answer vocabulary, tradeoffs, grounded recommendations, caveats, and report-section reuse, P19-H4 made reports synthesize reviewed answers into management summaries, key findings, action priorities, chart/evidence narrative, risks/limits, and a technical appendix, and P19-H5 completed focused/full regression, frontend build, live DeepSeek acceptance, artifact hygiene, and cleanup audit. Historical P19 bilingual output support is no longer a P20 product requirement; P20 now targets a Chinese-first business product, while English or mixed raw data headers remain supported through semantic recognition and Chinese labels.
+
+P20 is complete as the Chinese-first general business analysis foundation described in `docs/product/plans/2026-07-01-p20-general-business-analysis-foundation.md`. It avoids table-specific rule trees, fixed answer templates, bilingual output branching, and old compatibility paths. P20-H0 inventoried and cleaned the active FastAPI/Next.js workspace chain. P20-H1 added generalized profiling, semantic-layer drafts, safe formula quoting, and Chinese aliases for English/mixed raw fields. P20-H2 added the normalized Chinese `analysis_task` contract and slot-level clarification continuation. P20-H3 added the metric registry and reusable fact payload with comparison scope, warnings, formulas, display values, and technical SQL kept outside the main answer. P20-H4 made final answers, chart fallback, and management reports use validated evidence for Chinese business conclusions, recommendations when requested, tradeoff explanations, chart annotations, and report synthesis. P20-H5 proved the foundation against store sales/satisfaction and support ticket operations datasets, generalized management-report section prompts away from demo fields, added opt-in P20 live DeepSeek acceptance, and completed cleanup/documentation closeout. Old code, tests, docs, and routes that conflict with the current FastAPI/Next.js workspace product may be deleted instead of preserved.
+
+After P20, InsightFlow can import different business datasets, auto-profile them, draft a semantic layer, map raw Chinese/English/mixed fields into Chinese business semantics, understand and clarify Chinese business questions, call SQL/metric/evidence/chart/report tools, separate factual evidence from model judgment and final expression, and produce Chinese business answers plus reports. P21 responsiveness work is complete. P22 rebuilt Report Center into an evidence-driven Chinese report document pipeline. P23 completed shared evidence/artifact readiness, natural Chinese analysis answers, one-pass report hardening, cleanup, and live acceptance gating. P24 now strengthens generic business data understanding and evidence generation before real external business document/export integrations.
+
+P21 is complete in `docs/product/plans/2026-07-02-p21-responsive-analysis-experience.md`. P21-H1 through P21-H6 are complete: analysis runs now produce conservative `analysis_route` metadata for `clarify`, `fast_fact`, `standard_analysis`, `deep_judgment`, and `report`; low-risk factual totals, rankings, and simple trends can use a shorter SQL/evidence-backed fast fact path; every product result now carries business-friendly `progress_steps`; exact same-workspace/same-data-version/same-normalized-question completed runs can be offered as historical reuse candidates; new non-cached analysis requests create recoverable local background run shells that the frontend restores with compact task cards and polling; and fast fact answers use lightweight context packs that retain key facts without carrying full workspace/profile/semantic/trace/provider/raw-row context. The H2 path still runs SQL review, execution, evidence validation, fact payload generation, technical detail preservation, and history persistence, but skips the heavy insight/reviewer/final composer/claim typing chain for `fast_fact`; H3 keeps progress copy free of raw SQL, trace IDs, prompt/provider metadata, and raw rows; H4 avoids LLM cache checks, vector search, similar-question matching, and keyword-heavy normalization; H5 avoids Redis, Celery, WebSocket, SSE, timeout handling, and external SaaS while preserving same-run-id recovery for `running`, `waiting_for_clarification`, `completed`, and `failed`; H6 applies strict context compression only to `fast_fact`, while `standard_analysis`, `deep_judgment`, and `report` keep richer context for answer quality. P21 makes the P20 foundation feel faster and more recoverable by routing requests conservatively, giving low-risk factual questions a shorter evidence-backed path, showing clear progress, reusing exact same-version historical runs, restoring active/history runs after page changes, keeping task cards compact, and using focused fast fact context packs. P21 did not add provider timeout work, vector cache, Redis/Celery, WebSocket/SSE, aggressive fast paths, or old compatibility paths. During P21, obsolete code, stale tests, dead imports, duplicate routes, unused adapters, historical compatibility branches, and unreachable fallback code could be deleted instead of preserved; keep one clean current product path.
+
+P22 is complete in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 rebuilt Report Center around a clean evidence-first report document contract; Markdown and the frontend render the document body instead of analysis workbench answer blocks. H2 replaced the profile-only skeleton with Chinese goal-driven planning and structured evidence collection for workspace overview, available metrics/dimensions, revenue structure, customer segments, support issues, and trend changes when the semantic layer and data support them. H3 added `workspaces/report_composer.py` and `workspaces/report_validator.py`, wires `INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER` and product live mode into the FastAPI report API, and keeps deterministic fallback for no-key mode. H4 polished Markdown and the report reader into a clean Chinese business report: title metadata, opening summary, body chapters, inline chart artifacts with download links, chart-intent placeholders when no artifact exists, compact evidence tables, action recommendations, data boundaries, and a collapsed appendix that summarizes validation/evidence without dumping SQL, raw rows, query ids, provider metadata, trace details, or internal contracts. Missing requested evidence is preserved as warnings or data limits rather than invented. The old stitched-section behavior, where preset report sections call the analysis runner and Markdown renders each section's `business_answer`, is superseded/deleted from the active report main path. Old report presets, stitched summary functions, `章节业务答案` main-body rendering, English default report titles, obsolete report agents/writers/supervisors, and tests that only protect old stitched output may be deleted instead of preserved.
+
+P23 is complete in `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`. It is not the external-integration phase. P23 finished the core intelligence chain: Analysis Workbench and Report Center stay product-separated, but share factual evidence, metric, chart artifact, and validation standards; Report Center collects chapter-level evidence but writes the full report once; model-written reasons and recommendations are preserved as business judgment while hard facts remain evidence-bound; old template, stitched-report, duplicate evidence, stale bilingual, mock/demo, and compatibility paths that conflict with the current Chinese-first product may be deleted instead of preserved. P23-H4 is complete: tools calculate report facts and derived metrics into a compact ledger before the model writes, validation checks factual claims against that ledger instead of chasing every prose number, and one repair pass rewrites unsupported hard facts. The H4 ledger now derives coverage from actual fact fields/table columns, not titles or descriptions, and uses compact metric roles to choose contribution metrics, preventing ROI/rates/averages/satisfaction/durations or unknown numeric fields from becoming default total/share denominators. P23-H5 is complete: chart/report artifacts now carry `artifact_id`, local/report source, paths or download URLs, chart ids, and ledger fact/metric ids; local chart and Markdown renderer calls are recorded with safe summaries and output artifact ids; the main UI shows business-readable artifact status without raw ledger JSON, SQL, raw rows, query ids, trace, provider metadata, local paths, or tool names. P23-H6 is complete: focused and full regressions, frontend tests/build, old-path audit, tracked-artifact audit, no-key mode, and live-provider gating were verified.
+
+P24 is complete in `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md`. P24 made the product stronger for common Chinese business datasets, not just the current sample fields. P24-H1 added generic profiling and semantic-layer drafts for 门店销售、商品销售、客服/工单运营 style fields, including common time, amount/revenue, cost/spend, quantity, ID, dimension, order-count, ticket-count, and response-duration roles. P24-H2 made questions and report goals explicit evidence requirements; generic semantic-layer SQL/evidence covers rankings, contribution/share, operational efficiency, and safe same-table investment efficiency; unsupported ROI/net-return/trend/repeat-purchase/cross-table combinations become data limits instead of invented hard facts. P24-H3 proved the chain against realistic Chinese 门店、商品/品类、客户分群、客服、渠道投放、区域 datasets, fixed month-grain date filtering and same-table ROAS formula selection, fixed risk/improvement decision consistency so “优先复盘/优先处理/风险/改善” questions are not rewritten to the highest-sales entity, added deterministic report fallback when provider report validation remains partial, ran real DeepSeek analysis/report acceptance, and completed cleanup, frontend verification, old-path audit, and tracked-artifact hygiene. Report Center still writes one coherent Chinese report rather than stitched analysis answers. P24 did not add Word/PPT/PDF/飞书/企业微信/钉钉/Tencent Docs integrations; those move after the now-stable evidence ledger/artifact path.
+
+P25 is complete in `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`. It used the real manual testing issues from workspace `p24-32cc63f6` as product feedback: answer the primary metric directly, remove contradictory data limits, stop stale demo-field fallbacks, infer report titles and report shape from the user's goal, simplify the Report Center form, verify the result with realistic Chinese datasets plus opt-in live DeepSeek tests, and make missing time ranges natural in safe cases. H3 added a compact generated-data acceptance suite for the four real analysis questions and four report goals, fixed live-provider metric-fragment normalization so calculated ROI evidence is not reported as missing, reran real DeepSeek acceptance, and closed cleanup/documentation. H4 added a shared semantic/profile-backed time default policy: when users omit a time range, Analysis Workbench and Report Center default to the dataset's full available time range only when there is one safe time field, state the full date span in evidence and output, and still clarify ambiguous time fields or analysis trend grain gaps. Old paths, stale tests, unreachable compatibility branches, and template-like report-type behavior may be deleted instead of preserved.
+
+P25-H1 is complete. Analysis Workbench now prioritizes the primary metric in the user's question, avoids contradictory data-limit wording for calculated evidence, and stops falling back to old demo schema fields when the current workspace cannot safely support a query. P25-H2 is complete. Report Center now infers report intent from the user's goal before local topic keywords, keeps broad经营复盘 and管理层经营简报 titles from being hijacked by渠道局部词, preserves specialized channel/trend titles for single-topic goals, and makes the main report form goal-first with `report_type` reduced to an internal default. P25-H3 is complete. Realistic acceptance, live DeepSeek acceptance, backend/frontend regression, old-path audit, tracked-artifact audit, and documentation closeout are done. P25-H4 is complete. A shared time default helper applies safe full-data time ranges across question understanding, evidence requirements, answers, and report metadata without introducing table-specific business rules; it now recognizes generic explicit ranges such as 最近 N 天, 近 N 个月, and 本季度, keeps trend analysis clarifications when grain is missing, and stops Report Center on ambiguous time fields instead of silently defaulting.
+
+P23-H1 through P23-H6 are complete. The shared factual payload foundation now lives in `tools/evidence_tool.build_evidence_payload()` as `p23.shared.v1`, and both Analysis Workbench `fact_payload` and Report Center `ReportEvidencePack.evidence_payloads` use it for intent, time range, metrics, dimensions, result rows, derived metrics, formula metadata, chart-ready data, warnings/data limits, and technical-detail references. Unsupported requested metrics are recorded as data limits instead of being invented. H2 polished Analysis Workbench Chinese business answers so supported facts remain evidence-bound while model explanations, hypotheses, conditional recommendations, and missing-data caveats read like natural business analysis. H3 hardened the one-pass Report Center path with shared evidence. H4 added the `p23.report_ledger.v1` EvidenceLedger, chapter coverage metadata, ledger-backed report composition/validation, and one automatic repair pass for unsupported hard facts while keeping Report Center one-pass and free of old section-answer stitching. H4's post-acceptance repair made coverage evidence-aware and added metric role selection so tables with收入、成本、ROI use收入 for contribution totals/shares/rankings, ROI-only or average/duration-only tables keep row facts without misleading SUM/share derivatives, and coverage reports only truly missing cost/profit/ROI inputs. H5 added report artifact and tool-call readiness without external SaaS: chart artifacts reference ledger facts/derived metrics, Markdown/report-document artifacts summarize ledger references, and future export tools can use artifact ids plus ledger evidence ids instead of re-querying SQL or asking the model to recalculate. H6 closed the phase with cleanup, regression, no-key verification, tracked-artifact audit, and explicit live-provider gating.
+
+## Current Entry Points
+
+Backend:
+
+```bash
+uvicorn api.app:app --reload
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Primary product APIs:
 
 ```text
-User Question
--> Question Understanding / Clarification
--> SQL Planning Router
--> deterministic template or guarded LLM SQL candidate
--> validate_sql()
--> run_sql()
--> Evidence Validator
--> guarded insight/report polishing
--> Chart Tool / Report Tool
--> Action Plan Drafting
--> Risk Assessor / Approval Gate
--> Action Tool
--> Audit / Trace
+POST /api/workspaces/{workspace_id}/runs
+POST /api/workspaces/{workspace_id}/reports
 ```
 
-### LLM Acceptance Rules
+Primary frontend routes:
 
-- README, DEVELOPMENT_STATUS, requirements, and development plan language must stay aligned on LLM boundaries.
-- All real-provider outputs must pass prompt-specific structured-output validation.
-- LLM work must be connected to a real runtime path with tests, trace evidence, and opt-in live DeepSeek verification.
-- LLM-assisted SQL candidates must not bypass `validate_sql()`.
-- LLM-assisted insights and reports must not bypass Evidence Validator.
-- LLM-assisted action drafts must not bypass Approval Gate or Audit Logger.
-- Default no-key baseline must continue to run.
-- P0 eval must remain 20/20 passing.
+```text
+/workspaces/{workspaceId}/analysis
+/workspaces/{workspaceId}/reports
+/workspaces/{workspaceId}/settings
+/workspaces/{workspaceId}/runs/{runId}
+```
 
-## 12. Long-Term Development Principles
+## Verification Plan
 
-- Do not pile on features before the current phase is stable.
-- Preserve Agent/Tool/Graph boundaries.
-- Prefer deterministic baselines and optional model-assisted enhancements.
-- Every new behavior needs focused tests.
-- High-risk boundaries must remain tool-owned: SQL validation, SQL execution, evidence validation, approval, trace, and audit.
-- User-facing demos should make implemented capabilities visible and understandable.
+Use these commands for current product regression:
+
+```bash
+python3 -m pytest tests/test_p17_product_cleanup_boundaries.py tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q
+python3 -m pytest tests/test_metric_tool.py tests/test_evidence_tool.py tests/test_evidence_validator.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_project_initialization.py tests/test_mcp_tool_layer.py -q
+python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q
+python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_p20_live_deepseek_acceptance.py -q
+cd frontend && npm test
+cd frontend && npm run build
+```
+
+Live DeepSeek tests remain opt-in. To run live acceptance locally, set `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`, `DEEPSEEK_API_KEY`, and the provider feature flags, then run the current live analysis/report acceptance tests. Without those flags and a key, live tests skip and normal regression remains deterministic. P25-H3 reran real DeepSeek acceptance with local `.env` plus explicit opt-in flags: P24/P25-style analysis/report evidence acceptance, P20 live store analysis, P12 report acceptance, and P11 workspace analysis all passed (`4 passed in 254.67s`).
+
+## Historical / Superseded Context
+
+The following names are retained only for cleanup history, deleted-file assertions, or low-level fixture context. They are not current product entry points or development instructions:
+
+- Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference.
+- Historical retained fixture: `data/ecommerce.db` remains only because low-level tests use it directly for schema, SQL, workflow, report, MCP, and provider regressions.
+- Historical P11/P12/P13 design specs under `docs/superpowers/specs/` are snapshots. Current implementation guidance is `docs/product/plans/`, the P16 `business_answer` contract, and the P17 cleanup plan.

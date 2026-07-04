@@ -3,20 +3,36 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from agents.analysis_planner import run_analysis_planner_agent
 from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
+from agents.evidence_validator import run_evidence_validator_agent
 from agents.insight_claim_typer import run_insight_claim_typer_agent
 from agents.insight_agent import run_insight_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
+from agents.schema_repair import is_schema_mismatch_review, run_schema_repair_agent
 from agents.sql_planning_router import run_sql_planning_router_agent
 from agents.sql_generator import run_sql_generator
 from agents.sql_reviewer import run_sql_reviewer
+from agents.visualization_agent import run_visualization_agent
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
+from workspaces.context_pack_builder import build_fast_fact_context_pack
+from workspaces.fast_fact_composer import build_fast_fact_claims, compose_fast_fact_answer
+from workspaces.product_result_builder import build_evidence
 
 from graph.state import AgentState
+
+
+def _artifact_dir(state: dict, child: str) -> str:
+    base = state.get("run_artifact_dir")
+    if base:
+        path = Path(base) / child
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+    return f"reports/{child}"
 
 
 def schema_node(state: AgentState) -> AgentState:
@@ -27,12 +43,23 @@ def metric_node(state: AgentState) -> AgentState:
     return run_metric_agent(dict(state))
 
 
+def route_after_metric(state: AgentState) -> str:
+    planning = state.get("sql_planning", {})
+    if planning.get("source") == "provider" and planning.get("strategy") == "llm_candidate":
+        return "guarded_candidate"
+    return "generate"
+
+
 def clarification_node(state: AgentState, provider=None) -> AgentState:
     return run_clarification_router_agent(dict(state), provider=provider)
 
 
 def sql_planning_node(state: AgentState, provider=None) -> AgentState:
     return run_sql_planning_router_agent(dict(state), provider=provider)
+
+
+def analysis_planner_node(state: AgentState, provider=None) -> AgentState:
+    return run_analysis_planner_agent(dict(state), provider=provider)
 
 
 def early_response_node(state: AgentState) -> AgentState:
@@ -55,6 +82,8 @@ def early_response_node(state: AgentState) -> AgentState:
     updated = {
         **state,
         "status": status,
+        "question_thread_status": status,
+        "clarification_question": (state.get("clarification_questions") or [""])[0],
         "final_answer": answer,
         "data_used": False,
     }
@@ -110,7 +139,29 @@ def guarded_sql_candidate_node(state: AgentState, provider=None) -> AgentState:
 
 
 def sql_reviewer_node(state: AgentState) -> AgentState:
-    return run_sql_reviewer(dict(state))
+    updated = run_sql_reviewer(dict(state))
+    if updated.get("schema_repair_pending_review"):
+        review_result = updated.get("review_result", {})
+        repair = dict(updated.get("schema_repair") or {})
+        approved = bool(review_result.get("approved"))
+        repair.update(
+            {
+                "reviewed": True,
+                "succeeded": approved,
+                "review_status": "approved" if approved else "rejected",
+                "repair_rejection_reasons": list(review_result.get("issues") or []),
+            }
+        )
+        updated["schema_repair"] = repair
+        updated["schema_repair_succeeded"] = approved
+        updated["schema_repair_pending_review"] = False
+        if not approved:
+            updated["schema_repair_reason"] = "; ".join(str(issue) for issue in review_result.get("issues") or [])
+    return updated
+
+
+def schema_repair_node(state: AgentState, provider=None) -> AgentState:
+    return run_schema_repair_agent(dict(state), provider=provider)
 
 
 def sql_executor_node(state: AgentState) -> AgentState:
@@ -132,6 +183,68 @@ def sql_executor_node(state: AgentState) -> AgentState:
     return append_trace(updated, trace_event)
 
 
+def fast_fact_node(state: AgentState) -> AgentState:
+    evidence = build_evidence(dict(state))
+    fact_payload = evidence.get("fact_payload") if isinstance(evidence.get("fact_payload"), dict) else {}
+    claims = build_fast_fact_claims(
+        analysis_task=state.get("analysis_task") or {},
+        execution_result=state.get("execution_result") or {},
+        fact_payload=fact_payload,
+    )
+    validated = run_evidence_validator_agent({**dict(state), "claims_to_validate": claims})
+    evidence_result = dict(validated.get("evidence_result") or {})
+    if evidence_result.get("success"):
+        evidence_result.setdefault("validation_status", "validated")
+
+    fast_fact_context_pack = build_fast_fact_context_pack(
+        user_question=state.get("user_question", ""),
+        analysis_route=state.get("analysis_route") or {},
+        analysis_task=state.get("analysis_task") or {},
+        fact_payload=fact_payload,
+        evidence_result=evidence_result,
+        execution_result=state.get("execution_result") or {},
+        metric_registry=state.get("metric_registry") or state.get("metric_context") or {},
+    )
+    business_answer = compose_fast_fact_answer(
+        user_question=state.get("user_question", ""),
+        analysis_route=state.get("analysis_route") or {},
+        analysis_task=state.get("analysis_task") or {},
+        execution_result=state.get("execution_result") or {},
+        evidence_result=evidence_result,
+        fact_payload=fact_payload,
+        context_pack=fast_fact_context_pack,
+    )
+    final_answer = business_answer.get("direct_answer") or business_answer.get("headline") or ""
+    updated = {
+        **validated,
+        "status": "completed",
+        "data_used": True,
+        "business_answer": business_answer,
+        "final_answer": final_answer,
+        "fast_fact_context_pack": fast_fact_context_pack,
+        "fast_fact_result": {
+            "success": True,
+            "business_answer": business_answer,
+            "fact_payload": fact_payload,
+            "context_pack": fast_fact_context_pack,
+            "claims_to_validate": claims,
+        },
+    }
+    return append_trace(
+        updated,
+        {
+            "node": "fast_fact_composer",
+            "tool_name": "",
+            "tool_input_summary": f"route={(state.get('analysis_route') or {}).get('route', '')}",
+            "tool_output_summary": final_answer[:200],
+            "status": "success",
+            "latency_ms": 0,
+            "provider_called": False,
+            "fallback_used": False,
+        },
+    )
+
+
 def error_fix_node(state: AgentState) -> AgentState:
     fixed = run_error_fix_agent(dict(state))
     if fixed.get("fixed_sql"):
@@ -139,8 +252,18 @@ def error_fix_node(state: AgentState) -> AgentState:
     return fixed
 
 
-def insight_node(state: AgentState) -> AgentState:
-    updated = run_insight_agent(dict(state))
+def insight_node(
+    state: AgentState,
+    provider=None,
+    answer_reviewer_provider=None,
+    final_answer_composer_provider=None,
+) -> AgentState:
+    updated = run_insight_agent(
+        dict(state),
+        provider=provider,
+        answer_reviewer_provider=answer_reviewer_provider,
+        final_answer_composer_provider=final_answer_composer_provider,
+    )
     updated["status"] = "completed" if updated.get("insight", {}).get("success") else "failed"
     updated["data_used"] = updated.get("insight", {}).get("data_used", False)
     return updated
@@ -150,6 +273,12 @@ def claim_typing_node(state: AgentState, provider=None) -> AgentState:
     if state.get("status") != "completed":
         return dict(state)
     return run_insight_claim_typer_agent(dict(state), provider=provider)
+
+
+def visualization_agent_node(state: AgentState, provider=None) -> AgentState:
+    if state.get("status") != "completed":
+        return dict(state)
+    return run_visualization_agent(dict(state), provider=provider, output_dir=_artifact_dir(state, "charts"))
 
 
 def fail_response_node(state: AgentState) -> AgentState:
@@ -193,6 +322,14 @@ def save_trace_node(state: AgentState) -> AgentState:
         session_id=state.get("session_id"),
         user_question=state.get("user_question"),
         status=state.get("status", "unknown"),
+        question_thread={
+            "original_question": state.get("original_question") or state.get("user_question") or "",
+            "clarification_question": state.get("clarification_question") or "",
+            "clarification_answer": state.get("clarification_answer") or "",
+            "resolved_question": state.get("resolved_question") or "",
+            "pending_run_id": state.get("pending_run_id") or "",
+            "status": state.get("question_thread_status") or state.get("status", "unknown"),
+        },
     )
     updated = {
         **state,
@@ -207,11 +344,24 @@ def save_trace_node(state: AgentState) -> AgentState:
 def route_after_review(state: AgentState) -> str:
     if state.get("review_result", {}).get("approved"):
         return "execute"
+    if (
+        is_schema_mismatch_review(state.get("review_result"))
+        and not state.get("schema_repair_attempted")
+    ):
+        return "schema_repair"
+    return "fail"
+
+
+def route_after_schema_repair(state: AgentState) -> str:
+    if state.get("schema_repair_pending_review") and state.get("generated_sql"):
+        return "review"
     return "fail"
 
 
 def route_after_execute(state: AgentState) -> str:
     if state.get("execution_result", {}).get("success"):
+        if (state.get("analysis_route") or {}).get("route") == "fast_fact":
+            return "fast_fact"
         return "insight"
     if int(state.get("retry_count") or 0) < 1:
         return "fix"
@@ -229,6 +379,30 @@ def route_after_clarification(state: AgentState) -> str:
         return "schema"
     if state.get("routing_strategy") == "reject":
         return "early_response"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("clarification_result", {}).get("requires_clarification") is True
+    ):
+        return "early_response"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and _has_continuation_context(state)
+        and not state.get("clarification_result", {}).get("missing_slots")
+    ):
+        return "schema"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("clarification_result", {}).get("provider_called")
+        and state.get("clarification_result", {}).get("requires_clarification") is False
+    ):
+        return "schema"
+    if state.get("routing_strategy") == "clarify" and state.get("stop_for_clarification"):
+        return "early_response"
+    if (
+        state.get("routing_strategy") == "clarify"
+        and state.get("question_understanding", {}).get("source") == "provider_unavailable"
+    ):
+        return "early_response"
     if state.get("routing_strategy") == "clarify" and state.get("clarification_result", {}).get("provider_called"):
         return "early_response"
     return "schema"
@@ -238,6 +412,21 @@ def route_after_sql_planning(state: AgentState) -> str:
     if state.get("initial_sql"):
         return "schema"
     planning = state.get("sql_planning", {})
-    if planning.get("source") == "provider" and planning.get("strategy") in {"clarify", "reject"}:
+    if (
+        planning.get("source") == "provider"
+        and planning.get("strategy") == "clarify"
+        and _has_continuation_context(state)
+    ):
+        return "schema"
+    if planning.get("source") in {"provider", "provider_unavailable"} and planning.get("strategy") in {"clarify", "reject"}:
         return "early_response"
     return "schema"
+
+
+def _has_continuation_context(state: AgentState) -> bool:
+    return bool(
+        state.get("pending_run_id")
+        and state.get("clarification_answer")
+        and state.get("resolved_question")
+        and not state.get("stop_for_clarification")
+    )

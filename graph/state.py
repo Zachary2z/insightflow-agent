@@ -9,6 +9,13 @@ class AgentState(TypedDict, total=False):
     run_id: str
     session_id: str
     user_question: str
+    original_question: str
+    clarification_question: str
+    clarification_answer: str
+    resolved_question: str
+    pending_run_id: str
+    question_thread_status: str
+    stop_for_clarification: bool
     task_type: str
     report_type: str
     report_plan: dict[str, Any]
@@ -19,11 +26,22 @@ class AgentState(TypedDict, total=False):
     llm_insight_enhancement: dict[str, Any]
     claim_typing_result: dict[str, Any]
     question_understanding: dict[str, Any]
+    analysis_task: dict[str, Any]
+    analysis_route: dict[str, Any]
+    fast_fact_context_pack: dict[str, Any]
     intent_slots: dict[str, Any]
     routing_strategy: str
     clarification_result: dict[str, Any]
     sql_planning: dict[str, Any]
     sql_routing_strategy: str
+    comparison_scope_adjustment: dict[str, Any]
+    analysis_plan: dict[str, Any]
+    scenario_type: str
+    analysis_steps: list[dict[str, Any]]
+    visualization_decision: dict[str, Any]
+    visualization_plan: dict[str, Any]
+    visualization_delivery_result: dict[str, Any]
+    visualization_trace: dict[str, Any]
     llm_sql_enhancement: dict[str, Any]
     action_plan: dict[str, Any]
     risk_assessment: dict[str, Any]
@@ -39,6 +57,12 @@ class AgentState(TypedDict, total=False):
     db_path: str | Path
     trace_dir: str | Path
     initial_sql: str
+    workspace_id: str | None
+    workspace_root: str | None
+    profile_path: str | None
+    semantic_layer_path: str | None
+    workspace_context: dict[str, Any]
+    run_artifact_dir: str | None
 
     database_schema: dict[str, Any]
     schema_text: str
@@ -63,6 +87,11 @@ class AgentState(TypedDict, total=False):
     sql_reason: str
     review_result: dict[str, Any]
     review_retry_count: int
+    schema_repair_attempted: bool
+    schema_repair_succeeded: bool
+    schema_repair_reason: str
+    schema_repair: dict[str, Any]
+    schema_repair_pending_review: bool
 
     execution_result: dict[str, Any]
     error_message: str
@@ -71,6 +100,8 @@ class AgentState(TypedDict, total=False):
     retry_count: int
 
     insight: dict[str, Any]
+    answer_review: dict[str, Any]
+    answer_composition: dict[str, Any]
     final_answer: str
     data_used: bool
 

@@ -5,6 +5,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from semantic_layer.retriever import retrieve_semantic_context
+
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_CONTEXT_PATHS = {
@@ -194,6 +196,7 @@ def retrieve_business_context(
         matched_rules = _matched_sections(question, rule_sections)
         matched_table_docs = _matched_sections(question, table_sections)
         matched_sql_examples = _matched_sql_examples(question, sql_examples)
+        semantic_context = retrieve_semantic_context(question)
     except Exception as exc:
         latency_ms = int((perf_counter() - started_at) * 1000)
         error = str(exc)
@@ -215,6 +218,7 @@ def retrieve_business_context(
         "matched_rules": matched_rules,
         "matched_table_docs": matched_table_docs,
         "matched_sql_examples": matched_sql_examples,
+        "semantic_context": semantic_context,
         "context_summary": _context_summary(matched_rules, matched_table_docs, matched_sql_examples),
         "trace_event": _trace_event(
             question,

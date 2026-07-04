@@ -40,6 +40,7 @@ def _base_checks() -> dict[str, bool]:
         "sensitive_fields_blocked": True,
         "metric_formula_correct": True,
         "paid_filter_included": True,
+        "sqlite_compatible": True,
     }
 
 
@@ -82,6 +83,31 @@ def _table_aliases(expression: exp.Expression) -> dict[str, str]:
     return aliases
 
 
+def _projection_names(query: exp.Expression) -> set[str]:
+    if isinstance(query, exp.Union):
+        return _projection_names(query.left)
+    if not isinstance(query, exp.Select):
+        return set()
+    names: set[str] = set()
+    for projection in query.expressions:
+        if isinstance(projection, exp.Star):
+            names.add("*")
+            continue
+        name = projection.alias_or_name
+        if name:
+            names.add(name.lower())
+    return names
+
+
+def _derived_table_aliases(expression: exp.Expression) -> dict[str, set[str]]:
+    aliases: dict[str, set[str]] = {}
+    for subquery in expression.find_all(exp.Subquery):
+        alias = subquery.alias
+        if alias:
+            aliases[alias.lower()] = _projection_names(subquery.this)
+    return aliases
+
+
 def _select_aliases(expression: exp.Expression) -> set[str]:
     if not isinstance(expression, exp.Select):
         return set()
@@ -109,6 +135,7 @@ def _validate_columns(
     checks: dict[str, bool],
 ) -> None:
     aliases = _table_aliases(expression)
+    derived_aliases = _derived_table_aliases(expression)
     projection_aliases = _select_aliases(expression)
 
     for column in expression.find_all(exp.Column):
@@ -120,6 +147,13 @@ def _validate_columns(
             issues.append(f"Sensitive field access is not allowed: {column.name}")
 
         if table_ref:
+            derived_columns = derived_aliases.get(table_ref)
+            if derived_columns is not None:
+                if "*" not in derived_columns and column_name not in derived_columns:
+                    checks["columns_exist"] = False
+                    issues.append(f"Unknown column: {column.table}.{column.name}")
+                continue
+
             table_name = aliases.get(table_ref)
             if not table_name:
                 checks["columns_exist"] = False
@@ -181,6 +215,12 @@ def _validate_metric_context(
         issues.append("GMV queries must include orders.status = 'paid'")
 
 
+def _validate_sqlite_compatibility(sql: str, issues: list[str], checks: dict[str, bool]) -> None:
+    if re.search(r"\bINTERVAL\s+['\"]?\d+['\"]?\s+\w+", sql, flags=re.IGNORECASE):
+        checks["sqlite_compatible"] = False
+        issues.append("SQLite does not support INTERVAL date arithmetic; use date() or julianday() syntax")
+
+
 def validate_sql(
     sql: str,
     schema: dict[str, Any],
@@ -200,6 +240,8 @@ def validate_sql(
     if _contains_dangerous_keyword(sql):
         checks["no_dangerous_keywords"] = False
         issues.append("SQL contains a dangerous keyword")
+
+    _validate_sqlite_compatibility(sql, issues, checks)
 
     expression = None
     try:
@@ -234,6 +276,7 @@ def validate_sql(
         "sensitive_fields_blocked",
         "metric_formula_correct",
         "paid_filter_included",
+        "sqlite_compatible",
     ]
     approved = all(checks[check] for check in blocking_checks)
     risk_level = "low" if approved else "high"

@@ -5,6 +5,7 @@ from typing import Any
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
+from question_understanding.task_contract import build_clarification_questions
 
 
 _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "selected_tables"}
@@ -21,11 +22,17 @@ def _fallback_result(
     provider_error: str = "",
     validation_error: str = "",
 ) -> dict[str, Any]:
+    task = dict(understanding.get("analysis_task") or {})
+    missing_slots = list(task.get("missing_slots") or understanding.get("missing_slots", []))
+    clarification_questions = build_clarification_questions(missing_slots, task=task) or list(
+        understanding.get("clarification_questions", [])
+    )
     return {
         "success": True,
         "requires_clarification": understanding.get("strategy") == "clarify",
-        "missing_slots": list(understanding.get("missing_slots", [])),
-        "clarification_questions": list(understanding.get("clarification_questions", [])),
+        "analysis_task": task,
+        "missing_slots": missing_slots,
+        "clarification_questions": clarification_questions,
         "risk_flags": list(understanding.get("risk_flags", [])),
         "reason": understanding.get("reason", ""),
         "source": "deterministic",

@@ -92,6 +92,7 @@ def save_trace(
     session_id: str | None = None,
     user_question: str | None = None,
     status: str = "success",
+    question_thread: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_at = perf_counter()
     safe_run_id = _safe_run_id(run_id)
@@ -101,6 +102,7 @@ def save_trace(
         "session_id": session_id,
         "user_question": user_question,
         "status": status,
+        "question_thread": question_thread or {},
         "event_count": len(trace),
         "trace": trace,
         "saved_at": _now_iso(),

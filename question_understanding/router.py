@@ -3,9 +3,18 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from question_understanding.task_contract import (
+    build_clarification_questions,
+    extract_time_range,
+    legacy_dimension_id,
+    legacy_metric_id,
+    normalize_analysis_task,
+    strategy_for_task,
+)
+
 
 def _compact(text: str) -> str:
-    return text.lower().replace(" ", "")
+    return re.sub(r"[\s_\-（）()。,.，:：]+", "", text.lower())
 
 
 def _contains(text: str, *keywords: str) -> bool:
@@ -25,40 +34,34 @@ def _extract_limit(question: str) -> int | None:
 
 
 def _extract_time_range(question: str) -> dict[str, Any]:
-    match = re.search(r"最近\s*(\d+)\s*天", question)
-    if match:
-        days = int(match.group(1))
-        return {"type": "last_n_days", "value": days, "raw_text": f"最近 {days} 天"}
-
-    match = re.search(r"最近\s*(\d+)\s*个?月", question)
-    if match:
-        months = int(match.group(1))
-        return {"type": "last_n_months", "value": months, "raw_text": f"最近 {months} 个月"}
-
-    if _contains(question, "本周", "这周"):
-        return {"type": "this_week", "raw_text": "本周"}
-    if _contains(question, "本月", "这个月"):
-        return {"type": "this_month", "raw_text": "本月"}
-    if _contains(question, "季度", "本季度"):
-        return {"type": "quarter", "raw_text": "季度"}
-    return {}
+    return extract_time_range(question) or {}
 
 
 def _extract_metric(question: str) -> str:
+    if _contains(question, "净投放回报率", "净回报率", "net return", "net_return", "net roi", "netroi"):
+        return "net_return"
     if _contains(question, "复购率", "复购"):
         return "repurchase_rate"
     if _contains(question, "客单价", "aov", "平均订单金额"):
         return "aov"
     if _contains(question, "订单量", "订单数", "订单数量", "ordercount"):
         return "order_count"
-    if _contains(question, "销售额", "gmv", "成交额", "收入", "销售情况"):
+    if _contains(question, "销售额", "gmv", "成交额", "收入", "销售情况", "贡献", "占比", "支付金额", "paid amount"):
         return "gmv"
+    if _contains(question, "花费", "费用", "成本", "投放成本", "spend", "cost"):
+        return "spend"
+    if _contains(question, "roas"):
+        return "roas"
+    if _contains(question, "roi"):
+        return "roi"
     if _contains(question, "销量", "销售量"):
         return "product_sales"
     return ""
 
 
 def _extract_dimension(question: str) -> str:
+    if _contains(question, "门店", "店铺", "store", "store name"):
+        return "store"
     if _contains(question, "商品", "产品", "product"):
         return "product"
     if _contains(question, "品类", "类别", "category"):
@@ -79,9 +82,11 @@ def _extract_operation(question: str) -> str:
         return "trend"
     if _contains(question, "下降", "下滑", "降低", "跌"):
         return "decline"
+    if _contains(question, "roi", "roas", "投放成本", "加预算", "预算建议", "预算", "推荐", "建议"):
+        return "comparison"
     if _contains(question, "对比", "比较", "环比", "同比"):
         return "comparison"
-    if _contains(question, "最高", "最多", "top", "前"):
+    if _contains(question, "最高", "最多", "贡献最大", "占比", "top", "前"):
         return "top_n"
     if _contains(question, "明细", "详情", "drilldown"):
         return "drilldown"
@@ -113,21 +118,12 @@ def _risk_flags(question: str) -> list[str]:
 
 
 def _missing_slots(intent: dict[str, Any]) -> list[str]:
-    required = ["metric", "dimension", "time_range", "operation"]
+    required = ["metric", "dimension", "time_range"]
     return [slot for slot in required if not intent.get(slot)]
 
 
-def _clarification_questions(missing: list[str]) -> list[str]:
-    questions = []
-    if "metric" in missing:
-        questions.append("请确认要分析的指标，例如 GMV、订单量、客单价或复购率？")
-    if "dimension" in missing:
-        questions.append("请确认要按哪个维度分析，例如商品、品类、城市或用户？")
-    if "time_range" in missing:
-        questions.append("请确认分析时间范围，例如最近 30 天、本周、本月或最近 3 个月？")
-    if "operation" in missing:
-        questions.append("请确认分析方式，例如 Top N、趋势、对比、下降原因或概览？")
-    return questions
+def _clarification_questions(missing: list[str], task: dict[str, Any] | None = None) -> list[str]:
+    return build_clarification_questions(missing, task=task)
 
 
 def _is_stable_template_intent(intent: dict[str, Any]) -> bool:
@@ -141,7 +137,7 @@ def _is_stable_template_intent(intent: dict[str, Any]) -> bool:
     )
 
 
-def understand_question(question: str) -> dict[str, Any]:
+def understand_question(question: str, workspace_context: dict[str, Any] | None = None) -> dict[str, Any]:
     metric = _extract_metric(question)
     dimension = _extract_dimension(question)
     operation = _extract_operation(question)
@@ -154,12 +150,30 @@ def understand_question(question: str) -> dict[str, Any]:
         "limit": _extract_limit(question),
         "risk_flags": _risk_flags(question),
     }
+    task = normalize_analysis_task(question, intent=intent, workspace_context=workspace_context)
+    if task["metrics"] and not intent["metric"]:
+        intent["metric"] = legacy_metric_id(task["metrics"][0])
+    if task["dimensions"] and not intent["dimension"]:
+        intent["dimension"] = legacy_dimension_id(task["dimensions"][0])
+    if task["time_range"] and not intent["time_range"]:
+        intent["time_range"] = task["time_range"]
+    if not intent["operation"]:
+        intent["operation"] = {
+            "compare": "comparison",
+            "rank": "top_n",
+            "trend": "trend",
+            "recommendation": "comparison",
+            "summary": "summary",
+            "anomaly": "comparison",
+            "report": "summary",
+        }.get(task["task_type"], "summary")
 
     if intent["risk_flags"]:
         return {
             "success": True,
             "strategy": "reject",
             "intent": intent,
+            "analysis_task": task,
             "missing_slots": [],
             "clarification_questions": [],
             "risk_flags": intent["risk_flags"],
@@ -167,24 +181,26 @@ def understand_question(question: str) -> dict[str, Any]:
             "reason": "Question understanding rejected the request before SQL planning.",
         }
 
-    missing = _missing_slots(intent)
+    missing = task["missing_slots"]
     if missing:
         return {
             "success": True,
             "strategy": "clarify",
             "intent": intent,
+            "analysis_task": task,
             "missing_slots": missing,
-            "clarification_questions": _clarification_questions(missing),
+            "clarification_questions": _clarification_questions(missing, task),
             "risk_flags": [],
             "rejection_reason": "",
             "reason": "Question is missing required intent slots.",
         }
 
-    strategy = "template" if _is_stable_template_intent(intent) else "llm_candidate"
+    strategy = "template" if _is_stable_template_intent(intent) else strategy_for_task(task)
     return {
         "success": True,
         "strategy": strategy,
         "intent": intent,
+        "analysis_task": task,
         "missing_slots": [],
         "clarification_questions": [],
         "risk_flags": [],

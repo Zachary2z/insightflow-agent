@@ -74,3 +74,438 @@ def test_validate_evidence_returns_error_for_missing_claims():
     assert "claims are required" in result["error"]
     assert result["trace_event"]["status"] == "error"
     assert result["trace_event"]["error_type"] == "evidence_validation_error"
+
+
+def test_build_evidence_payload_preserves_comparison_rows_formulas_and_business_formats():
+    from tools.evidence_tool import build_evidence_payload
+
+    execution_result = {
+        "success": True,
+        "columns": ["channel", "total_revenue", "total_spend", "roas", "net_return"],
+        "rows": [
+            ["自然流量", 26255.44, 0.0, None, None],
+            ["付费搜索", 18400.0, 5000.0, 3.68, 2.68],
+            ["内容种草", 12000.0, 4500.0, 2.6667, 1.6667],
+        ],
+        "row_count": 3,
+    }
+    metric_registry = {
+        "metrics": {
+            "roas": {
+                "business_label": "广告投入产出比",
+                "formula": "SUM(revenue) / NULLIF(SUM(spend), 0)",
+                "unit": "ratio",
+            },
+            "net_return": {
+                "business_label": "净投放回报率",
+                "formula": "(SUM(revenue) - SUM(spend)) / NULLIF(SUM(spend), 0)",
+                "unit": "percentage",
+            },
+        },
+        "formulas": {
+            "roas": "SUM(revenue) / NULLIF(SUM(spend), 0)",
+            "net_return": "(SUM(revenue) - SUM(spend)) / NULLIF(SUM(spend), 0)",
+        },
+        "warnings": [],
+    }
+
+    payload = build_evidence_payload(
+        task={"task_type": "recommendation", "dimensions": ["渠道"], "metrics": ["ROAS"], "time_range": {"raw_text": "最近 90 天"}},
+        execution_result=execution_result,
+        metric_registry=metric_registry,
+        sql="SELECT ...",
+        filters=["country = 'CN'"],
+    )
+
+    assert payload["task_type"] == "recommendation"
+    assert payload["columns"] == execution_result["columns"]
+    assert payload["rows"] == execution_result["rows"]
+    assert payload["comparison_scope"]["row_count"] == 3
+    assert payload["comparison_scope"]["sufficient"] is True
+    assert payload["formulas"]["roas"] != payload["formulas"]["net_return"]
+    assert payload["time_scope"] == {"raw_text": "最近 90 天"}
+    assert payload["filters"] == ["country = 'CN'"]
+    assert payload["display_values"][0]["总收入"] == "2.6 万"
+    assert payload["display_values"][1]["广告投入产出比"] == "3.68"
+    assert payload["display_values"][1]["净投放回报率"] == "268.0%"
+    assert "technical_sql" not in payload
+    assert "technical_details" not in payload
+    assert payload["technical_refs"] == {"sql": "technical_details.sql", "raw_rows": "technical_details.raw_rows"}
+
+
+def test_build_evidence_payload_warns_when_ranking_has_only_winner_row():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["门店"], "metrics": ["销售额"], "time_range": {"raw_text": "本月"}},
+        execution_result={
+            "success": True,
+            "columns": ["store_name", "total_revenue"],
+            "rows": [["上海旗舰店", 99800.0]],
+            "row_count": 1,
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        sql="SELECT store_name, SUM(sales) AS total_revenue FROM store_sales GROUP BY store_name ORDER BY total_revenue DESC LIMIT 1",
+    )
+
+    assert payload["comparison_scope"]["required_min_rows"] == 2
+    assert payload["comparison_scope"]["sufficient"] is False
+    assert any("比较范围不足" in warning for warning in payload["warnings"])
+    assert payload["display_values"][0]["门店"] == "上海旗舰店"
+    assert payload["display_values"][0]["总收入"] == "10.0 万"
+
+
+def test_build_evidence_payload_supports_non_channel_business_dataset_aliases():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["客服分组"], "metrics": ["平均解决时长"], "time_range": {"raw_text": "最近 30 天"}},
+        execution_result={
+            "success": True,
+            "columns": ["team_name", "avg_resolution_hours", "ticket_count"],
+            "rows": [["售后组", 3.2, 84], ["技术组", 5.7, 61]],
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        business_aliases={"team_name": "客服分组", "avg_resolution_hours": "平均解决时长", "ticket_count": "工单数"},
+    )
+
+    assert payload["dimensions"] == ["客服分组"]
+    assert payload["metrics"] == ["平均解决时长"]
+    assert payload["display_values"][0]["客服分组"] == "售后组"
+    assert payload["display_values"][0]["平均解决时长"] == "3.2"
+    assert payload["display_values"][0]["工单数"] == "84"
+
+
+def test_build_evidence_payload_exposes_shared_pack_with_traceable_derived_metrics():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "rank",
+            "dimensions": ["门店"],
+            "metrics": ["销售额"],
+            "time_range": {"raw_text": "最近 90 天"},
+            "decision_goal": "比较门店销售贡献",
+        },
+        execution_result={
+            "success": True,
+            "columns": ["store_name", "sales_amount"],
+            "rows": [["上海旗舰店", 300000.0], ["北京国贸店", 100000.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_sales_amount": {
+                    "business_label": "销售额",
+                    "formula": 'SUM("store_sales"."sales_amount")',
+                    "unit": "currency",
+                    "source_fields": ["store_sales.sales_amount"],
+                }
+            },
+            "formulas": {"sum_sales_amount": 'SUM("store_sales"."sales_amount")'},
+            "warnings": [],
+        },
+        sql='SELECT "store_name", SUM("sales_amount") AS sales_amount FROM "store_sales" GROUP BY "store_name"',
+        business_aliases={"store_name": "门店", "sales_amount": "销售额"},
+    )
+
+    assert payload["evidence_pack_version"] == "p23.shared.v1"
+    assert payload["time_range"] == {"raw_text": "最近 90 天"}
+    assert payload["intent"] == {"task_type": "rank", "decision_goal": "比较门店销售贡献"}
+    assert payload["result_rows"][0]["dimensions"][0] == {
+        "key": "store_name",
+        "label": "门店",
+        "value": "上海旗舰店",
+        "display_value": "上海旗舰店",
+    }
+    assert payload["result_rows"][0]["metrics"][0]["key"] == "sales_amount"
+    assert payload["result_rows"][0]["metrics"][0]["display_value"] == "30.0 万"
+    share = next(item for item in payload["derived_metrics"] if item["metric_id"] == "sales_amount_share")
+    assert share["label"] == "销售额占比"
+    assert share["formula"] == "sales_amount / SUM(sales_amount)"
+    assert share["source_columns"] == ["sales_amount"]
+    assert share["values"][0]["display_value"] == "75.0%"
+    rank = next(item for item in payload["derived_metrics"] if item["metric_id"] == "sales_amount_rank")
+    assert rank["values"][0]["display_value"] == "第 1 名"
+    assert payload["formula_metadata"][0] == {
+        "metric_id": "sum_sales_amount",
+        "label": "销售额",
+        "formula": 'SUM("store_sales"."sales_amount")',
+        "source_columns": ["store_sales.sales_amount"],
+        "unit": "currency",
+        "derived": False,
+    }
+    assert payload["chart_data"]["x_axis"] == "store_name"
+    assert payload["chart_data"]["y_axis"] == "sales_amount"
+    assert payload["data_limits"] == []
+    assert payload["technical_refs"] == {"sql": "technical_details.sql", "raw_rows": "technical_details.raw_rows"}
+
+
+def test_build_evidence_payload_records_missing_metric_limit_instead_of_inventing_roi():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "recommendation",
+            "dimensions": ["门店"],
+            "metrics": ["销售额", "ROI"],
+            "time_range": {"raw_text": "最近 90 天"},
+        },
+        execution_result={
+            "success": True,
+            "columns": ["store_name", "sales_amount"],
+            "rows": [["上海旗舰店", 300000.0], ["北京国贸店", 100000.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_sales_amount": {
+                    "business_label": "销售额",
+                    "formula": 'SUM("store_sales"."sales_amount")',
+                    "unit": "currency",
+                    "source_fields": ["store_sales.sales_amount"],
+                }
+            },
+            "formulas": {"sum_sales_amount": 'SUM("store_sales"."sales_amount")'},
+            "warnings": [],
+        },
+        business_aliases={"store_name": "门店", "sales_amount": "销售额"},
+    )
+
+    assert "roi" not in {item["metric_id"].lower() for item in payload["derived_metrics"]}
+    assert any("ROI" in limit and "未计算" in limit for limit in payload["data_limits"])
+
+
+def test_build_evidence_payload_does_not_mark_provider_metric_fragments_missing_when_columns_exist():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "rank",
+            "dimensions": ["渠道"],
+            "metrics": ["销售额", "投放成本", "ROI（收入", "投放）", "销售额（收入）"],
+            "calculation_type": "investment_efficiency",
+        },
+        execution_result={
+            "success": True,
+            "columns": ["渠道", "revenue", "spend", "roi"],
+            "rows": [["私域社群", 198000, 28000, 7.07], ["抖音", 410000, 160000, 2.56]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_revenue": {"business_label": "收入", "formula": "SUM(revenue)", "source_fields": ["revenue"]},
+                "sum_spend": {"business_label": "投放成本", "formula": "SUM(spend)", "source_fields": ["spend"]},
+                "roi": {"business_label": "ROI", "formula": "SUM(revenue) / SUM(spend)", "source_fields": ["revenue", "spend"]},
+            },
+            "formulas": {"roi": "SUM(revenue) / SUM(spend)"},
+            "warnings": [],
+            "available_analysis_capabilities": {"can_calculate_roi": True},
+        },
+        business_aliases={"revenue": "收入", "spend": "投放金额", "roi": "ROI"},
+    )
+
+    limits_text = "\n".join(payload["data_limits"])
+    assert "ROI（收入" not in limits_text
+    assert "投放）" not in limits_text
+    assert "销售额（收入）" not in limits_text
+    assert "ROI/ROAS" not in limits_text
+
+
+def test_build_evidence_payload_does_not_embed_sql_in_shared_business_payload():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["渠道"], "metrics": ["收入"]},
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue"],
+            "rows": [["自然流量", 1200.0], ["付费搜索", 800.0]],
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        sql="SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
+        business_aliases={"channel": "渠道", "revenue": "收入"},
+    )
+
+    assert "technical_sql" not in payload
+    assert "technical_details" not in payload
+    assert payload["technical_refs"] == {
+        "sql": "technical_details.sql",
+        "raw_rows": "technical_details.raw_rows",
+    }
+
+
+def test_build_evidence_payload_targets_requested_metric_for_derived_metrics():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={"task_type": "rank", "dimensions": ["渠道"], "metrics": ["收入"]},
+        execution_result={
+            "success": True,
+            "columns": ["channel", "order_count", "revenue"],
+            "rows": [["自然流量", 42, 1200.0], ["付费搜索", 31, 800.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "revenue": {
+                    "business_label": "收入",
+                    "formula": "SUM(revenue)",
+                    "unit": "currency",
+                    "source_fields": ["orders.revenue"],
+                },
+                "order_count": {
+                    "business_label": "订单数",
+                    "formula": "COUNT(order_id)",
+                    "unit": "number",
+                    "source_fields": ["orders.order_id"],
+                },
+            },
+            "formulas": {"revenue": "SUM(revenue)", "order_count": "COUNT(order_id)"},
+            "warnings": [],
+        },
+        business_aliases={"channel": "渠道", "order_count": "订单数", "revenue": "收入"},
+    )
+
+    derived_ids = {item["metric_id"] for item in payload["derived_metrics"]}
+    assert "revenue_share" in derived_ids
+    assert "revenue_rank" in derived_ids
+    assert "order_count_share" not in derived_ids
+    assert "order_count_rank" not in derived_ids
+    share = next(item for item in payload["derived_metrics"] if item["metric_id"] == "revenue_share")
+    assert share["values"][0]["display_value"] == "60.0%"
+
+
+def test_build_evidence_payload_records_missing_time_cost_and_join_limits():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "recommendation",
+            "dimensions": ["地区"],
+            "metrics": ["收入", "利润", "ROI"],
+            "time_range": {"raw_text": "最近90天"},
+            "requires_time_field": True,
+            "requires_cost_field": True,
+            "requires_join": True,
+        },
+        execution_result={
+            "success": True,
+            "columns": ["region", "revenue_amount"],
+            "rows": [["华东", 98000.0], ["华南", 76000.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_revenue_amount": {
+                    "business_label": "收入",
+                    "formula": 'SUM("区域销售"."收入金额")',
+                    "unit": "currency",
+                    "source_fields": ["区域销售.收入金额"],
+                    "meanings": ["revenue_like"],
+                }
+            },
+            "formulas": {"sum_revenue_amount": 'SUM("区域销售"."收入金额")'},
+            "warnings": ["利润率需要同时存在收入类字段和成本类字段，当前证据不足，未生成。"],
+            "available_analysis_capabilities": {
+                "can_analyze_trends": False,
+                "can_calculate_profit": False,
+                "can_calculate_roi": False,
+                "can_join_tables": False,
+            },
+        },
+        business_aliases={"region": "地区", "revenue_amount": "收入"},
+    )
+
+    limits_text = "\n".join(payload["data_limits"])
+    assert "利润" in limits_text and "成本字段" in limits_text
+    assert "ROI" in limits_text and "投放" in limits_text
+    assert "最近90天" in limits_text and "时间字段" in limits_text
+    assert "跨表" in limits_text and "关联字段" in limits_text
+    assert "roi" not in {item["metric_id"].lower() for item in payload["derived_metrics"]}
+
+
+def test_build_evidence_payload_uses_real_metric_registry_capabilities_for_roi_join_limits():
+    from tools.evidence_tool import build_evidence_payload
+    from tools.metric_tool import build_metric_registry
+
+    metric_registry = build_metric_registry(
+        {
+            "metrics": [
+                {
+                    "name": "sum_收入金额",
+                    "label": "收入",
+                    "field": "销售表.收入金额",
+                    "formula": 'SUM("销售表"."收入金额")',
+                    "business_meaning_candidates": ["revenue_like", "amount_like"],
+                    "source_fields": ["销售表.收入金额"],
+                },
+                {
+                    "name": "sum_投放金额",
+                    "label": "投放金额",
+                    "field": "投放表.投放金额",
+                    "formula": 'SUM("投放表"."投放金额")',
+                    "business_meaning_candidates": ["spend_like", "cost_like", "amount_like"],
+                    "source_fields": ["投放表.投放金额"],
+                },
+            ],
+            "relationships": [],
+            "available_analysis_capabilities": {
+                "can_join_tables": False,
+                "can_calculate_roi": False,
+                "can_calculate_profit": False,
+            },
+        }
+    )
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "recommendation",
+            "dimensions": ["渠道"],
+            "metrics": ["收入", "ROI"],
+            "time_range": {"raw_text": "最近90天"},
+            "requires_join": True,
+        },
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue_amount"],
+            "rows": [["自然流量", 120000.0], ["付费搜索", 98000.0]],
+        },
+        metric_registry=metric_registry,
+        business_aliases={"channel": "渠道", "revenue_amount": "收入"},
+    )
+
+    assert "roas" not in payload["formulas"]
+    assert "net_return" not in payload["formulas"]
+    limits_text = "\n".join(payload["data_limits"])
+    assert "ROI" in limits_text and "投放" in limits_text
+    assert "跨表" in limits_text and "关联字段" in limits_text
+    assert "可确认关联字段" in "\n".join(payload["warnings"])
+
+
+def test_build_evidence_payload_exposes_explicit_evidence_requirements():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "rank",
+            "dimensions": ["品类"],
+            "metrics": ["销售额"],
+            "time_range": {"raw_text": "最近90天"},
+            "filters": ["地区 = 华东"],
+            "calculation_type": "contribution",
+        },
+        execution_result={
+            "success": True,
+            "columns": ["category_name", "sales_amount"],
+            "rows": [["饮料", 120000.0], ["零食", 80000.0]],
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        business_aliases={"category_name": "品类", "sales_amount": "销售额"},
+    )
+
+    requirement = payload["evidence_requirements"][0]
+
+    assert requirement["time_range"] == {"raw_text": "最近90天"}
+    assert requirement["metrics"] == ["销售额"]
+    assert requirement["dimensions"] == ["品类"]
+    assert requirement["filters"] == ["地区 = 华东"]
+    assert requirement["group_by"] == ["品类"]
+    assert requirement["comparison_scope"]["type"] == "peer_comparison"
+    assert requirement["calculation_type"] == "contribution"
+    assert requirement["missing_evidence"] == []

@@ -1,0 +1,187 @@
+orders_to_products_categories:
+  name: "Orders to products and categories"
+  aliases:
+    - "gmv by product"
+    - "gmv by category"
+    - "销售额按商品"
+    - "销售额按品类"
+  tables:
+    - "orders"
+    - "order_items"
+    - "products"
+    - "categories"
+  joins:
+    - "orders.id = order_items.order_id"
+    - "order_items.product_id = products.id"
+    - "products.category_id = categories.id"
+  metrics:
+    - "gmv"
+    - "order_count"
+    - "aov"
+    - "category_gmv"
+    - "product_sales"
+  dimensions:
+    - "product"
+    - "category"
+    - "time"
+  entities:
+    - "order"
+    - "product"
+    - "category"
+  purpose: "Analyze paid order metrics by product or category."
+
+orders_to_users_city:
+  name: "Orders to users and city"
+  aliases:
+    - "gmv by city"
+    - "城市销售额"
+    - "city gmv"
+  tables:
+    - "orders"
+    - "users"
+    - "order_items"
+  joins:
+    - "orders.user_id = users.id"
+    - "orders.id = order_items.order_id"
+  metrics:
+    - "gmv"
+    - "order_count"
+    - "aov"
+  dimensions:
+    - "city"
+    - "time"
+  entities:
+    - "order"
+    - "customer"
+    - "city"
+  purpose: "Analyze paid order metrics by customer city."
+
+marketing_campaigns_to_campaign_daily_metrics:
+  name: "Campaigns to daily metrics"
+  aliases:
+    - "campaign roi"
+    - "paid search roi"
+    - "投放 ROI"
+    - "CAC"
+  tables:
+    - "marketing_campaigns"
+    - "campaign_daily_metrics"
+  joins:
+    - "marketing_campaigns.id = campaign_daily_metrics.campaign_id"
+  metrics:
+    - "net_gmv"
+    - "cac"
+    - "roi"
+    - "roas"
+  dimensions:
+    - "campaign"
+    - "channel"
+    - "promotion"
+    - "time"
+  entities:
+    - "campaign"
+    - "channel"
+    - "promotion"
+  purpose: "Analyze marketing spend, attributed GMV, CAC, ROI, and promotion quality."
+
+traffic_sessions_by_city_channel_category:
+  name: "Traffic sessions by city, channel, and landing category"
+  aliases:
+    - "conversion by city"
+    - "checkout conversion"
+    - "城市转化率"
+    - "sessions"
+  tables:
+    - "traffic_sessions"
+  joins: []
+  metrics:
+    - "conversion_rate"
+    - "checkout_conversion_rate"
+  dimensions:
+    - "city"
+    - "channel"
+    - "category"
+    - "time"
+  entities:
+    - "traffic_session"
+    - "city"
+    - "channel"
+    - "category"
+  purpose: "Analyze traffic funnel conversion by city, channel, and landing category."
+
+refund_requests_to_category:
+  name: "Refunds to category"
+  aliases:
+    - "refund_rate by category"
+    - "退款率按品类"
+    - "售后风险按品类"
+  tables:
+    - "refund_requests"
+    - "orders"
+    - "order_items"
+    - "products"
+    - "categories"
+  joins:
+    - "refund_requests.order_id = orders.id"
+    - "orders.id = order_items.order_id"
+    - "order_items.product_id = products.id"
+    - "products.category_id = categories.id"
+  metrics:
+    - "refund_rate"
+    - "net_gmv"
+  dimensions:
+    - "product"
+    - "category"
+    - "time"
+  entities:
+    - "refund"
+    - "order"
+    - "product"
+    - "category"
+  purpose: "Analyze refunds by product or category using paid order context."
+
+inventory_snapshots_to_products:
+  name: "Inventory snapshots to products"
+  aliases:
+    - "库存按商品"
+    - "stockout by product"
+    - "inventory risk"
+  tables:
+    - "inventory_snapshots"
+    - "products"
+  joins:
+    - "inventory_snapshots.product_id = products.id"
+  metrics:
+    - "stockout_rate"
+  dimensions:
+    - "product"
+    - "category"
+    - "time"
+  entities:
+    - "inventory"
+    - "product"
+    - "category"
+  purpose: "Analyze inventory and stockout risk by product or category."
+
+product_reviews_to_products:
+  name: "Product reviews to products"
+  aliases:
+    - "negative review by product"
+    - "负面评价按商品"
+    - "评价风险"
+  tables:
+    - "product_reviews"
+    - "products"
+  joins:
+    - "product_reviews.product_id = products.id"
+  metrics:
+    - "negative_review_rate"
+  dimensions:
+    - "product"
+    - "category"
+    - "time"
+  entities:
+    - "review"
+    - "product"
+    - "category"
+  purpose: "Analyze review sentiment and product quality risk."

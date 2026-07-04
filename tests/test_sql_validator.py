@@ -135,3 +135,92 @@ def test_validate_sql_detects_metric_formula_and_paid_filter_errors():
     assert filter_result["approved"] is False
     assert filter_result["checks"]["paid_filter_included"] is False
     assert "GMV queries must include orders.status = 'paid'" in filter_result["issues"]
+
+
+def test_validate_sql_rejects_non_sqlite_interval_syntax():
+    from tools.sql_validator import validate_sql
+
+    sql = """
+        SELECT channel, SUM(revenue) AS total_revenue
+        FROM orders
+        WHERE order_date >= (SELECT MAX(order_date) FROM orders) - INTERVAL '90' DAY
+        GROUP BY channel
+        ORDER BY total_revenue DESC
+        LIMIT 5
+    """
+    schema = {
+        "tables": [
+            {
+                "table_name": "orders",
+                "columns": [
+                    {"name": "channel"},
+                    {"name": "revenue"},
+                    {"name": "order_date"},
+                ],
+            }
+        ]
+    }
+
+    result = validate_sql(sql, schema)
+
+    assert result["approved"] is False
+    assert result["checks"]["sqlite_compatible"] is False
+    assert any("SQLite does not support INTERVAL date arithmetic" in issue for issue in result["issues"])
+
+
+def test_validate_sql_allows_safe_derived_table_aliases():
+    from tools.sql_validator import validate_sql
+
+    schema = {
+        "tables": [
+            {
+                "table_name": "orders",
+                "columns": [
+                    {"name": "channel"},
+                    {"name": "order_date"},
+                    {"name": "revenue"},
+                ],
+            },
+            {
+                "table_name": "marketing_spend",
+                "columns": [
+                    {"name": "channel"},
+                    {"name": "spend_date"},
+                    {"name": "spend"},
+                ],
+            },
+        ]
+    }
+    sql = """
+        SELECT
+            a.channel,
+            COALESCE(r.revenue, 0) AS revenue,
+            COALESCE(s.spend, 0) AS spend,
+            CASE
+                WHEN COALESCE(s.spend, 0) = 0 THEN NULL
+                ELSE (COALESCE(r.revenue, 0) - COALESCE(s.spend, 0)) / COALESCE(s.spend, 0)
+            END AS roi
+        FROM (
+            SELECT DISTINCT channel FROM orders
+            UNION
+            SELECT DISTINCT channel FROM marketing_spend
+        ) AS a
+        LEFT JOIN (
+            SELECT channel, SUM(revenue) AS revenue
+            FROM orders
+            WHERE order_date >= date((SELECT MAX(order_date) FROM orders), '-90 days')
+            GROUP BY channel
+        ) AS r ON a.channel = r.channel
+        LEFT JOIN (
+            SELECT channel, SUM(spend) AS spend
+            FROM marketing_spend
+            WHERE spend_date >= date((SELECT MAX(order_date) FROM orders), '-90 days')
+            GROUP BY channel
+        ) AS s ON a.channel = s.channel
+    """
+
+    result = validate_sql(sql, schema)
+
+    assert result["approved"] is True
+    assert result["checks"]["columns_exist"] is True
+    assert not any("Unknown table alias" in issue for issue in result["issues"])
