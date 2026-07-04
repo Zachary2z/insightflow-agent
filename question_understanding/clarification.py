@@ -24,7 +24,7 @@ def _fallback_result(
 ) -> dict[str, Any]:
     task = dict(understanding.get("analysis_task") or {})
     missing_slots = list(task.get("missing_slots") or understanding.get("missing_slots", []))
-    clarification_questions = build_clarification_questions(missing_slots) or list(
+    clarification_questions = build_clarification_questions(missing_slots, task=task) or list(
         understanding.get("clarification_questions", [])
     )
     return {

@@ -141,13 +141,13 @@ def test_metric_registry_distinguishes_roas_net_return_and_margin_formulas():
 
     assert result["success"] is True
     formulas = result["formulas"]
-    assert formulas["roas"] == 'SUM("campaigns"."revenue") / NULLIF(SUM("campaigns"."spend"), 0)'
+    assert formulas["roas"] == '1.0 * SUM("campaigns"."revenue") / NULLIF(SUM("campaigns"."spend"), 0)'
     assert formulas["net_return"] == (
-        '(SUM("campaigns"."revenue") - SUM("campaigns"."spend")) '
+        '1.0 * (SUM("campaigns"."revenue") - SUM("campaigns"."spend")) '
         '/ NULLIF(SUM("campaigns"."spend"), 0)'
     )
     assert formulas["margin_rate"] == (
-        '(SUM("campaigns"."revenue") - SUM("campaigns"."cost")) '
+        '1.0 * (SUM("campaigns"."revenue") - SUM("campaigns"."cost")) '
         '/ NULLIF(SUM("campaigns"."revenue"), 0)'
     )
     assert result["metrics"]["roas"]["business_label"] == "广告投入产出比"
@@ -219,6 +219,318 @@ def test_metric_registry_can_register_average_order_value_when_sources_exist():
     result = build_metric_registry(semantic_layer)
 
     assert result["metrics"]["average_order_value"]["formula"] == (
-        'SUM("stores"."Sales Amount") / NULLIF(COUNT("stores"."order_id"), 0)'
+        '1.0 * SUM("stores"."Sales Amount") / NULLIF(COUNT("stores"."order_id"), 0)'
     )
     assert result["metrics"]["average_order_value"]["unit"] == "currency"
+
+
+def test_metric_registry_uses_general_chinese_business_meanings_for_derived_limits():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_成交金额",
+                "label": "销售额",
+                "field": "商品销售.成交金额",
+                "formula": 'SUM("商品销售"."成交金额")',
+                "business_meaning_candidates": ["revenue_like", "amount_like"],
+                "aliases": ["成交金额", "收入金额", "销售额"],
+            },
+            {
+                "name": "sum_订单数",
+                "label": "订单数",
+                "field": "商品销售.订单数",
+                "formula": 'SUM("商品销售"."订单数")',
+                "business_meaning_candidates": ["order_count_like", "count_like"],
+                "aliases": ["订单数", "订单量"],
+            },
+            {
+                "name": "sum_采购成本",
+                "label": "采购成本",
+                "field": "商品销售.采购成本",
+                "formula": 'SUM("商品销售"."采购成本")',
+                "business_meaning_candidates": ["cost_like", "amount_like"],
+                "aliases": ["采购成本", "成本"],
+            },
+        ]
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    formulas = result["formulas"]
+    assert formulas["margin_rate"] == (
+        '1.0 * (SUM("商品销售"."成交金额") - SUM("商品销售"."采购成本")) '
+        '/ NULLIF(SUM("商品销售"."成交金额"), 0)'
+    )
+    assert formulas["average_order_value"] == (
+        '1.0 * SUM("商品销售"."成交金额") / NULLIF(SUM("商品销售"."订单数"), 0)'
+    )
+    assert "roas" not in result["metrics"]
+    assert any("ROAS" in warning and "花费类字段" in warning for warning in result["warnings"])
+
+
+def test_metric_registry_blocks_cross_table_roas_without_safe_relationship():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_收入金额",
+                "label": "收入",
+                "field": "销售表.收入金额",
+                "formula": 'SUM("销售表"."收入金额")',
+                "business_meaning_candidates": ["revenue_like", "amount_like"],
+                "source_fields": ["销售表.收入金额"],
+            },
+            {
+                "name": "sum_投放金额",
+                "label": "投放金额",
+                "field": "投放表.投放金额",
+                "formula": 'SUM("投放表"."投放金额")',
+                "business_meaning_candidates": ["spend_like", "cost_like", "amount_like"],
+                "source_fields": ["投放表.投放金额"],
+            },
+        ],
+        "relationships": [],
+        "available_analysis_capabilities": {
+            "can_join_tables": False,
+            "can_calculate_roi": False,
+            "can_calculate_profit": False,
+        },
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["available_analysis_capabilities"]["can_join_tables"] is False
+    assert result["available_analysis_capabilities"]["can_calculate_roi"] is False
+    assert "roas" not in result["metrics"]
+    assert "net_return" not in result["metrics"]
+    assert "roas" not in result["formulas"]
+    assert "net_return" not in result["formulas"]
+    assert any("ROAS" in warning and "可确认关联字段" in warning for warning in result["warnings"])
+
+
+def test_metric_registry_allows_same_table_roas_and_net_return():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "field": "campaigns.revenue",
+                "formula": 'SUM("campaigns"."revenue")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["campaigns.revenue"],
+            },
+            {
+                "name": "sum_spend",
+                "label": "投放金额",
+                "field": "campaigns.spend",
+                "formula": 'SUM("campaigns"."spend")',
+                "business_meaning_candidates": ["spend_like", "cost_like"],
+                "source_fields": ["campaigns.spend"],
+            },
+        ],
+        "available_analysis_capabilities": {
+            "can_join_tables": False,
+            "can_calculate_roi": True,
+        },
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["available_analysis_capabilities"]["can_calculate_roi"] is True
+    assert result["formulas"]["roas"] == '1.0 * SUM("campaigns"."revenue") / NULLIF(SUM("campaigns"."spend"), 0)'
+    assert result["formulas"]["net_return"] == (
+        '1.0 * (SUM("campaigns"."revenue") - SUM("campaigns"."spend")) '
+        '/ NULLIF(SUM("campaigns"."spend"), 0)'
+    )
+
+
+def test_metric_registry_allows_cross_table_roas_with_relationship():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "field": "sales.revenue",
+                "formula": 'SUM("sales"."revenue")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["sales.revenue"],
+            },
+            {
+                "name": "sum_spend",
+                "label": "投放金额",
+                "field": "campaign_spend.spend",
+                "formula": 'SUM("campaign_spend"."spend")',
+                "business_meaning_candidates": ["spend_like", "cost_like"],
+                "source_fields": ["campaign_spend.spend"],
+            },
+        ],
+        "relationships": [
+            {
+                "left_table": "sales",
+                "left_field": "sales.campaign_id",
+                "right_table": "campaign_spend",
+                "right_field": "campaign_spend.campaign_id",
+            }
+        ],
+        "available_analysis_capabilities": {
+            "can_join_tables": True,
+            "can_calculate_roi": True,
+        },
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert "roas" in result["metrics"]
+    assert "net_return" in result["metrics"]
+    assert result["available_analysis_capabilities"]["can_join_tables"] is True
+
+
+def test_metric_registry_does_not_use_global_join_capability_for_unrelated_cross_table_roas():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "field": "sales.revenue",
+                "formula": 'SUM("sales"."revenue")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["sales.revenue"],
+            },
+            {
+                "name": "sum_spend",
+                "label": "投放金额",
+                "field": "ad_spend.spend",
+                "formula": 'SUM("ad_spend"."spend")',
+                "business_meaning_candidates": ["spend_like", "cost_like"],
+                "source_fields": ["ad_spend.spend"],
+            },
+        ],
+        "relationships": [
+            {
+                "left_table": "customers",
+                "left_field": "customers.customer_id",
+                "right_table": "orders",
+                "right_field": "orders.customer_id",
+            }
+        ],
+        "available_analysis_capabilities": {
+            "can_join_tables": True,
+            "can_calculate_roi": True,
+        },
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["available_analysis_capabilities"]["can_join_tables"] is True
+    assert "roas" not in result["metrics"]
+    assert "net_return" not in result["metrics"]
+    assert "roas" not in result["formulas"]
+    assert "net_return" not in result["formulas"]
+    assert any("ROAS" in warning and "可确认关联字段" in warning for warning in result["warnings"])
+
+
+def test_metric_registry_does_not_use_global_join_capability_for_unrelated_cross_table_margin_rate():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "field": "sales.revenue",
+                "formula": 'SUM("sales"."revenue")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["sales.revenue"],
+            },
+            {
+                "name": "sum_cost",
+                "label": "成本",
+                "field": "cost_snapshots.cost_amount",
+                "formula": 'SUM("cost_snapshots"."cost_amount")',
+                "business_meaning_candidates": ["cost_like"],
+                "source_fields": ["cost_snapshots.cost_amount"],
+            },
+        ],
+        "relationships": [
+            {
+                "left_table": "customers",
+                "left_field": "customers.customer_id",
+                "right_table": "orders",
+                "right_field": "orders.customer_id",
+            }
+        ],
+        "available_analysis_capabilities": {
+            "can_join_tables": True,
+            "can_calculate_profit": True,
+        },
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["available_analysis_capabilities"]["can_join_tables"] is True
+    assert "margin_rate" not in result["metrics"]
+    assert "margin_rate" not in result["formulas"]
+    assert any("利润率" in warning and "可确认关联字段" in warning for warning in result["warnings"])
+
+
+def test_metric_registry_uses_same_table_revenue_spend_pair_when_other_revenue_metrics_exist():
+    from tools.metric_tool import build_metric_registry
+
+    semantic_layer = {
+        "metrics": [
+            {
+                "name": "sum_store_sales",
+                "label": "门店销售额",
+                "field": "store_sales.sales_amount",
+                "formula": 'SUM("store_sales"."sales_amount")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["store_sales.sales_amount"],
+            },
+            {
+                "name": "sum_channel_revenue",
+                "label": "渠道收入",
+                "field": "channel_spend.revenue_amount",
+                "formula": 'SUM("channel_spend"."revenue_amount")',
+                "business_meaning_candidates": ["revenue_like"],
+                "source_fields": ["channel_spend.revenue_amount"],
+            },
+            {
+                "name": "sum_channel_spend",
+                "label": "投放金额",
+                "field": "channel_spend.spend_amount",
+                "formula": 'SUM("channel_spend"."spend_amount")',
+                "business_meaning_candidates": ["spend_like", "cost_like"],
+                "source_fields": ["channel_spend.spend_amount"],
+            },
+            {
+                "name": "sum_product_quantity",
+                "label": "销量",
+                "field": "product_sales.quantity",
+                "formula": 'SUM("product_sales"."quantity")',
+                "business_meaning_candidates": ["count_like"],
+                "source_fields": ["product_sales.quantity"],
+            },
+        ],
+        "relationships": [],
+        "available_analysis_capabilities": {"can_join_tables": False, "can_calculate_roi": True},
+    }
+
+    result = build_metric_registry(semantic_layer)
+
+    assert result["metrics"]["roas"]["formula"] == (
+        '1.0 * SUM("channel_spend"."revenue_amount") / NULLIF(SUM("channel_spend"."spend_amount"), 0)'
+    )
+    assert result["metrics"]["net_return"]["formula"] == (
+        '1.0 * (SUM("channel_spend"."revenue_amount") - SUM("channel_spend"."spend_amount")) '
+        '/ NULLIF(SUM("channel_spend"."spend_amount"), 0)'
+    )
+    assert "average_order_value" not in result["metrics"]

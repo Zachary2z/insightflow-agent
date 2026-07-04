@@ -60,7 +60,7 @@ def test_question_understanding_rejects_unsafe_write_request():
 def test_question_understanding_routes_complete_non_template_question_to_llm_candidate():
     from question_understanding.router import understand_question
 
-    result = understand_question("最近 30 天按用户分析复购率趋势")
+    result = understand_question("最近 30 天按用户、按月分析复购率趋势")
 
     assert result["success"] is True
     assert result["strategy"] == "llm_candidate"

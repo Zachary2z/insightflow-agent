@@ -176,7 +176,7 @@ def test_fast_fact_trend_returns_fact_summary_without_recommendations(tmp_path):
     result = run_workspace_analysis(
         store,
         workspace["workspace_id"],
-        "本月订单量趋势怎么样？",
+        "本月按周看订单量趋势怎么样？",
         initial_sql="SELECT order_date, SUM(order_count) AS order_count FROM orders GROUP BY order_date ORDER BY order_date",
     )
 
@@ -198,7 +198,7 @@ def test_fast_fact_trend_context_pack_keeps_trend_points_and_time_range(tmp_path
     result = run_workspace_analysis(
         store,
         workspace["workspace_id"],
-        "本月订单量趋势怎么样？",
+        "本月按周看订单量趋势怎么样？",
         initial_sql="SELECT order_date, SUM(order_count) AS order_count FROM orders GROUP BY order_date ORDER BY order_date",
     )
 

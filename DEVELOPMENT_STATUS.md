@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-03
+Last updated: 2026-07-04
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P23 Core Evidence And Report Tooling Readiness complete |
-| Current task | P23-H6 Cleanup, Regression, And Live Acceptance complete |
-| Next planned task | P24 Real Business Tool Calling And Exports |
-| Last completed task | P23-H6 Cleanup, Regression, And Live Acceptance |
+| Current phase | P25 Real Usage Answer And Report Polish |
+| Current task | P25-H4 Default Full Data Time Range For Safe Cases complete |
+| Next planned task | Post-P25 planning |
+| Last completed task | P25-H4 Default Full Data Time Range For Safe Cases |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -38,7 +38,8 @@ This is the concise current status surface for InsightFlow Agent.
 | P21 | `[x]` Complete | Responsive analysis experience: conservative route classification, fast factual path, progress states, exact history reuse, compact task cards, page recovery, and lightweight context packs; H1-H6 complete |
 | P22 | `[x]` Complete | Evidence-driven Report Center: H1 replaced the report main contract; H2 added Chinese goal-driven planning and structured evidence collection; H3 added model-backed report composition, API provider wiring, and lightweight fact validation; H4 polished the report reader and Markdown renderer |
 | P23 | `[x]` Complete | H1-H6 complete; core evidence/report tooling readiness is clean, regression-tested, no-key verified, and ready to hand off to P24 |
-| P24 | `[ ]` Future | Real China-oriented business tool calling and exports after P23 stabilizes the core chain |
+| P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
+| P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 
 ## P20 Task Status
 
@@ -73,7 +74,167 @@ This is the concise current status surface for InsightFlow Agent.
 
 P22 planning is recorded in `docs/product/plans/2026-07-02-p22-evidence-driven-report-generation.md`. H1 superseded/deleted the old report main path: fixed English report presets, per-section `run_workspace_analysis()` report generation, stitched report summary helpers, `章节业务答案` main-body rendering, old report supervisor/agent/writer/planner files, old provider report writer/planner flags, and the frontend `ReportSection` business-answer renderer are no longer active report-center code paths. H4 completed the renderer/frontend closeout: Report Center now reads as a business report instead of a debugging page, chart artifacts render inline with download links, chart intents are clearly labeled as待生成图表, Markdown downloads avoid internal dumps, and the appendix stays collapsed with business-readable validation/evidence counts. Remaining search hits for old report terms are historical/superseded notes, negative tests, contract names, or Analysis Workbench tests where `run_workspace_analysis()` remains the correct entry point. P22 does not add external Word/PPT/飞书/腾讯文档 integrations.
 
-P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`. P23 keeps Analysis Workbench and Report Center separate at the product layer, but makes them share factual evidence, metric, chart artifact, and validation standards. Report Center may collect chapter-level evidence, but it must write the final report once instead of stitching analysis answers together. Model-written explanations and recommendations should be preserved as business judgment; only hard facts such as amounts, dates, rankings, percentages, chart values, and report title/time range are strictly evidence-bound. P23 may delete old templates, stitched report paths, duplicate evidence contracts, stale bilingual branches, mock/demo tests, unused adapters, dead imports, and unreachable compatibility code that conflict with the Chinese-first product path. Real Word/PPT/PDF/飞书/企业微信/钉钉/腾讯文档 integrations move to P24 after P23 passes live Chinese analysis/report acceptance.
+P23 planning is recorded in `docs/product/plans/2026-07-03-p23-core-evidence-and-report-tooling-readiness.md`. P23 keeps Analysis Workbench and Report Center separate at the product layer, but makes them share factual evidence, metric, chart artifact, and validation standards. Report Center may collect chapter-level evidence, but it must write the final report once instead of stitching analysis answers together. Model-written explanations and recommendations should be preserved as business judgment; only hard facts such as amounts, dates, rankings, percentages, chart values, and report title/time range are strictly evidence-bound. P23 may delete old templates, stitched report paths, duplicate evidence contracts, stale bilingual branches, mock/demo tests, unused adapters, dead imports, and unreachable compatibility code that conflict with the Chinese-first product path.
+
+P24 planning is recorded in `docs/product/plans/2026-07-03-p24-general-business-data-understanding.md`. P24 is complete. It re-scoped away from immediate external exports and strengthened the Chinese business data analysis foundation across generic field profiling, semantic-layer drafts, evidence requirements, safe evidence calculation, Analysis Workbench grounding, Report Center grounding, real DeepSeek acceptance, and cleanup across different business datasets. P24 has three implementation slices: H1 General Data Understanding, H2 General Evidence Chain, and H3 Real Acceptance And Cleanup; all are complete. Real Word/PPT/PDF/飞书/企业微信/钉钉/腾讯文档 integrations remain deferred until after P24.
+
+P25 planning is recorded in `docs/product/plans/2026-07-04-p25-real-usage-answer-report-polish.md`. P25 is complete: H1 fixes Analysis Workbench directness, evidence-limit contradictions, and stale field fallbacks; H2 simplifies Report Center goal/title inference and removes the main report-type template feel; H3 runs realistic/live acceptance and cleanup; H4 makes missing time ranges use the full available data range when one safe time field exists, while still asking clarification when time fields are ambiguous or analysis trend windows lack grain. Old paths, stale compatibility code, obsolete tests, and unused files can be deleted instead of preserved when they conflict with the current Chinese-first product.
+
+## P25 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P25-H1 | `[x]` Complete | Analysis answers now directly answer the primary metric, keep calculated evidence and data limits consistent, and stop using stale demo fields |
+| P25-H2 | `[x]` Complete | Report Center infers intent/title from the user's goal, keeps broad goals from channel keyword hijack, and makes the main report form goal-first |
+| P25-H3 | `[x]` Complete | Realistic Chinese acceptance, opt-in live DeepSeek verification, frontend/backend regression, old-path cleanup, and documentation closeout |
+| P25-H4 | `[x]` Complete | Default missing time range to the dataset's full available range when there is one safe time field; still clarify ambiguous time fields or trend grain gaps |
+
+## Latest P25-H4 Result
+
+P25-H4 Default Full Data Time Range For Safe Cases completed on 2026-07-04:
+
+- Added `workspaces/time_range_defaults.py` as the shared Analysis Workbench and Report Center policy. It reads semantic-layer time fields plus profile `value_range` metadata, not table-specific names.
+- Analysis Workbench now defaults missing time ranges to `完整数据时间范围：YYYY-MM-DD 至 YYYY-MM-DD` when exactly one safe time field exists, records the default in `analysis_task.defaults_applied`, `resolved_question`, shared evidence payloads, fast-fact context packs, and business-answer caveats, and does not enter `waiting_for_clarification`.
+- Analysis Workbench still asks concise clarification when multiple plausible time fields exist (`date_field`) or when trend/同比/环比/变化 questions lack grain (`time_grain`).
+- Report Center now uses the same safe full-range policy for missing-time report goals and no longer silently titles those reports as `最近90天`; explicit goals such as `生成最近7天渠道表现复盘报告`, `生成最近180天经营复盘报告`, `生成最近6个月收入趋势报告`, and `生成本季度经营复盘报告` keep the user's time range.
+- P25-H4 boundary repair now stops Report Center when a missing-time goal has multiple plausible time fields, returning a clear `date_field` clarification instead of falling back to `当前工作区全部可用数据`.
+- Report validation now treats dates from the structured plan time range as supported time context, so full-range date spans are not misread as unsupported prose numbers.
+- Live DeepSeek smoke ran with local `.env` and explicit provider flags. Analysis question `哪个客户分群贡献的收入最高？` completed through provider-backed understanding/planning with full range `2025-01-15 至 2026-06-30`; `收入趋势怎么样？` stayed `waiting_for_clarification` with `time_grain`; provider-backed Report Center generated `完整数据渠道表现复盘报告`, validation `passed`, and data boundaries explicitly stated the full data range.
+- Verification passed:
+  - `python3 -m pytest tests/test_p25_time_range_defaults.py tests/test_clarification_routing.py tests/test_workspace_analysis_runner.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_evidence_tool.py -q` (`103 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_answer_consistency.py tests/test_workspace_analysis_runner.py -q` (`80 passed`)
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_report_composer_validator.py -q` (`69 passed`)
+  - `python3 -m pytest tests/test_p25_real_usage_acceptance.py tests/test_product_result_builder.py tests/test_answer_consistency.py -q` (`51 passed`)
+  - `python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_metric_tool.py tests/test_workspace_profiler.py tests/test_workspace_semantic_draft.py -q` (`31 passed`)
+  - `python3 -m pytest tests -q` (`560 passed, 12 skipped`)
+  - `cd frontend && npm test` (`69 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P25-H3 Result
+
+P25-H3 Real Usage Acceptance, Cleanup, And Documentation completed on 2026-07-04:
+
+- Added `tests/test_p25_real_usage_acceptance.py`, a compact generated-data suite that creates Chinese business workspace data in a temp directory and does not depend on saved workspace run/report artifacts.
+- Analysis Workbench acceptance covers:
+  - `最近90天哪个渠道 ROI 最高？为什么？` -> first sentence names 私域社群 as the ROI leader.
+  - `哪个客户分群复购率最高？` -> uses calculated 复购率 evidence for 高价值会员 without reporting 复购率/repeat_rate as missing.
+  - `哪个商品品类成交金额最高，哪个销量最高？` -> preserves both 成交金额 and 销量 facts, including different leaders 咖啡豆 and 挂耳咖啡, without data-limit contradictions.
+  - `帮我做一下门店经营复盘。` -> uses current 门店/销售额/订单数/毛利率/满意度 evidence and does not fall back to stale demo fields such as `order_date`, `total_revenue`, `marketing_spend`, or `orders_`.
+- Report Center acceptance covers:
+  - `生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。` -> title `最近90天经营复盘报告` with 收入结构、客户分群、商品表现、渠道投放表现 chapters.
+  - `生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。` -> title `最近90天管理层经营简报`.
+  - `生成一份最近90天渠道投放表现复盘报告。` -> title `最近90天渠道表现复盘报告`.
+  - `生成一份最近90天收入趋势变化报告。` -> title `最近90天趋势变化报告`.
+- Report business text is checked for no `章节业务答案`, raw SQL, raw rows, query ids, trace/provider metadata, prompt text, or restored top-level stitched `sections` shape. Report Center still generates one complete `ReportDocument`, not multiple Analysis Workbench answers pasted together.
+- Real DeepSeek acceptance ran because local `.env` contains `DEEPSEEK_API_KEY` and opt-in flags were enabled explicitly. Command passed: `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING=1 INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1 INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1 INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT=1 INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER=1 python3 -m pytest tests/test_p20_live_deepseek_acceptance.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p11_live_deepseek_workspace_analysis.py -q` (`4 passed in 253.36s`).
+- Live record after the P25 fix: analysis question `最近90天按渠道比较收入、投放金额和 ROI，哪个渠道投放效率最高？请给证据、图表和风险边界。`; recognized task `rank` by 渠道 with metrics 销售额、投放成本、收入金额、投放金额、ROI and calculation type `investment_efficiency`; SQL grouped `channel_spend` by 渠道 and calculated 总收入、总投放、ROI、ROAS; evidence rows ranked 私域社群 first by ROI/ROAS, then 小红书, then 抖音; `data_limits` was empty for the calculated ROI evidence.
+- Live final analysis reply remained Chinese and evidence-bound: it reported that 抖音 leads by 总收入/总投放 while 私域社群 leads by ROI/ROAS, and kept a tradeoff caveat for multi-metric decision context.
+- Live report record: goal `生成经营复盘报告，覆盖门店表现、商品表现、客户分群、客服运营、渠道投放表现、利润和复购率。`; title `最近90天经营复盘报告`; sections `经营概览`, `门店表现`, `收入结构`, `客服问题`, `客服运营`, `渠道投放表现`, `趋势变化`; data boundaries explicitly noted missing 客户分群、利润/毛利/净利, and 复购/留存 evidence where unsupported.
+- Live provider calls were recorded on question understanding, SQL planning, guarded SQL candidate, insight drafting, claim typing, and visualization; Report Center recorded `provider_supplied=true`. Report validation status was `passed`, unsupported claims were empty after one provider repair pass, and deterministic fallback repair was not needed.
+- Fixed the live-provider H3 edge case where provider metric fragments such as `ROI（收入`, `投放）`, and `销售额（收入）` could make `data_limits` say calculated ROI evidence was missing even when SQL output included `ROI`/`ROAS`/revenue/spend columns. Metric-token normalization now handles bracket/fragment tokens and spend synonyms conservatively.
+- Old-path audit found remaining legacy terms only in Historical/Superseded documentation, negative boundary tests, provider/tool rejection tests, or assertions that old strings such as `章节业务答案` and `报告类型` are absent from product output. No active runtime path restored superseded chart, action, mock integration, stitched-report, template, inference, Streamlit, or eval entry points.
+- Remaining risk: real provider wording can still choose a multi-metric tradeoff framing when the question includes revenue, spend, and ROI together; deterministic answer consistency and exact ROI questions now keep ROI-first answers, and data limits no longer contradict calculated ROI evidence.
+- Verification passed:
+  - `python3 -m pytest tests/test_p25_real_usage_acceptance.py tests/test_evidence_tool.py tests/test_report_planner_evidence.py -q` (`48 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_answer_consistency.py tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py -q` (`96 passed`)
+  - `python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_metric_tool.py tests/test_workspace_profiler.py tests/test_workspace_semantic_draft.py -q` (`31 passed`)
+  - `python3 -m pytest -q` (`548 passed, 12 skipped`)
+  - `cd frontend && npm test` (`69 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P25-H2 Result
+
+P25-H2 Report Goal Inference, Titles, And UI Simplification completed on 2026-07-04:
+
+- Added fail-first coverage for broad经营复盘 goals that mention渠道, management brief goals that mention渠道效率, channel-only goals, and trend-only goals.
+- Report planning now infers whole-report intent before local topic keywords. Broad goals keep titles such as `最近90天经营复盘报告`; management brief goals keep `最近90天管理层经营简报`; single-topic channel and trend goals still produce specialized titles.
+- Report chapters are still goal/evidence driven: broad goals can include渠道投放表现 without letting that chapter hijack the whole report title or style, and goals mentioning收入、客户、商品、渠道 continue to plan the corresponding chapters.
+- Report Center's main form now centers on the report goal. The visible `报告类型` selector was removed from the primary UI, and the frontend sends `business_review` only as an internal default when no explicit type is supplied.
+- Report list/detail views no longer foreground `报告类型` as a product-facing template choice. The generated result remains a single `ReportDocument` through the ledger-backed report path, not stitched Analysis Workbench answers.
+- Verification passed:
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_report_composer_validator.py tests/test_workspace_report_api.py -q` (`83 passed`)
+  - `cd frontend && npm test -- --run tests/workspace-flow.test.tsx` (`54 passed`)
+  - `cd frontend && npm test -- --run tests/api-client.test.ts` (`10 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_answer_consistency.py tests/test_workspace_analysis_runner.py -q` (`80 passed`)
+  - `python3 -m pytest -q` (`546 passed, 12 skipped`)
+
+## Latest P25-H1 Result
+
+P25-H1 Analysis Answer Decisiveness And Evidence Limits completed on 2026-07-04:
+
+- Analysis Workbench now treats the user's explicit primary metric as the first answer target. ROI questions answer the ROI leader first, then explain revenue scale, spend, and tradeoffs.
+- Evidence/data-limit handling now treats SQL-derived aliases and calculated metrics such as `repeat_rate`, 成交金额, and 销量 as supported evidence when they are present in the current run, avoiding contradictory “未计算” caveats.
+- Generic semantic-layer SQL generation no longer falls back to old demo fields when no safe current-workspace query can be built. Missing evidence is explained from the current profile/semantic layer instead of trying stale `orders`, `order_date`, `city`, or `total_revenue` assumptions.
+- Added focused coverage for ROI leader questions, repeat-rate questions, product category amount/quantity questions, generic store review fallback, and current semantic-layer SQL generation.
+- Verification passed:
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_answer_consistency.py tests/test_workspace_analysis_runner.py -q` (`80 passed`)
+  - `python3 -m pytest tests/test_evidence_tool.py tests/test_metric_tool.py tests/test_p20_realistic_acceptance.py -q` (`33 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
+  - `git diff --check` passed
+
+## P24 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P24-H1 | `[x]` Complete | General data understanding now profiles and drafts semantic layers for 门店销售、商品销售、客服/工单运营 fields beyond the original channel/revenue/spend/order-date sample shape |
+| P24-H2 | `[x]` Complete | General evidence chain now turns questions/report goals into explicit evidence requirements and uses semantic-layer SQL/evidence tools for ranking, contribution/share, operational-efficiency, same-table investment-efficiency, and conservative data limits |
+| P24-H3 | `[x]` Complete | Real DeepSeek acceptance, realistic multi-dataset regression, cleanup, full backend/frontend verification, old-path audit, and artifact hygiene |
+
+## Latest P24-H3 Result
+
+P24-H3 Real Acceptance And Cleanup completed on 2026-07-04:
+
+- Added P24 realistic acceptance across six Chinese business dataset shapes: 门店销售、商品/品类销售、客户分群、客服/工单运营、渠道投放、区域表现.
+- Analysis Workbench now verifies generic semantic-layer SQL/evidence for ranking, contribution/share, operational efficiency, same-table investment efficiency, report-safe chart artifacts, formula traceability, and unsupported复购/趋势 data limits.
+- Report Center now verifies one coherent Chinese report over the same realistic workspace, with report evidence payloads, evidence ledger, chart artifacts, data boundaries for missing利润/复购 inputs, and no stitched Analysis Workbench answer blocks.
+- Fixed P24 closeout issues found by acceptance: month-grain `YYYY-MM` time fields now work in generic SQL filters, all-zero report chart values no longer crash SVG rendering, metric registry selects compatible same-table revenue/spend pairs for ROAS/net-return even when other revenue metrics exist, and ratio/AOV formulas use floating-point division.
+- Fixed the P24-H3 closeout blocker where answer consistency treated “最值得优先复盘/优先处理/风险/改善” as a highest-value ranking. The consistency layer now distinguishes risk/improvement decisions from growth/best/benchmark decisions, keeps `final_answer` and `business_answer` aligned, and does not rewrite a supported low-performance/high-risk object such as 深圳湾店 into the highest-sales object.
+- Fixed the final P24-H3 intent edge case where natural question prefixes such as “我有个问题” could trigger risk/improvement direction through the standalone word “问题”. Growth/best/benchmark markers such as “表现最好” and “标杆” now win, so the benchmark question correctly keeps 上海旗舰店 as the supported high-performance object while “客服问题最需要优先处理” remains risk-directed.
+- Report Center live stability now has a deterministic ledger-backed fallback when provider report repair still fails validation or leaves the document partial, so real provider calls remain recorded without letting unsupported provider prose close the report as complete.
+- Real DeepSeek acceptance ran with local `.env` plus explicit opt-in flags. The new P24 live test records the analysis question, recognized task, semantic fields/metrics, evidence requirements, evidence rows, model answer, report goal, report summary/sections, artifacts, and data limits. The live suite passed: `python3 -m pytest tests/test_p20_live_deepseek_acceptance.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p11_live_deepseek_workspace_analysis.py -q` (`4 passed in 210.23s`).
+- Analysis Workbench and Report Center remain separate product experiences. Report Center uses one full ledger-backed report document, not concatenated analysis answers.
+- Old-path audit found remaining legacy/mock/demo terms only in Historical/Superseded docs, negative boundary tests, or external-tool rejection tests. Tracked-artifact audit found no committed `.env`, `.next`, caches, workspace run/report output, report chart artifacts, trace JSON, or sample data.
+- Verification passed:
+  - `python3 -m pytest tests/test_answer_consistency.py tests/test_product_result_builder.py -q` (`47 passed`)
+  - `python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_workspace_analysis_runner.py tests/test_report_planner_evidence.py tests/test_workspace_report_runner.py tests/test_metric_tool.py tests/test_evidence_tool.py -q` (`108 passed`)
+  - `python3 -m pytest tests/test_p20_live_deepseek_acceptance.py tests/test_p12_live_deepseek_workspace_report.py tests/test_p11_live_deepseek_workspace_analysis.py -q` (`4 passed in 210.23s`, real DeepSeek opt-in)
+  - `python3 -m pytest` (`539 passed, 12 skipped`)
+  - `cd frontend && npm test` (`68 passed`)
+  - `cd frontend && npm run build` passed
+  - `git diff --check` passed
+  - tracked-artifact audit returned no hits
+  - old-path audit returned only historical documentation and negative/rejection tests
+
+## Latest P24-H2 Result
+
+P24-H2 General Evidence Chain completed on 2026-07-03:
+
+- Added fail-first coverage for generic 门店销售 ranking, 商品销售 contribution/share, 客服/工单 operational efficiency, report-goal planning, report evidence collection, and unsafe cross-table投放效率 data limits.
+- Shared evidence payloads now expose explicit `evidence_requirements`: time range, metrics, dimensions, filters, grouping, comparison scope, calculation type, and missing evidence.
+- Analysis Workbench can generate semantic-layer-backed SQL/evidence for common business questions without relying on the original `orders/channel/revenue/spend/order_date` shape.
+- Report Center plans and collects evidence for经营复盘、门店表现、商品表现、客服运营、渠道投放表现 from the same requirements/evidence path while preserving one coherent Chinese report composition.
+- Cross-table investment-efficiency evidence is conservative: ROAS/净投放回报率 is calculated only when required metrics are safe in the same analyzable table or supported by the metric registry; otherwise the report records a data limit instead of hard-calculating.
+- Remaining P24-H3 work: real DeepSeek acceptance, full cleanup, frontend verification, tracked-artifact audit, and final old-path audit.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_metric_tool.py tests/test_evidence_tool.py -q` (`107 passed`)
+  - `python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_product_result_builder.py -q` (`32 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
+
+## Latest P24-H1 Result
+
+P24-H1 General Data Understanding completed on 2026-07-03:
+
+- Added fail-first coverage for three non-original-sample datasets: 门店销售, 商品销售, and 客服/工单运营.
+- Profiling now recognizes common business roles for 时间字段, 金额/收入字段, 成本/投放字段, 数量字段, ID 字段, 维度字段, 订单数字段, 工单数字段, and response-duration style operational metrics.
+- Semantic drafts now generate Chinese business aliases and labels for fields such as GMV, 实付金额, 成交金额, 收入金额, 订单数, 件数, 销量, 工单数, 采购成本, and 平均响应分钟.
+- Semantic drafts now expose capability flags and data limits for missing time fields, missing cost fields, missing spend/ROI inputs, and missing cross-table relationship fields instead of inventing unavailable metrics.
+- Metric registry now preserves semantic-layer capability flags and only generates ROAS/净投放回报率/利润率 when the required metrics are in the same table or can be safely combined through a confirmed relationship/join capability. Unrelated cross-table收入+投放 stays a warning/data limit instead of a formula.
+- Evidence payloads can surface missing time/cost/ROI/join capability limits from the real metric registry when requested metrics or task requirements need those inputs.
+- Remaining P24-H2 work: convert natural-language questions/report goals into explicit evidence requirements and use the strengthened semantic layer for generic SQL/evidence collection, including safe cross-table evidence when joins are actually available.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_profiler.py tests/test_workspace_semantic_draft.py tests/test_metric_tool.py tests/test_evidence_tool.py -q` (`38 passed`)
+  - `python3 -m pytest tests/test_p20_realistic_acceptance.py tests/test_workspace_analysis_runner.py tests/test_product_result_builder.py -q` (`58 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
 
 ## P23 Task Status
 
@@ -472,7 +633,7 @@ Latest P20-H5 closeout result on 2026-07-02:
 - Cleanup audit for old action/chart/mock/eval/Streamlit terms found matches only in historical/superseded notes, cleanup/boundary tests, negative mock-tool tests, and the audit command in the P20 plan; no active product import or main path was restored.
 - Verification passed: question-understanding/P17/P20/project/P20 acceptance boundary set `45 passed, 1 skipped`; metric/evidence/workspace-analysis/product-result focused set `49 passed`; report/composer/visualization focused set `36 passed`; full backend regression `python3 -m pytest` (`434 passed, 13 skipped`); frontend Vitest `npm test` (`62 passed`); frontend production build passed.
 
-P20 completion definition is now satisfied: InsightFlow is a Chinese-first general business data-analysis multi-agent product foundation that profiles uploaded datasets, builds semantic layers, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools, validates factual claims, and writes Chinese business-readable answers and reports. P21 responsiveness and fast-path work is complete; P22 evidence-driven report generation is complete; P23 is core evidence/report tooling readiness; China-oriented external tool calling/export moves to P24.
+P20 completion definition is now satisfied: InsightFlow is a Chinese-first general business data-analysis multi-agent product foundation that profiles uploaded datasets, builds semantic layers, maps raw Chinese/English/mixed fields into Chinese business semantics, routes natural-language questions into analysis tasks, calls SQL/calculation/chart/report tools, validates factual claims, and writes Chinese business-readable answers and reports. P21 responsiveness and fast-path work is complete; P22 evidence-driven report generation is complete; P23 is core evidence/report tooling readiness. This older note originally expected external tool calling/export next, but current P24 planning supersedes it with general business data understanding and evidence generation first.
 
 Latest P20-H4 answer/report generation result on 2026-07-02:
 
@@ -568,7 +729,7 @@ P19 planning note on 2026-07-01:
 - Direction update: P19 should not become an expanding deterministic patch list for every possible model mistake. The next design direction is an Answer Reviewer Agent plus Final Answer Composer, with small deterministic checks as the last safety guardrail.
 - Planning update: P19 is intentionally compacted into five H tasks so development is easier to steer, but each H task still requires tests, code cleanup, artifact hygiene, and focused/full verification.
 - Cleanup policy update: P19 should delete old paths, obsolete tests, fallback/template/demo compatibility code, and unused modules when they conflict with the current FastAPI/Next.js workspace product direction. Historical behavior does not need to be preserved.
-- Future notes at the time of P19 planning originally pointed P20 toward responsiveness, but real product testing later re-scoped P20 into the general business analysis foundation. Responsiveness became P21. Later live report testing re-scoped P23 into core evidence/report readiness, so real business tool calling/export is now P24.
+- Future notes at the time of P19 planning originally pointed P20 toward responsiveness, but real product testing later re-scoped P20 into the general business analysis foundation. Responsiveness became P21. Later live report testing re-scoped P23 into core evidence/report readiness. Current planning has re-scoped P24 again: P24 is now general business data understanding and evidence generation before external tool calling/export.
 
 P19-H2 completion note on 2026-07-01:
 
@@ -611,7 +772,7 @@ P19-H5 completion note on 2026-07-01:
 - H5 fixed a live acceptance quality gap where a clean provider factual answer could omit recommendations and caveats; the product result builder now fills only minimal evidence-based next-step guidance and query-scope caveats for sufficiently supported answers.
 - Artifact hygiene was rechecked: generated databases, reports, report Markdown, chart artifacts, traces, `.env`, frontend build output, `.superpowers`, and real DeepSeek temporary artifacts remain untracked/ignored and were not staged.
 - Cleanup audit found old action/chart/mock/template terms only in historical notes, deleted-file assertions, ignored generated artifacts, or necessary test doubles; no current product entry point was restored or duplicated.
-- This older closeout note has been superseded by later planning: P20 became the general business analysis foundation, P21 handled responsiveness, P22 rebuilt evidence-driven reports, P23 now handles core evidence/report readiness, and real business tool calling moves to P24.
+- This older closeout note has been superseded by later planning: P20 became the general business analysis foundation, P21 handled responsiveness, P22 rebuilt evidence-driven reports, P23 handled core evidence/report readiness, and current P24 now strengthens general business data understanding before real business tool calling.
 
 P19 closeout fix note on 2026-07-01:
 
@@ -620,7 +781,7 @@ P19 closeout fix note on 2026-07-01:
 - Workspace settings model-mode summary reads the merged local `.env` and process environment, so provider key presence and product live mode remain separate states.
 - Frontend coverage now includes loading, key-only, live-mode-on, and fetch-failure model status states without relying on a real backend.
 - Local ignored generated artifacts were cleaned from `.superpowers`, chart PNG outputs, run workspaces, pytest/cache directories, `__pycache__`, and frontend build output; retained `.env`, tracked placeholders, and the historical `data/ecommerce.db` fixture were not removed or staged.
-- P20 has been re-scoped after real product testing: it is now the general business analysis foundation phase, not responsiveness work. Responsiveness moved to P21; later report testing moved real business tool calling to P24 after P23 core evidence/report readiness.
+- P20 has been re-scoped after real product testing: it is now the general business analysis foundation phase, not responsiveness work. Responsiveness moved to P21; later report testing moved real business tool calling after P23 core evidence/report readiness. Current P24 planning supersedes that handoff and focuses first on general business data understanding and evidence generation.
 
 P20 planning note on 2026-07-01:
 
@@ -650,4 +811,4 @@ This section is historical cleanup context only, not current product guidance.
 - Historical / Superseded: `streamlit run app.py`, `eval/run_eval.py`, `tests/test_eval_runner.py`, `tests/test_streamlit_app.py`, `chart_agent`, `visualization_planner`, `chart_tool`, `action_delivery`, `action_drafter`, `powerbi_publisher_mock`, `jira_ticket_mock`, mock SaaS, fixed template behavior, deterministic action template behavior, and keyword inference are old cleanup terms.
 - Historical retained fixture: `data/ecommerce.db` remains for low-level tests that directly exercise schema, SQL validation, SQL execution, workflow, report, MCP, and provider regressions. It is not the current product database.
 - Historical P11/P12/P13 specs under `docs/superpowers/specs/` must be treated as snapshots. Current guidance is `docs/product/plans/`, the P16 `business_answer` contract, and P17 cleanup.
-- Real China-oriented external tool calling remains deferred until the core answer/report chain is stable. Current guidance is P23 for evidence/report readiness, then P24 for real external tools and exports.
+- Real China-oriented external tool calling remains deferred until the core answer/report chain and generic data understanding are stable. Current guidance is P24 for general business data understanding and evidence generation; external tools and exports move after P24.

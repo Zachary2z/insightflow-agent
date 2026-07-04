@@ -15,6 +15,14 @@ class EvidenceRequirement:
     dimension_hint: str = ""
     query_hint: str = ""
     chart_hint: str = ""
+    time_range: Any = field(default_factory=dict)
+    metrics: list[str] = field(default_factory=list)
+    dimensions: list[str] = field(default_factory=list)
+    filters: list[str] = field(default_factory=list)
+    group_by: list[str] = field(default_factory=list)
+    comparison_scope: dict[str, Any] = field(default_factory=dict)
+    calculation_type: str = ""
+    missing_evidence: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -29,6 +37,14 @@ class EvidenceRequirement:
             dimension_hint=str(data.get("dimension_hint") or ""),
             query_hint=str(data.get("query_hint") or ""),
             chart_hint=str(data.get("chart_hint") or ""),
+            time_range=data.get("time_range") if isinstance(data.get("time_range"), dict) else {},
+            metrics=[str(item) for item in data.get("metrics", [])],
+            dimensions=[str(item) for item in data.get("dimensions", [])],
+            filters=[str(item) for item in data.get("filters", [])],
+            group_by=[str(item) for item in data.get("group_by", [])],
+            comparison_scope=dict(data.get("comparison_scope") or {}),
+            calculation_type=str(data.get("calculation_type") or ""),
+            missing_evidence=[str(item) for item in data.get("missing_evidence", [])],
         )
 
 
@@ -68,6 +84,8 @@ class ReportPlan:
     report_goal: str = ""
     data_sources: list[str] = field(default_factory=list)
     chapters: list[ReportChapterPlan] = field(default_factory=list)
+    missing_slots: list[str] = field(default_factory=list)
+    clarification_questions: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> dict[str, Any]:
@@ -87,6 +105,10 @@ class ReportPlan:
                 ReportChapterPlan.from_dict(chapter)
                 for chapter in data.get("chapters", [])
                 if isinstance(chapter, dict)
+            ],
+            missing_slots=[str(item) for item in data.get("missing_slots", [])],
+            clarification_questions=[
+                str(item) for item in data.get("clarification_questions", [])
             ],
             created_at=str(data.get("created_at") or utc_now_iso()),
         )

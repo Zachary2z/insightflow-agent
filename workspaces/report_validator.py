@@ -56,7 +56,7 @@ def validate_report_document(
             unsupported_claims.append(f"正文使用了计划和证据外的数据来源：{source}")
 
     supported_values = _supported_values_from_ledger(ledger)
-    supported_time_forms = _supported_time_forms(evidence_pack)
+    supported_time_forms = _supported_time_forms(evidence_pack, plan=plan)
     for number in _numbers_in_text(_business_text(document), supported_time_forms=supported_time_forms):
         if number not in supported_values:
             unsupported_claims.append(f"正文数字缺少证据支持：{number}")
@@ -113,10 +113,10 @@ def _supported_values_from_ledger(ledger: EvidenceLedger) -> set[str]:
     return {value for value in values if value}
 
 
-def _supported_time_forms(evidence_pack: ReportEvidencePack) -> set[str]:
+def _supported_time_forms(evidence_pack: ReportEvidencePack, *, plan: ReportPlan | None = None) -> set[str]:
     values: set[str] = set()
     months_by_year: dict[str, set[int]] = {}
-    for value in _raw_evidence_values(evidence_pack):
+    for value in [* _raw_evidence_values(evidence_pack), getattr(plan, "time_range", "") if plan else ""]:
         text = str(value).strip()
         if not text:
             continue

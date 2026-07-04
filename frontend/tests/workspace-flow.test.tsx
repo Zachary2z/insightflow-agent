@@ -1783,9 +1783,9 @@ describe("workspace product components", () => {
       report: {
         report_id: "report_1",
         workspace_id: "ws_1",
-        report_type: "channel_performance",
-        report_goal: "Compare acquisition channel revenue.",
-        title: "Channel Performance",
+        report_type: "business_review",
+        report_goal: "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。",
+        title: "最近90天经营复盘报告",
         status: "completed",
         markdown_path: "workspaces/ws_1/reports/report_1/report.md",
         json_path: "workspaces/ws_1/reports/report_1/report.json",
@@ -1797,19 +1797,18 @@ describe("workspace product components", () => {
     render(<ReportGenerator workspaceId="ws_1" />);
     expect(screen.getByText("新建报告")).toBeTruthy();
     expect(screen.queryByText("Create Report")).toBeNull();
-    expect(screen.getByText("生成最近 90 天渠道表现复盘")).toBeTruthy();
-    expect(screen.getByText("生成管理层收入复盘报告")).toBeTruthy();
-    expect(screen.getByText("生成客户增长与留存报告")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("报告类型"), { target: { value: "channel_performance" } });
+    expect(screen.getByText("生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。")).toBeTruthy();
+    expect(screen.getByText("生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。")).toBeTruthy();
+    expect(screen.getByText("生成一份最近90天收入趋势变化报告。")).toBeTruthy();
+    expect(screen.queryByLabelText("报告类型")).toBeNull();
     fireEvent.change(screen.getByLabelText("报告目标"), {
-      target: { value: "生成最近 90 天渠道表现复盘" },
+      target: { value: "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。" },
     });
     fireEvent.click(screen.getByRole("button", { name: "生成报告" }));
 
     await waitFor(() =>
       expect(createWorkspaceReport).toHaveBeenCalledWith("ws_1", {
-        reportType: "channel_performance",
-        reportGoal: "生成最近 90 天渠道表现复盘",
+        reportGoal: "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。",
       }),
     );
     expect(pushMock).toHaveBeenCalledWith("/workspaces/ws_1/reports/report_1");
@@ -1851,7 +1850,7 @@ describe("workspace product components", () => {
     expect(screen.queryByText("Report Library")).toBeNull();
     expect(screen.queryByText("目标：生成管理层收入复盘报告")).toBeNull();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
-    expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
+    expect(screen.queryByText("报告类型：经营复盘")).toBeNull();
     expect(screen.getByText("摘要：Revenue grew.")).toBeTruthy();
     expect(screen.getByText("更新时间：2026-06-23")).toBeTruthy();
     expect(screen.getByRole("link", { name: "打开报告" }).getAttribute("href")).toBe(
@@ -2204,7 +2203,7 @@ describe("workspace product components", () => {
     expect(await screen.findByText("最近90天经营复盘报告")).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("进度：1/1 个章节已完成")).toBeTruthy();
-    expect(screen.getByText("报告类型：经营复盘")).toBeTruthy();
+    expect(screen.queryByText("报告类型：经营复盘")).toBeNull();
     expect(screen.queryByText("报告目标：Create an English leadership report about revenue.")).toBeNull();
     expect(screen.getByText("开篇摘要")).toBeTruthy();
     expect(screen.getByText("报告正文")).toBeTruthy();

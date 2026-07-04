@@ -80,3 +80,94 @@ def test_profiler_outputs_general_business_field_profile_for_chinese_store_data(
     assert columns["门店"]["field_role"] == "dimension"
     assert columns["门店"]["suitable_group_by"] is True
     assert columns["门店ID"]["field_role"] == "id"
+
+
+def test_profiler_recognizes_p24_store_product_and_support_business_roles(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P24 Profile Coverage")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            'CREATE TABLE "门店销售" ('
+            '"下单时间" TEXT, '
+            '"门店编号" TEXT, '
+            '"门店" TEXT, '
+            '"城市" TEXT, '
+            '"GMV" REAL, '
+            '"实付金额" REAL, '
+            '"销量" INTEGER)'
+        )
+        conn.execute(
+            'CREATE TABLE "商品销售" ('
+            '"日期" TEXT, '
+            '"商品编号" TEXT, '
+            '"商品" TEXT, '
+            '"品类" TEXT, '
+            '"成交金额" REAL, '
+            '"订单数" INTEGER, '
+            '"件数" INTEGER, '
+            '"采购成本" REAL)'
+        )
+        conn.execute(
+            'CREATE TABLE "客服工单" ('
+            '"创建时间" TEXT, '
+            '"工单编号" TEXT, '
+            '"客户编号" TEXT, '
+            '"团队" TEXT, '
+            '"工单数" INTEGER, '
+            '"平均响应分钟" REAL, '
+            '"解决状态" TEXT)'
+        )
+        conn.executemany(
+            'INSERT INTO "门店销售" VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                ("2026-06-01", "S001", "上海旗舰店", "上海", 32000.0, 30100.0, 128),
+                ("2026-06-02", "S002", "深圳湾店", "深圳", 18000.0, 17100.0, 76),
+            ],
+        )
+        conn.executemany(
+            'INSERT INTO "商品销售" VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                ("2026-06-01", "P001", "咖啡豆", "食品", 8600.0, 42, 118, 3900.0),
+                ("2026-06-02", "P002", "保温杯", "日用品", 7200.0, 31, 64, 2800.0),
+            ],
+        )
+        conn.executemany(
+            'INSERT INTO "客服工单" VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+                ("2026-06-01", "T001", "C001", "华东客服组", 86, 18.0, "已解决"),
+                ("2026-06-02", "T002", "C002", "华南客服组", 71, 24.0, "处理中"),
+            ],
+        )
+
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    tables = {
+        table["table_name"]: {column["name"]: column for column in table["columns"]}
+        for table in profile["tables"]
+    }
+
+    store_sales = tables["门店销售"]
+    assert store_sales["下单时间"]["field_role"] == "time"
+    assert store_sales["门店编号"]["field_role"] == "id"
+    assert store_sales["门店"]["field_role"] == "dimension"
+    assert store_sales["城市"]["field_role"] == "dimension"
+    assert "revenue_like" in store_sales["GMV"]["business_meaning_candidates"]
+    assert "revenue_like" in store_sales["实付金额"]["business_meaning_candidates"]
+    assert "count_like" in store_sales["销量"]["business_meaning_candidates"]
+
+    product_sales = tables["商品销售"]
+    assert product_sales["商品编号"]["field_role"] == "id"
+    assert product_sales["商品"]["field_role"] == "dimension"
+    assert product_sales["品类"]["field_role"] == "dimension"
+    assert "revenue_like" in product_sales["成交金额"]["business_meaning_candidates"]
+    assert "order_count_like" in product_sales["订单数"]["business_meaning_candidates"]
+    assert "count_like" in product_sales["件数"]["business_meaning_candidates"]
+    assert "cost_like" in product_sales["采购成本"]["business_meaning_candidates"]
+
+    support = tables["客服工单"]
+    assert support["创建时间"]["field_role"] == "time"
+    assert support["工单编号"]["field_role"] == "id"
+    assert support["客户编号"]["field_role"] == "id"
+    assert support["团队"]["field_role"] == "dimension"
+    assert "ticket_count_like" in support["工单数"]["business_meaning_candidates"]
+    assert "duration_like" in support["平均响应分钟"]["business_meaning_candidates"]
+    assert support["解决状态"]["field_role"] == "status"

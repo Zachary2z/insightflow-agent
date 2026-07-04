@@ -291,7 +291,7 @@ export type WorkspaceReport = {
 };
 
 export type CreateWorkspaceReportRequest = {
-  reportType: ReportType;
+  reportType?: ReportType;
   reportGoal: string;
 };
 
@@ -429,7 +429,7 @@ export async function createWorkspaceReport(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      report_type: request.reportType,
+      report_type: request.reportType ?? "business_review",
       report_goal: request.reportGoal,
     }),
   });

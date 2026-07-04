@@ -213,7 +213,8 @@ def test_report_markdown_renders_document_body_without_stitched_section_labels(t
     markdown = Path(result["report"]["markdown_path"]).read_text(encoding="utf-8")
     business_body = markdown.split("## 技术附录", 1)[0]
 
-    assert "# 最近90天趋势变化报告" in markdown
+    assert "# 完整数据趋势变化报告" in markdown
+    assert "最近90天" not in business_body
     assert "## 报告正文" in markdown
     assert "## 数据边界" in markdown
     assert "章节业务答案" not in business_body
@@ -405,7 +406,7 @@ def test_report_runner_persists_chart_artifacts_from_evidence_pack(tmp_path):
         for artifact in report["artifacts"]
         if artifact["artifact_type"] == "chart"
     ]
-    chart_tool_calls = [
+    renderer_tool_calls = [
         tool_call
         for tool_call in report["tool_calls"]
         if tool_call["tool_name"] == "local_chart_renderer"
@@ -418,8 +419,8 @@ def test_report_runner_persists_chart_artifacts_from_evidence_pack(tmp_path):
     assert chart_artifacts
     assert all(artifact["evidence_ids"] or artifact["ledger_metric_ids"] for artifact in chart_artifacts)
     assert all(set(artifact["chart_ids"]).issubset(evidence_chart_ids) for artifact in chart_artifacts)
-    assert chart_tool_calls
-    assert all(set(tool_call["output_artifact_ids"]).issubset(artifact_ids) for tool_call in chart_tool_calls)
+    assert renderer_tool_calls
+    assert all(set(tool_call["output_artifact_ids"]).issubset(artifact_ids) for tool_call in renderer_tool_calls)
     assert report["document"]["technical_appendix"]["artifact_summary"]["chart_count"] == len(chart_artifacts)
 
 
@@ -528,6 +529,131 @@ def test_report_runner_repairs_unsupported_facts_once_and_completes(tmp_path, mo
     assert report["provider_metadata"]["repair_attempted"] is True
     assert report["document"]["technical_appendix"]["repair"]["attempted"] is True
     assert report["provider_metadata"]["generation_flow"] == "ledger_backed_report_center"
+
+
+def test_report_runner_falls_back_to_deterministic_repair_when_provider_repair_still_fails(tmp_path, monkeypatch):
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = {"compose": 0, "provider_repair": 0, "deterministic_repair": 0, "validate": 0}
+
+    def fake_compose_report_document(*, plan, evidence_pack, evidence_ledger=None, provider=None):
+        calls["compose"] += 1
+        assert provider == "fake-report-provider"
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="最近90天总收入为 99.9 万。",
+            sections=[],
+            action_recommendations=[],
+            data_boundaries=[],
+        )
+
+    def fake_repair_report_document(*, document, plan, evidence_pack, evidence_ledger, unsupported_claims, provider=None):
+        if provider is not None:
+            calls["provider_repair"] += 1
+            return ReportDocument(
+                title=plan.title,
+                time_range=plan.time_range,
+                data_sources=plan.data_sources,
+                opening_summary="最近90天总收入仍为 99.9 万。",
+                sections=[],
+                action_recommendations=[],
+                data_boundaries=[],
+            )
+        calls["deterministic_repair"] += 1
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="报告已删除缺少证据支持的收入数字。",
+            sections=[],
+            action_recommendations=["补齐口径后再做预算判断。"],
+            data_boundaries=["已使用证据账本回退修复未支持事实。"],
+        )
+
+    def fake_validate_report_document(*, document, plan, evidence_pack, evidence_ledger=None):
+        calls["validate"] += 1
+        if calls["validate"] < 3:
+            return ReportValidationResult(status="warning", unsupported_claims=["正文数字缺少证据支持：99.9 万"])
+        return ReportValidationResult(status="passed", checked_facts=["ledger_fact_workspace_table_count"])
+
+    monkeypatch.setattr(report_runner, "compose_report_document", fake_compose_report_document)
+    monkeypatch.setattr(report_runner, "repair_report_document", fake_repair_report_document)
+    monkeypatch.setattr(report_runner, "validate_report_document", fake_validate_report_document)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+        providers={"report_composer": "fake-report-provider"},
+    )
+
+    report = result["report"]
+    assert result["success"] is True
+    assert report["status"] == "completed"
+    assert calls == {"compose": 1, "provider_repair": 1, "deterministic_repair": 1, "validate": 3}
+    assert report["validation"]["status"] == "passed"
+    assert report["provider_metadata"]["repair_attempted"] is True
+    assert report["document"]["technical_appendix"]["repair"]["fallback_to_deterministic"] is True
+
+
+def test_report_runner_falls_back_to_deterministic_document_when_provider_validation_stays_partial(
+    tmp_path, monkeypatch
+):
+    import workspaces.report_runner as report_runner
+
+    store, workspace = _create_workspace_with_orders(tmp_path)
+    calls = {"provider_compose": 0, "deterministic_compose": 0, "validate": 0}
+
+    def fake_compose_report_document(*, plan, evidence_pack, evidence_ledger=None, provider=None):
+        if provider is not None:
+            calls["provider_compose"] += 1
+            return ReportDocument(
+                title=plan.title,
+                time_range=plan.time_range,
+                data_sources=plan.data_sources,
+                opening_summary="Provider report remained partial.",
+                sections=[],
+                action_recommendations=[],
+                data_boundaries=[],
+            )
+        calls["deterministic_compose"] += 1
+        return ReportDocument(
+            title=plan.title,
+            time_range=plan.time_range,
+            data_sources=plan.data_sources,
+            opening_summary="报告已按证据账本重新生成。",
+            sections=[],
+            action_recommendations=[],
+            data_boundaries=["已使用证据账本回退生成完整报告。"],
+        )
+
+    def fake_validate_report_document(*, document, plan, evidence_pack, evidence_ledger=None):
+        calls["validate"] += 1
+        if calls["validate"] == 1:
+            return ReportValidationResult(status="warning", warnings=["provider output did not cover required sections"])
+        return ReportValidationResult(status="passed", checked_facts=["ledger_fact_workspace_table_count"])
+
+    monkeypatch.setattr(report_runner, "compose_report_document", fake_compose_report_document)
+    monkeypatch.setattr(report_runner, "validate_report_document", fake_validate_report_document)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告。",
+        providers={"report_composer": "fake-report-provider"},
+    )
+
+    report = result["report"]
+    assert result["success"] is True
+    assert report["status"] == "completed"
+    assert calls == {"provider_compose": 1, "deterministic_compose": 1, "validate": 2}
+    assert report["provider_metadata"]["fallback_to_deterministic_repair"] is True
+    assert report["document"]["technical_appendix"]["repair"]["fallback_to_deterministic"] is True
 
 
 def test_existing_semantic_layer_is_not_overwritten(tmp_path):

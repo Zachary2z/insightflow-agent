@@ -55,6 +55,40 @@ CHART_DECISION_MARKERS = ADVICE_MARKERS + (
     "prioritize",
     "priority",
 )
+IMPROVE_RISK_MARKERS = (
+    "优先复盘",
+    "优先处理",
+    "最需要处理",
+    "最需要优先",
+    "最值得关注",
+    "风险",
+    "改善",
+    "改进",
+    "客服问题",
+    "业务问题",
+    "问题最需要",
+    "问题最多",
+    "问题最严重",
+    "表现最差",
+    "最差",
+    "短板",
+    "预警",
+)
+GROWTH_BEST_MARKERS = (
+    "表现最好",
+    "最值得作为标杆",
+    "作为标杆",
+    "标杆",
+    "加资源",
+    "加预算",
+    "增长投入",
+    "表现最佳",
+    "最佳",
+    "最好",
+    "最高",
+    "领先",
+    "优秀",
+)
 
 CHINESE_FACTUAL_CHART_ANNOTATION = "图表展示本轮查询返回的各对象指标对比，请结合业务结论中的判断口径解读。"
 ENGLISH_FACTUAL_CHART_ANNOTATION = (
@@ -78,8 +112,23 @@ def apply_answer_consistency(
     if _has_single_row_budget_reduction_risk(question, rows):
         return _single_row_budget_answer(question=question, answer=answer, rows=rows)
 
+    direction = _decision_direction(question, answer)
     conflict = _multi_metric_conflict(question, rows)
-    if conflict and not _has_tradeoff_language(answer):
+    primary_metric = _primary_metric_key(question, rows)
+    if conflict and primary_metric and not _answer_matches_primary_metric(answer, rows, primary_metric):
+        return _primary_metric_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_metric=primary_metric,
+        )
+    directional_primary = _directional_primary_entity(rows, direction=direction)
+    risk_direction_resolves_conflict = (
+        direction == "improve_risk"
+        and directional_primary
+        and _risk_direction_resolves_conflict(question, rows, directional_primary)
+    )
+    if conflict and not primary_metric and not _has_tradeoff_language(answer) and not risk_direction_resolves_conflict:
         return _tradeoff_answer(
             answer=answer,
             conflict=conflict,
@@ -261,6 +310,7 @@ def _answer_evidence_alignment(
     rows: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     decision_text = _decision_text(answer)
+    direction = _decision_direction(question, answer)
     if not rows or _has_tradeoff_language(answer):
         return None
     if not (_is_decision_question(question) or _has_decision_language(decision_text)):
@@ -276,7 +326,7 @@ def _answer_evidence_alignment(
     if not entities:
         return None
 
-    primary_entity = _supported_primary_entity(rows)
+    primary_entity = _supported_primary_entity(rows, direction=direction)
     if not primary_entity:
         if (
             _answer_has_entity_conflict(answer=answer, entities=entities)
@@ -290,14 +340,34 @@ def _answer_evidence_alignment(
         return None
 
     decision_entities = _mentioned_entities(decision_text, entities)
+    recommendation_entities = _recommendation_entities(answer, entities)
     support_decision_entities = _support_decision_entities(answer, entities)
     focused_support_entities = _focused_support_entities(answer, entities)
+    if not decision_entities and _unknown_decision_entity_candidate(decision_text):
+        return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
+    if len(recommendation_entities) == 1 and recommendation_entities[0] != primary_entity:
+        return _ranked_evidence_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_entity=primary_entity,
+            direction=direction,
+        )
+    if direction != "neutral_rank" and not recommendation_entities and len(decision_entities) != 1:
+        return _ranked_evidence_answer(
+            question=question,
+            answer=answer,
+            rows=rows,
+            primary_entity=primary_entity,
+            direction=direction,
+        )
     if len(decision_entities) == 1 and decision_entities[0] != primary_entity:
         return _ranked_evidence_answer(
             question=question,
             answer=answer,
             rows=rows,
             primary_entity=primary_entity,
+            direction=direction,
         )
     if decision_entities and support_decision_entities and set(decision_entities) != set(support_decision_entities):
         return _ranked_evidence_answer(
@@ -305,6 +375,7 @@ def _answer_evidence_alignment(
             answer=answer,
             rows=rows,
             primary_entity=primary_entity,
+            direction=direction,
         )
     if (
         len(decision_entities) == 1
@@ -316,9 +387,8 @@ def _answer_evidence_alignment(
             answer=answer,
             rows=rows,
             primary_entity=primary_entity,
+            direction=direction,
         )
-    if not decision_entities and _unknown_decision_entity_candidate(decision_text):
-        return _insufficient_alignment_answer(question=question, answer=answer, rows=rows)
     return None
 
 
@@ -365,7 +435,11 @@ def _answer_has_entity_conflict(*, answer: dict[str, Any], entities: list[str]) 
     return bool(decision_entities and support_entities and decision_entities != support_entities)
 
 
-def _supported_primary_entity(rows: list[dict[str, Any]]) -> str:
+def _supported_primary_entity(rows: list[dict[str, Any]], *, direction: str = "neutral_rank") -> str:
+    directional = _directional_primary_entity(rows, direction=direction)
+    if directional:
+        return directional
+
     entity_key = _entity_key(rows)
     if not entity_key:
         return ""
@@ -382,6 +456,239 @@ def _supported_primary_entity(rows: list[dict[str, Any]]) -> str:
     return unique_leaders[0] if len(unique_leaders) == 1 else ""
 
 
+def _decision_direction(question: str, answer: dict[str, Any]) -> str:
+    question_text = _compact_for_direction(question)
+    answer_text = _compact_for_direction(_decision_text(answer))
+    if any(_compact_for_direction(marker) in question_text for marker in GROWTH_BEST_MARKERS):
+        return "growth_best"
+    if any(_compact_for_direction(marker) in question_text for marker in IMPROVE_RISK_MARKERS):
+        return "improve_risk"
+    if any(_compact_for_direction(marker) in answer_text for marker in GROWTH_BEST_MARKERS):
+        return "growth_best"
+    if any(_compact_for_direction(marker) in answer_text for marker in IMPROVE_RISK_MARKERS):
+        return "improve_risk"
+    return "neutral_rank"
+
+
+def _directional_primary_entity(rows: list[dict[str, Any]], *, direction: str) -> str:
+    if direction not in {"improve_risk", "growth_best"} or len(rows) < 2:
+        return ""
+    entity_key = _entity_key(rows)
+    if not entity_key:
+        return ""
+
+    scores: dict[str, int] = {}
+    metric_count = 0
+    for metric in _numeric_metric_keys(rows, exclude=entity_key):
+        prefer_higher = _prefer_higher_for_decision(metric, direction=direction)
+        if prefer_higher is None:
+            continue
+        candidates: list[tuple[str, float]] = []
+        for row in rows:
+            entity = str(row.get(entity_key) or "").strip()
+            value = _to_number(row.get(metric))
+            if entity and value is not None:
+                candidates.append((entity, value))
+        if len(candidates) < 2:
+            continue
+        metric_count += 1
+        ordered = sorted(candidates, key=lambda item: item[1], reverse=prefer_higher)
+        for rank, (entity, _value) in enumerate(ordered):
+            scores[entity] = scores.get(entity, 0) + rank
+
+    if not metric_count or not scores:
+        return ""
+    ranked = sorted(scores.items(), key=lambda item: item[1])
+    if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+        return ""
+    return ranked[0][0]
+
+
+def _risk_direction_resolves_conflict(question: str, rows: list[dict[str, Any]], primary_entity: str) -> bool:
+    entity_key = _entity_key(rows)
+    if not entity_key:
+        return False
+    mentioned_supporting_metrics = 0
+    directional_leaders: list[str] = []
+    for metric in _numeric_metric_keys(rows, exclude=entity_key):
+        prefer_higher = _prefer_higher_for_decision(metric, direction="improve_risk")
+        if prefer_higher is None:
+            continue
+        leader = _directional_metric_leader(rows, entity_key=entity_key, metric=metric, prefer_higher=prefer_higher)
+        if leader:
+            directional_leaders.append(leader)
+        if leader == primary_entity and _metric_mentioned_in_question(metric, question):
+            mentioned_supporting_metrics += 1
+    if mentioned_supporting_metrics >= 1:
+        return True
+    unique_leaders = set(directional_leaders)
+    return bool(len(directional_leaders) >= 2 and unique_leaders == {primary_entity})
+
+
+def _directional_metric_leader(
+    rows: list[dict[str, Any]],
+    *,
+    entity_key: str,
+    metric: str,
+    prefer_higher: bool,
+) -> str:
+    candidates: list[tuple[str, float]] = []
+    for row in rows:
+        entity = str(row.get(entity_key) or "").strip()
+        value = _to_number(row.get(metric))
+        if entity and value is not None:
+            candidates.append((entity, value))
+    if not candidates:
+        return ""
+    return sorted(candidates, key=lambda item: item[1], reverse=prefer_higher)[0][0]
+
+
+def _metric_mentioned_in_question(metric: str, question: str) -> bool:
+    question_text = _compact_for_direction(question)
+    metric_text = _compact_for_direction(metric)
+    token_groups = (
+        ("response", "响应", "duration", "时长", "minutes", "分钟"),
+        ("satisfaction", "满意", "nps", "评分", "score"),
+        ("sales", "revenue", "gmv", "销售", "收入", "营收", "成交"),
+        ("grossmargin", "margin", "毛利", "利润率"),
+        ("repeat", "repurchase", "复购", "留存"),
+        ("quantity", "qty", "销量", "销售量"),
+        ("amount", "paid", "成交", "金额"),
+        ("complaint", "投诉"),
+        ("ticket", "工单"),
+        ("cost", "spend", "成本", "花费", "费用"),
+        ("roi", "roas", "投产", "回报"),
+    )
+    for group in token_groups:
+        compact_group = [_compact_for_direction(token) for token in group]
+        if any(token in metric_text for token in compact_group) and any(token in question_text for token in compact_group):
+            return True
+    return metric_text and metric_text in question_text
+
+
+def _primary_metric_key(question: str, rows: list[dict[str, Any]]) -> str:
+    entity_key = _entity_key(rows)
+    if not entity_key:
+        return ""
+    mentioned = [
+        metric
+        for metric in _numeric_metric_keys(rows, exclude=entity_key)
+        if _metric_mentioned_in_question(metric, question)
+    ]
+    return mentioned[0] if len(mentioned) == 1 else ""
+
+
+def _answer_matches_primary_metric(answer: dict[str, Any], rows: list[dict[str, Any]], primary_metric: str) -> bool:
+    entity_key = _entity_key(rows)
+    leader = _metric_leader(rows, entity_key=entity_key, metric=primary_metric) if entity_key else None
+    if not leader:
+        return False
+    leader_name, _value = leader
+    first_sentence = str(answer.get("direct_answer") or "").split("。", 1)[0].split(".", 1)[0]
+    return leader_name in first_sentence and _metric_label(primary_metric, chinese=_contains_cjk(first_sentence)) in first_sentence
+
+
+def _primary_metric_answer(
+    *,
+    question: str,
+    answer: dict[str, Any],
+    rows: list[dict[str, Any]],
+    primary_metric: str,
+) -> dict[str, Any]:
+    chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
+    entity_key = _entity_key(rows)
+    leader = _metric_leader(rows, entity_key=entity_key, metric=primary_metric) if entity_key else None
+    if not leader:
+        return answer
+    leader_name, value = leader
+    label = _metric_label(primary_metric, chinese=chinese)
+    formatted = _format_metric_value(value, metric=primary_metric)
+    row = _row_for_entity(rows, leader_name) or {}
+    context = _row_summary(row, chinese=chinese)
+    evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
+    if chinese:
+        recommendations = answer["recommendations"]
+        if _recommendation_entities(answer, _entity_values(rows)) and leader_name not in " ".join(recommendations):
+            recommendations = [f"围绕 {leader_name} 做下一步评估，并用{label}继续跟踪。"]
+        answer.update(
+            {
+                "headline": f"{leader_name}{label}最高",
+                "direct_answer": f"{leader_name}{label}最高，为 {formatted}。",
+                "why": f"本轮证据按{label}排序，{leader_name}领先；{context}。",
+                "evidence_bullets": evidence_bullets,
+                "recommendations": recommendations,
+                "confidence": "medium" if answer["confidence"] == "high" else answer["confidence"],
+            }
+        )
+        return answer
+    recommendations = answer["recommendations"]
+    if _recommendation_entities(answer, _entity_values(rows)) and leader_name not in " ".join(recommendations):
+        recommendations = [f"Evaluate the next decision around {leader_name} and keep tracking {label}."]
+    answer.update(
+        {
+            "headline": f"{leader_name} has the highest {label}",
+            "direct_answer": f"{leader_name} has the highest {label} at {formatted}.",
+            "why": f"The returned evidence ranks {leader_name} first by {label}: {context}.",
+            "evidence_bullets": evidence_bullets,
+            "recommendations": recommendations,
+            "confidence": "medium" if answer["confidence"] == "high" else answer["confidence"],
+        }
+    )
+    return answer
+
+
+def _prefer_higher_for_decision(metric: str, *, direction: str) -> bool | None:
+    polarity = _metric_polarity(metric)
+    if not polarity:
+        return None
+    if direction == "improve_risk":
+        return polarity in {"risk", "negative"}
+    if direction == "growth_best":
+        return polarity == "positive"
+    return None
+
+
+def _metric_polarity(metric: str) -> str:
+    text = _compact_for_direction(metric)
+    if any(marker in text for marker in ("priority", "优先级", "complaint", "投诉", "ticket", "工单")):
+        return "risk"
+    if any(marker in text for marker in ("response", "响应", "duration", "时长", "minutes", "分钟", "resolution", "解决")):
+        return "negative"
+    if any(marker in text for marker in ("cost", "spend", "成本", "花费", "费用", "投放金额")):
+        return "negative"
+    if any(
+        marker in text
+        for marker in (
+            "sales",
+            "revenue",
+            "gmv",
+            "销售",
+            "收入",
+            "营收",
+            "成交",
+            "grossmargin",
+            "margin",
+            "毛利",
+            "利润率",
+            "满意",
+            "satisfaction",
+            "nps",
+            "score",
+            "评分",
+            "roi",
+            "roas",
+            "conversion",
+            "转化",
+        )
+    ):
+        return "positive"
+    return ""
+
+
+def _compact_for_direction(text: str) -> str:
+    return str(text or "").lower().replace(" ", "").replace("_", "").replace("-", "")
+
+
 def _has_decision_language(text: str) -> bool:
     lowered = str(text or "").lower()
     return any(marker in lowered for marker in CHART_DECISION_MARKERS)
@@ -393,11 +700,15 @@ def _ranked_evidence_answer(
     answer: dict[str, Any],
     rows: list[dict[str, Any]],
     primary_entity: str,
+    direction: str = "neutral_rank",
 ) -> dict[str, Any]:
     chinese = _contains_cjk(question) or _contains_cjk(_answer_text(answer))
-    row_summary = _row_summary(rows[0], chinese=chinese)
+    primary_row = _row_for_entity(rows, primary_entity) or (rows[0] if rows else {})
+    row_summary = _row_summary(primary_row, chinese=chinese)
     evidence_sentence = business_evidence_sentence(rows, chinese=chinese) or f"{row_summary}。"
     evidence_bullets = _ranked_row_bullets(rows, chinese=chinese)
+    decision_noun = _decision_noun(direction=direction, chinese=chinese)
+    why_basis = _decision_why_basis(direction=direction, chinese=chinese)
     caveats = _dedupe(
         answer["caveats"]
         + [
@@ -413,11 +724,11 @@ def _ranked_evidence_answer(
     if chinese:
         answer.update(
             {
-                "headline": f"当前证据最支持优先评估 {primary_entity}",
-                "direct_answer": f"当前数据支持优先评估 {primary_entity}，建议先围绕 {primary_entity} 复盘。",
-                "why": f"当前数据中，{primary_entity}在主要排序指标上领先；完整对比见证据说明。",
+                "headline": f"当前证据最支持优先{decision_noun} {primary_entity}",
+                "direct_answer": f"当前数据支持优先{decision_noun} {primary_entity}，{row_summary}。",
+                "why": f"当前数据中，{primary_entity}{why_basis}；完整对比见证据说明。",
                 "evidence_bullets": evidence_bullets,
-                "recommendations": [f"围绕 {primary_entity} 做下一步资源评估，并用相同指标继续跟踪。"],
+                "recommendations": [f"围绕 {primary_entity} 做下一步{decision_noun}，并用相同指标继续跟踪。"],
                 "caveats": caveats,
                 "confidence": confidence,
             }
@@ -431,7 +742,7 @@ def _ranked_evidence_answer(
                 f"The current data most supports prioritizing {primary_entity}; {row_summary}. "
                 f"So the recommendation should prioritize {primary_entity}."
             ),
-            "why": f"The current data shows: {row_summary}.",
+            "why": f"The current data shows {primary_entity} as the evidence-supported priority: {row_summary}.",
             "evidence_bullets": evidence_bullets,
             "recommendations": [f"Evaluate the next resource decision around {primary_entity} using the same metrics."],
             "caveats": caveats,
@@ -439,6 +750,31 @@ def _ranked_evidence_answer(
         }
     )
     return answer
+
+
+def _row_for_entity(rows: list[dict[str, Any]], entity: str) -> dict[str, Any] | None:
+    for row in rows:
+        if _entity_value(row) == entity:
+            return row
+    return None
+
+
+def _decision_noun(*, direction: str, chinese: bool) -> str:
+    if not chinese:
+        return "review" if direction == "improve_risk" else "evaluate"
+    if direction == "improve_risk":
+        return "复盘"
+    return "评估"
+
+
+def _decision_why_basis(*, direction: str, chinese: bool) -> str:
+    if not chinese:
+        return "has the strongest directional support"
+    if direction == "improve_risk":
+        return "在风险或改善指标上更需要关注"
+    if direction == "growth_best":
+        return "在主要正向指标上领先"
+    return "在主要排序指标上领先"
 
 
 def _insufficient_alignment_answer(

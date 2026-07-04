@@ -61,7 +61,7 @@ def test_sql_planning_routes_complete_non_template_intent_to_guarded_llm_candida
     from question_understanding.router import understand_question
     from sql_planning.router import plan_sql_strategy
 
-    result = plan_sql_strategy(understand_question("最近 30 天按用户分析复购率趋势"))
+    result = plan_sql_strategy(understand_question("最近 30 天按用户、按月分析复购率趋势"))
 
     assert result["success"] is True
     assert result["strategy"] == "llm_candidate"

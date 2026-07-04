@@ -62,6 +62,20 @@ def _flatten_execution_values(result: dict) -> set[str]:
     return values
 
 
+def _business_answer_text(result: dict) -> str:
+    answer = result["product_result"]["business_answer"]
+    return "\n".join(
+        [
+            answer["headline"],
+            answer["direct_answer"],
+            answer["why"],
+            *answer["evidence_bullets"],
+            *answer["recommendations"],
+            *answer["caveats"],
+        ]
+    )
+
+
 def test_live_deepseek_analyzes_uploaded_workspace_data(tmp_path):
     _require_live_deepseek_workspace_flags()
 
@@ -108,7 +122,9 @@ def test_live_deepseek_analyzes_uploaded_workspace_data(tmp_path):
     )
     assert set(_flatten_execution_values(result)) & workspace_channels
     assert result["final_answer"].strip()
-    assert any(str(value) in result["final_answer"] for value in _flatten_execution_values(result))
+    answer_text = result["final_answer"] + "\n" + _business_answer_text(result)
+    assert any(str(channel) in answer_text for channel in workspace_channels)
+    assert result["product_result"]["evidence"]["fact_payload"]["rows"] == result["execution_result"]["rows"]
     assert result["question_understanding"]["provider_called"] is True
     assert result["question_understanding"]["source"] == "provider"
     assert result["sql_planning"]["provider_called"] is True

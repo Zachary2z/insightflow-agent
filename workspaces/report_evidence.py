@@ -39,8 +39,24 @@ def collect_report_evidence(
     charts: list[ReportEvidenceChart] = []
     warnings: list[str] = []
     data_limits: list[str] = []
+    default_time_note = _default_time_range_note(plan.time_range)
+    if default_time_note:
+        warnings.append(default_time_note)
 
     for chapter in plan.chapters:
+        for requirement in chapter.evidence_requirements:
+            if requirement.query_hint.startswith("generic_"):
+                _collect_generic_requirement(
+                    context,
+                    analysis_db_path,
+                    requirement=requirement,
+                    time_range=plan.time_range,
+                    tables=tables,
+                    charts=charts,
+                    warnings=warnings,
+                    data_limits=data_limits,
+                    technical_queries=technical_queries,
+                )
         if chapter.chapter_id == "revenue_structure":
             _collect_revenue_structure(
                 context,
@@ -134,7 +150,26 @@ def _requested_goal_data_limits(plan: ReportPlan, context: "_EvidenceContext") -
         _matches(item, _COST_TOKENS) for item in available_items
     ):
         limits.append("用户目标包含投放成本，但当前工作区暂未识别到成本、花费或投放消耗字段。")
+    if _goal_mentions(goal, ("利润", "毛利", "净利", "利润率", "profit", "margin")) and not any(
+        _matches(item, _PROFIT_TOKENS) for item in available_items
+    ):
+        limits.append("用户目标包含利润或利润率，但当前工作区暂未识别到利润、毛利、净利或可验证的利润口径字段。")
+    if _goal_mentions(goal, ("复购", "留存", "retention", "repeat purchase", "repurchase")) and not any(
+        _matches(item, _RETENTION_TOKENS) for item in available_items
+    ):
+        limits.append("用户目标包含复购或留存，但当前工作区暂未识别到可直接计算复购率/留存率的订单序列或复购标记字段。")
     return limits
+
+
+def _default_time_range_note(time_range: str) -> str:
+    match = re.search(
+        r"完整数据时间范围：\s*(\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?)\s*至\s*(\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?)",
+        str(time_range or ""),
+    )
+    if not match:
+        return ""
+    start, end = match.groups()
+    return f"你没有指定时间范围，本报告默认使用数据集中完整可用时间范围：{start} 至 {end}。"
 
 
 def _profile_fields(profile: dict[str, Any]) -> list[dict[str, Any]]:
@@ -212,6 +247,8 @@ def _render_svg_chart(*, chart: ReportEvidenceChart, table: ReportEvidenceTable)
     rows = table.rows[:8]
     numeric_values = [_display_number(row.get(table.columns[-1] if table.columns else "")) for row in rows]
     max_value = max([value for value in numeric_values if value is not None] or [1.0])
+    if max_value <= 0:
+        max_value = 1.0
     entity_column = table.columns[0] if table.columns else ""
     metric_column = table.columns[-1] if table.columns else ""
     body_lines = [
@@ -717,6 +754,227 @@ def _collect_trend_changes(
     )
 
 
+def _collect_generic_requirement(
+    context: _EvidenceContext,
+    db_path: str | Path,
+    *,
+    requirement: Any,
+    time_range: str,
+    tables: list[ReportEvidenceTable],
+    charts: list[ReportEvidenceChart],
+    warnings: list[str],
+    data_limits: list[str],
+    technical_queries: list[dict[str, Any]],
+) -> None:
+    if requirement.missing_evidence:
+        data_limits.extend(requirement.missing_evidence)
+    calculation_type = str(requirement.calculation_type or "")
+    if calculation_type == "investment_efficiency":
+        _collect_generic_investment_efficiency(
+            context,
+            db_path,
+            requirement=requirement,
+            time_range=time_range,
+            tables=tables,
+            charts=charts,
+            data_limits=data_limits,
+            technical_queries=technical_queries,
+        )
+        return
+
+    dimension = _requirement_dimension(context, requirement)
+    metric = _requirement_metric(
+        context,
+        requirement,
+        table_name=_field_table(dimension) if dimension else "",
+    )
+    if not dimension or not metric:
+        data_limits.append(f"{requirement.description} 当前缺少可匹配的指标或维度，未生成证据。")
+        return
+    table_name = _metric_table(metric)
+    if not table_name or _field_table(dimension) != table_name:
+        data_limits.append(f"{requirement.description} 需要指标和维度位于同一可分析表，当前证据不足。")
+        return
+
+    selected_metrics = _metrics_for_generic_requirement(context, requirement, table_name)
+    if metric not in selected_metrics:
+        selected_metrics.insert(0, metric)
+    selected_metrics = [item for item in selected_metrics if _metric_table(item) == table_name and _metric_formula(item)]
+    if not selected_metrics:
+        data_limits.append(f"{requirement.description} 当前缺少可执行的指标公式，未生成证据。")
+        return
+
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label=requirement.description,
+    )
+    dim_col = _field_column(dimension)
+    select_parts = [f"{_quote(dim_col)} AS dimension_value"]
+    for index, item in enumerate(selected_metrics):
+        select_parts.append(f"{_metric_formula(item)} AS metric_value_{index}")
+    order_index = _generic_order_metric_index(selected_metrics, calculation_type=calculation_type)
+    direction = "ASC" if _metric_lower_is_better(selected_metrics[order_index], calculation_type=calculation_type) else "DESC"
+    result = _execute_query(
+        context,
+        db_path,
+        sql=(
+            f"SELECT {', '.join(select_parts)} FROM {_quote(table_name)}{time_filter.where_sql} "
+            f"GROUP BY {_quote(dim_col)} ORDER BY metric_value_{order_index} {direction}"
+        ),
+        task={
+            "task_type": "rank",
+            "metrics": [_metric_label(item) for item in selected_metrics],
+            "dimensions": [_label(dimension)],
+            "calculation_type": calculation_type,
+            "group_by": [_label(dimension)],
+        },
+        time_range=time_range,
+        evidence_ref=f"query_{requirement.requirement_id}",
+        technical_queries=technical_queries,
+    )
+    if not result.get("success"):
+        warnings.append(f"{requirement.description} 查询未通过校验或执行失败。")
+        return
+
+    metric_labels = [_metric_label(item) for item in selected_metrics]
+    rows = []
+    for row in result.get("rows") or []:
+        record = {_label(dimension) or "业务维度": row[0]}
+        for index, label in enumerate(metric_labels):
+            value = row[index + 1] if len(row) > index + 1 else None
+            record[label] = _format_value(value, unit=_unit_for_metric(selected_metrics[index]))
+        rows.append(record)
+    tables.append(
+        ReportEvidenceTable(
+            table_id=requirement.requirement_id,
+            title=_generic_table_title(requirement),
+            columns=[_label(dimension) or "业务维度", *metric_labels],
+            rows=rows,
+            source_chapter_id=requirement.chapter_id,
+            description=f"证据来自{_readable_table_name(table_name)}按{_label(dimension)}汇总。",
+            evidence_ref=f"query_{requirement.requirement_id}",
+            evidence_payload_ref=f"query_{requirement.requirement_id}",
+        )
+    )
+    charts.append(
+        ReportEvidenceChart(
+            chart_id=f"{requirement.requirement_id}_intent",
+            title=f"{_generic_table_title(requirement)}图表",
+            source_chapter_id=requirement.chapter_id,
+            chart_type=requirement.chart_hint or "bar",
+            description=f"图表意图：展示{_generic_table_title(requirement)}。",
+            evidence_ref=f"query_{requirement.requirement_id}",
+        )
+    )
+
+
+def _collect_generic_investment_efficiency(
+    context: _EvidenceContext,
+    db_path: str | Path,
+    *,
+    requirement: Any,
+    time_range: str,
+    tables: list[ReportEvidenceTable],
+    charts: list[ReportEvidenceChart],
+    data_limits: list[str],
+    technical_queries: list[dict[str, Any]],
+) -> None:
+    registry = context.registry_metrics
+    revenue = _first_registry_metric(registry, _REVENUE_TOKENS)
+    spend = _first_registry_metric(registry, _COST_TOKENS)
+    roas = registry.get("roas") if isinstance(registry.get("roas"), dict) else None
+    net_return = registry.get("net_return") if isinstance(registry.get("net_return"), dict) else None
+    if not revenue or not spend or not roas or not net_return:
+        data_limits.append(
+            "跨表投放效率需要收入和投放字段位于同一可分析表，或存在可确认关联字段；"
+            "当前证据不足，未计算 ROAS/净投放回报率。"
+        )
+        return
+    table_name = _metric_table(roas)
+    if not table_name or _metric_table(revenue) != table_name or _metric_table(spend) != table_name:
+        data_limits.append(
+            "跨表投放效率需要收入和投放字段位于同一可分析表，或存在可确认关联字段；"
+            "当前证据不足，未计算 ROAS/净投放回报率。"
+        )
+        return
+    dimension = _requirement_dimension(context, requirement, table_name=table_name)
+    if not dimension:
+        data_limits.append("渠道投放表现需要渠道或活动维度，当前证据不足。")
+        return
+    time_filter = _time_filter_clause(
+        context,
+        table_name,
+        time_range=time_range,
+        data_limits=data_limits,
+        evidence_label=requirement.description,
+    )
+    dim_col = _field_column(dimension)
+    metrics = [revenue, spend, {**roas, "name": "roas"}, {**net_return, "name": "net_return"}]
+    result = _execute_query(
+        context,
+        db_path,
+        sql=(
+            f"SELECT {_quote(dim_col)} AS dimension_value, "
+            f"{_metric_formula(revenue)} AS revenue_value, "
+            f"{_metric_formula(spend)} AS spend_value, "
+            f"{_metric_formula(roas)} AS roas_value, "
+            f"{_metric_formula(net_return)} AS net_return_value "
+            f"FROM {_quote(table_name)}{time_filter.where_sql} "
+            f"GROUP BY {_quote(dim_col)} ORDER BY roas_value DESC"
+        ),
+        task={
+            "task_type": "rank",
+            "metrics": [_metric_label(item) for item in metrics],
+            "dimensions": [_label(dimension)],
+            "calculation_type": "investment_efficiency",
+            "group_by": [_label(dimension)],
+        },
+        time_range=time_range,
+        evidence_ref=f"query_{requirement.requirement_id}",
+        technical_queries=technical_queries,
+    )
+    if not result.get("success"):
+        data_limits.append("渠道投放效率查询未通过校验或执行失败。")
+        return
+    rows = []
+    columns = [_label(dimension) or "渠道", "收入", "投放成本", "广告投入产出比", "净投放回报率"]
+    for row in result.get("rows") or []:
+        rows.append(
+            {
+                columns[0]: row[0],
+                columns[1]: _format_value(row[1], unit="currency"),
+                columns[2]: _format_value(row[2], unit="currency"),
+                columns[3]: _format_value(row[3]),
+                columns[4]: _format_value(row[4], unit="percentage"),
+            }
+        )
+    tables.append(
+        ReportEvidenceTable(
+            table_id=requirement.requirement_id,
+            title="渠道投放效率",
+            columns=columns,
+            rows=rows,
+            source_chapter_id=requirement.chapter_id,
+            description=f"证据来自{_readable_table_name(table_name)}按{_label(dimension)}汇总。",
+            evidence_ref=f"query_{requirement.requirement_id}",
+            evidence_payload_ref=f"query_{requirement.requirement_id}",
+        )
+    )
+    charts.append(
+        ReportEvidenceChart(
+            chart_id=f"{requirement.requirement_id}_intent",
+            title="渠道投放效率图表",
+            source_chapter_id=requirement.chapter_id,
+            chart_type=requirement.chart_hint or "bar",
+            description="图表意图：展示不同渠道的收入、投放成本和回报效率。",
+            evidence_ref=f"query_{requirement.requirement_id}",
+        )
+    )
+
+
 def _execute_query(
     context: _EvidenceContext,
     db_path: str | Path,
@@ -768,6 +1026,171 @@ def _payload_aliases(task: dict[str, Any]) -> dict[str, str]:
         aliases["total_value"] = metrics[0]
         aliases["ticket_value"] = metrics[0]
     return aliases
+
+
+def _requirement_dimension(context: _EvidenceContext, requirement: Any, table_name: str = "") -> dict[str, Any] | None:
+    dimensions = [
+        item
+        for item in context.dimensions
+        if not table_name or _field_table(item) == table_name
+    ]
+    requested = [str(item) for item in getattr(requirement, "dimensions", []) or []]
+    requested.append(str(getattr(requirement, "dimension_hint", "") or ""))
+    for label in requested:
+        match = next((dimension for dimension in dimensions if _matches(dimension, (label,))), None)
+        if match:
+            return match
+    return dimensions[0] if dimensions else None
+
+
+def _requirement_metric(context: _EvidenceContext, requirement: Any, table_name: str = "") -> dict[str, Any] | None:
+    requested = [str(item) for item in getattr(requirement, "metrics", []) or []]
+    requested.append(str(getattr(requirement, "metric_hint", "") or ""))
+    for label in requested:
+        match = _first_registry_metric(context.registry_metrics, (label,))
+        if match and (not table_name or _metric_table(match) == table_name):
+            return match
+        match = _first_semantic_metric(context.metrics, (label,))
+        if match and (not table_name or _metric_table(match) == table_name):
+            return match
+    if table_name:
+        fallback = _profile_numeric_metric(context, table_name, requested=requested)
+        if fallback:
+            return fallback
+    primary = context.primary_metric()
+    if primary and (not table_name or _metric_table(primary) == table_name):
+        return primary
+    return None
+
+
+def _metrics_for_generic_requirement(
+    context: _EvidenceContext,
+    requirement: Any,
+    table_name: str,
+) -> list[dict[str, Any]]:
+    calculation_type = str(getattr(requirement, "calculation_type", "") or "")
+    if calculation_type == "operational_efficiency":
+        tokens = ("工单", "响应", "满意度", "评分", "ticket", "response", "satisfaction", "score")
+        return [
+            metric
+            for metric in [_first_registry_metric(context.registry_metrics, (token,)) for token in tokens]
+            if metric and _metric_table(metric) == table_name
+        ]
+    requested = [str(item) for item in getattr(requirement, "metrics", []) or [] if str(item).strip()]
+    metrics: list[dict[str, Any]] = []
+    for label in requested:
+        metric = _first_registry_metric(context.registry_metrics, (label,))
+        if metric and _metric_table(metric) == table_name:
+            metrics.append(metric)
+    if not metrics:
+        fallback = _profile_numeric_metric(context, table_name, requested=requested)
+        if fallback:
+            metrics.append(fallback)
+    return _unique_metrics(metrics)
+
+
+def _profile_numeric_metric(
+    context: _EvidenceContext,
+    table_name: str,
+    *,
+    requested: list[str],
+) -> dict[str, Any] | None:
+    table = _profile_table(context.profile, table_name)
+    columns = [column for column in table.get("columns") or [] if isinstance(column, dict)]
+    requested_text = _compact(" ".join(requested))
+    numeric_columns = [column for column in columns if _profile_column_is_numeric(column)]
+    if not numeric_columns:
+        return None
+    preferred = next(
+        (
+            column
+            for column in numeric_columns
+            if _matches(column, ("amount", "金额", "销售", "收入", "paid"))
+            and (
+                any(token in requested_text for token in ("销售", "收入", "金额", "paid", "amount"))
+                or not requested_text
+            )
+        ),
+        None,
+    )
+    preferred = preferred or numeric_columns[0]
+    column_name = str(preferred.get("name") or "")
+    label = _profile_metric_label(preferred, requested=requested)
+    aggregation = "AVG" if _matches(preferred, ("avg", "average", "满意度", "评分", "响应", "时长", "minutes")) else "SUM"
+    unit = "currency" if _matches(preferred, ("amount", "金额", "销售", "收入", "paid", "cost", "spend")) else "number"
+    return {
+        "name": f"{aggregation.lower()}_{column_name}",
+        "business_label": label,
+        "field": f"{table_name}.{column_name}",
+        "formula": f'{aggregation}({_quote(table_name)}.{_quote(column_name)})',
+        "unit": unit,
+        "source_fields": [f"{table_name}.{column_name}"],
+    }
+
+
+def _profile_column_is_numeric(column: dict[str, Any]) -> bool:
+    text = _compact(
+        " ".join(
+            str(value or "")
+            for value in [
+                column.get("name"),
+                column.get("type"),
+                column.get("original_type"),
+                column.get("inferred_type"),
+                column.get("field_role"),
+                *(column.get("business_meaning_candidates") or []),
+            ]
+        )
+    )
+    return any(token in text for token in ("real", "integer", "float", "number", "numeric", "amount", "count", "金额", "数量"))
+
+
+def _profile_metric_label(column: dict[str, Any], *, requested: list[str]) -> str:
+    cjk_requested = [item for item in requested if any("\u4e00" <= char <= "\u9fff" for char in item)]
+    if cjk_requested:
+        return cjk_requested[0]
+    if _matches(column, ("response", "响应")):
+        return "平均响应时长"
+    if _matches(column, ("satisfaction", "满意度", "score", "评分")):
+        return "满意度"
+    if _matches(column, ("ticket", "工单")):
+        return "工单数"
+    if _matches(column, ("amount", "paid", "销售", "收入", "金额")):
+        return "销售额"
+    return str(column.get("label") or column.get("name") or "业务指标")
+
+
+def _generic_order_metric_index(metrics: list[dict[str, Any]], *, calculation_type: str) -> int:
+    if calculation_type == "operational_efficiency":
+        for index, metric in enumerate(metrics):
+            if _metric_lower_is_better(metric, calculation_type=calculation_type):
+                return index
+    return 0
+
+
+def _metric_lower_is_better(metric: dict[str, Any], *, calculation_type: str) -> bool:
+    text = _compact(f"{_metric_label(metric)} {metric.get('name')} {metric.get('field')} {calculation_type}")
+    return "响应" in text or "时长" in text or "duration" in text or "minutes" in text
+
+
+def _generic_table_title(requirement: Any) -> str:
+    return {
+        "store_performance": "门店表现",
+        "product_performance": "商品贡献",
+        "support_operations": "客服运营效率",
+        "channel_investment": "渠道投放效率",
+    }.get(str(getattr(requirement, "chapter_id", "") or ""), str(getattr(requirement, "description", "") or "业务证据"))
+
+
+def _unique_metrics(metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unique: list[dict[str, Any]] = []
+    seen = set()
+    for metric in metrics:
+        key = str(metric.get("name") or metric.get("field") or metric.get("formula") or "")
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(metric)
+    return unique
 
 
 def _business_safe_evidence_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1080,6 +1503,8 @@ def _quote(identifier: str) -> str:
 _REVENUE_TOKENS = ("revenue_like", "sales_like", "gmv_like", "revenue", "sales", "收入", "营收", "销售额", "营业额", "成交额")
 _COST_TOKENS = ("cost", "spend", "expense", "ad_spend", "marketing_spend", "成本", "花费", "消耗", "投放")
 _ROI_TOKENS = ("roi", "roas", "return_on_investment", "投产比", "投资回报", "回报率", "roi_like", "roas_like")
+_PROFIT_TOKENS = ("profit", "margin", "gross_margin", "net_profit", "利润", "毛利", "净利", "利润率", "毛利率")
+_RETENTION_TOKENS = ("retention", "repeat", "repurchase", "repeat_purchase", "复购", "留存", "回购")
 _CUSTOMER_TOKENS = ("customer", "client", "member", "segment", "客户", "会员", "客群", "人群", "分群")
 _SUPPORT_TOKENS = ("support", "ticket", "issue", "complaint", "response", "satisfaction", "客服", "工单", "问题", "投诉", "响应", "满意度")
 _ISSUE_TOKENS = ("issue", "problem", "complaint", "type", "问题", "投诉", "类型")

@@ -274,6 +274,41 @@ def test_build_evidence_payload_records_missing_metric_limit_instead_of_inventin
     assert any("ROI" in limit and "未计算" in limit for limit in payload["data_limits"])
 
 
+def test_build_evidence_payload_does_not_mark_provider_metric_fragments_missing_when_columns_exist():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "rank",
+            "dimensions": ["渠道"],
+            "metrics": ["销售额", "投放成本", "ROI（收入", "投放）", "销售额（收入）"],
+            "calculation_type": "investment_efficiency",
+        },
+        execution_result={
+            "success": True,
+            "columns": ["渠道", "revenue", "spend", "roi"],
+            "rows": [["私域社群", 198000, 28000, 7.07], ["抖音", 410000, 160000, 2.56]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_revenue": {"business_label": "收入", "formula": "SUM(revenue)", "source_fields": ["revenue"]},
+                "sum_spend": {"business_label": "投放成本", "formula": "SUM(spend)", "source_fields": ["spend"]},
+                "roi": {"business_label": "ROI", "formula": "SUM(revenue) / SUM(spend)", "source_fields": ["revenue", "spend"]},
+            },
+            "formulas": {"roi": "SUM(revenue) / SUM(spend)"},
+            "warnings": [],
+            "available_analysis_capabilities": {"can_calculate_roi": True},
+        },
+        business_aliases={"revenue": "收入", "spend": "投放金额", "roi": "ROI"},
+    )
+
+    limits_text = "\n".join(payload["data_limits"])
+    assert "ROI（收入" not in limits_text
+    assert "投放）" not in limits_text
+    assert "销售额（收入）" not in limits_text
+    assert "ROI/ROAS" not in limits_text
+
+
 def test_build_evidence_payload_does_not_embed_sql_in_shared_business_payload():
     from tools.evidence_tool import build_evidence_payload
 
@@ -335,3 +370,142 @@ def test_build_evidence_payload_targets_requested_metric_for_derived_metrics():
     assert "order_count_rank" not in derived_ids
     share = next(item for item in payload["derived_metrics"] if item["metric_id"] == "revenue_share")
     assert share["values"][0]["display_value"] == "60.0%"
+
+
+def test_build_evidence_payload_records_missing_time_cost_and_join_limits():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "recommendation",
+            "dimensions": ["地区"],
+            "metrics": ["收入", "利润", "ROI"],
+            "time_range": {"raw_text": "最近90天"},
+            "requires_time_field": True,
+            "requires_cost_field": True,
+            "requires_join": True,
+        },
+        execution_result={
+            "success": True,
+            "columns": ["region", "revenue_amount"],
+            "rows": [["华东", 98000.0], ["华南", 76000.0]],
+        },
+        metric_registry={
+            "metrics": {
+                "sum_revenue_amount": {
+                    "business_label": "收入",
+                    "formula": 'SUM("区域销售"."收入金额")',
+                    "unit": "currency",
+                    "source_fields": ["区域销售.收入金额"],
+                    "meanings": ["revenue_like"],
+                }
+            },
+            "formulas": {"sum_revenue_amount": 'SUM("区域销售"."收入金额")'},
+            "warnings": ["利润率需要同时存在收入类字段和成本类字段，当前证据不足，未生成。"],
+            "available_analysis_capabilities": {
+                "can_analyze_trends": False,
+                "can_calculate_profit": False,
+                "can_calculate_roi": False,
+                "can_join_tables": False,
+            },
+        },
+        business_aliases={"region": "地区", "revenue_amount": "收入"},
+    )
+
+    limits_text = "\n".join(payload["data_limits"])
+    assert "利润" in limits_text and "成本字段" in limits_text
+    assert "ROI" in limits_text and "投放" in limits_text
+    assert "最近90天" in limits_text and "时间字段" in limits_text
+    assert "跨表" in limits_text and "关联字段" in limits_text
+    assert "roi" not in {item["metric_id"].lower() for item in payload["derived_metrics"]}
+
+
+def test_build_evidence_payload_uses_real_metric_registry_capabilities_for_roi_join_limits():
+    from tools.evidence_tool import build_evidence_payload
+    from tools.metric_tool import build_metric_registry
+
+    metric_registry = build_metric_registry(
+        {
+            "metrics": [
+                {
+                    "name": "sum_收入金额",
+                    "label": "收入",
+                    "field": "销售表.收入金额",
+                    "formula": 'SUM("销售表"."收入金额")',
+                    "business_meaning_candidates": ["revenue_like", "amount_like"],
+                    "source_fields": ["销售表.收入金额"],
+                },
+                {
+                    "name": "sum_投放金额",
+                    "label": "投放金额",
+                    "field": "投放表.投放金额",
+                    "formula": 'SUM("投放表"."投放金额")',
+                    "business_meaning_candidates": ["spend_like", "cost_like", "amount_like"],
+                    "source_fields": ["投放表.投放金额"],
+                },
+            ],
+            "relationships": [],
+            "available_analysis_capabilities": {
+                "can_join_tables": False,
+                "can_calculate_roi": False,
+                "can_calculate_profit": False,
+            },
+        }
+    )
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "recommendation",
+            "dimensions": ["渠道"],
+            "metrics": ["收入", "ROI"],
+            "time_range": {"raw_text": "最近90天"},
+            "requires_join": True,
+        },
+        execution_result={
+            "success": True,
+            "columns": ["channel", "revenue_amount"],
+            "rows": [["自然流量", 120000.0], ["付费搜索", 98000.0]],
+        },
+        metric_registry=metric_registry,
+        business_aliases={"channel": "渠道", "revenue_amount": "收入"},
+    )
+
+    assert "roas" not in payload["formulas"]
+    assert "net_return" not in payload["formulas"]
+    limits_text = "\n".join(payload["data_limits"])
+    assert "ROI" in limits_text and "投放" in limits_text
+    assert "跨表" in limits_text and "关联字段" in limits_text
+    assert "可确认关联字段" in "\n".join(payload["warnings"])
+
+
+def test_build_evidence_payload_exposes_explicit_evidence_requirements():
+    from tools.evidence_tool import build_evidence_payload
+
+    payload = build_evidence_payload(
+        task={
+            "task_type": "rank",
+            "dimensions": ["品类"],
+            "metrics": ["销售额"],
+            "time_range": {"raw_text": "最近90天"},
+            "filters": ["地区 = 华东"],
+            "calculation_type": "contribution",
+        },
+        execution_result={
+            "success": True,
+            "columns": ["category_name", "sales_amount"],
+            "rows": [["饮料", 120000.0], ["零食", 80000.0]],
+        },
+        metric_registry={"metrics": {}, "formulas": {}, "warnings": []},
+        business_aliases={"category_name": "品类", "sales_amount": "销售额"},
+    )
+
+    requirement = payload["evidence_requirements"][0]
+
+    assert requirement["time_range"] == {"raw_text": "最近90天"}
+    assert requirement["metrics"] == ["销售额"]
+    assert requirement["dimensions"] == ["品类"]
+    assert requirement["filters"] == ["地区 = 华东"]
+    assert requirement["group_by"] == ["品类"]
+    assert requirement["comparison_scope"]["type"] == "peer_comparison"
+    assert requirement["calculation_type"] == "contribution"
+    assert requirement["missing_evidence"] == []

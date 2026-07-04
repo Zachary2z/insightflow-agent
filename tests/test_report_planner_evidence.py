@@ -137,7 +137,9 @@ def test_chinese_report_planner_generates_goal_driven_chapters(tmp_path):
     )
 
     titles = [chapter.title for chapter in plan.chapters]
-    assert plan.title == "最近90天经营复盘报告"
+    assert "date_field" in plan.missing_slots
+    assert any("多个可能的时间字段" in question for question in plan.clarification_questions)
+    assert "最近90天" not in plan.title
     assert plan.report_style == "经营复盘"
     assert "经营概览" in titles
     assert "收入结构" in titles
@@ -165,6 +167,60 @@ def test_report_planner_title_matches_channel_performance_goal(tmp_path):
     assert "Business Review" not in plan.title
     assert "管理层摘要" not in plan.title
     assert "Revenue Overview" not in plan.title
+
+
+def test_report_planner_broad_business_review_is_not_hijacked_by_channel_topic(tmp_path):
+    _store, _workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    titles = {chapter.title for chapter in plan.chapters}
+
+    assert plan.title == "最近90天经营复盘报告"
+    assert plan.title != "最近90天渠道表现复盘报告"
+    assert plan.report_style == "经营复盘"
+    assert {"收入结构", "客户分群", "商品表现", "渠道投放表现"}.issubset(titles)
+    assert "行动建议" in titles
+
+
+def test_report_planner_management_brief_is_not_hijacked_by_channel_efficiency(tmp_path):
+    _store, _workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    titles = {chapter.title for chapter in plan.chapters}
+
+    assert "date_field" in plan.missing_slots
+    assert any("多个可能的时间字段" in question for question in plan.clarification_questions)
+    assert plan.title != "最近90天渠道表现复盘报告"
+    assert plan.report_style == "管理层经营简报"
+    assert {"经营概览", "商品表现", "客户分群", "渠道投放表现"}.issubset(titles)
+
+
+def test_report_planner_keeps_specialized_trend_title_for_trend_only_goal(tmp_path):
+    _store, _workspace, profile, semantic_layer = _prepare_business_workspace(tmp_path)
+
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成一份最近90天收入趋势变化报告。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    assert plan.title == "最近90天趋势变化报告"
+    assert plan.report_style == "趋势分析"
+    assert any(chapter.title == "趋势变化" for chapter in plan.chapters)
+    assert plan.title != "最近90天经营复盘报告"
 
 
 def test_report_evidence_records_requested_cost_and_roi_data_limits(tmp_path):
@@ -666,6 +722,140 @@ def test_report_evidence_payloads_do_not_embed_sql_or_raw_rows(tmp_path):
     assert all("rows" not in payload for payload in payloads)
     assert all("rows" not in payload.get("chart_data", {}) for payload in payloads)
     assert "SELECT" in json.dumps(evidence_pack.technical_details["queries"], ensure_ascii=False).upper()
+
+
+def test_report_planner_generates_structured_requirements_for_common_business_goals(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Common Business Goals Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.execute("CREATE TABLE product_sales (sale_date TEXT, category_name TEXT, paid_amount REAL)")
+        conn.execute(
+            "CREATE TABLE support_tickets (ticket_date TEXT, team_name TEXT, ticket_count INTEGER, avg_response_minutes REAL, satisfaction_score REAL)"
+        )
+        conn.execute("CREATE TABLE campaigns (campaign_date TEXT, channel_name TEXT, revenue_amount REAL, spend_amount REAL)")
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成经营复盘报告，包含门店表现、商品表现、客服运营和渠道投放表现。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    requirements = [req.to_dict() for chapter in plan.chapters for req in chapter.evidence_requirements]
+    calculations = {req["calculation_type"] for req in requirements}
+    requirement_text = json.dumps(requirements, ensure_ascii=False)
+
+    assert "门店表现" in [chapter.title for chapter in plan.chapters]
+    assert "商品表现" in [chapter.title for chapter in plan.chapters]
+    assert "客服运营" in [chapter.title for chapter in plan.chapters]
+    assert "渠道投放表现" in [chapter.title for chapter in plan.chapters]
+    assert {"ranking", "contribution", "operational_efficiency", "investment_efficiency"} <= calculations
+    assert "time_range" in requirement_text
+    assert "metrics" in requirement_text
+    assert "dimensions" in requirement_text
+    assert "group_by" in requirement_text
+    assert "comparison_scope" in requirement_text
+    assert "missing_evidence" in requirement_text
+
+
+def test_report_evidence_collects_generic_store_product_support_and_campaign_evidence(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Generic Report Evidence Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [("2026-06-01", "上海旗舰店", 300000.0), ("2026-06-02", "北京国贸店", 100000.0)],
+        )
+        conn.execute("CREATE TABLE product_sales (sale_date TEXT, category_name TEXT, paid_amount REAL)")
+        conn.executemany(
+            "INSERT INTO product_sales VALUES (?, ?, ?)",
+            [("2026-06-01", "饮料", 120000.0), ("2026-06-02", "零食", 80000.0)],
+        )
+        conn.execute(
+            "CREATE TABLE support_tickets (ticket_date TEXT, team_name TEXT, ticket_count INTEGER, avg_response_minutes REAL, satisfaction_score REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO support_tickets VALUES (?, ?, ?, ?, ?)",
+            [
+                ("2026-06-01", "华东客服组", 120, 16.0, 4.8),
+                ("2026-06-02", "华北客服组", 95, 35.0, 4.2),
+            ],
+        )
+        conn.execute("CREATE TABLE campaigns (campaign_date TEXT, channel_name TEXT, revenue_amount REAL, spend_amount REAL)")
+        conn.executemany(
+            "INSERT INTO campaigns VALUES (?, ?, ?, ?)",
+            [("2026-06-01", "搜索广告", 180000.0, 60000.0), ("2026-06-02", "内容投放", 90000.0, 45000.0)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    plan = plan_workspace_report(
+        report_type="business_review",
+        report_goal="生成最近90天经营复盘报告，包含门店表现、商品表现、客服运营和渠道投放表现。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    titles = {table.title for table in evidence_pack.tables}
+    serialized_payloads = json.dumps(evidence_pack.evidence_payloads, ensure_ascii=False)
+
+    assert "门店表现" in titles
+    assert "商品贡献" in titles
+    assert "客服运营效率" in titles
+    assert "渠道投放效率" in titles
+    assert "上海旗舰店" in serialized_payloads
+    assert "60.0%" in serialized_payloads
+    assert "华东客服组" in serialized_payloads
+    assert "广告投入产出比" in serialized_payloads or "净投放回报率" in serialized_payloads
+    assert "SELECT" not in serialized_payloads.upper()
+
+
+def test_report_evidence_records_data_limit_for_unsafe_cross_table_investment_efficiency(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Unsafe Cross Table Investment Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE sales (sale_date TEXT, channel_name TEXT, revenue_amount REAL)")
+        conn.execute("CREATE TABLE ad_spend (spend_date TEXT, campaign_name TEXT, spend_amount REAL)")
+        conn.executemany(
+            "INSERT INTO sales VALUES (?, ?, ?)",
+            [("2026-06-01", "搜索广告", 180000.0), ("2026-06-02", "内容投放", 90000.0)],
+        )
+        conn.executemany(
+            "INSERT INTO ad_spend VALUES (?, ?, ?)",
+            [("2026-06-01", "SEM-6月", 60000.0), ("2026-06-02", "内容-6月", 45000.0)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    semantic_layer = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    plan = plan_workspace_report(
+        report_type="channel_performance",
+        report_goal="生成最近90天渠道投放表现报告，关注收入、投放成本、ROAS 和净投放回报率。",
+        profile=profile,
+        semantic_layer=semantic_layer,
+    )
+
+    evidence_pack = collect_report_evidence(
+        plan=plan,
+        profile=profile,
+        semantic_layer=semantic_layer,
+        analysis_db_path=workspace["analysis_db_path"],
+    )
+
+    limits = "\n".join([*evidence_pack.warnings, *evidence_pack.data_limits])
+    investment_tables = [table for table in evidence_pack.tables if table.title == "渠道投放效率"]
+
+    assert not investment_tables
+    assert "跨表" in limits or "关联字段" in limits
+    assert "ROAS" in limits or "ROI" in limits or "投放" in limits
 
 
 def test_evidence_collector_records_data_limit_when_support_data_missing(tmp_path):

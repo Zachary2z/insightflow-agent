@@ -41,26 +41,88 @@ def _looks_like_date_value(value: Any) -> bool:
 _TIME_TOKENS = ("date", "time", "created", "updated", "month", "day", "日期", "时间", "月份", "年月", "创建")
 _ID_TOKENS = ("id", "编号", "编码", "主键")
 _STATUS_TOKENS = ("status", "state", "stage", "状态", "阶段")
-_REVENUE_TOKENS = ("revenue", "sales", "gmv", "income", "turnover", "营业额", "营收", "收入", "销售额", "成交额")
-_COST_TOKENS = ("cost", "spend", "expense", "fee", "budget", "成本", "花费", "费用", "支出", "投放")
-_AMOUNT_TOKENS = ("amount", "price", "value", "revenue", "sales", "gmv", "金额", "额", "价格", "单价", "营业额")
+_REVENUE_TOKENS = (
+    "revenue",
+    "sales",
+    "salesamount",
+    "gmv",
+    "income",
+    "turnover",
+    "营业额",
+    "营收",
+    "收入",
+    "收入金额",
+    "销售额",
+    "销售金额",
+    "成交额",
+    "成交金额",
+    "实付金额",
+)
+_SPEND_TOKENS = ("adspend", "marketing_spend", "media_spend", "spend", "budget", "花费", "投放", "广告费")
+_COST_TOKENS = (
+    "cost",
+    "expense",
+    "fee",
+    "成本",
+    "采购成本",
+    "费用",
+    "支出",
+    *_SPEND_TOKENS,
+)
+_AMOUNT_TOKENS = (
+    "amount",
+    "price",
+    "value",
+    "revenue",
+    "sales",
+    "gmv",
+    "金额",
+    "额",
+    "价格",
+    "单价",
+    "营业额",
+)
 _COUNT_TOKENS = (
     "count",
     "qty",
     "quantity",
     "number",
     "num",
+    "orders",
+    "ordercount",
     "tickets",
+    "ticketcount",
     "stock",
     "inventory",
     "数量",
     "次数",
     "件数",
+    "销量",
     "单量",
+    "订单数",
+    "订单量",
+    "工单数",
+    "工单量",
     "库存",
     "客诉",
 )
+_ORDER_COUNT_TOKENS = ("ordercount", "orders", "订单数", "订单量", "下单数")
+_TICKET_COUNT_TOKENS = ("ticketcount", "tickets", "工单数", "工单量", "客诉数量")
 _RATING_TOKENS = ("rating", "score", "stars", "nps", "评分", "满意度", "星级", "得分")
+_DURATION_TOKENS = (
+    "duration",
+    "response",
+    "resolution",
+    "handle",
+    "minutes",
+    "hours",
+    "时长",
+    "分钟",
+    "小时",
+    "响应",
+    "解决",
+    "处理",
+)
 _TEXT_TOKENS = ("note", "comment", "description", "remark", "备注", "描述", "说明", "内容")
 
 
@@ -70,14 +132,22 @@ def _business_meanings(name: str, *, is_time: bool, is_status: bool) -> list[str
         meanings.append("date_like")
     if _contains_any(name, _REVENUE_TOKENS):
         meanings.append("revenue_like")
+    if _contains_any(name, _SPEND_TOKENS):
+        meanings.append("spend_like")
     if _contains_any(name, _COST_TOKENS):
         meanings.append("cost_like")
     if _contains_any(name, _AMOUNT_TOKENS) or any(item in meanings for item in ("revenue_like", "cost_like")):
         meanings.append("amount_like")
     if _contains_any(name, _COUNT_TOKENS):
         meanings.append("count_like")
+    if _contains_any(name, _ORDER_COUNT_TOKENS):
+        meanings.append("order_count_like")
+    if _contains_any(name, _TICKET_COUNT_TOKENS):
+        meanings.append("ticket_count_like")
     if _contains_any(name, _RATING_TOKENS):
         meanings.append("rating_like")
+    if _contains_any(name, _DURATION_TOKENS):
+        meanings.append("duration_like")
     if is_status or _contains_any(name, _STATUS_TOKENS):
         meanings.append("status")
     return list(dict.fromkeys(meanings))
@@ -140,6 +210,8 @@ def _suitable_aggregations(field_role: str, meanings: list[str]) -> list[str]:
     if field_role != "metric":
         return ["count"]
     if "rating_like" in meanings:
+        return ["avg", "count", "min", "max"]
+    if "duration_like" in meanings:
         return ["avg", "count", "min", "max"]
     return ["sum", "avg", "count", "min", "max"]
 

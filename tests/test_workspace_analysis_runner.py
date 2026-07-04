@@ -699,6 +699,143 @@ def test_workspace_analysis_provider_priority_question_preserves_comparison_scop
         assert forbidden not in text
 
 
+def test_workspace_analysis_generates_generic_store_ranking_evidence_without_initial_sql(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Generic Store Evidence Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+                ("2026-06-03", "深圳湾店", 80000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高，为什么？",
+    )
+
+    fact_payload = result["product_result"]["evidence"]["fact_payload"]
+    requirement = fact_payload["evidence_requirements"][0]
+
+    assert result["status"] == "completed"
+    assert "store_sales" in result["generated_sql"]
+    assert "orders" not in result["generated_sql"]
+    assert result["execution_result"]["rows"][0][0] == "上海旗舰店"
+    assert fact_payload["display_values"][0]["门店"] == "上海旗舰店"
+    assert fact_payload["display_values"][0]["销售额"] == "30.0 万"
+    assert requirement["metrics"] == ["销售额"]
+    assert requirement["dimensions"] == ["门店"]
+    assert requirement["time_range"]["raw_text"] == "最近 90 天"
+    assert requirement["calculation_type"] == "ranking"
+    assert requirement["missing_evidence"] == []
+
+
+def test_workspace_analysis_generates_generic_product_contribution_share_without_initial_sql(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Generic Product Contribution Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE product_sales (sale_date TEXT, category_name TEXT, paid_amount REAL)")
+        conn.executemany(
+            "INSERT INTO product_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "饮料", 120000.0),
+                ("2026-06-02", "零食", 80000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪些品类贡献最大，占比多少？",
+    )
+
+    payload = result["product_result"]["evidence"]["fact_payload"]
+
+    assert result["status"] == "completed"
+    assert "product_sales" in result["generated_sql"]
+    assert result["execution_result"]["rows"][0][0] == "饮料"
+    share = next(item for item in payload["derived_metrics"] if item["metric_id"].endswith("_share"))
+
+    assert payload["display_values"][0]["品类"] == "饮料"
+    assert share["values"][0]["display_value"] == "60.0%"
+    assert payload["evidence_requirements"][0]["calculation_type"] == "contribution"
+
+
+def test_workspace_analysis_generates_generic_support_operational_evidence_without_initial_sql(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Generic Support Operations Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE support_tickets (ticket_date TEXT, team_name TEXT, ticket_count INTEGER, avg_response_minutes REAL, satisfaction_score REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO support_tickets VALUES (?, ?, ?, ?, ?)",
+            [
+                ("2026-06-01", "华东客服组", 120, 16.0, 4.8),
+                ("2026-06-02", "华北客服组", 95, 35.0, 4.2),
+                ("2026-06-03", "华南客服组", 80, 22.0, 4.5),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个客服团队响应效率最好，是否影响满意度？",
+    )
+
+    payload = result["product_result"]["evidence"]["fact_payload"]
+    requirement = payload["evidence_requirements"][0]
+
+    assert result["status"] == "completed"
+    assert "support_tickets" in result["generated_sql"]
+    assert result["execution_result"]["rows"][0][0] == "华东客服组"
+    assert payload["display_values"][0]["团队"] == "华东客服组"
+    assert "平均响应时长" in payload["display_values"][0]
+    assert "满意度" in payload["display_values"][0]
+    assert requirement["calculation_type"] == "operational_efficiency"
+    assert requirement["metrics"] == ["平均响应时长", "满意度"]
+
+
+def test_sql_generator_does_not_fallback_to_old_demo_schema_for_store_review():
+    from agents.sql_generator import run_sql_generator
+
+    result = run_sql_generator(
+        {
+            "user_question": "帮我做一下门店经营复盘。",
+            "analysis_task": {
+                "task_type": "summary",
+                "dimensions": ["门店"],
+                "metrics": [],
+                "time_range": {},
+                "filters": [],
+            },
+            "metric_context": {"success": False, "matched_metrics": []},
+            "sql_planning": {},
+        }
+    )
+
+    sql = result.get("generated_sql") or ""
+    reason = result["sql_generation"]["reason"]
+
+    assert result["sql_generation"]["success"] is False
+    assert sql == ""
+    assert "当前工作区" in reason
+    for stale_name in ("orders", "order_items", "products", "users", "city", "total_revenue", "order_date"):
+        assert stale_name not in sql
+        assert stale_name not in reason
+
+
 def test_workspace_analysis_shell_can_be_restored_before_job_finishes(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Recoverable Run Workspace")
@@ -904,7 +1041,19 @@ def test_workspace_analysis_persists_pending_clarification_run(tmp_path):
 def test_workspace_analysis_continuation_resolves_question_and_calls_workflow(tmp_path):
     from workspaces.analysis_runner import run_workspace_analysis_continuation
 
-    store, workspace = _create_ecommerce_workspace(tmp_path)
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Continuation Current Product Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE product_sales (sale_date TEXT, product_name TEXT, paid_amount REAL)")
+        conn.executemany(
+            "INSERT INTO product_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "咖啡豆", 3000.0),
+                ("2026-06-02", "挂耳咖啡", 1800.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
     pending = run_workspace_analysis(
         store=store,
         workspace_id=workspace["workspace_id"],

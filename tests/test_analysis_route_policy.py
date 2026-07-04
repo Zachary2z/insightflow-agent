@@ -7,7 +7,7 @@ import pytest
         ("最近90天销售额最高的门店是谁？", "fast_fact"),
         ("最近90天总销售额是多少？", "fast_fact"),
         ("最近30天各渠道收入排名", "fast_fact"),
-        ("本月订单量趋势怎么样？", "fast_fact"),
+        ("本月按周看订单量趋势怎么样？", "fast_fact"),
         ("哪个门店最值得复盘，为什么？", "deep_judgment"),
         ("哪个渠道应该加预算？", "deep_judgment"),
         ("生成一份管理层报告", "report"),

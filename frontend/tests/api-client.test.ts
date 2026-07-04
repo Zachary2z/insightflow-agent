@@ -329,4 +329,40 @@ describe("api client", () => {
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1",
     );
   });
+
+  it("defaults report creation to an internal business review type when only a goal is provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        workspace_id: "ws_1",
+        report_id: "report_goal_only",
+        report: {
+          report_id: "report_goal_only",
+          workspace_id: "ws_1",
+          report_type: "business_review",
+          report_goal: "生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。",
+          title: "最近90天管理层经营简报",
+          status: "completed",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createWorkspaceReport("ws_1", {
+      reportGoal: "生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/reports",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report_type: "business_review",
+          report_goal: "生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。",
+        }),
+      }),
+    );
+  });
 });

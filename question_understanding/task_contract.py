@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from workspaces.time_range_defaults import full_range_default_note, resolve_time_default
+
 
 ALLOWED_TASK_TYPES = {"compare", "rank", "trend", "summary", "anomaly", "recommendation", "report", "clarification"}
 ALLOWED_CONFIDENCE = {"low", "medium", "high"}
@@ -49,18 +51,56 @@ def normalize_analysis_task(
         if provider_task.get("time_range") not in (None, {}, "")
         else intent.get("time_range")
     )
+    task_type = _normalize_task_type(provider_task.get("task_type") or intent.get("operation") or "", question)
     if time_range is None:
         time_range = extract_time_range(question)
 
-    task_type = _normalize_task_type(provider_task.get("task_type") or intent.get("operation") or "", question)
     filters = _normalize_string_list(provider_task.get("filters"))
     if not filters:
         filters = _normalize_string_list(intent.get("filters"))
     decision_goal = _decision_goal(question, provider_task.get("decision_goal"))
+    defaults_applied = _normalize_string_list(provider_task.get("defaults_applied"))
+    time_field_candidates: list[dict[str, str]] = []
+    specialized_missing_slots: list[str] = []
+    resolved_question = str(provider_task.get("resolved_question") or question or "").strip()
+
+    if time_range is None:
+        default_decision = resolve_time_default(
+            text=question,
+            workspace_context=workspace_context,
+            task_type=task_type,
+        )
+        if default_decision.get("action") == "apply":
+            time_range = dict(default_decision.get("time_range") or {})
+            default_note = str(default_decision.get("default_note") or "")
+            if default_note:
+                defaults_applied.append(default_note)
+                resolved_question = _resolved_with_default_time(resolved_question or question, default_note)
+        elif default_decision.get("action") == "clarify":
+            missing_slot = str(default_decision.get("missing_slot") or "").strip()
+            if missing_slot:
+                specialized_missing_slots.append(missing_slot)
+            time_field_candidates = [
+                dict(item)
+                for item in default_decision.get("candidates") or []
+                if isinstance(item, dict)
+            ]
+    else:
+        trend_decision = resolve_time_default(
+            text=question,
+            workspace_context=workspace_context,
+            task_type=task_type,
+        )
+        if trend_decision.get("action") == "clarify" and trend_decision.get("missing_slot") == "time_grain":
+            specialized_missing_slots.append("time_grain")
 
     missing_slots = _missing_slots(task_type=task_type, metrics=metrics, dimensions=dimensions, time_range=time_range)
+    if specialized_missing_slots:
+        missing_slots = [slot for slot in missing_slots if slot != "time_range"]
+        missing_slots = _dedupe([*missing_slots, *specialized_missing_slots])
     confidence = _confidence(provider_task.get("confidence"), missing_slots)
-    resolved_question = str(provider_task.get("resolved_question") or question or "").strip()
+
+    metrics = _order_metrics_for_calculation(metrics, _calculation_type(task_type, question))
 
     return {
         "task_type": task_type if task_type in ALLOWED_TASK_TYPES else "summary",
@@ -68,9 +108,14 @@ def normalize_analysis_task(
         "metrics": metrics,
         "time_range": time_range,
         "filters": filters,
+        "group_by": dimensions,
+        "calculation_type": _calculation_type(task_type, question),
+        "requires_time_field": bool(time_range),
+        "requires_join": contains_any(question, ("跨表", "关联", "投放回报", "ROAS", "roi", "ROI")),
         "decision_goal": decision_goal,
         "missing_slots": missing_slots,
-        "defaults_applied": _normalize_string_list(provider_task.get("defaults_applied")),
+        "defaults_applied": _dedupe(defaults_applied),
+        "time_field_candidates": time_field_candidates,
         "resolved_question": resolved_question,
         "output_language": "zh",
         "confidence": confidence,
@@ -101,8 +146,20 @@ def extract_time_range(question: str) -> dict[str, Any] | None:
     return None
 
 
-def build_clarification_questions(missing_slots: list[str]) -> list[str]:
+def build_clarification_questions(missing_slots: list[str], task: dict[str, Any] | None = None) -> list[str]:
     missing = set(missing_slots)
+    task = task or {}
+    if "date_field" in missing:
+        candidates = [
+            str(item.get("name") or item.get("field") or "").strip()
+            for item in task.get("time_field_candidates") or []
+            if isinstance(item, dict) and str(item.get("name") or item.get("field") or "").strip()
+        ]
+        if candidates:
+            return [f"当前数据里有多个可能的时间字段（{ '、'.join(candidates) }），你希望按哪个时间字段分析？"]
+        return ["当前数据里有多个可能的时间字段，你希望按哪个时间字段分析？"]
+    if "time_grain" in missing:
+        return ["你希望按天、周还是月查看趋势？是否使用完整数据范围？"]
     if {"metric", "time_range"} <= missing:
         return ["请补充要分析的指标和时间范围，例如：最近90天看销售额。"]
     if {"dimension", "time_range"} <= missing:
@@ -184,7 +241,7 @@ def _normalize_task_type(value: Any, question: str) -> str:
         return "anomaly"
     if contains_any(question, ("趋势", "走势", "变化", "trend")) or compact == "trend":
         return "trend"
-    if contains_any(question, ("最高", "最低", "最多", "排名", "top", "rank")) or compact in {"topn", "rank"}:
+    if contains_any(question, ("最高", "最低", "最多", "排名", "贡献最大", "top", "rank")) or compact in {"topn", "rank"}:
         return "rank"
     if contains_any(question, ("对比", "比较", "compare", "comparison")) or compact in {"comparison", "compare"}:
         return "compare"
@@ -227,6 +284,18 @@ def _missing_slots(
     if not time_range:
         missing.append("time_range")
     return missing
+
+
+def _resolved_with_default_time(question: str, default_note: str) -> str:
+    note = full_range_default_note({"type": "full_data_range", **_extract_start_end(default_note)})
+    return f"{question}（{note or default_note}）"
+
+
+def _extract_start_end(text: str) -> dict[str, str]:
+    match = re.search(r"(\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?)\s*至\s*(\d{4}[-/]\d{1,2}(?:[-/]\d{1,2})?)", text)
+    if not match:
+        return {}
+    return {"start": match.group(1), "end": match.group(2)}
 
 
 def _confidence(value: Any, missing_slots: list[str]) -> str:
@@ -294,6 +363,7 @@ def _question_metric_matches(question: str) -> list[str]:
         (("订单量", "订单数", "订单数量", "order count"), "订单量"),
         (("客单价", "平均订单金额", "aov"), "客单价"),
         (("复购率", "复购"), "复购率"),
+        (("响应效率", "响应时长", "平均响应", "response time", "response minutes"), "平均响应时长"),
         (("满意度", "评分", "nps", "score"), "满意度"),
         (("销量", "销售量"), "销量"),
     ]
@@ -321,6 +391,7 @@ def _question_dimension_matches(question: str) -> list[str]:
         (("品类", "类别", "category"), "品类"),
         (("城市", "city"), "城市"),
         (("客户", "用户", "customer", "user"), "客户"),
+        (("客服团队", "团队", "team"), "团队"),
     ]
     return [label for keywords, label in candidates if contains_any(question, keywords)]
 
@@ -356,6 +427,10 @@ def _metric_label(value: Any) -> str:
         "客单价": "客单价",
         "repurchaserate": "复购率",
         "复购率": "复购率",
+        "响应效率": "平均响应时长",
+        "响应时长": "平均响应时长",
+        "平均响应时长": "平均响应时长",
+        "avgresponseminutes": "平均响应时长",
         "productsales": "销量",
         "销量": "销量",
         "scorenps": "满意度",
@@ -379,6 +454,9 @@ def _dimension_label(value: Any) -> str:
         "customer": "客户",
         "客户": "客户",
         "用户": "客户",
+        "team": "团队",
+        "团队": "团队",
+        "客服团队": "团队",
         "channel": "渠道",
         "渠道": "渠道",
         "store": "门店",
@@ -398,6 +476,29 @@ def _normalize_time_range(value: Any) -> dict[str, Any] | None:
             normalized["raw_text"] = f"最近 {int(normalized['value'])} 个月"
         return normalized
     return None
+
+
+def _calculation_type(task_type: str, question: str) -> str:
+    if contains_any(question, ("贡献", "占比", "份额", "share", "contribution")):
+        return "contribution"
+    if contains_any(question, ("响应效率", "响应时长", "处理效率", "满意度", "客服运营")):
+        return "operational_efficiency"
+    if contains_any(question, ("roas", "roi", "投放回报", "投产比", "净投放回报")):
+        return "investment_efficiency"
+    if task_type == "rank":
+        return "ranking"
+    if task_type == "trend":
+        return "trend"
+    if task_type == "compare":
+        return "comparison"
+    return task_type or "summary"
+
+
+def _order_metrics_for_calculation(metrics: list[str], calculation_type: str) -> list[str]:
+    if calculation_type != "operational_efficiency":
+        return metrics
+    priority = {"平均响应时长": 0, "响应时长": 0, "满意度": 1, "工单数": 2, "工单量": 2}
+    return sorted(metrics, key=lambda item: (priority.get(item, 99), metrics.index(item)))
 
 
 def _dedupe(values: list[str]) -> list[str]:

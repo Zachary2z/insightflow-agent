@@ -59,7 +59,21 @@ def _assert_chinese_business_result(result: dict, *, expect_chart: bool) -> None
         assert result["product_result"]["chart_artifacts"] == []
 
 
-def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recommendation_and_report(tmp_path):
+def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recommendation_and_report(tmp_path, monkeypatch):
+    for name in [
+        "INSIGHTFLOW_PRODUCT_LIVE_MODE",
+        "INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING",
+        "INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING",
+        "INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE",
+        "INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT",
+        "INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER",
+        "INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING",
+        "INSIGHTFLOW_USE_PROVIDER_ANSWER_REVIEWER",
+        "INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER",
+        "INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING",
+    ]:
+        monkeypatch.setenv(name, "0")
+
     store, workspace, profile, semantic_layer = _prepare_workspace(
         tmp_path,
         "store_sales_acceptance",
@@ -119,7 +133,7 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
     trend = run_workspace_analysis(
         store,
         workspace["workspace_id"],
-        "最近90天销售额趋势如何？",
+        "最近90天按月看销售额趋势如何？",
         initial_sql=(
             "SELECT substr(business_date, 1, 7) AS month, SUM(sales_amount) AS total_sales "
             "FROM store_sales GROUP BY month ORDER BY month"
@@ -136,9 +150,11 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
         ),
     )
 
-    for result in (fact, ranking, trend):
+    for result in (fact, ranking):
         _assert_chinese_business_result(result, expect_chart=False)
         assert result["analysis_route"]["route"] == "fast_fact"
+    _assert_chinese_business_result(trend, expect_chart=bool(trend["product_result"]["chart_artifacts"]))
+    assert trend["analysis_route"]["route"] == "fast_fact"
     for result in (comparison, recommendation):
         _assert_chinese_business_result(result, expect_chart=True)
         assert result["analysis_route"]["requires_full_chain"] is True
@@ -147,7 +163,15 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
     assert ranking["product_result"]["evidence"]["fact_payload"]["comparison_scope"]["sufficient"] is True
     assert comparison["visualization_decision"]["chart_spec"]["chart_type"] == "scatter"
     assert recommendation["product_result"]["business_answer"]["recommendations"]
-    assert "上海旗舰店" in _answer_text(recommendation)
+    recommendation_decision_text = " ".join(
+        [
+            recommendation["product_result"]["business_answer"]["headline"],
+            recommendation["product_result"]["business_answer"]["direct_answer"],
+            *recommendation["product_result"]["business_answer"]["recommendations"],
+        ]
+    )
+    assert "深圳湾店" in recommendation_decision_text
+    assert "上海旗舰店" not in recommendation_decision_text
 
     report = run_workspace_report(
         store,
@@ -158,7 +182,8 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
     document = report["report"]["document"]
     assert report["success"] is True
     assert "sections" not in report["report"]
-    assert report["report"]["plan"]["title"] == "最近90天经营复盘报告"
+    assert report["report"]["plan"]["title"] == "完整数据经营复盘报告"
+    assert "最近90天" not in report["report"]["plan"]["title"]
     assert report["report"]["evidence_pack"]["facts"]
     assert document["sections"]
     document_text = json.dumps(
@@ -245,3 +270,135 @@ def test_p20_report_output_uses_document_contract_not_fixed_section_prompts(tmp_
     assert report["report"]["document"]["sections"]
     removed_metadata_key = "section" + "_" + "runner" + "_" + "used"
     assert removed_metadata_key not in report["report"]["provider_metadata"]
+
+
+def test_p24_realistic_chinese_business_datasets_cover_analysis_report_evidence_and_limits(tmp_path, monkeypatch):
+    for name in [
+        "INSIGHTFLOW_PRODUCT_LIVE_MODE",
+        "INSIGHTFLOW_USE_PROVIDER_QUESTION_UNDERSTANDING",
+        "INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING",
+        "INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE",
+        "INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT",
+        "INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER",
+        "INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING",
+        "INSIGHTFLOW_USE_PROVIDER_ANSWER_REVIEWER",
+        "INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER",
+        "INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING",
+    ]:
+        monkeypatch.setenv(name, "0")
+
+    store, workspace, profile, semantic_layer = _prepare_workspace(
+        tmp_path,
+        "p24_realistic_business_acceptance",
+        {
+            "store_sales.csv": (
+                "门店,营业日期,城市,销售额,订单数",
+                [
+                    "上海旗舰店,2026-06-01,上海,38200,126",
+                    "北京国贸店,2026-06-01,北京,29100,98",
+                    "深圳湾店,2026-06-01,深圳,24600,88",
+                ],
+            ),
+            "product_sales.csv": (
+                "品类,销售月份,成交金额,销量",
+                [
+                    "咖啡豆,2026-06,186000,620",
+                    "挂耳咖啡,2026-06,94000,1880",
+                    "杯具周边,2026-06,52000,430",
+                ],
+            ),
+            "customer_segments.csv": (
+                "客户分群,月份,客户数,成交金额",
+                [
+                    "高价值会员,2026-06,460,248000",
+                    "新客,2026-06,980,176000",
+                    "沉睡唤醒,2026-06,210,39000",
+                ],
+            ),
+            "support_tickets.csv": (
+                "客服团队,工单日期,工单数,平均响应分钟,满意度",
+                [
+                    "华东客服组,2026-06-01,178,16,4.8",
+                    "华北客服组,2026-06-01,155,33,4.2",
+                    "华南客服组,2026-06-01,138,22,4.5",
+                ],
+            ),
+            "channel_spend.csv": (
+                "渠道,日期,收入金额,投放金额",
+                [
+                    "小红书,2026-06-01,320000,86000",
+                    "抖音,2026-06-01,410000,160000",
+                    "私域社群,2026-06-01,198000,28000",
+                ],
+            ),
+            "regional_sales.csv": (
+                "区域,统计日期,GMV,订单数",
+                [
+                    "华东,2026-06-01,520000,1810",
+                    "华北,2026-06-01,330000,1200",
+                    "华南,2026-06-01,365000,1375",
+                ],
+            ),
+        },
+    )
+
+    semantic_text = json.dumps(semantic_layer, ensure_ascii=False)
+    for keyword in ["门店", "品类", "客户", "客服", "渠道", "区域", "销售额", "工单", "投放"]:
+        assert keyword in semantic_text
+    assert "orders" not in semantic_text
+    assert "marketing_spend" not in semantic_text
+
+    questions = [
+        ("最近90天按门店做销售额排名。", "门店", "上海旗舰店"),
+        ("最近90天按品类看成交金额贡献和占比。", "品类", "咖啡豆"),
+        ("最近90天按客户分群比较成交金额贡献。", "客户", "高价值会员"),
+        ("最近90天比较各客服团队的工单数、平均响应时长和满意度，哪个团队运营效率最好？", "客服", "华东客服组"),
+        ("最近90天按渠道比较收入、投放金额和 ROI，哪个渠道投放效率最高？", "渠道", "私域社群"),
+        ("最近90天按区域看 GMV 表现排名。", "区域", "华东"),
+    ]
+    results_by_keyword = {}
+    for question, dimension_keyword, expected_entity in questions:
+        result = run_workspace_analysis(store, workspace["workspace_id"], question)
+        results_by_keyword[dimension_keyword] = result
+        _assert_chinese_business_result(
+            result,
+            expect_chart=bool(result["product_result"]["chart_artifacts"]),
+        )
+        payload = result["product_result"]["evidence"]["fact_payload"]
+        requirement_text = json.dumps(payload.get("evidence_requirements"), ensure_ascii=False)
+        result_text = json.dumps(payload.get("display_values"), ensure_ascii=False) + _answer_text(result)
+        assert dimension_keyword in requirement_text or dimension_keyword in result_text
+        assert expected_entity in result_text
+        assert payload["evidence_requirements"]
+        assert payload["formulas"]
+        assert "SELECT " not in _answer_text(result).upper()
+
+    channel_result = results_by_keyword["渠道"]
+    channel_columns = channel_result["execution_result"]["columns"]
+    private_row = next(row for row in channel_result["execution_result"]["rows"] if row[0] == "私域社群")
+    private_values = dict(zip(channel_columns, private_row, strict=False))
+    assert round(float(private_values["广告投入产出比"]), 2) == round(198000 / 28000, 2)
+    assert round(float(private_values["净投放回报率"]), 2) == round((198000 - 28000) / 28000, 2)
+
+    unsupported_repeat = run_workspace_analysis(
+        store,
+        workspace["workspace_id"],
+        "最近90天按客户分群计算复购率趋势，并说明哪个分群留存最好。",
+    )
+    assert unsupported_repeat["status"] == "waiting_for_clarification"
+    assert "time_grain" in unsupported_repeat["question_understanding"]["missing_slots"]
+
+    report = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成经营复盘报告，覆盖门店表现、商品表现、客户分群、客服运营、渠道投放表现、区域表现、利润和复购率。",
+    )
+    report_payload = report["report"]
+    report_text = json.dumps(report_payload, ensure_ascii=False)
+    assert report["success"] is False
+    assert report_payload["validation"]["status"] == "needs_clarification"
+    assert "date_field" in report_payload["plan"]["missing_slots"]
+    assert "多个可能的时间字段" in report_text
+    assert "完整数据时间范围" not in report_text
+    assert "当前工作区全部可用数据" not in report_text

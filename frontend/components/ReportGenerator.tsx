@@ -2,28 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import React, { FormEvent, useState } from "react";
-import { createWorkspaceReport, type ReportType } from "../lib/api";
+import { createWorkspaceReport } from "../lib/api";
 import ProductCard from "./ProductCard";
 
 type ReportGeneratorProps = {
   workspaceId: string;
 };
 
-const REPORT_TYPES: Array<{ value: ReportType; label: string; description: string }> = [
-  { value: "business_review", label: "经营复盘", description: "收入、渠道、趋势和建议的管理层报告" },
-  { value: "channel_performance", label: "渠道表现", description: "对比渠道贡献、效率和后续动作" },
-  { value: "revenue_trend", label: "收入趋势", description: "观察收入变化、异常波动和趋势判断" },
-];
-
 const GOAL_EXAMPLES = [
-  "生成最近 90 天渠道表现复盘",
-  "生成管理层收入复盘报告",
-  "生成客户增长与留存报告",
+  "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。",
+  "生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。",
+  "生成一份最近90天收入趋势变化报告。",
 ];
 
 export default function ReportGenerator({ workspaceId }: ReportGeneratorProps) {
   const router = useRouter();
-  const [reportType, setReportType] = useState<ReportType>("business_review");
   const [reportGoal, setReportGoal] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +31,6 @@ export default function ReportGenerator({ workspaceId }: ReportGeneratorProps) {
       setIsGenerating(true);
       setError("");
       const response = await createWorkspaceReport(workspaceId, {
-        reportType,
         reportGoal: reportGoal.trim(),
       });
       router.push(`/workspaces/${workspaceId}/reports/${response.report_id}`);
@@ -55,7 +47,7 @@ export default function ReportGenerator({ workspaceId }: ReportGeneratorProps) {
         <div>
           <p className="product-eyebrow">生成报告</p>
           <h2>新建报告</h2>
-          <p className="panel-help">选择报告类型，写下业务目标。系统会复用当前工作区数据和安全分析链路生成报告。</p>
+          <p className="panel-help">写下想生成的报告目标，系统会结合当前工作区数据推断标题、章节和证据范围。</p>
         </div>
       </div>
       <div className="report-goal-examples" aria-label="推荐报告目标">
@@ -66,26 +58,13 @@ export default function ReportGenerator({ workspaceId }: ReportGeneratorProps) {
         ))}
       </div>
       <form className="form-grid report-form" onSubmit={handleSubmit}>
-        <label htmlFor="report-type">报告类型</label>
-        <select
-          id="report-type"
-          value={reportType}
-          onChange={(event) => setReportType(event.target.value as ReportType)}
-        >
-          {REPORT_TYPES.map((type) => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
-        </select>
-        <p className="panel-help">{REPORT_TYPES.find((type) => type.value === reportType)?.description}</p>
         <label htmlFor="report-goal">报告目标</label>
         <textarea
           id="report-goal"
           rows={4}
           value={reportGoal}
           onChange={(event) => setReportGoal(event.target.value)}
-          placeholder="例如：生成最近 90 天渠道表现复盘，重点关注收入贡献、变化趋势和下一步建议。"
+          placeholder="例如：生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。"
         />
         <button type="submit" disabled={isGenerating}>
           {isGenerating ? "正在生成" : "生成报告"}

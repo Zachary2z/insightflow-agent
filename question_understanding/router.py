@@ -46,7 +46,7 @@ def _extract_metric(question: str) -> str:
         return "aov"
     if _contains(question, "订单量", "订单数", "订单数量", "ordercount"):
         return "order_count"
-    if _contains(question, "销售额", "gmv", "成交额", "收入", "销售情况"):
+    if _contains(question, "销售额", "gmv", "成交额", "收入", "销售情况", "贡献", "占比", "支付金额", "paid amount"):
         return "gmv"
     if _contains(question, "花费", "费用", "成本", "投放成本", "spend", "cost"):
         return "spend"
@@ -86,7 +86,7 @@ def _extract_operation(question: str) -> str:
         return "comparison"
     if _contains(question, "对比", "比较", "环比", "同比"):
         return "comparison"
-    if _contains(question, "最高", "最多", "top", "前"):
+    if _contains(question, "最高", "最多", "贡献最大", "占比", "top", "前"):
         return "top_n"
     if _contains(question, "明细", "详情", "drilldown"):
         return "drilldown"
@@ -122,8 +122,8 @@ def _missing_slots(intent: dict[str, Any]) -> list[str]:
     return [slot for slot in required if not intent.get(slot)]
 
 
-def _clarification_questions(missing: list[str]) -> list[str]:
-    return build_clarification_questions(missing)
+def _clarification_questions(missing: list[str], task: dict[str, Any] | None = None) -> list[str]:
+    return build_clarification_questions(missing, task=task)
 
 
 def _is_stable_template_intent(intent: dict[str, Any]) -> bool:
@@ -189,7 +189,7 @@ def understand_question(question: str, workspace_context: dict[str, Any] | None 
             "intent": intent,
             "analysis_task": task,
             "missing_slots": missing,
-            "clarification_questions": _clarification_questions(missing),
+            "clarification_questions": _clarification_questions(missing, task),
             "risk_flags": [],
             "rejection_reason": "",
             "reason": "Question is missing required intent slots.",

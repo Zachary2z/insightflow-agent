@@ -556,12 +556,12 @@ def test_completed_chinese_run_with_english_final_answer_is_built_as_chinese_p16
 
     assert history.status_code == 200
     summary = history.json()["runs"][0]
-    assert summary["headline"].startswith("已完成本轮查询")
+    assert summary["headline"].startswith("当前数据中")
     assert "Based on the data" not in summary["headline"]
 
     assert detail.status_code == 200
     answer = detail.json()["product_result"]["business_answer"]
-    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert answer["direct_answer"].startswith("当前数据中")
     assert "当前数据中" in answer["why"]
     assert "Based on the data" not in answer["direct_answer"]
 

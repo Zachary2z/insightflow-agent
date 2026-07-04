@@ -152,7 +152,22 @@ def plan_sql_strategy_with_provider(
     )
     provider_response = run_validated_llm_request(provider, request)
     if provider_response.get("success"):
-        return _provider_result(provider_response.get("content", {}), question_understanding, provider_response)
+        provider_plan = _provider_result(provider_response.get("content", {}), question_understanding, provider_response)
+        if (
+            provider_plan.get("strategy") == "clarify"
+            and deterministic_plan.get("strategy") != "clarify"
+            and not question_understanding.get("missing_slots")
+        ):
+            return {
+                **deterministic_plan,
+                "source": "provider_normalized",
+                "provider_called": True,
+                "fallback_used": True,
+                "provider_error": "",
+                "validation_error": "",
+                "reason": "Provider requested clarification, but normalized analysis task is complete; using deterministic SQL planning.",
+            }
+        return provider_plan
 
     error = provider_response.get("error", "")
     error_type = provider_response.get("error_type", "")

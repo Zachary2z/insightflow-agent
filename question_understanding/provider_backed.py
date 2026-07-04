@@ -141,7 +141,7 @@ def _normalize_provider_content(
     risk_flags = list(normalized.get("risk_flags") or intent.get("risk_flags") or [])
     normalized["analysis_task"] = task
     normalized["missing_slots"] = list(task.get("missing_slots", []))
-    normalized["clarification_questions"] = build_clarification_questions(normalized["missing_slots"])
+    normalized["clarification_questions"] = build_clarification_questions(normalized["missing_slots"], task=task)
     normalized["strategy"] = strategy_for_task(task, risk_flags=_safety_risk_flags(risk_flags))
     normalized["risk_flags"] = risk_flags
     return normalized
@@ -192,10 +192,11 @@ def _fallback_result(
     question: str,
     *,
     provider_called: bool,
+    workspace_context: dict[str, Any] | None = None,
     provider_error: str = "",
     validation_error: str = "",
 ) -> dict[str, Any]:
-    fallback = _strip_forbidden_fields(understand_question(question))
+    fallback = _strip_forbidden_fields(understand_question(question, workspace_context=workspace_context))
     return {
         **fallback,
         "source": "deterministic",
@@ -281,7 +282,7 @@ def understand_question_with_provider(
         return safety_result
 
     if provider is None:
-        return _fallback_result(question, provider_called=False)
+        return _fallback_result(question, provider_called=False, workspace_context=workspace_context)
 
     rendered = DEFAULT_PROMPT_REGISTRY.render(
         "question_understanding",
@@ -292,7 +293,12 @@ def understand_question_with_provider(
     )
     if not rendered.get("success"):
         if deterministic_fallback:
-            return _fallback_result(question, provider_called=False, provider_error=rendered.get("error", ""))
+            return _fallback_result(
+                question,
+                provider_called=False,
+                workspace_context=workspace_context,
+                provider_error=rendered.get("error", ""),
+            )
         return {
             "success": False,
             "source": "provider",

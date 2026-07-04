@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from question_understanding.route_policy import classify_analysis_route
 from tools.evidence_tool import build_evidence_payload
+from workspaces.time_range_defaults import full_range_default_note
 from workspaces.answer_evidence import (
     business_evidence_sentence,
     business_field_label,
@@ -148,12 +149,13 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
             evidence_result=evidence_result,
             chinese=chinese,
         )
-        return apply_answer_consistency(
+        consistent = apply_answer_consistency(
             user_question=user_question,
             business_answer=normalized,
             execution_result=execution_result,
             evidence_result=evidence_result,
         )
+        return _with_time_default_caveat(consistent, raw)
 
     direct_answer, fallback_reason = _safe_direct_answer(raw, user_question, execution_result, chinese=chinese)
     weak_evidence = _has_weak_evidence(execution_result, evidence_result)
@@ -193,12 +195,13 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
         confidence="low" if weak_evidence or unsafe_fallback else "medium",
         chinese=chinese,
     )
-    return apply_answer_consistency(
+    consistent = apply_answer_consistency(
         user_question=user_question,
         business_answer=answer,
         execution_result=execution_result,
         evidence_result=evidence_result,
     )
+    return _with_time_default_caveat(consistent, raw)
 
 
 def _business_failure_answer(raw: dict[str, Any]) -> dict[str, Any]:
@@ -264,6 +267,17 @@ def _business_answer(
         }
     )
     return answer
+
+
+def _with_time_default_caveat(answer: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
+    note = full_range_default_note((_analysis_task(raw) or {}).get("time_range") or {})
+    if not note:
+        return answer
+    updated = dict(answer)
+    caveats = _list_of_text(updated.get("caveats"))
+    caveats.append(note)
+    updated["caveats"] = list(dict.fromkeys(caveats))
+    return updated
 
 
 def business_answer_is_usable(
@@ -997,6 +1011,29 @@ def _metric_registry(raw: dict[str, Any]) -> dict[str, Any]:
 
 def _semantic_business_aliases(raw: dict[str, Any]) -> dict[str, str]:
     aliases: dict[str, str] = {}
+    task = _analysis_task(raw)
+    dimensions = [str(item) for item in task.get("dimensions") or [] if str(item).strip()]
+    metrics = [str(item) for item in task.get("metrics") or [] if str(item).strip()]
+    cjk_dimensions = [item for item in dimensions if _contains_cjk(item)]
+    for dimension in dimensions:
+        if "." not in dimension and not _contains_cjk(dimension) and cjk_dimensions:
+            aliases[dimension] = cjk_dimensions[-1]
+    if any(item in {"品类", "类别"} for item in cjk_dimensions):
+        aliases.setdefault("category_name", "品类")
+        aliases.setdefault("Category Name", "品类")
+    if any(item in {"门店", "店铺"} for item in cjk_dimensions):
+        aliases.setdefault("store_name", "门店")
+        aliases.setdefault("Store Name", "门店")
+    if any(item in {"团队", "客服团队"} for item in cjk_dimensions):
+        aliases.setdefault("team_name", "团队")
+        aliases.setdefault("Team Name", "团队")
+    metric_text = " ".join(metrics)
+    if any(token in metric_text for token in ("销售", "收入", "成交", "金额", "paid_amount")):
+        aliases.setdefault("total_amount", "销售额")
+        aliases.setdefault("metric_value", "销售额")
+    if "占比" in metric_text:
+        aliases.setdefault("percentage", "占比")
+        aliases.setdefault("proportion", "占比")
     semantic_context = raw.get("semantic_context") if isinstance(raw.get("semantic_context"), dict) else {}
     for collection_name in ("metrics", "dimensions", "time_fields"):
         items = semantic_context.get(collection_name)
@@ -1069,7 +1106,10 @@ def _answer_from_evidence(question: str, execution_result: dict[str, Any], *, ch
     if chinese:
         sentence = business_evidence_sentence(rows_as_dicts(execution_result), chinese=True)
         if sentence:
-            summary += "当前数据中，" + sentence
+            if _asks_ranked_fact_question(safe_question):
+                summary = "当前数据中，" + sentence
+            else:
+                summary += "当前数据中，" + sentence
     else:
         first_row = rows[0]
         if isinstance(first_row, dict):
@@ -1088,6 +1128,11 @@ def _answer_from_evidence(question: str, execution_result: dict[str, Any], *, ch
     if safe_question:
         summary += f"原问题：{safe_question}" if chinese else f" Original question: {safe_question}"
     return summary
+
+
+def _asks_ranked_fact_question(question: str) -> bool:
+    text = str(question or "").lower()
+    return any(marker in text for marker in ("哪个", "哪类", "谁", "最高", "最低", "最多", "最少", "top"))
 
 
 def _localized_system_understanding(intent: dict[str, Any]) -> str:

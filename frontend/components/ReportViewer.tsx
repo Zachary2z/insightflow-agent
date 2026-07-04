@@ -27,7 +27,6 @@ const REPORT_LABELS = {
     progressPrefix: "进度",
     progressComplete: "个章节已完成",
     progressRunning: "仍在生成",
-    reportTypePrefix: "报告类型",
     generatedAtPrefix: "生成时间",
     timeRangePrefix: "时间范围",
     dataSourcesPrefix: "数据来源",
@@ -47,7 +46,6 @@ const REPORT_LABELS = {
     progressPrefix: "Progress",
     progressComplete: "sections complete",
     progressRunning: "still running",
-    reportTypePrefix: "Report type",
     generatedAtPrefix: "Generated",
     timeRangePrefix: "Time range",
     dataSourcesPrefix: "Data sources",
@@ -425,11 +423,6 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
                 {statusLabel(report.status, language)}
               </StatusPill>
               <span>{progressSummary(report, language)}</span>
-              <span>
-                {labels.reportTypePrefix}
-                {language === "zh" ? "：" : ": "}
-                {reportTypeLabel(report.report_type, language)}
-              </span>
               <span>{metaText(labels.generatedAtPrefix, formatReportDate(report.updated_at || report.created_at), language)}</span>
               <span>{metaText(labels.timeRangePrefix, report.document?.time_range || "当前工作区可用数据", language)}</span>
               <span>{metaText(labels.dataSourcesPrefix, joinText(report.document?.data_sources), language)}</span>
@@ -464,22 +457,6 @@ function statusTone(status: string): "green" | "orange" | "blue" | "neutral" {
     return "blue";
   }
   return "neutral";
-}
-
-function reportTypeLabel(reportType: string, language: ReportLanguage) {
-  const labels: Record<ReportLanguage, Record<string, string>> = {
-    zh: {
-      business_review: "经营复盘",
-      channel_performance: "渠道表现",
-      revenue_trend: "收入趋势",
-    },
-    en: {
-      business_review: "经营复盘",
-      channel_performance: "渠道表现",
-      revenue_trend: "收入趋势",
-    },
-  };
-  return labels[language][reportType] ?? reportType;
 }
 
 function metaText(label: string, value: string, language: ReportLanguage) {

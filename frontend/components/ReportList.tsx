@@ -82,7 +82,6 @@ export default function ReportList({ workspaceId }: ReportListProps) {
             <h3>{report.title}</h3>
             <div className="report-meta-row">
               <StatusPill tone={statusTone(report.status)}>生成状态：{statusLabel(report.status)}</StatusPill>
-              <span>报告类型：{reportTypeLabel(report.report_type)}</span>
               <span>时间范围：{reportTimeRange(report)}</span>
               <span>更新时间：{formatReportDate(report.updated_at || report.created_at)}</span>
             </div>
@@ -120,15 +119,6 @@ function statusTone(status: string): "green" | "orange" | "blue" | "neutral" {
     return "blue";
   }
   return "neutral";
-}
-
-function reportTypeLabel(reportType: string) {
-  const labels: Record<string, string> = {
-    business_review: "经营复盘",
-    channel_performance: "渠道表现",
-    revenue_trend: "收入趋势",
-  };
-  return labels[reportType] ?? reportType;
 }
 
 function formatReportDate(value?: string) {

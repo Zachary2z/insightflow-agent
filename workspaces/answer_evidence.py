@@ -35,6 +35,17 @@ BUSINESS_FIELD_LABELS_ZH = {
     "cost": "成本",
     "roi": "ROI",
     "roas": "ROAS",
+    "repeat_rate": "复购率",
+    "repurchase_rate": "复购率",
+    "retention_rate": "留存率",
+    "paid_amount": "成交金额",
+    "total_amount": "成交金额",
+    "transaction_amount": "成交金额",
+    "quantity": "销量",
+    "quantity_sold": "销量",
+    "total_quantity": "销量",
+    "sales_quantity": "销量",
+    "customer_count": "客户数",
     "channel": "渠道",
     "segment": "客户分群",
     "customer_segment": "客户分群",
@@ -75,6 +86,17 @@ BUSINESS_FIELD_LABELS_EN = {
     "cost": "cost",
     "roi": "ROI",
     "roas": "ROAS",
+    "repeat_rate": "repeat purchase rate",
+    "repurchase_rate": "repeat purchase rate",
+    "retention_rate": "retention rate",
+    "paid_amount": "transaction amount",
+    "total_amount": "transaction amount",
+    "transaction_amount": "transaction amount",
+    "quantity": "quantity sold",
+    "quantity_sold": "quantity sold",
+    "total_quantity": "quantity sold",
+    "sales_quantity": "quantity sold",
+    "customer_count": "customer count",
     "channel": "channel",
     "segment": "segment",
     "customer_segment": "segment",
@@ -424,6 +446,16 @@ def _dynamic_business_field_label(lowered: str, *, chinese: bool) -> str:
         return "成本" if chinese else "cost"
     if "conversion" in token_set and "rate" in token_set:
         return "转化率" if chinese else "conversion rate"
+    if ("repeat" in token_set or "repurchase" in token_set) and "rate" in token_set:
+        return "复购率" if chinese else "repeat purchase rate"
+    if "retention" in token_set and "rate" in token_set:
+        return "留存率" if chinese else "retention rate"
+    if "paid" in token_set and "amount" in token_set:
+        return "成交金额" if chinese else "transaction amount"
+    if "transaction" in token_set and "amount" in token_set:
+        return "成交金额" if chinese else "transaction amount"
+    if ("quantity" in token_set or "qty" in token_set) and ("sold" in token_set or has_total):
+        return "销量" if chinese else "quantity sold"
     if "satisfaction" in token_set and "score" in token_set:
         return "满意度" if chinese else "satisfaction score"
     if "score" in token_set:

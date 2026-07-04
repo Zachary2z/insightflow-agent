@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stabilize the shared factual evidence layer, Chinese business answer writing, and one-pass report generation path so InsightFlow can move next into real external chart/document/export tools.
+**Goal:** Stabilize the shared factual evidence layer, Chinese business answer writing, and one-pass report generation path so InsightFlow can move next into stronger general business data understanding before real external chart/document/export tools.
 
 **Architecture:** Analysis Workbench and Report Center remain separate product experiences. They should share factual data profiling, semantic mapping, metric calculation, SQL execution, evidence packing, chart artifact contracts, and fact validation. Tools own facts and artifacts; model-backed agents own explanation, judgment, recommendations, and Chinese business expression inside evidence boundaries.
 
@@ -20,7 +20,7 @@ P22 replaced stitched report sections with a coherent report document path, but 
 - Some analysis answers still feel template-like instead of natural Chinese business analysis.
 - Report Center must not regress into per-section analysis answers stitched together. It should collect section-level evidence, then write the full report once.
 
-P23 is the final core-chain hardening phase before external tool calling. After P23, work should be able to move into real chart/document/export integrations without wrapping unstable analysis output in nicer artifacts.
+P23 is the core evidence/report hardening phase before broader product expansion. Current planning sends the next phase into general business data understanding first, so later chart/document/export integrations do not wrap unstable analysis output in nicer artifacts.
 
 ## Product Boundary
 
@@ -559,4 +559,4 @@ Agents understand, plan, explain, recommend, write, and validate.
 Tools query data, calculate metrics, produce evidence, generate charts, persist artifacts, and prepare report outputs.
 ```
 
-After that, P24 should start real business tool calling and exports: stronger chart rendering, Word/PDF/PPT/Excel outputs, and China-oriented document/collaboration tools where useful.
+Current planning supersedes the original handoff wording above: before real business tool calling and exports, P24 should strengthen general business data understanding and evidence generation across common Chinese business datasets. External chart/document/export integrations should start after that foundation is proven with deterministic regression and real DeepSeek acceptance.

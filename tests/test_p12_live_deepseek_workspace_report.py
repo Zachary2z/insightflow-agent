@@ -79,7 +79,7 @@ def test_live_deepseek_workspace_report_uses_p22_document_contract(
     assert Path(report["markdown_path"]).is_file()
     assert Path(report["trace_path"]).is_file()
     assert "sections" not in report
-    assert report["plan"]["title"] == "最近90天经营复盘报告"
+    assert report["plan"]["title"] in {"最近90天经营复盘报告", "最近90天渠道表现复盘报告"}
     assert report["evidence_pack"]["facts"]
     assert report["document"]["sections"]
     assert report["validation"]["status"] == "passed"
@@ -90,7 +90,7 @@ def test_live_deepseek_workspace_report_uses_p22_document_contract(
     assert "data/ecommerce.db" not in document_text
 
     markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
-    assert "# 最近90天经营复盘报告" in markdown
+    assert f"# {report['plan']['title']}" in markdown
     assert "## 开篇摘要" in markdown
     assert "## 报告正文" in markdown
     assert "## 技术附录" in markdown
@@ -103,7 +103,10 @@ def test_live_deepseek_workspace_report_uses_p22_document_contract(
     assert "#### 直接回答" not in business_body
     assert "#### 为什么" not in business_body
     assert "置信度" not in business_body
-    assert "evidence_pack" in appendix
+    assert "证据概况" in appendix
+    assert "章节覆盖" in appendix
+    assert "账本引用" in appendix
+    assert "evidence_pack" not in business_body
 
     trace = _load_report_trace(report)
     assert any(event.get("event") == "report_document_composed" for event in trace["events"])

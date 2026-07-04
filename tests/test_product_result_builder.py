@@ -270,6 +270,88 @@ def test_product_result_builder_exposes_shared_evidence_pack_without_main_answer
     assert product["technical_details"]["raw_rows"] == raw["execution_result"]["rows"]
 
 
+def test_fact_payload_does_not_report_calculated_repeat_rate_as_missing():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_repeat_rate",
+            "status": "completed",
+            "user_question": "哪个客户分群复购率最高？",
+            "analysis_task": {
+                "task_type": "rank",
+                "dimensions": ["客户分群"],
+                "metrics": ["复购率"],
+                "time_range": {"raw_text": "最近 90 天"},
+                "filters": [],
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["segment", "repeat_rate", "customer_count"],
+                "rows": [
+                    ["高价值会员", 0.42, 120],
+                    ["新客尝鲜", 0.18, 300],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        },
+        workspace_id="ws_repeat_rate",
+    )
+
+    answer = product["business_answer"]
+    payload = product["evidence"]["fact_payload"]
+    limits_text = "\n".join(payload["data_limits"])
+    first_sentence = answer["direct_answer"].split("。", 1)[0]
+
+    assert "高价值会员" in first_sentence
+    assert "复购率" in first_sentence
+    assert "最高" in first_sentence
+    assert "复购" not in limits_text
+    assert "repeat" not in limits_text.lower()
+    assert all("未计算" not in item for item in payload["data_limits"])
+
+
+def test_fact_payload_does_not_report_calculated_category_amount_or_quantity_as_missing():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_category_amount_quantity",
+            "status": "completed",
+            "user_question": "哪个商品品类成交金额最高，哪个销量最高？",
+            "analysis_task": {
+                "task_type": "rank",
+                "dimensions": ["品类"],
+                "metrics": ["成交金额", "销量"],
+                "time_range": {"raw_text": "最近 90 天"},
+                "filters": [],
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["category_name", "paid_amount", "quantity_sold"],
+                "rows": [
+                    ["咖啡豆", 188000.0, 930],
+                    ["挂耳咖啡", 142000.0, 1800],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        },
+        workspace_id="ws_category_amount_quantity",
+    )
+
+    answer_text = _business_answer_text(product["business_answer"])
+    payload = product["evidence"]["fact_payload"]
+    limits_text = "\n".join(payload["data_limits"])
+
+    assert "咖啡豆" in answer_text
+    assert "挂耳咖啡" in answer_text
+    assert "成交金额" in answer_text
+    assert "销量" in answer_text
+    assert "成交金额" not in limits_text
+    assert "销量" not in limits_text
+    assert all("未计算" not in item for item in payload["data_limits"])
+
+
 def test_product_result_builder_exposes_fast_fact_context_pack_only_in_technical_details():
     from workspaces.product_result_builder import build_product_analysis_result
 
@@ -895,7 +977,7 @@ def test_product_result_builder_rejects_provider_business_answer_with_technical_
     assert "SELECT" not in business_text
     assert "prompt_tokens" not in business_text
     assert "latency_ms" not in business_text
-    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert answer["direct_answer"].startswith("当前数据中，email 收入最高")
 
 
 def test_product_result_builder_uses_business_boundaries_for_unsafe_model_text():
@@ -958,8 +1040,8 @@ def test_product_result_builder_rewrites_english_answer_for_chinese_question_fro
 
     answer = product["business_answer"]
     _assert_new_business_answer_shape(answer)
-    assert answer["headline"].startswith("已完成本轮查询")
-    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert answer["headline"].startswith("当前数据中，email 总收入最高")
+    assert answer["direct_answer"].startswith("当前数据中，email 总收入最高")
     assert "证据表第一行显示" not in _business_answer_text(answer)
     assert "Based on the data" not in answer["headline"]
     assert "Based on the data" not in answer["direct_answer"]
@@ -1030,6 +1112,56 @@ def test_budget_question_evidence_fallback_does_not_force_first_row_when_metrics
     assert answer["recommendations"]
     assert answer["confidence"] in {"medium", "high"}
     assert any("预算" in caveat or "口径" in caveat or "本次查询" in caveat for caveat in answer["caveats"])
+
+
+def test_product_result_builder_does_not_conflict_with_supported_priority_review_final_answer():
+    from workspaces.product_result_builder import build_product_analysis_result
+
+    final_answer = "深圳湾店最值得优先复盘，因为销售额、毛利率和满意度均最低。"
+    product = build_product_analysis_result(
+        {
+            "run_id": "run_priority_review",
+            "status": "completed",
+            "user_question": "最近90天比较各门店销售额、毛利率和满意度，哪个门店最值得优先复盘？请给证据和风险边界。",
+            "final_answer": final_answer,
+            "business_answer": {
+                "headline": "深圳湾店最值得优先复盘",
+                "direct_answer": "深圳湾店最值得优先复盘，因为销售额、毛利率和满意度均最低。",
+                "why": "深圳湾店 total_sales 为 34600.0，margin_rate 为 0.32，satisfaction_score 为 4.13。",
+                "evidence_bullets": [
+                    "上海旗舰店 total_sales 为 71555.44，margin_rate 为 0.39，satisfaction_score 为 4.77。",
+                    "深圳湾店 total_sales 为 34600.0，margin_rate 为 0.32，satisfaction_score 为 4.13。",
+                ],
+                "recommendations": ["优先复盘深圳湾店的销售转化、毛利结构和服务体验。"],
+                "caveats": [],
+                "confidence": "high",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["store_name", "total_sales", "margin_rate", "satisfaction_score"],
+                "rows": [
+                    ["上海旗舰店", 71555.44, 0.39, 4.77],
+                    ["北京国贸店", 54100.0, 0.35, 4.37],
+                    ["深圳湾店", 34600.0, 0.32, 4.13],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        },
+        workspace_id="ws_priority_review",
+    )
+
+    business_text = _business_answer_text(product["business_answer"])
+    decision_text = " ".join(
+        [
+            product["business_answer"]["headline"],
+            product["business_answer"]["direct_answer"],
+            *product["business_answer"]["recommendations"],
+        ]
+    )
+    assert "深圳湾店" in final_answer
+    assert "深圳湾店" in decision_text
+    assert "上海旗舰店" not in decision_text
+    assert "当前证据最支持优先评估 上海旗舰店" not in business_text
 
 
 def test_product_result_builder_localizes_common_metric_fields_in_main_answer():

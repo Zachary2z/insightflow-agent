@@ -10,10 +10,14 @@ from workspaces.store import WorkspaceStore
 
 _CHINESE_ALIASES_BY_MEANING = {
     "revenue_like": ["销售额", "收入", "营收", "营业额", "成交额"],
+    "spend_like": ["投放成本", "投放金额", "广告费", "花费"],
     "cost_like": ["成本", "费用", "支出", "花费", "投放成本"],
     "amount_like": ["金额", "数值"],
     "count_like": ["数量", "次数", "单量", "件数"],
+    "order_count_like": ["订单数", "订单量"],
+    "ticket_count_like": ["工单数", "工单量"],
     "rating_like": ["满意度", "评分", "得分"],
+    "duration_like": ["响应时长", "处理时长", "解决时长"],
     "date_like": ["日期", "时间"],
     "status": ["状态", "阶段"],
 }
@@ -24,11 +28,14 @@ _CHINESE_ALIASES_BY_NAME = (
     (("customer", "client", "user", "客户", "用户"), ["客户", "用户"]),
     (("product", "sku", "商品", "产品"), ["产品", "商品"]),
     (("ticket", "case", "工单", "客服"), ["工单", "客服工单"]),
-    (("response", "resolution", "handle", "响应", "解决", "处理"), ["响应时长", "处理时长"]),
+    (("response", "resolution", "handle", "duration", "minutes", "hours", "响应", "解决", "处理", "分钟", "小时"), ["响应时长", "处理时长"]),
     (("city", "城市"), ["城市"]),
     (("region", "area", "地区", "区域"), ["区域", "地区"]),
-    (("sales", "revenue", "income", "turnover", "营业额", "营收", "收入", "销售额"), ["销售额", "收入", "营收", "营业额", "成交额"]),
-    (("cost", "expense", "spend", "fee", "成本", "费用", "支出"), ["成本", "费用", "支出", "花费", "投放成本"]),
+    (("sales", "revenue", "income", "turnover", "gmv", "营业额", "营收", "收入", "销售额", "成交金额", "实付金额"), ["销售额", "收入", "营收", "营业额", "成交额"]),
+    (("cost", "expense", "spend", "fee", "成本", "采购成本", "费用", "支出", "投放"), ["成本", "费用", "支出", "花费", "投放成本"]),
+    (("ordercount", "orders", "订单数", "订单量"), ["订单数", "订单量"]),
+    (("ticketcount", "tickets", "工单数", "工单量"), ["工单数", "工单量"]),
+    (("quantity", "qty", "销量", "件数", "数量"), ["数量", "销量", "件数"]),
     (("score", "rating", "nps", "满意度", "评分", "得分"), ["满意度", "评分", "得分"]),
     (("date", "time", "日期", "时间"), ["日期", "时间"]),
 )
@@ -108,6 +115,12 @@ def generate_semantic_layer_draft(
                     }
                 )
     relationships = _relationship_candidates(profile)
+    capabilities = _analysis_capabilities(
+        metrics=metrics,
+        dimensions=dimensions,
+        time_fields=time_fields,
+        relationships=relationships,
+    )
     semantic_layer = {
         "workspace_id": workspace_id,
         "tables": tables,
@@ -123,7 +136,9 @@ def generate_semantic_layer_draft(
             "groupable_dimensions": [dimension["field"] for dimension in dimensions],
             "time_fields": [field["field"] for field in time_fields],
             "relationships": [relationship["name"] for relationship in relationships],
+            **capabilities,
         },
+        "data_limits": _data_limits(capabilities),
         "join_paths": [],
     }
     save_semantic_layer(store, workspace_id, semantic_layer)
@@ -177,6 +192,9 @@ def _aliases_for_field(name: str, *, field_role: str = "", meanings: list[str] |
 
 def _chinese_business_aliases(name: str, *, field_role: str, meanings: list[str]) -> list[str]:
     aliases: list[str] = []
+    for meaning in ("order_count_like", "ticket_count_like", "duration_like"):
+        if meaning in meanings:
+            aliases.extend(_CHINESE_ALIASES_BY_MEANING.get(meaning, []))
     for meaning in meanings:
         aliases.extend(_CHINESE_ALIASES_BY_MEANING.get(str(meaning), []))
     if field_role == "id":
@@ -196,6 +214,8 @@ def _metric_definitions(table_name: str, name: str, qualified: str, column: dict
     meaning_set = set(meaning_list)
     aggregations = set(column.get("suitable_aggregations", [])) or {"sum", "avg", "count"}
     if "rating_like" in meaning_set:
+        selected_aggregations = ["avg"]
+    elif "duration_like" in meaning_set:
         selected_aggregations = ["avg"]
     elif "sum" in aggregations:
         selected_aggregations = ["sum"]
@@ -278,3 +298,42 @@ def _relationship_candidates(profile: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     return relationships
+
+
+def _analysis_capabilities(
+    *,
+    metrics: list[dict[str, Any]],
+    dimensions: list[dict[str, Any]],
+    time_fields: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+) -> dict[str, Any]:
+    meanings = {
+        str(meaning)
+        for metric in metrics
+        for meaning in metric.get("business_meaning_candidates", [])
+    }
+    has_revenue = "revenue_like" in meanings
+    has_cost = "cost_like" in meanings
+    has_spend = "spend_like" in meanings
+    has_order_count = "order_count_like" in meanings or "count_like" in meanings
+    return {
+        "can_analyze_trends": bool(time_fields),
+        "can_group_by_dimension": bool(dimensions),
+        "can_join_tables": bool(relationships),
+        "can_calculate_profit": has_revenue and has_cost,
+        "can_calculate_roi": has_revenue and has_spend,
+        "can_calculate_average_order_value": has_revenue and has_order_count,
+    }
+
+
+def _data_limits(capabilities: dict[str, Any]) -> list[str]:
+    limits: list[str] = []
+    if not capabilities.get("can_analyze_trends"):
+        limits.append("缺少时间字段，无法保证最近90天、按月趋势或时间范围分析。")
+    if not capabilities.get("can_calculate_profit"):
+        limits.append("缺少收入字段或成本字段，无法完整计算利润或利润率。")
+    if not capabilities.get("can_calculate_roi"):
+        limits.append("缺少收入字段或投放/花费字段，无法计算ROI、ROAS或投入产出。")
+    if not capabilities.get("can_join_tables"):
+        limits.append("缺少可确认的跨表关联字段，不能做跨表投入产出分析。")
+    return limits

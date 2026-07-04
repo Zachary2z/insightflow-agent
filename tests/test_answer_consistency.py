@@ -212,6 +212,48 @@ def test_budget_reduction_question_with_single_row_does_not_generate_unsupported
     )
 
 
+def test_explicit_roi_question_answers_roi_leader_before_secondary_metrics():
+    from workspaces.product_result_builder import build_business_answer
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个渠道 ROI 最高？为什么？",
+            "business_answer": {
+                "headline": "自然流量 ROI 最高",
+                "direct_answer": "自然流量 ROI 最高，为 18.11。",
+                "why": "自然流量收入不是最高，但投放金额较低，因此 ROI 排名第一。",
+                "evidence_bullets": [
+                    "自然流量 ROI 为 18.11，收入为 475560.92，投放金额为 26255.44。",
+                    "微信私域收入为 976660.21，ROI 为 8.29。",
+                ],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "high",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "total_revenue", "total_spend", "roi"],
+                "rows": [
+                    ["自然流量", 475560.92, 26255.44, 18.113],
+                    ["微信私域", 976660.21, 117836.73, 8.288],
+                    ["百度搜索", 632924.73, 255482.48, 2.477],
+                ],
+            },
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    first_sentence = answer["direct_answer"].split("。", 1)[0]
+    text = _answer_text(answer)
+    assert "自然流量" in first_sentence
+    assert "ROI" in first_sentence
+    assert "最高" in first_sentence
+    assert not first_sentence.startswith("按总收入看")
+    assert not first_sentence.startswith("按投放成本看")
+    assert "微信私域" in text
+    assert "投放" in text or "成本" in text
+
+
 def test_recommendation_entity_realigns_to_ranked_evidence_entity_for_chinese_question():
     from workspaces.product_result_builder import build_business_answer
 
@@ -253,6 +295,211 @@ def test_recommendation_entity_realigns_to_ranked_evidence_entity_for_chinese_qu
     assert "南区" not in decision_text
     assert "当前证据不足以支持该结论" not in decision_text
     assert _contains_cjk(answer["headline"] + answer["direct_answer"] + answer["why"])
+
+
+def test_priority_review_keeps_supported_low_performance_entity_for_risk_question():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["store_name", "total_sales", "margin_rate", "satisfaction_score"],
+        "rows": [
+            ["上海旗舰店", 71555.44, 0.39, 4.77],
+            ["北京国贸店", 54100.0, 0.35, 4.37],
+            ["深圳湾店", 34600.0, 0.32, 4.13],
+        ],
+    }
+    provider_answer = {
+        "headline": "深圳湾店最值得优先复盘",
+        "direct_answer": "深圳湾店最值得优先复盘，因为销售额、毛利率和满意度均最低。",
+        "why": "深圳湾店 total_sales 为 34600.0，margin_rate 为 0.32，satisfaction_score 为 4.13。",
+        "evidence_bullets": [
+            "上海旗舰店 total_sales 为 71555.44，margin_rate 为 0.39，satisfaction_score 为 4.77。",
+            "深圳湾店 total_sales 为 34600.0，margin_rate 为 0.32，satisfaction_score 为 4.13。",
+        ],
+        "recommendations": ["优先复盘深圳湾店的销售转化、毛利结构和服务体验。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天比较各门店销售额、毛利率和满意度，哪个门店最值得优先复盘？请给证据和风险边界。",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], *answer["recommendations"]])
+    assert "深圳湾店" in decision_text
+    assert "上海旗舰店" not in decision_text
+    assert "当前证据最支持优先评估 上海旗舰店" not in _answer_text(answer)
+    assert "销售额、毛利率和满意度均最低" in _answer_text(answer) or "深圳湾店" in answer["why"]
+
+
+def test_best_benchmark_question_realigns_to_high_performance_entity():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["store_name", "total_sales", "margin_rate", "satisfaction_score"],
+        "rows": [
+            ["上海旗舰店", 71555.44, 0.39, 4.77],
+            ["北京国贸店", 54100.0, 0.35, 4.37],
+            ["深圳湾店", 34600.0, 0.32, 4.13],
+        ],
+    }
+    provider_answer = {
+        "headline": "深圳湾店最值得作为标杆",
+        "direct_answer": "深圳湾店最值得作为标杆。",
+        "why": "上海旗舰店 total_sales 为 71555.44，margin_rate 为 0.39，satisfaction_score 为 4.77。",
+        "evidence_bullets": ["上海旗舰店在销售额、毛利率和满意度上均最高。"],
+        "recommendations": ["把标杆复盘放在深圳湾店。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个门店表现最好，最值得作为标杆？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], answer["why"], *answer["recommendations"]])
+    assert "上海旗舰店" in answer["direct_answer"]
+    assert "上海旗舰店" in answer["why"]
+    assert "上海旗舰店" in " ".join(answer["recommendations"])
+    assert "深圳湾店" not in decision_text
+
+
+def test_question_prefix_does_not_turn_best_benchmark_into_risk_review():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["store_name", "total_sales", "margin_rate", "satisfaction_score"],
+        "rows": [
+            ["上海旗舰店", 71555.44, 0.39, 4.77],
+            ["北京国贸店", 54100.0, 0.35, 4.37],
+            ["深圳湾店", 34600.0, 0.32, 4.13],
+        ],
+    }
+    provider_answer = {
+        "headline": "上海旗舰店最值得作为标杆",
+        "direct_answer": "上海旗舰店表现最好，最值得作为标杆。",
+        "why": "上海旗舰店 total_sales 为 71555.44，margin_rate 为 0.39，satisfaction_score 为 4.77。",
+        "evidence_bullets": ["上海旗舰店在销售额、毛利率和满意度上均最高。"],
+        "recommendations": ["将上海旗舰店作为标杆复盘其经营动作。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "我有个问题，最近90天哪个门店表现最好，最值得作为标杆？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], answer["why"], *answer["recommendations"]])
+    assert "上海旗舰店" in answer["direct_answer"]
+    assert "上海旗舰店" in answer["why"]
+    assert "上海旗舰店" in " ".join(answer["recommendations"])
+    assert "深圳湾店" not in decision_text
+    assert "优先复盘 深圳湾店" not in decision_text
+
+
+def test_support_issue_priority_question_still_uses_risk_direction():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["issue_type", "ticket_count", "avg_response_minutes", "satisfaction_score"],
+        "rows": [
+            ["退款咨询", 320, 48.0, 4.1],
+            ["物流延迟", 180, 28.0, 4.4],
+            ["发票问题", 90, 22.0, 4.7],
+        ],
+    }
+    provider_answer = {
+        "headline": "物流延迟最需要优先处理",
+        "direct_answer": "物流延迟最需要优先处理。",
+        "why": "退款咨询 avg_response_minutes 为 48.0，satisfaction_score 为 4.1。",
+        "evidence_bullets": [
+            "退款咨询 ticket_count 为 320，avg_response_minutes 为 48.0，satisfaction_score 为 4.1。",
+            "物流延迟 ticket_count 为 180，avg_response_minutes 为 28.0，satisfaction_score 为 4.4。",
+        ],
+        "recommendations": ["先处理物流延迟。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个客服问题最需要优先处理？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], answer["why"], *answer["recommendations"]])
+    assert "退款咨询" in answer["direct_answer"]
+    assert "退款咨询" in answer["why"]
+    assert "退款咨询" in " ".join(answer["recommendations"])
+    assert "物流延迟" not in decision_text
+
+
+def test_operational_priority_question_realigns_to_high_response_risk_entity():
+    from workspaces.product_result_builder import build_business_answer
+
+    execution_result = {
+        "success": True,
+        "columns": ["team_name", "ticket_count", "avg_response_minutes", "satisfaction_score"],
+        "rows": [
+            ["华东客服组", 178, 16, 4.8],
+            ["华北客服组", 155, 33, 4.2],
+            ["华南客服组", 138, 22, 4.5],
+        ],
+    }
+    provider_answer = {
+        "headline": "华东客服组最需要优先处理",
+        "direct_answer": "华东客服组最需要优先处理，因为工单数最高。",
+        "why": "华北客服组 avg_response_minutes 为 33，satisfaction_score 为 4.2。",
+        "evidence_bullets": [
+            "华东客服组 ticket_count 为 178，avg_response_minutes 为 16，satisfaction_score 为 4.8。",
+            "华北客服组 ticket_count 为 155，avg_response_minutes 为 33，satisfaction_score 为 4.2。",
+        ],
+        "recommendations": ["先处理华东客服组的问题。"],
+        "caveats": [],
+        "confidence": "high",
+    }
+
+    answer = build_business_answer(
+        {
+            "user_question": "最近90天哪个团队响应问题最需要优先处理？",
+            "business_answer": provider_answer,
+            "execution_result": execution_result,
+            "evidence_result": {"validation_status": "validated"},
+        }
+    )
+
+    _assert_business_answer_shape(answer)
+    decision_text = " ".join([answer["headline"], answer["direct_answer"], answer["why"], *answer["recommendations"]])
+    assert "华北客服组" in answer["direct_answer"]
+    assert "华北客服组" in answer["why"]
+    assert "华北客服组" in " ".join(answer["recommendations"])
+    assert "华东客服组" not in decision_text
 
 
 def test_unsupported_recommendation_entity_is_downgraded_to_insufficient_evidence():

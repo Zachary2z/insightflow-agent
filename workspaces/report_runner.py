@@ -12,8 +12,11 @@ from workspaces.report_ledger import build_evidence_ledger
 from workspaces.report_models import (
     EvidenceLedger,
     ReportArtifactRecord,
+    ReportDocument,
+    ReportEvidencePack,
     ReportRecord,
     ReportToolCallRecord,
+    ReportValidationResult,
 )
 from workspaces.report_planner import plan_workspace_report
 from workspaces.report_store import WorkspaceReportStore
@@ -55,6 +58,27 @@ def run_workspace_report(
         title=plan.title,
         status="running",
     )
+    if plan.missing_slots:
+        saved = _save_report_waiting_for_clarification(
+            report_store=report_store,
+            report=report,
+            plan=plan,
+        )
+        _append_trace_events(
+            Path(saved.trace_path),
+            [
+                {
+                    "event": "report_waiting_for_clarification",
+                    "missing_slots": list(plan.missing_slots),
+                }
+            ],
+        )
+        return {
+            "success": False,
+            "workspace_id": workspace_id,
+            "report_id": saved.report_id,
+            "report": saved.to_dict(),
+        }
     artifact_dir = Path(report.artifact_dir)
     artifact_base_path = artifact_dir.relative_to(Path(workspace["root_path"])).as_posix()
     evidence_pack = collect_report_evidence(
@@ -80,6 +104,7 @@ def run_workspace_report(
         evidence_ledger=evidence_ledger,
     )
     repair_attempted = False
+    fallback_to_deterministic_repair = False
     repair_claims: list[str] = []
     if validation.unsupported_claims:
         repair_attempted = True
@@ -91,6 +116,37 @@ def run_workspace_report(
             evidence_ledger=evidence_ledger,
             unsupported_claims=repair_claims,
             provider=composer_provider,
+        )
+        validation = validate_report_document(
+            document=document,
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+        )
+        if composer_provider is not None and validation.unsupported_claims:
+            fallback_to_deterministic_repair = True
+            repair_claims = list(dict.fromkeys([*repair_claims, *validation.unsupported_claims]))
+            document = repair_report_document(
+                document=document,
+                plan=plan,
+                evidence_pack=evidence_pack,
+                evidence_ledger=evidence_ledger,
+                unsupported_claims=list(validation.unsupported_claims),
+                provider=None,
+            )
+            validation = validate_report_document(
+                document=document,
+                plan=plan,
+                evidence_pack=evidence_pack,
+                evidence_ledger=evidence_ledger,
+            )
+    if composer_provider is not None and validation.status != "passed":
+        fallback_to_deterministic_repair = True
+        document = compose_report_document(
+            plan=plan,
+            evidence_pack=evidence_pack,
+            evidence_ledger=evidence_ledger,
+            provider=None,
         )
         validation = validate_report_document(
             document=document,
@@ -118,6 +174,7 @@ def run_workspace_report(
         "repair": {
             "attempted": repair_attempted,
             "unsupported_claims": repair_claims,
+            "fallback_to_deterministic": fallback_to_deterministic_repair,
         },
         "generation_steps": ["规划报告", "整理证据", "生成证据账本", "撰写正文", "校验证据", "必要时修复一次", "渲染保存"],
     }
@@ -135,6 +192,7 @@ def run_workspace_report(
         "generation_flow": "ledger_backed_report_center",
         "provider_supplied": bool(providers),
         "repair_attempted": repair_attempted,
+        "fallback_to_deterministic_repair": fallback_to_deterministic_repair,
     }
     saved = report_store.save_report(report, event_type="report_completed")
     _append_trace_events(
@@ -165,6 +223,48 @@ def run_workspace_report(
         "report_id": saved.report_id,
         "report": saved.to_dict(),
     }
+
+
+def _save_report_waiting_for_clarification(
+    *,
+    report_store: WorkspaceReportStore,
+    report: ReportRecord,
+    plan: Any,
+) -> ReportRecord:
+    message = " ".join(plan.clarification_questions) or "请补充报告所需信息后再生成。"
+    report.title = plan.title
+    report.status = "failed"
+    report.plan = plan
+    report.evidence_pack = ReportEvidencePack(
+        warnings=[message],
+        data_limits=[message],
+        technical_details={"missing_slots": list(plan.missing_slots)},
+    )
+    report.document = ReportDocument(
+        title=plan.title,
+        time_range=plan.time_range,
+        data_sources=list(plan.data_sources),
+        opening_summary=message,
+        sections=[],
+        action_recommendations=[],
+        data_boundaries=[message],
+        technical_appendix={
+            "plan": plan.to_dict(),
+            "generation_steps": ["规划报告", "发现缺少必要信息", "停止生成报告"],
+        },
+    )
+    report.validation = ReportValidationResult(
+        status="needs_clarification",
+        warnings=[message],
+        unsupported_claims=[],
+    )
+    report.provider_metadata = {
+        "generation_flow": "ledger_backed_report_center",
+        "provider_supplied": False,
+        "requires_clarification": True,
+        "missing_slots": list(plan.missing_slots),
+    }
+    return report_store.save_report(report, event_type="report_needs_clarification")
 
 
 def _ensure_profile(store: WorkspaceStore, workspace: dict[str, Any]) -> dict[str, Any]:

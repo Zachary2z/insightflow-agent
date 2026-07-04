@@ -4,6 +4,7 @@ import re
 from time import perf_counter
 from typing import Any
 
+from workspaces.time_range_defaults import full_range_default_note
 from workspaces.answer_evidence import business_field_label
 
 
@@ -25,6 +26,7 @@ DEFAULT_BUSINESS_ALIASES = {
     "ticket_count": "工单数",
     "avg_response_minutes": "平均响应时长",
     "response_minutes": "响应时长",
+    "响应时长": "平均响应时长",
     "avg_resolution_hours": "平均解决时长",
     "resolution_hours": "解决时长",
     "total_revenue": "总收入",
@@ -36,6 +38,18 @@ DEFAULT_BUSINESS_ALIASES = {
     "cost": "成本",
     "margin_rate": "利润率",
     "net_return": "净投放回报率",
+    "repeat_rate": "复购率",
+    "repurchase_rate": "复购率",
+    "retention_rate": "留存率",
+    "paid_amount": "成交金额",
+    "total_amount": "成交金额",
+    "transaction_amount": "成交金额",
+    "quantity": "销量",
+    "quantity_sold": "销量",
+    "total_quantity": "销量",
+    "sales_quantity": "销量",
+    "customer_count": "客户数",
+    "category_name": "品类",
 }
 
 
@@ -186,6 +200,9 @@ def build_evidence_payload(
     registry_warnings = [str(item) for item in metric_registry.get("warnings") or [] if str(item).strip()]
     comparison_scope = _comparison_scope(task, rows)
     warnings = [*registry_warnings]
+    time_default_note = full_range_default_note(task.get("time_range") or task.get("time_scope") or {})
+    if time_default_note:
+        warnings.append(time_default_note)
     if not comparison_scope["sufficient"]:
         warnings.append(
             f"比较范围不足：{task.get('task_type') or 'analysis'} 类问题至少需要 "
@@ -200,7 +217,9 @@ def build_evidence_payload(
         columns=columns,
         aliases=aliases,
         metric_registry=metric_registry,
+        task=task,
     )
+    evidence_requirements = _evidence_requirements(task, comparison_scope=comparison_scope, data_limits=data_limits)
     result_rows = _result_rows(rows, columns, aliases, metric_registry)
     derived_metrics = _derived_metrics(rows, columns, aliases, metric_registry, task=task)
     formula_metadata = _formula_metadata(metric_registry)
@@ -224,6 +243,7 @@ def build_evidence_payload(
         "time_scope": task.get("time_range") or task.get("time_scope") or {},
         "time_range": task.get("time_range") or task.get("time_scope") or {},
         "filters": list(filters if filters is not None else task.get("filters") or []),
+        "evidence_requirements": evidence_requirements,
         "comparison_scope": comparison_scope,
         "columns": columns,
         "rows": rows,
@@ -254,6 +274,45 @@ def _comparison_scope(task: dict[str, Any], rows: list[Any]) -> dict[str, Any]:
         "retained_rows": row_count,
         "sufficient": row_count >= required_min_rows,
     }
+
+
+def _evidence_requirements(
+    task: dict[str, Any],
+    *,
+    comparison_scope: dict[str, Any],
+    data_limits: list[str],
+) -> list[dict[str, Any]]:
+    dimensions = [str(item) for item in task.get("dimensions") or [] if str(item).strip()]
+    metrics = [str(item) for item in task.get("metrics") or [] if str(item).strip()]
+    filters = [str(item) for item in task.get("filters") or [] if str(item).strip()]
+    return [
+        {
+            "time_range": task.get("time_range") or task.get("time_scope") or {},
+            "metrics": metrics,
+            "dimensions": dimensions,
+            "filters": filters,
+            "group_by": list(task.get("group_by") or dimensions),
+            "comparison_scope": comparison_scope,
+            "calculation_type": str(task.get("calculation_type") or _calculation_type(task)),
+            "missing_evidence": list(data_limits),
+        }
+    ]
+
+
+def _calculation_type(task: dict[str, Any]) -> str:
+    explicit = str(task.get("desired_calculation") or "").strip()
+    if explicit:
+        return explicit
+    task_type = str(task.get("task_type") or "").lower()
+    if task_type == "rank":
+        return "ranking"
+    if task_type == "trend":
+        return "trend"
+    if task_type == "compare":
+        return "comparison"
+    if task_type == "recommendation":
+        return "recommendation"
+    return task_type or "summary"
 
 
 def _business_aliases(
@@ -543,26 +602,153 @@ def _data_limits_for_requested_metrics(
     columns: list[str],
     aliases: dict[str, str],
     metric_registry: dict[str, Any],
+    task: dict[str, Any],
 ) -> list[str]:
-    available = {_normalize_metric_token(column) for column in columns}
-    available.update(_normalize_metric_token(label) for label in aliases.values())
+    available = _supported_metric_tokens(columns=columns, aliases=aliases, metric_registry=metric_registry)
     for metric_id, metric in (metric_registry.get("metrics") or {}).items():
         if not isinstance(metric, dict):
             continue
-        available.add(_normalize_metric_token(metric_id))
-        available.add(_normalize_metric_token(metric.get("name") or ""))
-        available.add(_normalize_metric_token(metric.get("business_label") or metric.get("label") or ""))
+        available.update(_metric_token_aliases(metric_id))
+        available.update(_metric_token_aliases(metric.get("name") or ""))
+        available.update(_metric_token_aliases(metric.get("business_label") or metric.get("label") or ""))
     limits = []
     for metric in requested_metrics:
         metric_text = str(metric or "").strip()
         normalized = _normalize_metric_token(metric_text)
-        if normalized and normalized not in available:
+        supported = _metric_supported(metric_text, available)
+        capability_limit = _capability_limit_for_requested_metric(
+            metric_text,
+            capabilities=metric_registry.get("available_analysis_capabilities") or {},
+        )
+        if capability_limit and not supported:
+            limits.append(capability_limit)
+        if normalized and not supported:
             limits.append(f"请求的指标 {metric_text} 未在当前证据字段或指标注册表中找到，未计算。")
+    limits.extend(
+        _capability_limits_for_task(
+            metric_registry.get("available_analysis_capabilities") or {},
+            metric_registry,
+            requested_metrics,
+            task=task,
+            available=available,
+        )
+    )
     return list(dict.fromkeys(limits))
 
 
+def _supported_metric_tokens(
+    *,
+    columns: list[str],
+    aliases: dict[str, str],
+    metric_registry: dict[str, Any],
+) -> set[str]:
+    tokens: set[str] = set()
+    for column in columns:
+        tokens.update(_metric_token_aliases(column))
+        tokens.update(_metric_token_aliases(column.split(".")[-1]))
+    for key, label in aliases.items():
+        tokens.update(_metric_token_aliases(key))
+        tokens.update(_metric_token_aliases(label))
+    for metric_id, metric in (metric_registry.get("metrics") or {}).items():
+        if not isinstance(metric, dict):
+            continue
+        values = [
+            metric_id,
+            metric.get("name"),
+            metric.get("business_label"),
+            metric.get("label"),
+            metric.get("field"),
+            *(metric.get("source_fields") or []),
+            *(metric.get("aliases") or []),
+        ]
+        for value in values:
+            tokens.update(_metric_token_aliases(value))
+    return {token for token in tokens if token}
+
+
+def _metric_supported(metric_text: str, available: set[str]) -> bool:
+    candidates = _metric_token_aliases(metric_text)
+    if candidates & available:
+        return True
+    return any(
+        candidate in available_token or available_token in candidate
+        for candidate in candidates
+        for available_token in available
+        if len(candidate) >= 2 and len(available_token) >= 2
+    )
+
+
+def _capability_limit_for_requested_metric(metric_text: str, *, capabilities: dict[str, Any]) -> str:
+    normalized = _normalize_metric_token(metric_text)
+    if normalized in {"利润", "利润率", "margin", "marginrate", "profit"} and capabilities.get("can_calculate_profit") is False:
+        return f"请求的指标 {metric_text} 需要收入字段和成本字段，当前证据不足，未计算。"
+    if normalized in {"roi", "roas", "投入产出", "投入产出比"} and capabilities.get("can_calculate_roi") is False:
+        return f"请求的指标 {metric_text} 需要收入字段和投放/花费字段，当前证据不足，未计算。"
+    return ""
+
+
+def _capability_limits_for_task(
+    capabilities: dict[str, Any],
+    metric_registry: dict[str, Any],
+    requested_metrics: list[Any],
+    *,
+    task: dict[str, Any],
+    available: set[str],
+) -> list[str]:
+    limits: list[str] = []
+    warnings_text = "\n".join(str(item) for item in metric_registry.get("warnings") or [])
+    requested_text = " ".join(str(metric) for metric in requested_metrics)
+    profit_supported = any(_metric_supported(metric, available) for metric in ("利润", "利润率", "margin_rate"))
+    roi_supported = any(_metric_supported(metric, available) for metric in ("ROI", "ROAS", "roi", "roas"))
+    if (
+        capabilities.get("can_calculate_profit") is False
+        and not profit_supported
+        and ("利润" in requested_text or "成本字段" in warnings_text)
+    ):
+        limits.append("利润、利润率需要成本字段；当前证据不足，未计算。")
+    if capabilities.get("can_calculate_roi") is False and not roi_supported and (
+        "ROI" in requested_text.upper() or "ROAS" in requested_text.upper() or "花费类字段" in warnings_text
+    ):
+        limits.append("ROI/ROAS 需要收入字段和投放/花费字段；当前证据不足，未计算。")
+    time_range = task.get("time_range") or task.get("time_scope") or {}
+    if task.get("requires_time_field") and capabilities.get("can_analyze_trends") is False:
+        raw_time = ""
+        if isinstance(time_range, dict):
+            raw_time = str(time_range.get("raw_text") or "")
+        limits.append(f"{raw_time or '请求的时间范围'} 需要时间字段；当前证据不足，未应用该时间范围或趋势分析。")
+    if task.get("requires_join") and capabilities.get("can_join_tables") is False:
+        limits.append("跨表分析需要可确认的关联字段；当前证据不足，未做跨表投入产出分析。")
+    return limits
+
+
 def _normalize_metric_token(value: Any) -> str:
-    return re.sub(r"[\s_\-]+", "", str(value or "").lower())
+    return re.sub(r"[\s_\-（）()，,。.:：/]+", "", str(value or "").lower())
+
+
+def _metric_token_aliases(value: Any) -> set[str]:
+    raw_text = str(value or "")
+    token = _normalize_metric_token(raw_text)
+    if not token:
+        return set()
+    aliases = {token}
+    for part in re.split(r"[\s_\-（）()，,。.:：/]+", raw_text):
+        part_token = _normalize_metric_token(part)
+        if len(part_token) >= 2:
+            aliases.add(part_token)
+    synonym_groups = (
+        ("复购率", "复购", "repeatrate", "repurchaserate", "repeatpurchaserate"),
+        ("成交金额", "成交额", "销售额", "收入", "营收", "paidamount", "totalamount", "transactionamount", "salesamount", "revenue", "gmv"),
+        ("销量", "销售量", "quantity", "quantitysold", "totalquantity", "salesquantity", "qtysold"),
+        ("客户数", "customercount", "customers", "usercount"),
+        ("投放", "投放金额", "投放成本", "花费", "广告费", "spend", "adspend", "marketingspend", "cost"),
+        ("roi", "roas", "投入产出", "投入产出比"),
+        ("利润", "利润率", "margin", "marginrate", "profit"),
+    )
+    for group in synonym_groups:
+        normalized_group = {_normalize_metric_token(item) for item in group}
+        if token in normalized_group:
+            aliases.update(normalized_group)
+    return aliases
 
 
 def _chart_data(rows: list[Any], columns: list[str], *, preferred_metric_keys: list[str] | None = None) -> dict[str, Any]:

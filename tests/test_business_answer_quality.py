@@ -241,7 +241,7 @@ def test_chinese_question_rejects_english_provider_business_summary():
     assert result["insight"]["validation_error"]
     assert "输出语言" in result["insight"]["validation_error"]
     _assert_new_business_answer_shape(result["business_answer"])
-    assert "已完成本轮查询" in result["business_answer"]["direct_answer"]
+    assert "当前数据中" in result["business_answer"]["direct_answer"]
     assert "email 总收入最高" in result["business_answer"]["direct_answer"]
     assert "Based on the data" not in _business_answer_text(result["business_answer"])
 
@@ -491,4 +491,5 @@ def test_product_result_builder_rejects_mixed_language_provider_business_answer_
     assert "Email is the top revenue channel" not in _business_answer_text(answer)
     assert "The evidence row shows" not in _business_answer_text(answer)
     assert "Increase email budget" not in _business_answer_text(answer)
-    assert answer["direct_answer"].startswith("已完成本轮查询")
+    assert answer["direct_answer"].startswith("当前数据中")
+    assert "email 总收入最高" in answer["direct_answer"]

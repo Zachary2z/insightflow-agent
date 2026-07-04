@@ -103,6 +103,7 @@ def _ordered_matches(question: str, metrics: dict[str, Any]) -> list[str]:
 def build_metric_registry(semantic_layer: dict[str, Any] | None) -> dict[str, Any]:
     """Build a workspace metric registry without inventing unsupported derived metrics."""
     semantic_layer = semantic_layer or {}
+    capabilities = dict(semantic_layer.get("available_analysis_capabilities") or {})
     raw_metrics = semantic_layer.get("metrics") or []
     if isinstance(raw_metrics, dict):
         raw_metrics = raw_metrics.values()
@@ -110,17 +111,21 @@ def build_metric_registry(semantic_layer: dict[str, Any] | None) -> dict[str, An
     metrics = {metric["name"]: metric for metric in base_metrics if metric.get("name")}
     warnings: list[str] = []
 
-    revenue = _first_metric_with_meaning(base_metrics, ("revenue_like", "sales_like", "gmv_like"))
-    spend = _first_metric_with_meaning(base_metrics, ("spend_like", "ad_spend_like", "marketing_spend_like"))
-    cost = _first_metric_with_meaning(base_metrics, ("cost_like",), exclude_meanings=("spend_like",))
-    order_count = _first_metric_with_meaning(base_metrics, ("order_count_like", "count_like"))
+    revenue_metrics = _metrics_with_meaning(base_metrics, ("revenue_like", "sales_like", "gmv_like"))
+    spend_metrics = _metrics_with_meaning(base_metrics, ("spend_like", "ad_spend_like", "marketing_spend_like"))
+    cost_metrics = _metrics_with_meaning(base_metrics, ("cost_like",), exclude_meanings=("spend_like",))
+    order_count_metrics = _metrics_with_meaning(base_metrics, ("order_count_like", "count_like"))
+    revenue_spend_pair = _first_compatible_metric_pair(revenue_metrics, spend_metrics, semantic_layer)
+    revenue_cost_pair = _first_compatible_metric_pair(revenue_metrics, cost_metrics, semantic_layer)
+    revenue_order_pair = _first_compatible_metric_pair(revenue_metrics, order_count_metrics, semantic_layer)
 
-    if revenue and spend:
+    if revenue_spend_pair:
+        revenue, spend = revenue_spend_pair
         _add_derived_metric(
             metrics,
             name="roas",
             business_label="广告投入产出比",
-            formula=f'{revenue["formula"]} / NULLIF({spend["formula"]}, 0)',
+            formula=f'1.0 * {revenue["formula"]} / NULLIF({spend["formula"]}, 0)',
             unit="ratio",
             source_fields=[*revenue["source_fields"], *spend["source_fields"]],
             description="ROAS = revenue / spend. This is not net return.",
@@ -129,33 +134,44 @@ def build_metric_registry(semantic_layer: dict[str, Any] | None) -> dict[str, An
             metrics,
             name="net_return",
             business_label="净投放回报率",
-            formula=f'({revenue["formula"]} - {spend["formula"]}) / NULLIF({spend["formula"]}, 0)',
+            formula=f'1.0 * ({revenue["formula"]} - {spend["formula"]}) / NULLIF({spend["formula"]}, 0)',
             unit="percentage",
             source_fields=[*revenue["source_fields"], *spend["source_fields"]],
             description="Net return = (revenue - spend) / spend. This is not ROAS.",
         )
+    elif revenue_metrics and spend_metrics:
+        warnings.append(
+            "ROAS 和净投放回报率需要收入和投放字段位于同一可分析粒度，"
+            "或存在可确认关联字段，当前证据不足，未生成。"
+        )
     else:
         warnings.append("ROAS 和净投放回报率需要同时存在收入类字段和花费类字段，当前证据不足，未生成。")
 
-    if revenue and cost:
+    if revenue_cost_pair:
+        revenue, cost = revenue_cost_pair
         _add_derived_metric(
             metrics,
             name="margin_rate",
             business_label="利润率",
-            formula=f'({revenue["formula"]} - {cost["formula"]}) / NULLIF({revenue["formula"]}, 0)',
+            formula=f'1.0 * ({revenue["formula"]} - {cost["formula"]}) / NULLIF({revenue["formula"]}, 0)',
             unit="percentage",
             source_fields=[*revenue["source_fields"], *cost["source_fields"]],
             description="Margin-like rate = (revenue - cost) / revenue.",
         )
+    elif revenue_metrics and cost_metrics:
+        warnings.append(
+            "利润率需要收入和成本字段位于同一可分析粒度，或存在可确认关联字段，当前证据不足，未生成。"
+        )
     else:
         warnings.append("利润率需要同时存在收入类字段和成本类字段，当前证据不足，未生成。")
 
-    if revenue and order_count:
+    if revenue_order_pair:
+        revenue, order_count = revenue_order_pair
         _add_derived_metric(
             metrics,
             name="average_order_value",
             business_label="客单价",
-            formula=f'{revenue["formula"]} / NULLIF({order_count["formula"]}, 0)',
+            formula=f'1.0 * {revenue["formula"]} / NULLIF({order_count["formula"]}, 0)',
             unit="currency",
             source_fields=[*revenue["source_fields"], *order_count["source_fields"]],
             description="Average order value = revenue / order count.",
@@ -168,6 +184,7 @@ def build_metric_registry(semantic_layer: dict[str, Any] | None) -> dict[str, An
         "metrics": metrics,
         "formulas": {name: metric["formula"] for name, metric in metrics.items() if metric.get("formula")},
         "warnings": warnings,
+        "available_analysis_capabilities": capabilities,
     }
 
 
@@ -185,6 +202,7 @@ def _normalize_registry_metric(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": name,
         "business_label": str(item.get("business_label") or item.get("label") or item.get("name") or name),
+        "field": field,
         "formula": formula,
         "unit": unit,
         "source_fields": source_fields,
@@ -200,7 +218,7 @@ def _metric_meanings(item: dict[str, Any]) -> set[str]:
         item.get("field_role"),
         item.get("name"),
         item.get("label"),
-        item.get("field"),
+        _field_column(item.get("field")),
         *(item.get("aliases") or []),
         *(item.get("business_meaning_candidates") or []),
     ]
@@ -248,6 +266,92 @@ def _first_metric_with_meaning(
         if metric.get("formula") and meaning_set & metric_meanings and not (excluded & metric_meanings):
             return metric
     return None
+
+
+def _metrics_with_meaning(
+    metrics: list[dict[str, Any]],
+    meanings: tuple[str, ...],
+    *,
+    exclude_meanings: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
+    meaning_set = set(meanings)
+    excluded = set(exclude_meanings)
+    return [
+        metric
+        for metric in metrics
+        if metric.get("formula")
+        and meaning_set & set(metric.get("meanings") or [])
+        and not (excluded & set(metric.get("meanings") or []))
+    ]
+
+
+def _first_compatible_metric_pair(
+    left_metrics: list[dict[str, Any]],
+    right_metrics: list[dict[str, Any]],
+    semantic_layer: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    for left in left_metrics:
+        for right in right_metrics:
+            if _can_combine_metrics(left, right, semantic_layer):
+                return left, right
+    return None
+
+
+def _field_table(field: str) -> str:
+    parts = [part.strip().strip('"') for part in str(field or "").split(".") if part.strip()]
+    return parts[0] if len(parts) >= 2 else ""
+
+
+def _field_column(field: Any) -> str:
+    parts = [part.strip().strip('"') for part in str(field or "").split(".") if part.strip()]
+    return parts[-1] if parts else ""
+
+
+def _metric_tables(metric: dict[str, Any]) -> set[str]:
+    tables = {_field_table(str(metric.get("field") or ""))}
+    tables.update(_field_table(str(field)) for field in metric.get("source_fields") or [])
+    return {table for table in tables if table}
+
+
+def _same_table(metric_a: dict[str, Any], metric_b: dict[str, Any]) -> bool:
+    tables_a = _metric_tables(metric_a)
+    tables_b = _metric_tables(metric_b)
+    return bool(tables_a and tables_b and tables_a & tables_b)
+
+
+def _has_safe_relationship(metric_a: dict[str, Any], metric_b: dict[str, Any], semantic_layer: dict[str, Any]) -> bool:
+    tables_a = _metric_tables(metric_a)
+    tables_b = _metric_tables(metric_b)
+    if not tables_a or not tables_b:
+        return False
+    for relationship in _relationship_items(semantic_layer):
+        left_table = str(relationship.get("left_table") or _field_table(str(relationship.get("left_field") or "")))
+        right_table = str(relationship.get("right_table") or _field_table(str(relationship.get("right_field") or "")))
+        if not left_table or not right_table:
+            continue
+        if (left_table in tables_a and right_table in tables_b) or (
+            left_table in tables_b and right_table in tables_a
+        ):
+            return True
+    return False
+
+
+def _relationship_items(semantic_layer: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for key in ("relationships", "join_paths"):
+        raw_items = semantic_layer.get(key) or []
+        if isinstance(raw_items, dict):
+            raw_items = raw_items.values()
+        items.extend(item for item in raw_items if isinstance(item, dict))
+    return items
+
+
+def _can_combine_metrics(metric_a: dict[str, Any], metric_b: dict[str, Any], semantic_layer: dict[str, Any]) -> bool:
+    if _same_table(metric_a, metric_b):
+        return True
+    if _has_safe_relationship(metric_a, metric_b, semantic_layer):
+        return True
+    return False
 
 
 def _add_derived_metric(

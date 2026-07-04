@@ -192,3 +192,100 @@ def test_semantic_draft_quotes_mixed_identifiers_and_adds_chinese_business_alias
     assert metrics["store_ops.Cost Amount"]["label"] == "成本"
     assert metrics["store_ops.Score (NPS)"]["label"] == "满意度"
     assert dimensions["store_ops.Store Name"]["label"] == "门店"
+
+
+def test_semantic_draft_maps_p24_business_datasets_to_chinese_semantics_and_limits(tmp_path):
+    import sqlite3
+
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P24 General Semantic")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            'CREATE TABLE "门店销售" ('
+            '"下单时间" TEXT, "门店编号" TEXT, "门店" TEXT, "城市" TEXT, '
+            '"GMV" REAL, "实付金额" REAL, "销量" INTEGER)'
+        )
+        conn.execute(
+            'CREATE TABLE "商品销售" ('
+            '"日期" TEXT, "商品编号" TEXT, "商品" TEXT, "品类" TEXT, '
+            '"成交金额" REAL, "订单数" INTEGER, "件数" INTEGER, "采购成本" REAL)'
+        )
+        conn.execute(
+            'CREATE TABLE "客服工单" ('
+            '"创建时间" TEXT, "工单编号" TEXT, "客户编号" TEXT, "团队" TEXT, '
+            '"工单数" INTEGER, "平均响应分钟" REAL, "解决状态" TEXT)'
+        )
+        conn.executemany(
+            'INSERT INTO "门店销售" VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [("2026-06-01", "S001", "上海旗舰店", "上海", 32000.0, 30100.0, 128)],
+        )
+        conn.executemany(
+            'INSERT INTO "商品销售" VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [("2026-06-01", "P001", "咖啡豆", "食品", 8600.0, 42, 118, 3900.0)],
+        )
+        conn.executemany(
+            'INSERT INTO "客服工单" VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [("2026-06-01", "T001", "C001", "华东客服组", 86, 18.0, "已解决")],
+        )
+
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    draft = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    metrics = {metric["field"]: metric for metric in draft["metrics"]}
+    dimensions = {dimension["field"]: dimension for dimension in draft["dimensions"]}
+    time_fields = {field["field"]: field for field in draft["time_fields"]}
+    entities = {entity["field"]: entity for entity in draft["entities"]}
+
+    assert {"销售额", "收入", "成交金额"}.issubset(metrics["商品销售.成交金额"]["aliases"])
+    assert metrics["商品销售.成交金额"]["label"] == "销售额"
+    assert {"订单数", "订单量"}.issubset(metrics["商品销售.订单数"]["aliases"])
+    assert metrics["商品销售.订单数"]["label"] == "订单数"
+    assert {"成本", "采购成本"}.issubset(metrics["商品销售.采购成本"]["aliases"])
+    assert {"销售额", "GMV"}.issubset(metrics["门店销售.GMV"]["aliases"])
+    assert {"销售额", "实付金额"}.issubset(metrics["门店销售.实付金额"]["aliases"])
+    assert {"销量", "数量"}.issubset(metrics["门店销售.销量"]["aliases"])
+    assert {"工单数", "工单量"}.issubset(metrics["客服工单.工单数"]["aliases"])
+    assert metrics["客服工单.平均响应分钟"]["label"] == "响应时长"
+
+    assert {"门店销售.下单时间", "商品销售.日期", "客服工单.创建时间"}.issubset(time_fields)
+    assert {"门店销售.门店", "门店销售.城市", "商品销售.商品", "商品销售.品类", "客服工单.团队"}.issubset(
+        dimensions
+    )
+    assert {"门店销售.门店编号", "商品销售.商品编号", "客服工单.工单编号", "客服工单.客户编号"}.issubset(entities)
+    assert draft["field_roles"]["商品销售.成交金额"] == "metric"
+    assert draft["field_roles"]["客服工单.解决状态"] == "status"
+    assert draft["available_analysis_capabilities"]["can_analyze_trends"] is True
+    assert draft["available_analysis_capabilities"]["can_calculate_profit"] is True
+    assert draft["available_analysis_capabilities"]["can_calculate_roi"] is False
+    assert any("投放" in limit and "ROI" in limit for limit in draft["data_limits"])
+    assert not any(metric["field"].endswith(".channel") for metric in draft["metrics"])
+    assert not any(metric["field"].endswith(".revenue") for metric in draft["metrics"])
+
+
+def test_semantic_draft_records_missing_time_cost_and_relationship_limits_without_inventing_fields(tmp_path):
+    import sqlite3
+
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P24 Missing Limits")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute('CREATE TABLE "区域销售" ("地区" TEXT, "收入金额" REAL)')
+        conn.executemany('INSERT INTO "区域销售" VALUES (?, ?)', [("华东", 98000.0), ("华南", 76000.0)])
+
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    draft = generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    metric_fields = {metric["field"] for metric in draft["metrics"]}
+    assert metric_fields == {"区域销售.收入金额"}
+    assert draft["available_analysis_capabilities"]["can_analyze_trends"] is False
+    assert draft["available_analysis_capabilities"]["can_calculate_profit"] is False
+    assert draft["available_analysis_capabilities"]["can_calculate_roi"] is False
+    assert draft["available_analysis_capabilities"]["can_join_tables"] is False
+    limits_text = "\n".join(draft["data_limits"])
+    assert "时间字段" in limits_text
+    assert "成本字段" in limits_text
+    assert "ROI" in limits_text
+    assert "关联字段" in limits_text
+    serialized = yaml.safe_dump(draft, allow_unicode=True)
+    assert "order_date" not in serialized
+    assert "channel" not in serialized
+    assert "spend" not in serialized
