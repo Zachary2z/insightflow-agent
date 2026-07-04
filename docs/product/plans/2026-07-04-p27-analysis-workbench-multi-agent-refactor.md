@@ -194,6 +194,8 @@ Status: complete. H1 added `workspaces/analysis_contracts.py` and no-key boundar
 - Consolidate question understanding, clarification, resolved-question continuation, and fast/standard route output.
 - Keep Chinese-first behavior and P25 safe full-data time defaults.
 
+Status: complete. H2 added `workspaces/data_understanding_agent.py` and `workspaces/analysis_coordinator.py`, adapted the Analysis Workbench question-understanding graph node to emit H1 `AnalysisTask` and `CoordinatorDecision` state, and made the clarification router reuse Data Understanding's precomputed clarification result. Existing evidence, SQL execution, answer generation, visualization, and Report Center paths remain unchanged.
+
 ### H3 Evidence Agent Question Mode
 
 - Consolidate Analysis Workbench evidence planning, schema/metric lookup, SQL candidate building, SQL review, repair, execution, and evidence payload output.

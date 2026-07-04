@@ -65,7 +65,11 @@ def build_workflow(
     workflow = StateGraph(AgentState)
     workflow.add_node(
         "question_understanding",
-        lambda state: run_question_understanding_agent(dict(state), provider=question_understanding_provider),
+        lambda state: run_question_understanding_agent(
+            dict(state),
+            provider=question_understanding_provider,
+            clarification_provider=clarification_provider,
+        ),
     )
     workflow.add_node(
         "clarification",

@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H1 complete; ready for H2 Coordinator And Data Understanding |
-| Next planned task | P27-H2 Coordinator And Data Understanding |
+| Current task | P27-H2 complete; ready for H3 Evidence Agent Question Mode |
+| Next planned task | P27-H3 Evidence Agent Question Mode |
 | Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -41,7 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
-| P27 | `[~]` In progress | H1 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
+| P27 | `[~]` In progress | H1-H2 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
 
 ## P20 Task Status
 
@@ -91,7 +91,7 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 | Task | Status | Notes |
 |---|---|---|
 | P27-H1 | `[x]` Complete | Added Analysis Workbench contracts and no-key boundary tests proving Report Center stays independent |
-| P27-H2 | `[ ]` Planned | Coordinator + Data Understanding: consolidate question understanding, clarification, continuation, and route output |
+| P27-H2 | `[x]` Complete | Coordinator + Data Understanding: consolidated question understanding, clarification, continuation, H1 `AnalysisTask`, and `CoordinatorDecision` route output |
 | P27-H3 | `[ ]` Planned | Evidence Agent question mode: consolidate analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and evidence payload output |
 | P27-H4 | `[ ]` Planned | Evidence Auditor + Business Answer Agent: consolidate evidence validation/claim typing and answer drafting/review/composition |
 | P27-H5 | `[ ]` Planned | Analysis Workbench latency optimization: early fast path, conditional model calls, evidence caching, and on-demand visualization |
@@ -110,6 +110,21 @@ P27-H1 Agent Contracts And Boundary Tests completed on 2026-07-04:
   - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
   - `python3 -m pytest tests/test_workspace_analysis_runner.py -q` (`30 passed`)
   - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_workspace_analysis_runner.py tests/test_analysis_contracts.py -q` (`102 passed`)
+
+## Latest P27-H2 Result
+
+P27-H2 Coordinator And Data Understanding completed on 2026-07-04:
+
+- Added `workspaces/data_understanding_agent.py` as the Analysis Workbench Data Understanding surface. It wraps existing deterministic/provider-backed question understanding, clarification question generation, clarification provider fallback, resolved-question continuation, and P25 safe full-data time defaults into the H1 `AnalysisTask` contract.
+- Added `workspaces/analysis_coordinator.py` as the Coordinator surface. It converts Data Understanding output plus the existing conservative route policy into H1 `CoordinatorDecision` routes: `clarify`, `fast_fact`, `standard_analysis`, `deep_judgment`, or `reject`, with Chinese route reasons and Chinese required-agent labels.
+- Adapted `agents/question_understanding.py` so the Analysis Workbench main path now writes `analysis_task_contract`, `coordinator_decision`, and `data_understanding` state while preserving legacy `analysis_task`, `analysis_route`, and `routing_strategy` fields for the current evidence/SQL/answer chain.
+- Made the clarification router reuse Data Understanding's precomputed clarification result, so question understanding and clarification no longer independently rebuild the same missing-slot output on the main path.
+- Kept Report Center independent; H2 did not modify report planning, evidence, ledger, composer, validator, Markdown, or report document generation.
+- Verification passed:
+  - `python3 -m pytest tests/test_analysis_coordinator_data_understanding.py -q` (`7 passed`)
+  - `python3 -m pytest tests/test_analysis_contracts.py tests/test_analysis_route_policy.py tests/test_question_understanding_router.py -q` (`31 passed`)
+  - `python3 -m pytest tests/test_provider_backed_question_understanding.py tests/test_workspace_analysis_runner.py -q` (`51 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py::test_report_center_runtime_does_not_depend_on_analysis_workbench_entrypoint -q` (`1 passed`)
 
 ## P25 Task Status
 

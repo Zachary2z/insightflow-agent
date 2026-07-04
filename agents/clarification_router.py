@@ -10,8 +10,16 @@ from tools.trace_logger import append_trace
 def run_clarification_router_agent(state: dict[str, Any], provider: LLMProvider | None = None) -> dict[str, Any]:
     understanding = state.get("question_understanding", {})
     question = state.get("user_question", "")
+    data_understanding = state.get("data_understanding") if isinstance(state.get("data_understanding"), dict) else {}
+    precomputed = (
+        data_understanding.get("clarification_result")
+        if isinstance(data_understanding.get("clarification_result"), dict)
+        else {}
+    )
 
-    if understanding.get("strategy") != "clarify":
+    if precomputed:
+        result = dict(precomputed)
+    elif understanding.get("strategy") != "clarify":
         result = {
             "success": True,
             "requires_clarification": False,
