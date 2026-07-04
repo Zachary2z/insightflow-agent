@@ -14,6 +14,7 @@ from graph.nodes import (
     evidence_agent_node,
     fail_response_node,
     fast_fact_node,
+    route_after_answer_for_visualization,
     route_after_evidence_agent,
     route_after_clarification,
     save_trace_node,
@@ -100,8 +101,16 @@ def build_workflow(
         route_after_evidence_agent,
         {"business_answer": "business_answer", "fast_fact": "fast_fact", "fail": "fail", "early_response": "early_response"},
     )
-    workflow.add_edge("fast_fact", "save_trace")
-    workflow.add_edge("business_answer", "visualization_agent")
+    workflow.add_conditional_edges(
+        "fast_fact",
+        route_after_answer_for_visualization,
+        {"visualization_agent": "visualization_agent", "save_trace": "save_trace"},
+    )
+    workflow.add_conditional_edges(
+        "business_answer",
+        route_after_answer_for_visualization,
+        {"visualization_agent": "visualization_agent", "save_trace": "save_trace"},
+    )
     workflow.add_edge("visualization_agent", "save_trace")
     workflow.add_edge("fail", "save_trace")
     workflow.add_edge("early_response", "save_trace")
@@ -127,6 +136,7 @@ def run_workflow(
     profile_path: str | Path | None = None,
     semantic_layer_path: str | Path | None = None,
     run_artifact_dir: str | Path | None = None,
+    data_version: int | None = None,
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
@@ -160,6 +170,7 @@ def run_workflow(
     state["profile_path"] = str(profile_path) if profile_path else None
     state["semantic_layer_path"] = str(semantic_layer_path) if semantic_layer_path else None
     state["run_artifact_dir"] = str(run_artifact_dir) if run_artifact_dir else None
+    state["data_version"] = int(data_version or 0)
     if initial_sql:
         state["initial_sql"] = initial_sql
 

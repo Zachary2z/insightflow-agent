@@ -208,6 +208,31 @@ def test_fast_fact_trend_returns_fact_summary_without_recommendations(tmp_path):
     assert "insight_agent" not in _trace_nodes(result)
 
 
+def test_fast_fact_explicit_chart_request_allows_visualization_without_heavy_answer_path(tmp_path):
+    store, workspace = _prepare_store_workspace(tmp_path)
+
+    result = run_workspace_analysis(
+        store,
+        workspace["workspace_id"],
+        "最近90天销售额最高的门店是谁？请生成图表。",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 3"
+        ),
+    )
+
+    nodes = _trace_nodes(result)
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] == "fast_fact"
+    assert "fast_fact_composer" in nodes
+    assert "visualization_agent" in nodes
+    assert "insight_agent" not in nodes
+    assert "claim_typing_agent" not in nodes
+    assert "final_answer_composer" not in nodes
+    assert result["product_result"]["chart_artifacts"]
+
+
 def test_fast_fact_trend_context_pack_keeps_trend_points_and_time_range(tmp_path):
     store, workspace = _prepare_trend_workspace(tmp_path)
 

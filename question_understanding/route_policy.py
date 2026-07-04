@@ -187,7 +187,19 @@ def _canonical_metric(metric: Any) -> str:
     compact = compact_text(metric)
     if compact in {"数量", "次数", "单量", "件数", "订单数", "订单量", "ordercount", "sumordercount"}:
         return "订单量"
-    if compact in {"收入", "营收", "销售额", "成交额", "gmv", "sales", "salesamount", "totalsales", "totalrevenue"}:
+    if compact in {
+        "收入",
+        "营收",
+        "销售额",
+        "成交额",
+        "gmv",
+        "sales",
+        "salesamount",
+        "sumsalesamount",
+        "totalsales",
+        "totalrevenue",
+        "sumrevenue",
+    }:
         return "销售额"
     return compact
 

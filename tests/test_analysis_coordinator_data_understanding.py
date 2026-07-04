@@ -124,6 +124,23 @@ def test_coordinator_keeps_simple_fact_route_lightweight():
     assert decision.required_agents == ["数据理解", "证据查询", "证据审计", "业务回答"]
 
 
+def test_route_policy_treats_semantic_metric_id_and_business_label_as_one_fast_fact_metric():
+    from question_understanding.route_policy import classify_analysis_route
+
+    route = classify_analysis_route(
+        "最近90天哪个门店销售额最高？",
+        analysis_task={
+            "task_type": "rank",
+            "metrics": ["sum_sales_amount", "销售额"],
+            "dimensions": ["门店"],
+            "time_range": {"type": "relative", "value": 90, "unit": "day"},
+        },
+    )
+
+    assert route["route"] == "fast_fact"
+    assert route["disqualifiers"] == []
+
+
 def test_coordinator_routes_complex_diagnosis_to_full_business_agents():
     from workspaces.analysis_coordinator import coordinate_analysis_question
 

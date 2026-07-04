@@ -17,6 +17,11 @@ from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace
 from workspaces.analysis_contracts import AnalysisTask, QuestionEvidencePack, WorkbenchToolCall
 from workspaces.product_result_builder import build_evidence
+from workspaces.question_evidence_cache import (
+    load_question_evidence_cache,
+    save_question_evidence_cache,
+    with_question_evidence_cache_identity,
+)
 
 
 def run_evidence_agent_question_mode(
@@ -26,8 +31,11 @@ def run_evidence_agent_question_mode(
     analysis_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
-    updated = dict(state)
+    updated = with_question_evidence_cache_identity(dict(state))
     tool_calls: list[WorkbenchToolCall] = []
+    cached = load_question_evidence_cache(updated)
+    if cached:
+        return _with_cached_pack(updated, cached)
 
     if not updated.get("initial_sql"):
         updated = run_sql_planning_router_agent(updated, provider=sql_planning_provider)
@@ -258,7 +266,60 @@ def _with_pack(
     pack = _build_question_evidence_pack(updated, tool_calls)
     updated["question_evidence_pack"] = pack.to_dict()
     updated["workbench_tool_calls"] = [call.to_dict() for call in tool_calls]
+    save_question_evidence_cache(updated)
+    _drop_cache_identity(updated)
     return updated
+
+
+def _with_cached_pack(state: dict[str, Any], cached: dict[str, Any]) -> dict[str, Any]:
+    cache_call = WorkbenchToolCall(
+        tool_name="question_evidence_cache",
+        purpose="复用同一数据版本、语义层和规范化问题的已审核证据",
+        input_summary=str(state.get("user_question") or "")[:200],
+        output_summary="复用了已通过 SQL review 和 SQL execution 的 QuestionEvidencePack",
+        status="completed",
+    )
+    pack = QuestionEvidencePack.from_dict(cached.get("question_evidence_pack") or {})
+    pack.tool_calls = [
+        *pack.tool_calls,
+        cache_call,
+    ]
+    tool_calls = [call.to_dict() for call in pack.tool_calls]
+    updated = {
+        **state,
+        "status": "executed",
+        "generated_sql": str(cached.get("generated_sql") or ""),
+        "review_result": dict(cached.get("review_result") or {}),
+        "execution_result": dict(cached.get("execution_result") or {}),
+        "metric_context": dict(cached.get("metric_context") or {}),
+        "selected_metrics": list(cached.get("selected_metrics") or []),
+        "question_evidence_pack": pack.to_dict(),
+        "workbench_tool_calls": tool_calls,
+        "question_evidence_cache": {
+            "hit": True,
+            "cache_key": str(cached.get("cache_key") or ""),
+            "reason": "同一工作区、数据版本、语义层和规范化问题命中证据缓存。",
+        },
+    }
+    _drop_cache_identity(updated)
+    return append_trace(
+        updated,
+        {
+            "node": "question_evidence_cache",
+            "tool_name": "question_evidence_cache",
+            "tool_input_summary": cache_call.input_summary,
+            "tool_output_summary": cache_call.output_summary,
+            "status": "success",
+            "latency_ms": 0,
+            "provider_called": False,
+            "fallback_used": False,
+        },
+    )
+
+
+def _drop_cache_identity(state: dict[str, Any]) -> None:
+    state.pop("_question_evidence_cache_key", None)
+    state.pop("_question_evidence_cache_normalized_task", None)
 
 
 def _build_question_evidence_pack(

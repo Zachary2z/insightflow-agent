@@ -394,6 +394,12 @@ def route_after_evidence_agent(state: AgentState) -> str:
     return "fail"
 
 
+def route_after_answer_for_visualization(state: AgentState) -> str:
+    if _should_run_visualization(state):
+        return "visualization_agent"
+    return "save_trace"
+
+
 def route_after_clarification(state: AgentState) -> str:
     if state.get("initial_sql"):
         return "schema"
@@ -450,3 +456,57 @@ def _has_continuation_context(state: AgentState) -> bool:
         and state.get("resolved_question")
         and not state.get("stop_for_clarification")
     )
+
+
+def _should_run_visualization(state: AgentState) -> bool:
+    if state.get("status") != "completed":
+        return False
+    execution = state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {}
+    if not execution.get("success"):
+        return False
+    question = str(state.get("user_question") or state.get("original_question") or "")
+    if _explicit_chart_request(question):
+        return True
+    route = state.get("analysis_route") if isinstance(state.get("analysis_route"), dict) else {}
+    if route.get("route") == "fast_fact":
+        return False
+    task = state.get("analysis_task") if isinstance(state.get("analysis_task"), dict) else {}
+    if str(task.get("task_type") or "") != "trend":
+        return _chartable_complex_comparison(question, execution)
+    return _row_count(execution) >= 2
+
+
+def _explicit_chart_request(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "图表",
+            "画图",
+            "作图",
+            "可视化",
+            "趋势图",
+            "柱状图",
+            "折线图",
+            "chart",
+            "visualization",
+            "visualise",
+            "visualize",
+        )
+    )
+
+
+def _chartable_complex_comparison(question: str, execution: dict[str, Any]) -> bool:
+    if _row_count(execution) < 2:
+        return False
+    compact = "".join(str(question or "").lower().split())
+    comparison_intent = any(marker in compact for marker in ("比较", "对比", "差异", "difference", "compare"))
+    focus_intent = any(
+        marker in compact
+        for marker in ("值得关注", "优先关注", "最值得", "需要优先", "优先复盘", "风险边界", "priority")
+    )
+    return focus_intent and (comparison_intent or "复盘" in compact or "建议" in compact)
+
+
+def _row_count(execution: dict[str, Any]) -> int:
+    return int(execution.get("row_count") or len(execution.get("rows") or []))

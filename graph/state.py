@@ -30,6 +30,7 @@ class AgentState(TypedDict, total=False):
     analysis_task_contract: dict[str, Any]
     analysis_route: dict[str, Any]
     question_evidence_pack: dict[str, Any]
+    question_evidence_cache: dict[str, Any]
     workbench_tool_calls: list[dict[str, Any]]
     evidence_agent_early_response: bool
     fast_fact_context_pack: dict[str, Any]
@@ -67,6 +68,7 @@ class AgentState(TypedDict, total=False):
     semantic_layer_path: str | None
     workspace_context: dict[str, Any]
     run_artifact_dir: str | None
+    data_version: int
 
     database_schema: dict[str, Any]
     schema_text: str

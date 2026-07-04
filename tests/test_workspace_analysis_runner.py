@@ -120,6 +120,54 @@ def _create_channel_workspace(tmp_path):
     return store, workspace
 
 
+def _mock_chinese_full_answer_providers():
+    insight_provider = _SequenceProvider(
+        [
+            {
+            "candidate_claims": ["上海旗舰店 total_sales 为 26255.44。", "北京国贸店 satisfaction_score 为 4.2。"],
+            "business_answer": {
+                "headline": "上海旗舰店综合表现更靠前。",
+                "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
+                "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
+                "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
+                "recommendations": ["优先复盘上海旗舰店的经营动作。"],
+                "caveats": ["当前结论只基于本次查询返回的数据。"],
+                "confidence": "medium",
+            },
+            }
+        ]
+    )
+    reviewer_provider = _SequenceProvider(
+        [
+            {
+            "status": "accept",
+            "language": "zh",
+            "supported_entities": ["上海旗舰店", "北京国贸店"],
+            "unsupported_entities": [],
+            "supported_metrics": ["total_sales", "satisfaction_score"],
+            "unsupported_metrics": [],
+            "issues": [],
+            "revision_instructions": [],
+            "confidence": "high",
+            }
+        ]
+    )
+    composer_provider = _SequenceProvider(
+        [
+            {
+            "headline": "上海旗舰店综合表现更靠前。",
+            "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
+            "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
+            "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
+            "recommendations": ["优先复盘上海旗舰店的经营动作。"],
+            "caveats": ["当前结论只基于本次查询返回的数据。"],
+            "confidence": "medium",
+            }
+        ]
+    )
+    return insight_provider, reviewer_provider, composer_provider
+
+
 def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Analysis Workspace")
@@ -492,6 +540,44 @@ def test_workspace_analysis_standard_route_is_not_forced_into_fast_fact_context_
         )
     profile = profile_workspace_database(store, workspace["workspace_id"])
     generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    insight_provider = MockLLMProvider(
+        {
+            "candidate_claims": ["上海旗舰店 total_sales 为 26255.44。", "北京国贸店 satisfaction_score 为 4.2。"],
+            "business_answer": {
+                "headline": "上海旗舰店综合表现更靠前。",
+                "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
+                "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
+                "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
+                "recommendations": ["优先复盘上海旗舰店的经营动作。"],
+                "caveats": ["当前结论只基于本次查询返回的数据。"],
+                "confidence": "medium",
+            },
+        }
+    )
+    reviewer_provider = MockLLMProvider(
+        {
+            "status": "accept",
+            "language": "zh",
+            "supported_entities": ["上海旗舰店", "北京国贸店"],
+            "unsupported_entities": [],
+            "supported_metrics": ["total_sales", "satisfaction_score"],
+            "unsupported_metrics": [],
+            "issues": [],
+            "revision_instructions": [],
+            "confidence": "high",
+        }
+    )
+    composer_provider = MockLLMProvider(
+        {
+            "headline": "上海旗舰店综合表现更靠前。",
+            "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
+            "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
+            "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
+            "recommendations": ["优先复盘上海旗舰店的经营动作。"],
+            "caveats": ["当前结论只基于本次查询返回的数据。"],
+            "confidence": "medium",
+        }
+    )
 
     result = run_workspace_analysis(
         store=store,
@@ -501,6 +587,11 @@ def test_workspace_analysis_standard_route_is_not_forced_into_fast_fact_context_
             "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
             "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
         ),
+        providers={
+            "insight_drafting": insight_provider,
+            "answer_reviewer": reviewer_provider,
+            "final_answer_composer": composer_provider,
+        },
     )
 
     assert result["analysis_route"]["route"] != "fast_fact"
@@ -564,6 +655,46 @@ def test_workspace_analysis_non_channel_judgment_answer_reads_like_business_chin
     assert "channel" not in text.lower()
     assert answer["recommendations"]
     assert answer["direct_answer"] not in answer["recommendations"]
+
+
+def test_standard_analysis_without_chart_request_keeps_full_answer_path_but_skips_visualization(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("No Chart Standard Analysis Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL, satisfaction_score REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [("上海旗舰店", 26255.44, 4.8), ("北京国贸店", 18400.0, 4.2)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    insight_provider, reviewer_provider, composer_provider = _mock_chinese_full_answer_providers()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="销售额、满意度综合看哪个门店最好？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+        providers={
+            "insight_drafting": insight_provider,
+            "answer_reviewer": reviewer_provider,
+            "final_answer_composer": composer_provider,
+        },
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert "insight_agent" in nodes
+    assert len(insight_provider.requests) == 1
+    assert len(reviewer_provider.requests) == 1
+    assert len(composer_provider.requests) == 1
+    assert "visualization_agent" not in nodes
+    assert result["product_result"]["chart_artifacts"] == []
 
 
 def test_workspace_analysis_support_issue_priority_aliases_are_business_labeled(tmp_path):
@@ -738,6 +869,172 @@ def test_workspace_analysis_generates_generic_store_ranking_evidence_without_ini
     assert requirement["time_range"]["raw_text"] == "最近 90 天"
     assert requirement["calculation_type"] == "ranking"
     assert requirement["missing_evidence"] == []
+
+
+def test_workspace_analysis_reuses_question_evidence_pack_cache_for_same_task(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Question Evidence Cache Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+
+    second_nodes = [event.get("node") for event in second.get("trace") or []]
+    second_tool_names = [
+        call["tool_name"]
+        for call in second["question_evidence_pack"]["tool_calls"]
+    ]
+
+    assert first["status"] == "completed"
+    assert second["status"] == "completed"
+    assert second["question_evidence_cache"]["hit"] is True
+    assert second["generated_sql"] == first["generated_sql"]
+    assert second["execution_result"]["rows"] == first["execution_result"]["rows"]
+    assert "question_evidence_cache" in second_nodes
+    assert "sql_executor_node" not in second_nodes
+    assert "question_evidence_cache" in second_tool_names
+    assert {"sql_review", "sql_execution"}.issubset(second_tool_names)
+    assert second["audit_result"]["supported_facts"]
+
+
+def test_workspace_analysis_question_evidence_cache_invalidates_on_data_version_change(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Question Evidence Data Version Cache Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+    store.increment_data_version(workspace["workspace_id"])
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+
+    second_nodes = [event.get("node") for event in second.get("trace") or []]
+
+    assert first["data_version"] == 1
+    assert second["data_version"] == 2
+    assert second["status"] == "completed"
+    assert second.get("question_evidence_cache", {}).get("hit") is not True
+    assert "question_evidence_cache" not in second_nodes
+    assert "sql_executor_node" in second_nodes
+
+
+def test_workspace_analysis_question_evidence_cache_invalidates_on_semantic_layer_change(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Question Evidence Semantic Cache Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+    semantic_path = Path(workspace["semantic_layer_path"])
+    semantic_path.write_text(semantic_path.read_text(encoding="utf-8") + "\n# cache bust\n", encoding="utf-8")
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+
+    second_nodes = [event.get("node") for event in second.get("trace") or []]
+
+    assert first["status"] == "completed"
+    assert second["status"] == "completed"
+    assert second.get("question_evidence_cache", {}).get("hit") is not True
+    assert "question_evidence_cache" not in second_nodes
+    assert "sql_executor_node" in second_nodes
+
+
+def test_workspace_analysis_initial_sql_bypasses_question_evidence_cache(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Question Evidence Initial SQL Cache Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        force_reanalysis=True,
+    )
+    second = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales ASC LIMIT 2"
+        ),
+        force_reanalysis=True,
+    )
+
+    second_nodes = [event.get("node") for event in second.get("trace") or []]
+
+    assert first["status"] == "completed"
+    assert second["status"] == "completed"
+    assert second.get("question_evidence_cache", {}).get("hit") is not True
+    assert "question_evidence_cache" not in second_nodes
+    assert "sql_executor_node" in second_nodes
+    assert second["execution_result"]["rows"][0][0] == "北京国贸店"
 
 
 def test_workspace_analysis_generates_generic_product_contribution_share_without_initial_sql(tmp_path):

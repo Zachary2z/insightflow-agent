@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-04
+Last updated: 2026-07-05
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -9,8 +9,8 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H4 complete; ready for H5 latency optimization |
-| Next planned task | P27-H5 Latency Optimization |
+| Current task | P27-H5 complete; ready for H6 cleanup/regression/docs closeout |
+| Next planned task | P27-H6 Cleanup, Regression, And Documentation |
 | Last completed task | P26 Repository Cleanup Before External Tools |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -41,7 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
-| P27 | `[~]` In progress | H1-H4 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
+| P27 | `[~]` In progress | H1-H5 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
 
 ## P20 Task Status
 
@@ -94,7 +94,7 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 | P27-H2 | `[x]` Complete | Coordinator + Data Understanding: consolidated question understanding, clarification, continuation, H1 `AnalysisTask`, and `CoordinatorDecision` route output |
 | P27-H3 | `[x]` Complete | Evidence Agent question mode: consolidated analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and QuestionEvidencePack output |
 | P27-H4 | `[x]` Complete | Evidence Auditor + Business Answer Agent: consolidated evidence validation/claim typing and answer drafting/review/composition surfaces |
-| P27-H5 | `[ ]` Planned | Analysis Workbench latency optimization: early fast path, conditional model calls, evidence caching, and on-demand visualization |
+| P27-H5 | `[x]` Complete | Latency optimization: earlier fast path normalization, conditional heavy calls, QuestionEvidencePack cache, initial_sql bypass, and on-demand visualization |
 | P27-H6 | `[ ]` Planned | Cleanup, regression, docs closeout, and optional live DeepSeek acceptance |
 
 ## Latest P27-H1 Result
@@ -155,6 +155,23 @@ P27-H4 Evidence Auditor And Business Answer Agent completed on 2026-07-04:
   - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
   - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py tests/test_guarded_insight_claim_typing.py tests/test_p20_realistic_acceptance.py -q` (`110 passed`)
   - `python3 -m pytest -q` (`579 passed, 12 skipped`)
+
+## Latest P27-H5 Result
+
+P27-H5 Latency Optimization completed on 2026-07-05:
+
+- Fast-fact routing now treats semantic metric ids such as `sum_sales_amount` and Chinese business labels such as `销售额` as the same single metric, so simple fact/ranking questions are not incorrectly disqualified as multi-metric analysis.
+- Added `workspaces/question_evidence_cache.py`, a lightweight Analysis Workbench evidence cache keyed by workspace id, data version, semantic-layer file fingerprint, and normalized task. Cache entries store `QuestionEvidencePack`, reviewed SQL, `review_result`, `execution_result`, metric context, selected metrics, and workbench tool calls.
+- Cache hits restore only successfully SQL-reviewed and SQL-executed evidence, append a clear `question_evidence_cache` trace/tool-call record, and still generate downstream `AuditResult`. Dangerous SQL review failures or failed executions are not cached as successful evidence.
+- `initial_sql` explicitly bypasses the evidence cache, and cache keys invalidate when `data_version` or the semantic-layer file changes.
+- Visualization is now conditional instead of unconditional: explicit chart requests still render, trend and clearly chartable complex comparison/review questions can render, while simple facts and ordinary complex answers skip chart work.
+- Fast facts still avoid the heavy insight/reviewer/final composer path; standard/deep answers keep the full Business Answer Agent quality path.
+- Report Center remains independent; H5 did not route reports through the Analysis Workbench evidence cache.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_analysis_coordinator_data_understanding.py -q` (`58 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py -q` (`59 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
+  - `python3 -m pytest -q` (`586 passed, 12 skipped`)
 
 ## P25 Task Status
 

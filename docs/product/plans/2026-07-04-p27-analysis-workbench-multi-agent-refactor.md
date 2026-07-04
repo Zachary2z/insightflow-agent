@@ -219,6 +219,8 @@ Status: complete. H4 added `workspaces/evidence_auditor.py` and `workspaces/busi
 - Add `QuestionEvidencePack` cache and invalidation tests.
 - Keep complex-analysis quality and safety gates.
 
+Status: complete. H5 tightened fast-fact metric normalization so semantic ids and business labels for the same metric do not force simple fact questions onto the heavy path; added a workspace-scoped `QuestionEvidencePack` cache keyed by workspace id, data version, semantic-layer fingerprint, and normalized task; records cache-hit trace/tool-call metadata while restoring only previously SQL-reviewed and SQL-executed successful evidence; bypasses cache for explicit `initial_sql`; invalidates on data or semantic-layer changes; and makes Analysis Workbench visualization on-demand for explicit chart requests, trends, and clearly chartable complex comparison/review questions. Fast facts still keep SQL review, SQL execution evidence, `QuestionEvidencePack`, and `AuditResult`, while standard/deep questions keep the full Business Answer Agent quality path. Report Center remains independent and does not use the Analysis Workbench evidence cache.
+
 ### H6 Cleanup, Regression, And Documentation
 
 - Delete superseded Analysis Workbench compatibility code, duplicate routing branches, stale tests, and dead imports.
