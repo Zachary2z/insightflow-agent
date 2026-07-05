@@ -102,17 +102,12 @@ def test_current_graph_does_not_import_or_route_to_action_agents():
     for required_node in (
         "question_understanding",
         "clarification",
-        "sql_planning",
-        "analysis_planner",
-        "schema",
-        "metric",
-        "guarded_candidate",
-        "review",
-        "schema_repair",
-        "execute",
-        "insight",
-        "claim_typing",
+        "evidence_agent",
+        "fast_fact",
+        "business_answer",
         "visualization_agent",
+        "early_response",
+        "fail",
         "save_trace",
     ):
         assert required_node in graph_source

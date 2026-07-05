@@ -167,7 +167,7 @@ def test_coordinator_does_not_reject_business_caveat_risk_flags():
             time_range={"raw_text": "最近 90 天"},
         ),
         understanding={"strategy": "llm_candidate", "risk_flags": ["数据量有限"]},
-        legacy_route={"route": "standard_analysis"},
+        route_policy_result={"route": "standard_analysis"},
     )
 
     assert decision.route == "standard_analysis"

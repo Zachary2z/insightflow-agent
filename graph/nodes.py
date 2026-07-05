@@ -3,19 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agents.analysis_planner import run_analysis_planner_agent
-from agents.error_fixer import run_error_fix_agent
 from agents.clarification_router import run_clarification_router_agent
 from agents.evidence_validator import run_evidence_validator_agent
-from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
-from agents.metric_agent import run_metric_agent
-from agents.schema_agent import run_schema_agent
-from agents.schema_repair import is_schema_mismatch_review, run_schema_repair_agent
-from agents.sql_planning_router import run_sql_planning_router_agent
-from agents.sql_generator import run_sql_generator
-from agents.sql_reviewer import run_sql_reviewer
 from agents.visualization_agent import run_visualization_agent
-from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace, save_trace
 from workspaces.context_pack_builder import build_fast_fact_context_pack
 from workspaces.business_answer_agent import run_business_answer_agent
@@ -36,31 +26,8 @@ def _artifact_dir(state: dict, child: str) -> str:
     return f"reports/{child}"
 
 
-def schema_node(state: AgentState) -> AgentState:
-    return run_schema_agent(dict(state), state["db_path"])
-
-
-def metric_node(state: AgentState) -> AgentState:
-    return run_metric_agent(dict(state))
-
-
-def route_after_metric(state: AgentState) -> str:
-    planning = state.get("sql_planning", {})
-    if planning.get("source") == "provider" and planning.get("strategy") == "llm_candidate":
-        return "guarded_candidate"
-    return "generate"
-
-
 def clarification_node(state: AgentState, provider=None) -> AgentState:
     return run_clarification_router_agent(dict(state), provider=provider)
-
-
-def sql_planning_node(state: AgentState, provider=None) -> AgentState:
-    return run_sql_planning_router_agent(dict(state), provider=provider)
-
-
-def analysis_planner_node(state: AgentState, provider=None) -> AgentState:
-    return run_analysis_planner_agent(dict(state), provider=provider)
 
 
 def evidence_agent_node(
@@ -114,88 +81,6 @@ def early_response_node(state: AgentState) -> AgentState:
             "error_type": error_type,
         },
     )
-
-
-def sql_generator_node(state: AgentState) -> AgentState:
-    if state.get("initial_sql"):
-        output = {
-            "success": True,
-            "sql": state["initial_sql"],
-            "tables": [],
-            "metrics": [],
-            "reason": "Initial SQL supplied for workflow execution.",
-        }
-        updated = {
-            **state,
-            "sql_generation": output,
-            "generated_sql": state["initial_sql"],
-            "sql_reason": output["reason"],
-            "selected_tables": [],
-            "selected_metrics": [],
-        }
-        return append_trace(
-            updated,
-            {
-                "node": "sql_generator_agent",
-                "tool_name": "",
-                "tool_input_summary": state.get("user_question", ""),
-                "tool_output_summary": state["initial_sql"][:200],
-                "status": "success",
-                "latency_ms": 0,
-            },
-        )
-    return run_sql_generator(dict(state))
-
-
-def guarded_sql_candidate_node(state: AgentState, provider=None) -> AgentState:
-    if state.get("sql_routing_strategy") != "llm_candidate":
-        return dict(state)
-    return run_guarded_sql_candidate_agent(dict(state), llm_provider=provider)
-
-
-def sql_reviewer_node(state: AgentState) -> AgentState:
-    updated = run_sql_reviewer(dict(state))
-    if updated.get("schema_repair_pending_review"):
-        review_result = updated.get("review_result", {})
-        repair = dict(updated.get("schema_repair") or {})
-        approved = bool(review_result.get("approved"))
-        repair.update(
-            {
-                "reviewed": True,
-                "succeeded": approved,
-                "review_status": "approved" if approved else "rejected",
-                "repair_rejection_reasons": list(review_result.get("issues") or []),
-            }
-        )
-        updated["schema_repair"] = repair
-        updated["schema_repair_succeeded"] = approved
-        updated["schema_repair_pending_review"] = False
-        if not approved:
-            updated["schema_repair_reason"] = "; ".join(str(issue) for issue in review_result.get("issues") or [])
-    return updated
-
-
-def schema_repair_node(state: AgentState, provider=None) -> AgentState:
-    return run_schema_repair_agent(dict(state), provider=provider)
-
-
-def sql_executor_node(state: AgentState) -> AgentState:
-    sql = state.get("generated_sql", "")
-    result = run_sql(state["db_path"], sql)
-    updated = {
-        **state,
-        "execution_result": result,
-        "error_message": result.get("error", ""),
-    }
-    if result.get("success"):
-        updated["status"] = "executed"
-    else:
-        updated["status"] = "execution_error"
-
-    trace_event = dict(result.get("trace_event", {}))
-    trace_event["node"] = "sql_executor_node"
-    trace_event["retry_count"] = updated.get("retry_count", 0)
-    return append_trace(updated, trace_event)
 
 
 def fast_fact_node(state: AgentState) -> AgentState:
@@ -259,13 +144,6 @@ def fast_fact_node(state: AgentState) -> AgentState:
             "fallback_used": False,
         },
     )
-
-
-def error_fix_node(state: AgentState) -> AgentState:
-    fixed = run_error_fix_agent(dict(state))
-    if fixed.get("fixed_sql"):
-        fixed["generated_sql"] = fixed["fixed_sql"]
-    return fixed
 
 
 def business_answer_node(
@@ -351,39 +229,6 @@ def save_trace_node(state: AgentState) -> AgentState:
     return updated
 
 
-def route_after_review(state: AgentState) -> str:
-    if state.get("review_result", {}).get("approved"):
-        return "execute"
-    if (
-        is_schema_mismatch_review(state.get("review_result"))
-        and not state.get("schema_repair_attempted")
-    ):
-        return "schema_repair"
-    return "fail"
-
-
-def route_after_schema_repair(state: AgentState) -> str:
-    if state.get("schema_repair_pending_review") and state.get("generated_sql"):
-        return "review"
-    return "fail"
-
-
-def route_after_execute(state: AgentState) -> str:
-    if state.get("execution_result", {}).get("success"):
-        if (state.get("analysis_route") or {}).get("route") == "fast_fact":
-            return "fast_fact"
-        return "insight"
-    if int(state.get("retry_count") or 0) < 1:
-        return "fix"
-    return "fail"
-
-
-def route_after_fix(state: AgentState) -> str:
-    if state.get("sql_fix", {}).get("success"):
-        return "review"
-    return "fail"
-
-
 def route_after_evidence_agent(state: AgentState) -> str:
     if state.get("execution_result", {}).get("success"):
         if (state.get("analysis_route") or {}).get("route") == "fast_fact":
@@ -430,21 +275,6 @@ def route_after_clarification(state: AgentState) -> str:
     ):
         return "early_response"
     if state.get("routing_strategy") == "clarify" and state.get("clarification_result", {}).get("provider_called"):
-        return "early_response"
-    return "schema"
-
-
-def route_after_sql_planning(state: AgentState) -> str:
-    if state.get("initial_sql"):
-        return "schema"
-    planning = state.get("sql_planning", {})
-    if (
-        planning.get("source") == "provider"
-        and planning.get("strategy") == "clarify"
-        and _has_continuation_context(state)
-    ):
-        return "schema"
-    if planning.get("source") in {"provider", "provider_unavailable"} and planning.get("strategy") in {"clarify", "reject"}:
         return "early_response"
     return "schema"
 

@@ -12,6 +12,9 @@ MAIN_PATH_FILES = (
     "api/app.py",
     "workspaces/analysis_runner.py",
     "workspaces/report_runner.py",
+    "workspaces/evidence_agent.py",
+    "workspaces/evidence_auditor.py",
+    "workspaces/business_answer_agent.py",
     "workspaces/product_result_builder.py",
     "agents/final_answer_composer.py",
     "agents/answer_reviewer.py",
@@ -47,27 +50,46 @@ def _python_imports(path: str) -> set[str]:
     return imports
 
 
+def _python_function_names(path: str) -> set[str]:
+    tree = ast.parse(_source(path))
+    return {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+
+
 def test_p20_main_product_chain_keeps_current_agent_tool_boundaries():
     graph_source = _source("graph/workflow.py") + "\n" + _source("graph/nodes.py")
 
     ordered_nodes = [
         "question_understanding",
         "clarification",
-        "sql_planning",
-        "analysis_planner",
-        "schema",
-        "metric",
-        "guarded_candidate",
-        "review",
-        "schema_repair",
-        "execute",
-        "insight",
-        "claim_typing",
+        "evidence_agent",
+        "fast_fact",
+        "business_answer",
         "visualization_agent",
+        "early_response",
+        "fail",
         "save_trace",
     ]
     for node in ordered_nodes:
         assert node in graph_source
+    removed_node_functions = {
+        "schema_node",
+        "metric_node",
+        "sql_planning_node",
+        "analysis_planner_node",
+        "sql_generator_node",
+        "guarded_sql_candidate_node",
+        "sql_reviewer_node",
+        "schema_repair_node",
+        "sql_executor_node",
+        "error_fix_node",
+        "route_after_metric",
+        "route_after_review",
+        "route_after_schema_repair",
+        "route_after_execute",
+        "route_after_fix",
+        "route_after_sql_planning",
+    }
+    assert _python_function_names("graph/nodes.py").isdisjoint(removed_node_functions)
 
     main_source = "\n".join(_source(path) for path in MAIN_PATH_FILES)
     required_boundaries = (
@@ -79,6 +101,9 @@ def test_p20_main_product_chain_keeps_current_agent_tool_boundaries():
         "validate_evidence",
         "review_answer",
         "compose_final_answer",
+        "run_evidence_agent_question_mode",
+        "run_evidence_auditor_agent",
+        "run_business_answer_agent",
         "run_workspace_report",
         "save_trace",
     )

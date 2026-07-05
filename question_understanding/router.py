@@ -5,9 +5,9 @@ from typing import Any
 
 from question_understanding.task_contract import (
     build_clarification_questions,
+    canonical_dimension_id,
+    canonical_metric_id,
     extract_time_range,
-    legacy_dimension_id,
-    legacy_metric_id,
     normalize_analysis_task,
     strategy_for_task,
 )
@@ -152,9 +152,9 @@ def understand_question(question: str, workspace_context: dict[str, Any] | None 
     }
     task = normalize_analysis_task(question, intent=intent, workspace_context=workspace_context)
     if task["metrics"] and not intent["metric"]:
-        intent["metric"] = legacy_metric_id(task["metrics"][0])
+        intent["metric"] = canonical_metric_id(task["metrics"][0])
     if task["dimensions"] and not intent["dimension"]:
-        intent["dimension"] = legacy_dimension_id(task["dimensions"][0])
+        intent["dimension"] = canonical_dimension_id(task["dimensions"][0])
     if task["time_range"] and not intent["time_range"]:
         intent["time_range"] = task["time_range"]
     if not intent["operation"]:

@@ -33,7 +33,7 @@ def understand_data_question(
     return {
         "success": bool(understanding.get("success", True)),
         "analysis_task": task,
-        "analysis_task_dict": _legacy_task_dict(understanding),
+        "analysis_task_dict": _task_dict_from_understanding(understanding),
         "question_understanding": understanding,
         "clarification_result": clarification_result,
         "resolved_question": task.resolved_question,
@@ -129,7 +129,7 @@ def _analysis_task_from_understanding(
     *,
     clarification_result: dict[str, Any],
 ) -> AnalysisTask:
-    raw_task = _legacy_task_dict(understanding)
+    raw_task = _task_dict_from_understanding(understanding)
     clarification_question = _first_text(clarification_result.get("clarification_questions")) or _first_text(
         understanding.get("clarification_questions")
     )
@@ -147,7 +147,7 @@ def _analysis_task_from_understanding(
     )
 
 
-def _legacy_task_dict(understanding: dict[str, Any]) -> dict[str, Any]:
+def _task_dict_from_understanding(understanding: dict[str, Any]) -> dict[str, Any]:
     task = dict(understanding.get("analysis_task") or {})
     if task.get("time_range") is None:
         task["time_range"] = None

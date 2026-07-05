@@ -16,11 +16,6 @@ class AgentState(TypedDict, total=False):
     pending_run_id: str
     question_thread_status: str
     stop_for_clarification: bool
-    task_type: str
-    report_type: str
-    report_plan: dict[str, Any]
-    report_sections: list[dict[str, Any]]
-    report_sub_tasks: list[dict[str, Any]]
     clarification_questions: list[str]
     llm_sql_enhancement: dict[str, Any]
     llm_insight_enhancement: dict[str, Any]
@@ -47,17 +42,6 @@ class AgentState(TypedDict, total=False):
     visualization_plan: dict[str, Any]
     visualization_delivery_result: dict[str, Any]
     visualization_trace: dict[str, Any]
-    llm_sql_enhancement: dict[str, Any]
-    action_plan: dict[str, Any]
-    risk_assessment: dict[str, Any]
-    approval_status: str
-    approval_record: dict[str, Any]
-    created_actions: list[dict[str, Any]]
-    action_execution_result: dict[str, Any]
-    action_verification_result: dict[str, Any]
-    audit_log_result: dict[str, Any]
-    audit_log_id: str
-    action_db_path: str | Path
 
     db_path: str | Path
     trace_dir: str | Path
@@ -81,11 +65,6 @@ class AgentState(TypedDict, total=False):
     chart_result: dict[str, Any]
     chart_path: str
     chart_paths: list[str]
-    report_result: dict[str, Any]
-    report_writer_result: dict[str, Any]
-    report_path: str
-    weekly_report_result: dict[str, Any]
-    weekly_report_path: str
     selected_tables: list[str]
     selected_metrics: list[str]
 

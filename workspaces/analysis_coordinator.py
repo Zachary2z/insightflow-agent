@@ -26,7 +26,7 @@ def coordinate_analysis_question(
     )
     task = data_understanding["analysis_task"]
     understanding = data_understanding["question_understanding"]
-    legacy_route = classify_analysis_route(
+    route_policy_result = classify_analysis_route(
         question,
         analysis_task=data_understanding["analysis_task_dict"],
         missing_slots=understanding.get("missing_slots") or [],
@@ -36,14 +36,14 @@ def coordinate_analysis_question(
         question,
         task,
         understanding=understanding,
-        legacy_route=legacy_route,
+        route_policy_result=route_policy_result,
     )
     task.route_hint = decision.route
     return {
         **data_understanding,
         "analysis_task": task,
         "coordinator_decision": decision,
-        "analysis_route": legacy_route,
+        "analysis_route": route_policy_result,
     }
 
 
@@ -52,10 +52,10 @@ def coordinate_analysis(
     task: AnalysisTask,
     *,
     understanding: dict[str, Any] | None = None,
-    legacy_route: dict[str, Any] | None = None,
+    route_policy_result: dict[str, Any] | None = None,
 ) -> CoordinatorDecision:
     understanding = understanding or {}
-    legacy_route = legacy_route or {}
+    route_policy_result = route_policy_result or {}
     if understanding.get("strategy") == "reject" or _has_safety_risk(understanding.get("risk_flags")):
         return CoordinatorDecision(
             route="reject",
@@ -71,7 +71,7 @@ def coordinate_analysis(
             user_language="zh",
         )
 
-    route = str(legacy_route.get("route") or "standard_analysis")
+    route = str(route_policy_result.get("route") or "standard_analysis")
     if route == "report":
         route = "deep_judgment"
     if route not in {"fast_fact", "standard_analysis", "deep_judgment"}:

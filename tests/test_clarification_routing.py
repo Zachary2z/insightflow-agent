@@ -1,4 +1,4 @@
-from graph.nodes import route_after_clarification, route_after_sql_planning
+from graph.nodes import route_after_clarification
 
 
 def test_clarification_router_asks_chinese_question_for_missing_metric_and_time_range() -> None:
@@ -50,25 +50,6 @@ def test_complete_continuation_answer_can_resume_analysis() -> None:
                 "requires_clarification": False,
                 "missing_slots": [],
                 "clarification_questions": [],
-            },
-        }
-    )
-
-    assert route == "schema"
-
-
-def test_continuation_does_not_stop_for_provider_sql_planning_clarification() -> None:
-    route = route_after_sql_planning(
-        {
-            "routing_strategy": "clarify",
-            "stop_for_clarification": False,
-            "pending_run_id": "pending_123",
-            "clarification_answer": "最近 90 天，按渠道比较收入、投放成本和 ROI。",
-            "resolved_question": "帮我分析渠道表现。补充回答：最近 90 天，按渠道比较收入、投放成本和 ROI。",
-            "sql_planning": {
-                "source": "provider",
-                "strategy": "clarify",
-                "reason": "Provider asked for more context.",
             },
         }
     )

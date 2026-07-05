@@ -185,7 +185,7 @@ def strategy_for_task(task: dict[str, Any], *, risk_flags: list[str] | None = No
     return "llm_candidate"
 
 
-def legacy_metric_id(metric_label: str) -> str:
+def canonical_metric_id(metric_label: str) -> str:
     compact = compact_text(metric_label)
     if compact in {"roas"}:
         return "roas"
@@ -206,7 +206,7 @@ def legacy_metric_id(metric_label: str) -> str:
     return metric_label
 
 
-def legacy_dimension_id(dimension_label: str) -> str:
+def canonical_dimension_id(dimension_label: str) -> str:
     compact = compact_text(dimension_label)
     mapping = {
         "商品": "product",

@@ -9,9 +9,9 @@ This is the concise current status surface for InsightFlow Agent.
 | Field | Status |
 |---|---|
 | Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H5 complete; ready for H6 cleanup/regression/docs closeout |
-| Next planned task | P27-H6 Cleanup, Regression, And Documentation |
-| Last completed task | P26 Repository Cleanup Before External Tools |
+| Current task | P27-H6 complete; P27 ready for next phase planning |
+| Next planned task | Post-P27 phase planning |
+| Last completed task | P27-H6 Cleanup, Regression, And Documentation |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
@@ -41,7 +41,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P24 | `[x]` Complete | H1-H3 complete; real DeepSeek acceptance, cleanup, full verification, frontend build, old-path audit, and artifact hygiene complete |
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
-| P27 | `[~]` In progress | H1-H5 complete; Analysis Workbench multi-agent refactor and latency phase; Report Center remains independent and only receives boundary protection |
+| P27 | `[x]` Complete | H1-H6 complete; Analysis Workbench multi-agent refactor, latency cleanup, dead-path cleanup, regression, and docs closeout finished; Report Center remains independent |
 
 ## P20 Task Status
 
@@ -95,7 +95,18 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 | P27-H3 | `[x]` Complete | Evidence Agent question mode: consolidated analysis evidence planning, schema/metric lookup, SQL candidate/review/repair/execution/fix, and QuestionEvidencePack output |
 | P27-H4 | `[x]` Complete | Evidence Auditor + Business Answer Agent: consolidated evidence validation/claim typing and answer drafting/review/composition surfaces |
 | P27-H5 | `[x]` Complete | Latency optimization: earlier fast path normalization, conditional heavy calls, QuestionEvidencePack cache, initial_sql bypass, and on-demand visualization |
-| P27-H6 | `[ ]` Planned | Cleanup, regression, docs closeout, and optional live DeepSeek acceptance |
+| P27-H6 | `[x]` Complete | Cleanup, regression, docs closeout, old-node deletion, state cleanup, and Report Center independence verification |
+
+## Latest P27-H6 Result
+
+P27-H6 Cleanup, Regression, And Documentation completed on 2026-07-05:
+
+- Removed superseded Analysis Workbench graph node wrappers and route helpers for schema, metric, SQL planning, analysis planning, SQL generation, guarded candidate, review, schema repair, execute, fix, and old post-SQL routing. The current graph exposes the P27 path: question understanding, clarification, Evidence Agent, fast fact, Business Answer Agent, on-demand Visualization, fail/early response, and trace save.
+- Kept SQL review, one-pass schema repair, SQL execution, execution fix, evidence payload construction, and `QuestionEvidencePack` inside `workspaces/evidence_agent.py`, so fast facts still use the safe evidence chain instead of bypassing it.
+- Renamed the misleading Data Understanding task-dict helper to `_task_dict_from_understanding`.
+- Removed obsolete action/report/weekly report state fields from `graph/state.py` while keeping current chart fields used by visualization artifacts and run-history restoration.
+- Updated cleanup boundary tests so old small graph node functions and old action/chart/mock/eval paths stay out of the current product path.
+- Report Center remains independent on `ReportEvidencePack + EvidenceLedger + ReportDocument` and does not call Analysis Workbench entrypoints or stitch Analysis Workbench answers into report sections.
 
 ## Latest P27-H1 Result
 

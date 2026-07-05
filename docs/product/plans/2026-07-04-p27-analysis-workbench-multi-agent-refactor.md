@@ -228,6 +228,8 @@ Status: complete. H5 tightened fast-fact metric normalization so semantic ids an
 - Run focused Analysis Workbench tests, Report Center boundary tests, full backend tests, frontend tests, frontend build, and opt-in live DeepSeek acceptance when credentials and flags are available.
 - Update README, development plan, and status.
 
+Status: complete. H6 removed obsolete Analysis Workbench graph node wrappers and route helpers that were replaced by the Evidence Agent question mode, removed dead imports and obsolete action/report/weekly report state fields, renamed misleading Data Understanding compatibility wording, deleted the old `route_after_sql_planning` implementation-detail test, and updated cleanup boundary tests to assert the current P27 graph. Regression kept fast_fact, standard/deep analysis, clarification continuation, `QuestionEvidencePack` cache, initial SQL bypass, on-demand visualization, and Report Center independent. Report Center remains on `ReportEvidencePack + EvidenceLedger + ReportDocument` and does not call Analysis Workbench nodes to generate report chapters.
+
 ## Acceptance Criteria
 
 - Analysis Workbench is described and implemented through fewer large agent responsibilities: Coordinator, Data Understanding, Evidence, Evidence Auditor, Business Answer, and on-demand Visualization.
