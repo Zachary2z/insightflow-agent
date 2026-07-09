@@ -299,9 +299,9 @@ def test_cli_feishu_publisher_keeps_doc_success_when_companion_sheet_fails():
     assert result.url == "https://example.feishu.cn/docx/doccn123"
     assert result.sheet_url is None
     assert result.sheet_warnings == ["飞书表格创建失败，已保留飞书文档发布。"]
+    assert result.warnings == []
     assert len(runner.calls) == 1
     assert "## 可编辑数据和图表" not in content
-    assert any("飞书表格创建失败" in warning for warning in result.warnings)
 
 
 def test_cli_feishu_publisher_places_evidence_tables_and_chart_anchors_near_sections():

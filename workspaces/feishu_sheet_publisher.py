@@ -309,7 +309,7 @@ def _table_put_payload(table: dict[str, Any]) -> dict[str, Any]:
             {
                 "name": table["title"],
                 "start_cell": "A1",
-                "mode": "replace",
+                "mode": "overwrite",
                 "allow_overwrite": True,
                 "columns": list(table.get("columns") or []),
                 "data": list(table.get("data_rows") or []),

@@ -125,7 +125,7 @@ def test_cli_feishu_sheet_publisher_creates_workbook_and_writes_evidence_table()
             {
                 "name": "渠道收入",
                 "start_cell": "A1",
-                "mode": "replace",
+                "mode": "overwrite",
                 "allow_overwrite": True,
                 "columns": ["渠道", "收入"],
                 "data": [["私域社群", "180000"], ["直播间", "90000"]],

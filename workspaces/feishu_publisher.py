@@ -672,7 +672,6 @@ def _merge_sheet_result(result: ExternalPublishResult, sheet_result: dict[str, A
     result.written_table_count = _safe_count(sheet_result.get("written_table_count"))
     result.native_chart_count = _safe_count(sheet_result.get("native_chart_count"))
     result.sheet_warnings = _safe_text_list(sheet_result.get("warnings"))
-    result.warnings.extend(result.sheet_warnings)
     for tool_call in sheet_result.get("tool_calls") or []:
         if isinstance(tool_call, dict):
             result.tool_calls.append(tool_call)
