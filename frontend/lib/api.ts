@@ -315,6 +315,12 @@ export type ExternalPublishResult = {
   created_at?: string | null;
   inserted_chart_count?: number;
   failed_chart_count?: number;
+  sheet_url?: string | null;
+  sheet_id?: string | null;
+  spreadsheet_token?: string | null;
+  written_table_count?: number;
+  native_chart_count?: number;
+  sheet_warnings?: string[];
   warnings?: string[];
   tool_calls?: Array<Record<string, unknown>>;
 };

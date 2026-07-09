@@ -428,6 +428,12 @@ def test_publish_report_to_feishu_returns_result_and_persists_safe_artifact(tmp_
                 created_at="2026-07-08T10:00:00+00:00",
                 inserted_chart_count=2,
                 failed_chart_count=1,
+                sheet_url="https://example.feishu.cn/sheets/shtcn123",
+                sheet_id="shtcn123",
+                spreadsheet_token="shtcn123",
+                written_table_count=3,
+                native_chart_count=1,
+                sheet_warnings=["图表「不清晰图表」无法安全映射为飞书原生图表，已跳过。"],
                 warnings=["飞书文档已创建，但 1 张图表未插入。"],
                 tool_calls=[
                     {
@@ -454,6 +460,11 @@ def test_publish_report_to_feishu_returns_result_and_persists_safe_artifact(tmp_
     assert payload["publish_result"]["url"] == "https://example.feishu.cn/docx/doccn123"
     assert payload["publish_result"]["inserted_chart_count"] == 2
     assert payload["publish_result"]["failed_chart_count"] == 1
+    assert payload["publish_result"]["sheet_url"] == "https://example.feishu.cn/sheets/shtcn123"
+    assert payload["publish_result"]["spreadsheet_token"] == "shtcn123"
+    assert payload["publish_result"]["written_table_count"] == 3
+    assert payload["publish_result"]["native_chart_count"] == 1
+    assert payload["publish_result"]["sheet_warnings"] == ["图表「不清晰图表」无法安全映射为飞书原生图表，已跳过。"]
     assert payload["publish_result"]["tool_calls"] == [
         {
             "operation": "create_document",
@@ -473,6 +484,12 @@ def test_publish_report_to_feishu_returns_result_and_persists_safe_artifact(tmp_
     assert saved["document_id"] == "doccn123"
     assert saved["inserted_chart_count"] == 2
     assert saved["failed_chart_count"] == 1
+    assert saved["sheet_url"] == "https://example.feishu.cn/sheets/shtcn123"
+    assert saved["sheet_id"] == "shtcn123"
+    assert saved["spreadsheet_token"] == "shtcn123"
+    assert saved["written_table_count"] == 3
+    assert saved["native_chart_count"] == 1
+    assert saved["sheet_warnings"] == ["图表「不清晰图表」无法安全映射为飞书原生图表，已跳过。"]
     assert saved["warnings"] == ["飞书文档已创建，但 1 张图表未插入。"]
     saved_text = response.text + saved.__repr__()
     for forbidden in [

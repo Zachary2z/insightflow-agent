@@ -2497,6 +2497,11 @@ describe("workspace product components", () => {
         title: "管理层收入复盘报告",
         url: "https://example.feishu.cn/docx/doccn123",
         document_id: "doccn123",
+        sheet_url: "https://example.feishu.cn/sheets/shtcn123",
+        spreadsheet_token: "shtcn123",
+        written_table_count: 2,
+        native_chart_count: 1,
+        sheet_warnings: [],
         warnings: [],
         tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: true }],
       },
@@ -2505,6 +2510,10 @@ describe("workspace product components", () => {
     await waitFor(() => expect(publishFeishuReport).toHaveBeenCalledWith("ws_1", "report_1"));
     const link = await screen.findByRole("link", { name: "打开飞书文档" });
     expect(link.getAttribute("href")).toBe("https://example.feishu.cn/docx/doccn123");
+    expect(screen.getByRole("link", { name: "打开飞书表格" }).getAttribute("href")).toBe(
+      "https://example.feishu.cn/sheets/shtcn123",
+    );
+    expect(screen.getByText("已写入 2 个数据表，已创建 1 个原生图表。")).toBeTruthy();
     expect(screen.getByText("已发布到飞书")).toBeTruthy();
     expect(screen.queryByText(/lark-cli/)).toBeNull();
     expect(screen.queryByText(/token/)).toBeNull();
@@ -2548,6 +2557,10 @@ describe("workspace product components", () => {
         document_id: "doccn_warning",
         inserted_chart_count: 2,
         failed_chart_count: 1,
+        sheet_url: "https://example.feishu.cn/sheets/shtcn_warning",
+        written_table_count: 3,
+        native_chart_count: 0,
+        sheet_warnings: ["图表「不清晰图表」无法安全映射为飞书原生图表，已跳过。"],
         warnings: ["飞书文档已创建，但部分图表尚未插入。"],
         tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: true }],
       },
@@ -2562,6 +2575,11 @@ describe("workspace product components", () => {
       "https://example.feishu.cn/docx/doccn_warning",
     );
     expect(screen.getByText("已插入 2 张图表，1 张图表未插入。")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开飞书表格" }).getAttribute("href")).toBe(
+      "https://example.feishu.cn/sheets/shtcn_warning",
+    );
+    expect(screen.getByText("已写入 3 个数据表，已创建 0 个原生图表。")).toBeTruthy();
+    expect(screen.getByText("图表「不清晰图表」无法安全映射为飞书原生图表，已跳过。")).toBeTruthy();
     expect(screen.getByText("飞书文档已创建，但部分图表尚未插入。")).toBeTruthy();
   });
 
@@ -2602,6 +2620,13 @@ describe("workspace product components", () => {
         document_id: "doccn_internal_only",
         inserted_chart_count: 1,
         failed_chart_count: 1,
+        sheet_url: "https://example.feishu.cn/sheets/shtcn_safe",
+        written_table_count: 1,
+        native_chart_count: 0,
+        sheet_warnings: [
+          "飞书表格部分图表未创建。",
+          "stdout token=secret SELECT * FROM orders trace_path=/Users/me/trace.json prompt_tokens=123",
+        ],
         warnings: [
           "部分图表未插入，可稍后重试。",
           "stdout token=secret SELECT * FROM orders trace_path=/Users/me/trace.json prompt_tokens=123",
@@ -2628,7 +2653,12 @@ describe("workspace product components", () => {
       "https://example.feishu.cn/docx/doccn_safe",
     );
     expect(screen.getByText("已插入 1 张图表，1 张图表未插入。")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开飞书表格" }).getAttribute("href")).toBe(
+      "https://example.feishu.cn/sheets/shtcn_safe",
+    );
+    expect(screen.getByText("已写入 1 个数据表，已创建 0 个原生图表。")).toBeTruthy();
     expect(screen.getByText("部分图表未插入，可稍后重试。")).toBeTruthy();
+    expect(screen.getByText("飞书表格部分图表未创建。")).toBeTruthy();
     const renderedText = container.textContent ?? "";
     for (const forbidden of [
       "doccn_internal_only",

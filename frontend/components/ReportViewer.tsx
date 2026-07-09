@@ -564,13 +564,20 @@ function FeishuPublishStatus({
     return null;
   }
   const warnings = safePublishWarnings(state.result.warnings);
+  const sheetWarnings = safePublishWarnings(state.result.sheet_warnings);
   const insertedChartCount = nonNegativeNumber(state.result.inserted_chart_count);
   const failedChartCount = nonNegativeNumber(state.result.failed_chart_count);
+  const writtenTableCount = nonNegativeNumber(state.result.written_table_count);
+  const nativeChartCount = nonNegativeNumber(state.result.native_chart_count);
   const visibleWarnings =
     warnings.length || failedChartCount === 0 ? warnings : ["部分图表未插入飞书文档。"];
   const chartSummary =
     insertedChartCount || failedChartCount
       ? `已插入 ${insertedChartCount} 张图表，${failedChartCount} 张图表未插入。`
+      : "";
+  const sheetSummary =
+    writtenTableCount || nativeChartCount
+      ? `已写入 ${writtenTableCount} 个数据表，已创建 ${nativeChartCount} 个原生图表。`
       : "";
   const isFailed = state.result.status === "failed";
   const title =
@@ -580,6 +587,10 @@ function FeishuPublishStatus({
         ? "发布到飞书失败"
         : "已发布到飞书";
   const url = typeof state.result.url === "string" && state.result.url.trim() ? state.result.url.trim() : "";
+  const sheetUrl =
+    typeof state.result.sheet_url === "string" && state.result.sheet_url.trim()
+      ? state.result.sheet_url.trim()
+      : "";
   return (
     <section className="report-summary">
       <h3>{title}</h3>
@@ -588,10 +599,23 @@ function FeishuPublishStatus({
           打开飞书文档
         </a>
       ) : null}
+      {sheetUrl && !isFailed ? (
+        <a className="secondary-button" href={resolveApiUrl(sheetUrl)} target="_blank" rel="noreferrer">
+          打开飞书表格
+        </a>
+      ) : null}
       {chartSummary ? <p>{chartSummary}</p> : null}
+      {sheetSummary ? <p>{sheetSummary}</p> : null}
       {visibleWarnings.length ? (
         <ul>
           {visibleWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
+      {sheetWarnings.length ? (
+        <ul>
+          {sheetWarnings.map((warning) => (
             <li key={warning}>{warning}</li>
           ))}
         </ul>

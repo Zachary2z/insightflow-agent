@@ -99,6 +99,16 @@ def _success_media_result(elapsed_ms=5):
     )
 
 
+class FakeSheetPublisher:
+    def __init__(self, result):
+        self.result = result
+        self.calls = []
+
+    def publish_sheet(self, package):
+        self.calls.append(package)
+        return self.result
+
+
 def test_cli_feishu_publisher_builds_official_document_create_command_with_content(monkeypatch):
     from workspaces.feishu_publisher import CliFeishuPublisher, CommandExecutionResult
 
@@ -206,6 +216,78 @@ def test_cli_feishu_publisher_markdown_includes_evidence_tables():
     assert "| 私域社群 | 180000 |" in content
     assert "SELECT" not in content
     assert "raw_rows" not in content
+
+
+def test_cli_feishu_publisher_includes_companion_sheet_link_section_when_available():
+    from workspaces.feishu_publisher import CliFeishuPublisher
+    from workspaces.feishu_sheet_publisher import SheetPublishResult
+
+    runner = FakeRunner(_success_create_result())
+    sheet_publisher = FakeSheetPublisher(
+        SheetPublishResult(
+            status="published",
+            title="经营复盘报告 - 可编辑数据",
+            url="https://example.feishu.cn/sheets/shtcn123",
+            spreadsheet_token="shtcn123",
+            written_table_count=1,
+            native_chart_count=1,
+        )
+    )
+    package = _report_package(
+        evidence_tables=[
+            {
+                "table_id": "table_channel_revenue",
+                "title": "渠道收入证据表",
+                "columns": ["渠道", "收入"],
+                "rows": [{"渠道": "私域社群", "收入": "180000"}],
+            }
+        ]
+    )
+
+    result = CliFeishuPublisher(
+        runner=runner,
+        cli_binary="lark-cli",
+        sheet_publisher=sheet_publisher,
+    ).publish_report(package)
+
+    content = runner.calls[0]["command"][-1]
+    assert result.status == "published"
+    assert result.sheet_url == "https://example.feishu.cn/sheets/shtcn123"
+    assert result.written_table_count == 1
+    assert result.native_chart_count == 1
+    assert result.sheet_warnings == []
+    assert "## 可编辑数据和图表" in content
+    assert "可编辑数据表和图表：https://example.feishu.cn/sheets/shtcn123" in content
+    assert content.count("| 渠道 | 收入 |") == 1
+    assert sheet_publisher.calls
+
+
+def test_cli_feishu_publisher_keeps_doc_success_when_companion_sheet_fails():
+    from workspaces.feishu_publisher import CliFeishuPublisher
+    from workspaces.feishu_sheet_publisher import SheetPublishResult
+
+    runner = FakeRunner(_success_create_result())
+    sheet_publisher = FakeSheetPublisher(
+        SheetPublishResult(
+            status="failed",
+            title="经营复盘报告 - 可编辑数据",
+            warnings=["飞书表格创建失败，已保留飞书文档发布。"],
+        )
+    )
+
+    result = CliFeishuPublisher(
+        runner=runner,
+        cli_binary="lark-cli",
+        sheet_publisher=sheet_publisher,
+    ).publish_report(_report_package())
+
+    content = runner.calls[0]["command"][-1]
+    assert result.status == "warning"
+    assert result.url == "https://example.feishu.cn/docx/doccn123"
+    assert result.sheet_url is None
+    assert result.sheet_warnings == ["飞书表格创建失败，已保留飞书文档发布。"]
+    assert "## 可编辑数据和图表" not in content
+    assert any("飞书表格创建失败" in warning for warning in result.warnings)
 
 
 def test_cli_feishu_publisher_places_evidence_tables_and_chart_anchors_near_sections():

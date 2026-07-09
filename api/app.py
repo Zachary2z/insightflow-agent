@@ -42,6 +42,7 @@ from workspaces.importers import import_csv, import_excel, import_sqlite
 from workspaces.document_export import export_report_docx
 from workspaces.export_package import build_report_export_package
 from workspaces.feishu_publisher import CliFeishuPublisher
+from workspaces.feishu_sheet_publisher import CliFeishuSheetPublisher
 from workspaces.profiler import profile_workspace_database
 from workspaces.report_models import ReportArtifactRecord, ReportToolCallRecord
 from workspaces.report_runner import run_workspace_report
@@ -82,7 +83,10 @@ def _friendly_export_warnings(warnings: list[str]) -> list[str]:
 
 
 def _build_feishu_publisher(*, workspace_root: Path | None = None) -> CliFeishuPublisher:
-    return CliFeishuPublisher(workspace_root=workspace_root)
+    return CliFeishuPublisher(
+        workspace_root=workspace_root,
+        sheet_publisher=CliFeishuSheetPublisher(),
+    )
 
 
 def create_app(

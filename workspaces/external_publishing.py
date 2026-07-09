@@ -24,6 +24,12 @@ class ExternalPublishResult:
     created_at: str | None = None
     inserted_chart_count: int = 0
     failed_chart_count: int = 0
+    sheet_url: str | None = None
+    sheet_id: str | None = None
+    spreadsheet_token: str | None = None
+    written_table_count: int = 0
+    native_chart_count: int = 0
+    sheet_warnings: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
@@ -38,8 +44,33 @@ class ExternalPublishResult:
         data["created_at"] = _safe_text(data.get("created_at")) or None
         data["inserted_chart_count"] = _safe_int(data.get("inserted_chart_count"))
         data["failed_chart_count"] = _safe_int(data.get("failed_chart_count"))
+        data["sheet_url"] = _safe_url(data.get("sheet_url"))
+        data["sheet_id"] = _safe_text(data.get("sheet_id")) or None
+        data["spreadsheet_token"] = _safe_text(data.get("spreadsheet_token")) or None
+        data["written_table_count"] = _safe_int(data.get("written_table_count"))
+        data["native_chart_count"] = _safe_int(data.get("native_chart_count"))
+        data["sheet_warnings"] = _safe_text_list(data.get("sheet_warnings"))
         data["warnings"] = _safe_text_list(data.get("warnings"))
         data["tool_calls"] = [_safe_tool_call(item) for item in data.get("tool_calls") or [] if isinstance(item, dict)]
+        if not any(
+            [
+                data["sheet_url"],
+                data["sheet_id"],
+                data["spreadsheet_token"],
+                data["written_table_count"],
+                data["native_chart_count"],
+                data["sheet_warnings"],
+            ]
+        ):
+            for key in [
+                "sheet_url",
+                "sheet_id",
+                "spreadsheet_token",
+                "written_table_count",
+                "native_chart_count",
+                "sheet_warnings",
+            ]:
+                data.pop(key, None)
         return data
 
 

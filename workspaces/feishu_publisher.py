@@ -93,12 +93,14 @@ class CliFeishuPublisher:
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
         workspace_root: str | Path | None = None,
         cli_working_dir: str | Path | None = None,
+        sheet_publisher: Any | None = None,
     ) -> None:
         self.cli_binary = cli_binary or os.getenv("LARK_CLI_BIN") or DEFAULT_LARK_CLI_BIN
         self.timeout_seconds = timeout_seconds
         self.workspace_root = Path(workspace_root).resolve() if workspace_root else None
         self.cli_working_dir = Path(cli_working_dir).resolve() if cli_working_dir else Path.cwd().resolve()
         self.runner = runner or SubprocessCommandRunner(working_dir=self.cli_working_dir)
+        self.sheet_publisher = sheet_publisher
 
     def publish_report(self, package: Any) -> ExternalPublishResult:
         package_data = export_package_to_dict(package)
@@ -110,7 +112,9 @@ class CliFeishuPublisher:
                 warning="飞书发布当前只支持 Report Center 的 report export package；Analysis Workbench 分析回答不能作为完整报告发布。",
             )
 
-        command = self._build_create_document_command(title, _package_to_markdown(package_data))
+        sheet_result = self._publish_companion_sheet(package_data)
+        companion_sheet_url = sheet_result.get("url") if sheet_result.get("status") in {"published", "warning"} else None
+        command = self._build_create_document_command(title, _package_to_markdown(package_data, companion_sheet_url=companion_sheet_url))
         try:
             command_result = self.runner.run(
                 command,
@@ -200,6 +204,7 @@ class CliFeishuPublisher:
             warnings=warnings,
             tool_calls=tool_calls,
         )
+        _merge_sheet_result(result, sheet_result)
         self._insert_chart_images(package_data, result)
         return result
 
@@ -299,8 +304,25 @@ class CliFeishuPublisher:
             "800",
         ]
 
+    def _publish_companion_sheet(self, package: dict[str, Any]) -> dict[str, Any]:
+        publisher = self.sheet_publisher
+        if publisher is None:
+            return {}
+        try:
+            result = publisher.publish_sheet(package)
+        except Exception:  # noqa: BLE001 - Sheet companion must not block Doc publishing.
+            return {
+                "status": "failed",
+                "warnings": ["飞书表格创建失败，已保留飞书文档发布。"],
+            }
+        to_safe_dict = getattr(result, "to_safe_dict", None)
+        if callable(to_safe_dict):
+            safe = to_safe_dict()
+            return safe if isinstance(safe, dict) else {}
+        return result if isinstance(result, dict) else {}
 
-def _package_to_markdown(package: dict[str, Any]) -> str:
+
+def _package_to_markdown(package: dict[str, Any], *, companion_sheet_url: str | None = None) -> str:
     lines: list[str] = []
     document = package.get("document") if isinstance(package.get("document"), dict) else {}
     time_range = _safe_text(document.get("time_range"))
@@ -346,6 +368,9 @@ def _package_to_markdown(package: dict[str, Any]) -> str:
         for chart in remaining_charts:
             lines.extend(_render_chart_anchor(chart["title"]))
             lines.append("")
+    safe_sheet_url = _safe_text(companion_sheet_url)
+    if safe_sheet_url:
+        lines.extend(["## 可编辑数据和图表", "", f"可编辑数据表和图表：{safe_sheet_url}", ""])
     recommendations = _safe_text_list(package.get("action_recommendations"))
     if recommendations:
         lines.extend(["## 行动建议", ""])
@@ -580,6 +605,30 @@ def _tool_call(
         "elapsed_ms": max(0, int(elapsed_ms or 0)),
         "exit_code": int(exit_code or 0),
     }
+
+
+def _merge_sheet_result(result: ExternalPublishResult, sheet_result: dict[str, Any]) -> None:
+    if not sheet_result:
+        return
+    result.sheet_url = _safe_text(sheet_result.get("url")) or None
+    result.sheet_id = _safe_text(sheet_result.get("sheet_id")) or None
+    result.spreadsheet_token = _safe_text(sheet_result.get("spreadsheet_token")) or result.sheet_id
+    result.written_table_count = _safe_count(sheet_result.get("written_table_count"))
+    result.native_chart_count = _safe_count(sheet_result.get("native_chart_count"))
+    result.sheet_warnings = _safe_text_list(sheet_result.get("warnings"))
+    result.warnings.extend(result.sheet_warnings)
+    for tool_call in sheet_result.get("tool_calls") or []:
+        if isinstance(tool_call, dict):
+            result.tool_calls.append(tool_call)
+    if sheet_result.get("status") in {"warning", "failed"} or result.sheet_warnings:
+        result.status = "warning" if result.status != "failed" else "failed"
+
+
+def _safe_count(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _collect_chart_image_assets(

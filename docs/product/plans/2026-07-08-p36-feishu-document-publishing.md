@@ -1,6 +1,6 @@
 # P36 Feishu Document Publishing
 
-Status: H1-H6 complete
+Status: H1-H7 complete
 Date: 2026-07-08
 
 ## Goal
@@ -14,6 +14,7 @@ Report Center generates a ReportDocument
 -> Report export package projects safe report content and chart assets
 -> Feishu publisher creates a real Feishu document
 -> ECharts/static chart images are inserted when available
+-> optional companion Feishu Sheet stores editable evidence tables and native sheet charts
 -> Report Center stores and displays the Feishu document link
 ```
 
@@ -24,6 +25,7 @@ Live product testing on 2026-07-08 confirmed that the document-create path works
 - the Feishu document currently receives a simplified Markdown body, so report evidence tables that already exist in `report.md` / `ReportEvidencePack.tables` are not published;
 - report charts can remain SVG-only static assets, while `lark-cli docs +media-insert` inserts only local PNG/JPEG/GIF files, so charts are skipped even though the Feishu document is created successfully.
 - after H5, evidence tables and chart images could be published, but real readback showed that images were appended near the end of the Feishu document instead of appearing beside the matching report sections; evidence-table headings also cluttered the Feishu outline, and the document body could duplicate the title already owned by Feishu Docs. H6 replaces that active append-only image path with section anchors and Feishu CLI selection insertion.
+- after H6, live Feishu Docs output is readable enough for report sharing. The next question is chart usability: Feishu Docs should keep polished static chart snapshots in-context, while users who need editable data and native Feishu charts should get a companion Feishu Sheet generated from the same evidence tables and chart artifacts. H7 records this hybrid path before deciding whether to adopt a Sheet-first publishing model later.
 
 ## Product Scope
 
@@ -40,6 +42,7 @@ Live product testing on 2026-07-08 confirmed that the document-create path works
 - Add opt-in live Feishu verification that creates and reads back a real Feishu document when local credentials and `lark-cli` auth are configured.
 - Publish report evidence tables into the Feishu document as Markdown tables generated from existing `ReportEvidencePack.tables` / `ReportDocument` output.
 - Generate Feishu-safe PNG chart fallbacks from existing chart artifacts/ECharts options before `docs +media-insert`; keep ECharts interactive rendering in InsightFlow UI.
+- Optionally create a companion Feishu Sheet during publishing: write report evidence tables into sheet tabs/ranges, create native Feishu sheet charts from the same chart artifact/evidence data when safe, and add the sheet link back into the Feishu document/report UI.
 
 ### Out of Scope
 
@@ -50,8 +53,9 @@ Live product testing on 2026-07-08 confirmed that the document-create path works
 - No LLM-generated chart data, no LLM-generated ECharts options, and no model recalculation during publishing.
 - No fake-success external connector. If `lark-cli` is missing, unauthenticated, or the command fails, return a clear failure/warning.
 - No generated Feishu tokens, trace files, exported documents, chart images, local databases, `.env`, or credentials committed to git.
-- No Feishu Sheets/Base chart object integration in P36-H5. Sheets `+workbook-create` / `+chart-create` can become a later richer collaboration phase, but this P36 repair should make Feishu Docs publish complete readable reports first.
+- No Feishu Sheets/Base chart object integration in P36-H5/H6. P36-H7 may add a Feishu Sheets companion workbook as an optional enhancement, but it must not replace the already-working Feishu Docs publish path until live product testing proves the Sheet-first route is better.
 - No Feishu content rewriting in P36-H6. H6 may change where existing section tables/chart anchors render and how heading levels are projected into Feishu Markdown, but it must not regenerate the report, ask the LLM to rewrite the body, or replace report content with a fixed template.
+- No Sheet-side re-analysis in P36-H7. Feishu Sheets must receive evidence tables and chart data that already exist in the report export package; it must not query InsightFlow databases, call the LLM, rerun SQL, invent chart series, or become a second report generator.
 
 ## Current Foundations To Reuse
 
@@ -95,6 +99,7 @@ User opens Report Center
 -> CliFeishuPublisher calls lark-cli to create the Feishu document
 -> report evidence tables are included as Markdown tables in the document body
 -> chart static assets are converted/reused as Feishu-safe PNG/JPEG/GIF files and inserted through lark-cli media/doc commands when available
+-> optional Feishu Sheet companion is created from evidence tables/chart artifacts and linked from the document
 -> backend persists ExternalPublishResult on the report record
 -> frontend shows the Feishu link, warnings, and chart insertion summary
 ```
@@ -567,6 +572,152 @@ Manual live acceptance should create one fresh report, publish it to Feishu, fet
 - the document does not duplicate the report title at the top;
 - warnings are safe and useful if a chart cannot be placed.
 
+### P36-H7: Feishu Sheet Companion For Editable Evidence And Native Charts
+
+Add an optional hybrid publishing mode: keep the polished Feishu Doc as the primary reading surface, and create a companion Feishu Sheet from the same report evidence so users can inspect editable data tables and native Feishu charts.
+
+Status: complete on 2026-07-09.
+
+Result:
+
+- Added `workspaces.feishu_sheet_publisher.CliFeishuSheetPublisher` plus `SheetPublishResult`, `SheetTableWriteResult`, `SheetChartCreateResult`, and a `FeishuSheetPublisher` protocol.
+- The Sheet companion uses only `p34.export_package.v1`: `evidence_tables` become workbook tabs/ranges, and `chart_artifacts` become native Feishu sheet charts only for simple bar/line mappings with clear category and numeric value columns.
+- The CLI path uses `lark-cli sheets +workbook-create`, `sheets +table-put`, and `sheets +chart-create`; command results are summarized without stdout/stderr, local paths, SQL, trace, provider metadata, prompts, credentials, or raw command output.
+- `CliFeishuPublisher` can receive a companion Sheet publisher. When the Sheet exists, the Feishu Doc body gets one concise `## 可编辑数据和图表` link section. If the Sheet fails, the Doc publish continues as `warning` with safe Sheet warnings and no fake link.
+- `ExternalPublishResult` now safely carries optional `sheet_url`, `sheet_id`, `spreadsheet_token`, `written_table_count`, `native_chart_count`, and `sheet_warnings`. Empty Sheet fields are omitted from no-Sheet safe results.
+- Report Center publish API persists the safe Sheet fields under `external_publish_results.feishu`, and the frontend displays the Doc link, optional Sheet link, written table count, native chart count, and filtered warnings.
+- H7 did not call the LLM, execute SQL, rerun Report Runner, rewrite reports, query databases for Sheet export, invent chart data, or restore old mock/action/fake-success connector paths.
+- Deterministic verification passed: `python3 -m pytest tests/test_feishu_sheet_publisher.py tests/test_feishu_publisher.py tests/test_workspace_report_api.py -q` (`54 passed`), `python3 -m pytest tests/test_export_package.py tests/test_chart_static_export.py -q` (`19 passed`), `cd frontend && npm test -- workspace-flow.test.tsx` (`66 passed`), `cd frontend && npm run build`, and `git diff --check`. Live Feishu verification was not run in this pass.
+
+Why this is needed:
+
+- The current Feishu Doc path now works: it publishes a readable report with section-local evidence tables and in-context PNG/JPEG/GIF chart snapshots.
+- Static images are best for report reading, but they are not editable inside Feishu.
+- `lark-cli sheets` supports workbook creation, table/cell writes, and native chart creation through commands such as `sheets +workbook-create`, `sheets +table-put`, and `sheets +chart-create`.
+- The product should test a hybrid route before switching to a Sheet-first route: Feishu Docs remains the business report, while Feishu Sheets becomes the editable data/chart appendix.
+
+Target product behavior:
+
+```text
+User clicks 发布到飞书
+-> existing Feishu Doc report is created from ReportDocument/export package
+-> existing static chart images are inserted beside matching report sections
+-> optional companion Feishu Sheet workbook is created
+-> report evidence tables are written into Feishu Sheet tabs/ranges
+-> native Feishu sheet charts are created from safe chart artifact/evidence data when possible
+-> Feishu Doc receives a business-readable appendix link such as:
+   可编辑数据表和图表：打开飞书表格
+-> Report Center shows both the Feishu Doc link and, when available, the companion Sheet link
+```
+
+Implementation requirements:
+
+- Keep the publish path delivery-only. Do not call the LLM, execute SQL, rerun Report Runner, rewrite report prose, regenerate chart data, or stitch Analysis Workbench output.
+- Build the companion workbook only from existing `p34.export_package.v1` fields:
+  - `evidence_tables` for sheet tables;
+  - `chart_artifacts`, `static_assets`, `evidence_refs`, `chart_id` / `chart_ids`, and section ownership metadata for chart mapping;
+  - report title/time range/source labels for workbook naming and a summary tab.
+- Add a small, focused Sheets publisher boundary rather than mixing workbook logic into `CliFeishuPublisher` document code. Suggested shape:
+
+```text
+workspaces/feishu_sheet_publisher.py
+-> FeishuSheetPublisher protocol
+-> CliFeishuSheetPublisher
+-> SheetPublishResult
+-> command runner reuse or shared CLI command helper
+```
+
+- Use `lark-cli sheets` shortcuts when possible:
+  - `sheets +workbook-create` to create the workbook;
+  - `sheets +table-put` or `sheets +csv-put` to write each evidence table;
+  - `sheets +chart-create` to create native charts only when the chart artifact has enough safe tabular data to map x-axis, y-axis, title, chart type, and source range.
+- Do not try to embed live ECharts JavaScript into Feishu. InsightFlow UI keeps interactive ECharts; Feishu Doc gets static chart images; Feishu Sheet gets native sheet charts where possible.
+- Chart creation must be conservative:
+  - create native sheet charts only for simple bar/line/table-compatible chart artifacts with clear category and numeric value columns;
+  - if chart mapping is ambiguous, skip native chart creation and add a safe warning such as `图表「收入结构图表」缺少可映射的分类列或数值列，已仅发布数据表。`;
+  - never let the model generate chart ranges, formulas, or chart config.
+- The Feishu Doc should not become cluttered. Add one concise appendix/link section, not duplicate every Sheet table back into the Doc.
+- The frontend should display:
+  - Feishu Doc link;
+  - companion Sheet link if created;
+  - written table count;
+  - created native chart count;
+  - safe warnings for skipped charts/tables.
+- Result persistence should extend the safe external publish result without leaking raw CLI output, local absolute paths, SQL, trace, provider metadata, prompts, tokens, database paths, or generated file paths.
+- If Sheet creation fails after the Doc succeeds, keep the Doc publish successful with a warning. Do not roll back the Feishu Doc.
+- If the CLI lacks auth or the sheet command fails, return a safe actionable warning; do not fake a Sheet URL.
+- Delete or replace any old helper that tries to make Feishu Sheet data by querying the database directly. The only allowed data source is the export package.
+
+Suggested implementation slices:
+
+1. **Sheets publisher contract and command mapping**
+   - Add `workspaces/feishu_sheet_publisher.py`.
+   - Add tests with a fake command runner for workbook create, table write, chart create, CLI failure, and safe warning normalization.
+   - Prefer reusing existing command-runner patterns from `workspaces/feishu_publisher.py` without duplicating sanitization logic.
+
+2. **Export package to Sheet workbook projection**
+   - Add a small projector that converts `evidence_tables` into sheet-safe tabs/ranges and chart artifacts into conservative native chart requests.
+   - Keep all table/chart data evidence-bound and capped where necessary.
+   - Add tests proving no raw SQL, raw rows beyond intended evidence preview, trace paths, provider metadata, local paths, or token-like strings appear in the result.
+
+3. **Publish API and UI integration**
+   - Extend `POST /api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu` to optionally request the companion Sheet after the Doc is created.
+   - Persist `sheet_url`, `sheet_id`, table count, native chart count, and safe warnings under `external_publish_results.feishu`.
+   - Update Report Center UI to show the Sheet link and counts without adding a separate report type selector or changing the report-generation path.
+
+4. **Acceptance and live check**
+   - Run deterministic backend/frontend tests.
+   - If local auth is configured, publish one fresh report to real Feishu and verify:
+     - Doc still has in-context static chart images;
+     - Doc has a concise editable-data appendix link;
+     - Sheet contains evidence tables;
+     - native sheet charts are created when safe;
+     - skipped charts show safe warnings.
+
+Suggested tests:
+
+- `tests/test_feishu_sheet_publisher.py`
+  - workbook creation command is built through `lark-cli sheets +workbook-create`;
+  - evidence tables are written to safe sheet ranges;
+  - simple chart artifact creates a native sheet chart command;
+  - ambiguous chart artifact is skipped with a safe warning;
+  - command failures do not leak stdout/stderr, local paths, tokens, SQL, trace, or provider metadata.
+- `tests/test_feishu_publisher.py`
+  - document publishing can include a companion sheet link section without duplicating all sheet data in the document body;
+  - Doc publish success remains success/warning if companion Sheet creation fails.
+- `tests/test_workspace_report_api.py`
+  - `external_publish_results.feishu` persists safe `sheet_url`, counts, and warnings.
+- `frontend/tests/workspace-flow.test.tsx`
+  - Report detail displays the Feishu Sheet link and table/chart counts safely.
+
+Suggested deterministic verification:
+
+```bash
+python3 -m pytest tests/test_feishu_sheet_publisher.py tests/test_feishu_publisher.py tests/test_workspace_report_api.py -q
+python3 -m pytest tests/test_export_package.py tests/test_chart_static_export.py -q
+cd frontend && npm test -- workspace-flow.test.tsx
+git diff --check
+```
+
+Optional live verification:
+
+```bash
+INSIGHTFLOW_FEISHU_LIVE=1 \
+LARK_CLI_BIN=/Users/zhangzihao/Desktop/Multi-Agent\ Project/tmp/lark-cli-tools/node_modules/.bin/lark-cli \
+python3 -m pytest tests/test_feishu_live_publish.py -q -s
+```
+
+H7 acceptance criteria:
+
+- Existing Feishu Doc publishing still works and remains the primary report reading surface.
+- A companion Feishu Sheet can be created from the same export package when requested/enabled.
+- Evidence tables are editable in the Feishu Sheet.
+- Native Feishu sheet charts are created only when the chart artifact/evidence table can be mapped safely.
+- The Feishu Doc contains a concise link to the companion Sheet.
+- Report Center displays Doc URL, optional Sheet URL, table count, native chart count, and safe warnings.
+- No extra LLM call, SQL execution, report rewrite, chart-data invention, old simulated connector, or database-direct Sheet export path is introduced.
+- If the Sheet path fails, the Doc publish is preserved and the user sees a safe warning.
+
 ## Success Criteria
 
 - A generated Report Center report can be published to a real Feishu document through `lark-cli`.
@@ -575,6 +726,8 @@ Manual live acceptance should create one fresh report, publish it to Feishu, fet
 - Feishu documents include business-readable evidence tables that already exist in the Report Center report, not only free-text sections.
 - Feishu chart insertion prefers local PNG/JPEG/GIF assets generated from the same chart artifact/ECharts option used by the web UI.
 - Feishu chart images are inserted near their matching report sections instead of being appended at the bottom.
+- Optional companion Feishu Sheets can publish editable evidence tables and native sheet charts from the same export package when H7 is enabled.
+- Feishu Docs keep a concise companion Sheet link rather than duplicating all Sheet content in the report body.
 - Feishu document headings and outline remain readable: no duplicate body title and no noisy evidence-table heading flood.
 - Publishing consumes existing report/export artifacts and does not rewrite report content.
 - No simulated SaaS connector or fake-success path is introduced.
@@ -586,6 +739,6 @@ Manual live acceptance should create one fresh report, publish it to Feishu, fet
 ## Notes For Future P37+
 
 - A direct Feishu OpenAPI publisher can replace `CliFeishuPublisher` behind the same `FeishuPublisher` interface.
-- A richer Feishu collaboration phase can create companion Feishu Sheets: write chart/evidence data with `sheets +workbook-create` / `+table-put`, create native sheet charts with `sheets +chart-create`, and link those editable assets from the Feishu document. That is separate from P36-H5, which should first make Feishu Docs receive complete readable reports.
+- After P36-H7 live testing, decide whether the hybrid Doc + Sheet route should become the default or whether a later Sheet-first publishing model is worth building. Keep Feishu Docs as the primary reading surface until real users prefer editable Sheets as the main artifact.
 - PPT/PDF/Tencent Docs/DingTalk/WeCom publishing should reuse the same `ExportPackage -> publisher` boundary rather than inventing new report-generation paths.
 - If later product requirements need interactive charts inside a web page, keep that in InsightFlow UI. External document platforms should receive static chart exports unless they explicitly support safe embedded interactive content.
