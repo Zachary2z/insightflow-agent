@@ -115,14 +115,23 @@ def test_cli_feishu_sheet_publisher_creates_workbook_and_writes_evidence_table()
         "lark-cli",
         "sheets",
         "+table-put",
-        "--spreadsheet",
+        "--spreadsheet-token",
         "shtcn123",
-        "--sheet",
+        "--sheets",
     ]
-    assert runner.calls[1]["command"][6] == "渠道收入"
-    assert runner.calls[1]["command"][7:9] == ["--range", "A1:B3"]
-    payload = json.loads(runner.calls[1]["command"][10])
-    assert payload == [["渠道", "收入"], ["私域社群", "180000"], ["直播间", "90000"]]
+    payload = json.loads(runner.calls[1]["command"][6])
+    assert payload == {
+        "sheets": [
+            {
+                "name": "渠道收入",
+                "start_cell": "A1",
+                "mode": "replace",
+                "allow_overwrite": True,
+                "columns": ["渠道", "收入"],
+                "data": [["私域社群", "180000"], ["直播间", "90000"]],
+            }
+        ]
+    }
 
 
 def test_cli_feishu_sheet_publisher_creates_native_chart_for_safe_bar_mapping():
@@ -150,25 +159,22 @@ def test_cli_feishu_sheet_publisher_creates_native_chart_for_safe_bar_mapping():
 
     chart_command = runner.calls[2]["command"]
     assert result.native_chart_count == 1
-    assert chart_command == [
+    assert chart_command[:6] == [
         "lark-cli",
         "sheets",
         "+chart-create",
-        "--spreadsheet",
+        "--spreadsheet-token",
         "shtcn123",
-        "--sheet",
-        "渠道收入",
-        "--chart-type",
-        "bar",
-        "--range",
-        "A1:B3",
-        "--category-column",
-        "渠道",
-        "--value-column",
-        "收入",
-        "--title",
-        "渠道收入图",
+        "--sheet-name",
     ]
+    assert chart_command[6] == "渠道收入"
+    assert chart_command[7] == "--properties"
+    properties = json.loads(chart_command[8])
+    assert properties["snapshot"]["data"]["refs"] == [{"value": "渠道收入!A1:B3"}]
+    assert properties["snapshot"]["data"]["dim1"]["serie"]["index"] == 1
+    assert properties["snapshot"]["data"]["dim2"]["series"] == [{"index": 2, "aggregateType": "sum"}]
+    assert properties["snapshot"]["plotArea"]["plot"]["type"] == "column"
+    assert properties["position"]["row"] == 5
 
 
 def test_cli_feishu_sheet_publisher_skips_unclear_chart_with_safe_warning():

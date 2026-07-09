@@ -112,9 +112,7 @@ class CliFeishuPublisher:
                 warning="飞书发布当前只支持 Report Center 的 report export package；Analysis Workbench 分析回答不能作为完整报告发布。",
             )
 
-        sheet_result = self._publish_companion_sheet(package_data)
-        companion_sheet_url = sheet_result.get("url") if sheet_result.get("status") in {"published", "warning"} else None
-        command = self._build_create_document_command(title, _package_to_markdown(package_data, companion_sheet_url=companion_sheet_url))
+        command = self._build_create_document_command(title, _package_to_markdown(package_data))
         try:
             command_result = self.runner.run(
                 command,
@@ -204,8 +202,10 @@ class CliFeishuPublisher:
             warnings=warnings,
             tool_calls=tool_calls,
         )
-        _merge_sheet_result(result, sheet_result)
         self._insert_chart_images(package_data, result)
+        sheet_result = self._publish_companion_sheet(package_data)
+        _merge_sheet_result(result, sheet_result)
+        self._append_companion_sheet_link(result)
         return result
 
     def _build_create_document_command(self, title: str, content: str) -> list[str]:
@@ -303,6 +303,62 @@ class CliFeishuPublisher:
             "--width",
             "800",
         ]
+
+    def _build_append_sheet_link_command(self, *, doc_ref: str, sheet_url: str) -> list[str]:
+        return [
+            self.cli_binary,
+            "docs",
+            "+update",
+            "--doc",
+            doc_ref,
+            "--command",
+            "append",
+            "--doc-format",
+            "markdown",
+            "--content",
+            f"\n## 可编辑数据和图表\n\n可编辑数据表和图表：{sheet_url}\n",
+        ]
+
+    def _append_companion_sheet_link(self, result: ExternalPublishResult) -> None:
+        if not result.sheet_url or result.status == "failed":
+            return
+        doc_ref = result.document_id or _docx_url_or_empty(result.url)
+        if not doc_ref:
+            result.status = "warning"
+            result.warnings.append("飞书表格已创建，但文档缺少可更新的 document_id，表格链接未写入文档。")
+            return
+        command = self._build_append_sheet_link_command(doc_ref=doc_ref, sheet_url=result.sheet_url)
+        try:
+            command_result = self.runner.run(
+                command,
+                input_text=None,
+                timeout_seconds=self.timeout_seconds,
+            )
+        except Exception:  # noqa: BLE001 - link append is warning-only.
+            result.status = "warning"
+            result.warnings.append("飞书表格已创建，但表格链接未能写入文档，请手动粘贴。")
+            result.tool_calls.append(
+                _tool_call(
+                    operation="append_companion_sheet_link",
+                    command_name=safe_command_name(self.cli_binary),
+                    success=False,
+                    exit_code=127,
+                    elapsed_ms=0,
+                )
+            )
+            return
+        result.tool_calls.append(
+            _tool_call(
+                operation="append_companion_sheet_link",
+                command_name=command_result.command_name or self.cli_binary,
+                success=command_result.exit_code == 0,
+                exit_code=command_result.exit_code,
+                elapsed_ms=command_result.elapsed_ms,
+            )
+        )
+        if command_result.exit_code != 0:
+            result.status = "warning"
+            result.warnings.append("飞书表格已创建，但表格链接未能写入文档，请手动粘贴。")
 
     def _publish_companion_sheet(self, package: dict[str, Any]) -> dict[str, Any]:
         publisher = self.sheet_publisher

@@ -283,14 +283,10 @@ class CliFeishuSheetPublisher:
             self.cli_binary,
             "sheets",
             "+table-put",
-            "--spreadsheet",
+            "--spreadsheet-token",
             spreadsheet_token,
-            "--sheet",
-            table["title"],
-            "--range",
-            table["range"],
-            "--values",
-            json.dumps(table["values"], ensure_ascii=False),
+            "--sheets",
+            json.dumps(_table_put_payload(table), ensure_ascii=False),
         ]
 
     def _build_chart_create_command(self, *, spreadsheet_token: str, chart: dict[str, Any]) -> list[str]:
@@ -298,21 +294,62 @@ class CliFeishuSheetPublisher:
             self.cli_binary,
             "sheets",
             "+chart-create",
-            "--spreadsheet",
+            "--spreadsheet-token",
             spreadsheet_token,
-            "--sheet",
+            "--sheet-name",
             chart["sheet_title"],
-            "--chart-type",
-            chart["chart_type"],
-            "--range",
-            chart["range"],
-            "--category-column",
-            chart["category_column"],
-            "--value-column",
-            chart["value_column"],
-            "--title",
-            chart["title"],
+            "--properties",
+            json.dumps(_chart_properties(chart), ensure_ascii=False),
         ]
+
+
+def _table_put_payload(table: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "sheets": [
+            {
+                "name": table["title"],
+                "start_cell": "A1",
+                "mode": "replace",
+                "allow_overwrite": True,
+                "columns": list(table.get("columns") or []),
+                "data": list(table.get("data_rows") or []),
+            }
+        ]
+    }
+
+
+def _chart_properties(chart: dict[str, Any]) -> dict[str, Any]:
+    chart_type = "line" if chart.get("chart_type") == "line" else "column"
+    return {
+        "position": {"row": max(4, _safe_int(chart.get("row_count")) + 2), "col": "A"},
+        "size": {"width": 640, "height": 360},
+        "snapshot": {
+            "data": {
+                "refs": [{"value": _sheet_range_ref(chart["sheet_title"], chart["range"])}],
+                "headerMode": "inline",
+                "direction": "column",
+                "includeHiddenOrFilter": False,
+                "isStaticData": False,
+                "dim1": {"serie": {"index": _safe_int(chart.get("category_index")) or 1}},
+                "dim2": {
+                    "series": [
+                        {
+                            "index": _safe_int(chart.get("value_index")) or 2,
+                            "aggregateType": "sum",
+                        }
+                    ]
+                },
+            },
+            "plotArea": {"plot": {"type": chart_type}},
+        },
+    }
+
+
+def _sheet_range_ref(sheet_title: str, cell_range: str) -> str:
+    title = _safe_text(sheet_title).replace("'", "''")
+    if re.search(r"[\s!']", title):
+        title = f"'{title}'"
+    return f"{title}!{_safe_text(cell_range) or 'A1:B2'}"
 
 
 def _project_evidence_tables(value: Any) -> tuple[list[dict[str, Any]], list[str]]:
@@ -333,8 +370,11 @@ def _project_evidence_tables(value: Any) -> tuple[list[dict[str, Any]], list[str
         if len(rows) > len(visible_rows):
             warnings.append(f"证据表「{title}」行数较多，仅写入前 {len(visible_rows)} 行。")
         values = [columns]
+        data_rows: list[list[str]] = []
         for row in visible_rows:
-            values.append([_safe_cell(row.get(column)) for column in columns])
+            data_row = [_safe_cell(row.get(column)) for column in columns]
+            data_rows.append(data_row)
+            values.append(data_row)
         range_name = f"A1:{_column_letter(len(columns))}{len(values)}"
         tables.append(
             {
@@ -345,6 +385,7 @@ def _project_evidence_tables(value: Any) -> tuple[list[dict[str, Any]], list[str
                 "evidence_payload_ref": _safe_text(item.get("evidence_payload_ref")),
                 "columns": columns,
                 "rows": visible_rows,
+                "data_rows": data_rows,
                 "values": values,
                 "range": range_name,
             }
@@ -383,8 +424,11 @@ def _project_native_charts(value: Any, tables: list[dict[str, Any]]) -> list[dic
                 "sheet_title": matched["table"]["title"],
                 "table_id": matched["table"]["table_id"],
                 "range": matched["table"]["range"],
+                "row_count": len(matched["table"].get("values") or []),
                 "category_column": matched["category_column"],
                 "value_column": matched["value_column"],
+                "category_index": matched["category_index"],
+                "value_index": matched["value_index"],
             }
         )
     return projections
@@ -418,7 +462,14 @@ def _match_table_for_chart(
         category_column = _category_column(table, labels)
         value_column = _value_column(table, values=values, series_name=series_name)
         if category_column and value_column:
-            return {"table": table, "category_column": category_column, "value_column": value_column}
+            columns = list(table.get("columns") or [])
+            return {
+                "table": table,
+                "category_column": category_column,
+                "value_column": value_column,
+                "category_index": columns.index(category_column) + 1,
+                "value_index": columns.index(value_column) + 1,
+            }
     return {}
 
 

@@ -251,13 +251,26 @@ def test_cli_feishu_publisher_includes_companion_sheet_link_section_when_availab
     ).publish_report(package)
 
     content = runner.calls[0]["command"][-1]
+    append_command = runner.calls[1]["command"]
     assert result.status == "published"
     assert result.sheet_url == "https://example.feishu.cn/sheets/shtcn123"
     assert result.written_table_count == 1
     assert result.native_chart_count == 1
     assert result.sheet_warnings == []
-    assert "## 可编辑数据和图表" in content
-    assert "可编辑数据表和图表：https://example.feishu.cn/sheets/shtcn123" in content
+    assert "## 可编辑数据和图表" not in content
+    assert append_command[:8] == [
+        "lark-cli",
+        "docs",
+        "+update",
+        "--doc",
+        "doccn123",
+        "--command",
+        "append",
+        "--doc-format",
+    ]
+    assert append_command[8:10] == ["markdown", "--content"]
+    assert "## 可编辑数据和图表" in append_command[10]
+    assert "可编辑数据表和图表：https://example.feishu.cn/sheets/shtcn123" in append_command[10]
     assert content.count("| 渠道 | 收入 |") == 1
     assert sheet_publisher.calls
 
@@ -286,6 +299,7 @@ def test_cli_feishu_publisher_keeps_doc_success_when_companion_sheet_fails():
     assert result.url == "https://example.feishu.cn/docx/doccn123"
     assert result.sheet_url is None
     assert result.sheet_warnings == ["飞书表格创建失败，已保留飞书文档发布。"]
+    assert len(runner.calls) == 1
     assert "## 可编辑数据和图表" not in content
     assert any("飞书表格创建失败" in warning for warning in result.warnings)
 
