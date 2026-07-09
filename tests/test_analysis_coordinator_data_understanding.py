@@ -17,6 +17,7 @@ def test_coordinator_data_understanding_handles_complete_chinese_question():
     assert task.time_range == {"type": "last_n_days", "value": 90, "raw_text": "最近 90 天"}
     assert task.missing_slots == []
     assert task.clarification_question == ""
+    assert task.business_lens["needs_clarification"] is False
     assert decision.route in {"fast_fact", "standard_analysis"}
     assert decision.user_language == "zh"
     assert "数据理解" in decision.required_agents
@@ -108,7 +109,128 @@ def test_data_understanding_uses_full_data_time_range_when_safe():
     assert task.time_range["raw_text"] == "完整数据时间范围：2025-01-15 至 2026-06-30"
     assert "完整可用时间范围" in task.resolved_question
     assert task.missing_slots == []
+    assert task.business_lens["metrics"][0]["time_field"] == "business_date"
     assert result["coordinator_decision"].route == "fast_fact"
+
+
+def test_data_understanding_does_not_default_full_data_range_without_profile_range():
+    from workspaces.analysis_coordinator import coordinate_analysis_question
+
+    workspace_context = {
+        "semantic_metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "table": "orders",
+                "field": "orders.revenue",
+                "aliases": ["收入"],
+                "business_meaning_candidates": ["revenue_like", "amount_like"],
+            }
+        ],
+        "semantic_dimensions": [
+            {
+                "name": "channel",
+                "label": "渠道",
+                "table": "orders",
+                "field": "orders.channel",
+                "aliases": ["渠道"],
+            }
+        ],
+        "semantic_time_fields": [
+            {
+                "name": "order_date",
+                "label": "下单日期",
+                "table": "orders",
+                "field": "orders.order_date",
+                "enabled": True,
+            }
+        ],
+        "tables": [
+            {
+                "table_name": "orders",
+                "columns": [{"name": "order_date"}],
+            }
+        ],
+    }
+
+    result = coordinate_analysis_question("哪个渠道收入最高？", workspace_context=workspace_context)
+    task = result["analysis_task"]
+
+    assert task.business_lens["metrics"][0]["time_field"] == "order_date"
+    assert task.business_lens["time_range"] == {}
+    assert task.time_range == {}
+    assert "time_range" in task.missing_slots
+    assert "time_range" in result["question_understanding"]["missing_slots"]
+    assert result["coordinator_decision"].route == "clarify"
+    assert "时间范围" in task.clarification_question
+
+
+def test_data_understanding_business_lens_allows_cross_table_metric_time_fields():
+    from workspaces.analysis_coordinator import coordinate_analysis_question
+
+    workspace_context = {
+        "semantic_metrics": [
+            {
+                "name": "sum_revenue",
+                "label": "收入",
+                "table": "orders",
+                "field": "orders.revenue",
+                "aliases": ["收入", "营收", "revenue"],
+                "business_meaning_candidates": ["revenue_like", "amount_like"],
+            },
+            {
+                "name": "sum_spend",
+                "label": "投放花费",
+                "table": "marketing_spend",
+                "field": "marketing_spend.spend",
+                "aliases": ["投放花费", "投放金额", "spend"],
+                "business_meaning_candidates": ["spend_like", "cost_like", "amount_like"],
+            },
+        ],
+        "semantic_dimensions": [
+            {"name": "channel", "label": "渠道", "table": "orders", "field": "orders.channel", "aliases": ["渠道"]},
+            {
+                "name": "channel",
+                "label": "渠道",
+                "table": "marketing_spend",
+                "field": "marketing_spend.channel",
+                "aliases": ["渠道"],
+            },
+        ],
+        "semantic_time_fields": [
+            {"name": "order_date", "label": "下单日期", "table": "orders", "field": "orders.order_date", "enabled": True},
+            {
+                "name": "spend_date",
+                "label": "投放日期",
+                "table": "marketing_spend",
+                "field": "marketing_spend.spend_date",
+                "enabled": True,
+            },
+        ],
+        "tables": [
+            {
+                "table_name": "orders",
+                "columns": [{"name": "order_date", "value_range": {"min": "2026-01-01", "max": "2026-06-30"}}],
+            },
+            {
+                "table_name": "marketing_spend",
+                "columns": [{"name": "spend_date", "value_range": {"min": "2026-01-01", "max": "2026-06-30"}}],
+            },
+        ],
+    }
+
+    result = coordinate_analysis_question("各渠道投放花费和收入表现怎么样？", workspace_context=workspace_context)
+    task = result["analysis_task"]
+    metrics = {metric["metric_role"]: metric for metric in task.business_lens["metrics"]}
+
+    assert task.missing_slots == []
+    assert "date_field" not in result["question_understanding"]["missing_slots"]
+    assert task.business_lens["needs_clarification"] is False
+    assert metrics["revenue_like"]["time_field"] == "order_date"
+    assert metrics["spend_like"]["time_field"] == "spend_date"
+    assert "收入按下单日期" in task.business_lens["time_policy_note"]
+    assert "投放花费按投放日期" in task.business_lens["time_policy_note"]
+    assert result["coordinator_decision"].route != "clarify"
 
 
 def test_coordinator_keeps_simple_fact_route_lightweight():

@@ -6,7 +6,7 @@ import pytest
 
 from llm_ops.deepseek_provider import load_deepseek_config
 from llm_ops.runtime_provider import product_live_mode_enabled
-from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_continuation
+from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_follow_up
 from workspaces.importers import import_csv
 from workspaces.profiler import profile_workspace_database
 from workspaces.semantic_draft import generate_semantic_layer_draft
@@ -115,7 +115,7 @@ def _assert_provider_chain(result: dict) -> None:
     else:
         assert result.get("sql_routing_strategy") != "llm_candidate"
         assert result["generated_sql"].strip()
-    assert result["insight"]["provider_called"] is True
+    assert result["business_answer_generation"]["provider_called"] is True
     assert result["visualization_trace"]["provider_called"] is True
     assert result["execution_result"]["success"] is True
     assert result["generated_sql"].strip()
@@ -162,14 +162,14 @@ def test_live_deepseek_clarification_continuation_completes_product_flow(tmp_pat
 
     first_thread = first_result["product_result"]["question_thread"]
     assert first_result["status"] == "waiting_for_clarification"
-    assert first_thread["pending_run_id"]
+    assert first_thread["thread_id"] == first_result["run_id"]
     assert first_thread["clarification_question"]
 
-    continuation = run_workspace_analysis_continuation(
+    continuation = run_workspace_analysis_follow_up(
         store=store,
         workspace_id=workspace_id,
-        pending_run_id=first_thread["pending_run_id"],
-        clarification_answer="最近 90 天，按渠道比较收入、投放成本和 ROI，并给出预算建议。",
+        run_id=first_result["run_id"],
+        message="最近 90 天，按渠道比较收入、投放成本和 ROI，并给出预算建议。",
     )
 
     thread = continuation["product_result"]["question_thread"]

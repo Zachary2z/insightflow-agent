@@ -13,4 +13,6 @@ pandas
 SQLAlchemy
 PyYAML
 matplotlib
+Pillow
 pytest
+python-docx

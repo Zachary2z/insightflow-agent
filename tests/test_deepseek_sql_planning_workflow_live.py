@@ -45,6 +45,6 @@ def test_live_deepseek_sql_planning_and_candidate_enter_core_workflow(tmp_path):
     provider_nodes = [
         event
         for event in result["trace"]
-        if event.get("node") in {"sql_planning_router_agent", "guarded_sql_candidate_agent"}
+        if event.get("node") in {"evidence_planning_agent", "guarded_sql_candidate_agent"}
     ]
     assert any(event.get("provider_called") is True for event in provider_nodes)

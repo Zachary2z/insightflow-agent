@@ -4,6 +4,8 @@ import {
   createWorkspaceReport,
   createSemanticDraft,
   createWorkspace,
+  exportWorkspaceReportDocx,
+  followUpAnalysis,
   getWorkspaceReport,
   getWorkspaceReportDownloadUrl,
   getWorkspaceSettings,
@@ -11,6 +13,7 @@ import {
   listWorkspaceReports,
   listSources,
   listWorkspaces,
+  publishFeishuReport,
   runAnalysis,
   uploadSource,
 } from "../lib/api";
@@ -160,7 +163,7 @@ describe("api client", () => {
     );
   });
 
-  it("posts clarification continuation requests without requiring the full question", async () => {
+  it("posts same-thread follow-up requests with the run id", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -190,20 +193,18 @@ describe("api client", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const run = await runAnalysis("ws_1", {
-      pendingRunId: "pending_1",
-      clarificationAnswer: "按商品，最近 90 天，看 Top 5",
+    const run = await followUpAnalysis("ws_1", "run_2", {
+      message: "按商品，最近 90 天，看 Top 5",
     });
 
     expect(run.product_result?.question_thread?.resolved_question).toContain("最近 90 天");
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/workspaces/ws_1/runs",
+      "http://localhost:8000/api/workspaces/ws_1/runs/run_2/follow-ups",
       expect.objectContaining({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pending_run_id: "pending_1",
-          clarification_answer: "按商品，最近 90 天，看 Top 5",
+          message: "按商品，最近 90 天，看 Top 5",
         }),
       }),
     );
@@ -327,6 +328,70 @@ describe("api client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1",
+    );
+  });
+
+  it("exports a workspace report to Word through FastAPI", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        workspace_id: "ws_1",
+        report_id: "report_1",
+        document_path: "exports/documents/管理层报告_report_1.docx",
+        download_name: "管理层报告_report_1.docx",
+        download_url: "/api/workspaces/ws_1/artifacts/exports/documents/%E7%AE%A1%E7%90%86%E5%B1%82%E6%8A%A5%E5%91%8A_report_1.docx",
+        warnings: ["部分图表当前以占位说明展示。"],
+        artifact: {
+          artifact_id: "artifact_docx_report_1",
+          artifact_type: "word_document",
+          title: "管理层报告",
+          relative_path: "exports/documents/管理层报告_report_1.docx",
+          download_name: "管理层报告_report_1.docx",
+          download_url: "/api/workspaces/ws_1/artifacts/exports/documents/%E7%AE%A1%E7%90%86%E5%B1%82%E6%8A%A5%E5%91%8A_report_1.docx",
+          status: "completed",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await exportWorkspaceReportDocx("ws_1", "report_1");
+
+    expect(result.download_name).toBe("管理层报告_report_1.docx");
+    expect(result.warnings).toEqual(["部分图表当前以占位说明展示。"]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/export",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("publishes a workspace report to Feishu through FastAPI", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        workspace_id: "ws_1",
+        report_id: "report_1",
+        publish_result: {
+          platform: "feishu",
+          status: "published",
+          title: "管理层报告",
+          url: "https://example.feishu.cn/docx/doccn123",
+          document_id: "doccn123",
+          warnings: [],
+          tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: true }],
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await publishFeishuReport("ws_1", "report_1");
+
+    expect(result.publish_result.status).toBe("published");
+    expect(result.publish_result.url).toBe("https://example.feishu.cn/docx/doccn123");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/publish/feishu",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

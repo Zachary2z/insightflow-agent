@@ -89,10 +89,9 @@ def test_analysis_defaults_missing_time_range_to_full_data_range_when_single_tim
 
     task = result["question_understanding"]["analysis_task"]
     fact_payload = result["product_result"]["evidence"]["fact_payload"]
-    answer_text = _answer_text(result)
+    ledger_text = json.dumps(result["product_result"]["question_evidence_ledger"], ensure_ascii=False)
 
     assert result["status"] == "completed"
-    assert result.get("pending_run_id") in (None, "")
     assert task["missing_slots"] == []
     assert task["time_range"]["type"] == "full_data_range"
     assert task["time_range"]["start"] == "2025-01-15"
@@ -100,11 +99,11 @@ def test_analysis_defaults_missing_time_range_to_full_data_range_when_single_tim
     assert "用户未指定时间范围" in " ".join(task["defaults_applied"])
     assert "完整可用时间范围" in task["resolved_question"]
     assert fact_payload["time_range"]["raw_text"] == "完整数据时间范围：2025-01-15 至 2026-06-30"
-    assert "你没有指定时间范围" in answer_text
-    assert "2025-01-15 至 2026-06-30" in answer_text
+    assert "完整数据时间范围" in ledger_text or "完整数据时间范围" in fact_payload["time_range"]["raw_text"]
+    assert "2025-01-15 至 2026-06-30" in fact_payload["time_range"]["raw_text"]
 
 
-def test_analysis_asks_when_missing_time_range_has_multiple_possible_time_fields(tmp_path):
+def test_analysis_defaults_missing_time_range_when_business_lens_can_bind_metric_time_field(tmp_path):
     store, workspace, _profile, _semantic_layer = _prepare_multi_time_workspace(tmp_path)
 
     result = run_workspace_analysis(
@@ -113,14 +112,16 @@ def test_analysis_asks_when_missing_time_range_has_multiple_possible_time_fields
         user_question="哪个客户分群贡献的收入最高？",
     )
 
+    task = result["analysis_task"]
     understanding = result["question_understanding"]
-    question_text = " ".join(result.get("clarification_questions") or [])
 
-    assert result["status"] == "waiting_for_clarification"
-    assert "date_field" in understanding["missing_slots"]
-    assert "时间字段" in question_text
-    assert "order_date" in question_text
-    assert "paid_at" in question_text
+    assert result["status"] == "completed"
+    assert "date_field" not in understanding["missing_slots"]
+    assert task["time_range"]["field"] == "business_sales.order_date"
+    assert "用户未指定时间范围" in task["time_range"]["reason"]
+    assert "完整数据时间范围" in task["time_range"]["raw_text"]
+    assert "销售额按order_date统计" in task["business_lens"]["time_policy_note"]
+    assert "完整数据时间范围" in result["technical_details"]["fact_payload"]["time_range"]["raw_text"]
 
 
 def test_analysis_asks_for_trend_grain_even_when_single_full_range_is_available(tmp_path):

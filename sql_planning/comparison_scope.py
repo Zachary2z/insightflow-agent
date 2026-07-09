@@ -89,6 +89,8 @@ def requires_comparison_scope(
     operation = str((question_understanding.get("intent") or {}).get("operation") or "").lower()
     if task_type in {"recommendation", "compare", "anomaly"} or operation in {"recommendation", "compare", "comparison"}:
         return True
+    if task_type == "rank" and analysis_task.get("dimensions"):
+        return True
     if str(analysis_task.get("decision_goal") or "").strip():
         return True
 

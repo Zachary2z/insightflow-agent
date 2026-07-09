@@ -7,9 +7,8 @@ from typing import Any
 from llm_ops.deepseek_provider import load_deepseek_config
 from llm_ops.runtime_provider import (
     product_live_mode_enabled,
-    provider_claim_typing_enabled,
+    provider_business_answer_enabled,
     provider_clarification_router_enabled,
-    provider_insight_drafting_enabled,
     provider_question_understanding_enabled,
     provider_report_composer_enabled,
     provider_sql_candidate_enabled,
@@ -78,8 +77,7 @@ def _model_mode_status() -> dict[str, Any]:
         "clarification": provider_clarification_router_enabled(env_path=env_path),
         "sql_planning": provider_sql_planning_enabled(env_path=env_path),
         "sql_candidate": provider_sql_candidate_enabled(env_path=env_path),
-        "insight_drafting": provider_insight_drafting_enabled(env_path=env_path),
-        "claim_typing": provider_claim_typing_enabled(env_path=env_path),
+        "business_answer": provider_business_answer_enabled(env_path=env_path),
         "visualization": provider_visualization_agent_enabled(env_path=env_path),
         "report_composer": provider_report_composer_enabled(env_path=env_path),
     }
@@ -88,8 +86,7 @@ def _model_mode_status() -> dict[str, Any]:
         "clarification": "澄清路由",
         "sql_planning": "SQL 规划",
         "sql_candidate": "SQL 候选生成",
-        "insight_drafting": "洞察起草",
-        "claim_typing": "事实声明识别",
+        "business_answer": "业务回答生成",
         "visualization": "图表建议",
         "report_composer": "报告撰写",
     }

@@ -451,6 +451,117 @@ def test_report_runner_persists_chart_artifacts_from_evidence_pack(tmp_path):
     assert report["document"]["technical_appendix"]["artifact_summary"]["chart_count"] == len(chart_artifacts)
 
 
+def test_report_runner_saves_unified_chart_artifacts_with_echarts_and_static_fallback(tmp_path):
+    store, workspace = _create_workspace_with_chartable_recent_orders(tmp_path)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告，关注收入结构、客户分群和趋势变化。",
+    )
+
+    report = result["report"]
+    chart_artifacts = report["chart_artifacts"]
+    first_chart = chart_artifacts[0]
+
+    assert chart_artifacts
+    assert first_chart["artifact_id"]
+    assert first_chart["renderer"] == "echarts"
+    assert first_chart["chart_type"] in {"bar", "line", "ranked_bar"}
+    assert first_chart["chart_spec"]["x"]
+    assert first_chart["chart_spec"]["y"]
+    assert first_chart["echarts_option"]["series"]
+    assert first_chart["image_path"]
+    assert first_chart["image_url"]
+    assert first_chart["path"] == first_chart["image_path"]
+    assert first_chart["url"] == first_chart["image_url"]
+    assert first_chart["rendering_status"] == "rendered"
+    assert first_chart["business_annotation"]
+    assert first_chart["evidence_refs"]
+    assert first_chart["source"] == "report_center"
+    assert first_chart["data_row_count"] > 0
+    assert all(chart["source"] == "report_center" for chart in chart_artifacts)
+    assert report["evidence_pack"]["charts"][0]["echarts_option"]
+    assert report["document"]["sections"]
+
+    markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
+    assert "echarts_option" not in markdown
+    assert "chart_spec" not in markdown
+    assert "SELECT" not in markdown.upper()
+    assert "provider_metadata" not in markdown
+    assert "trace" not in markdown.lower()
+
+
+def test_report_runner_result_can_build_safe_export_package(tmp_path):
+    from workspaces.export_package import build_report_export_package
+
+    store, workspace = _create_workspace_with_chartable_recent_orders(tmp_path)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告，关注收入结构、客户分群和趋势变化。",
+    )
+
+    package = build_report_export_package(
+        result["report"],
+        workspace_root=workspace["root_path"],
+    ).to_dict()
+    serialized = json.dumps(package, ensure_ascii=False)
+
+    assert package["workspace_id"] == workspace["workspace_id"]
+    assert package["source_type"] == "report"
+    assert package["source_id"] == result["report"]["report_id"]
+    assert package["document"]["opening_summary"]
+    assert package["markdown_path"].endswith(".md")
+    assert package["document_path"].endswith(".json")
+    assert package["chart_artifacts"]
+    assert any(asset["asset_type"] == "chart_image" for asset in package["static_assets"])
+    assert package["evidence_refs"]
+    assert "echarts_option" in package["chart_artifacts"][0]
+    assert "chart_spec" not in package["chart_artifacts"][0]
+    assert "SELECT" not in serialized.upper()
+    assert "trace_path" not in serialized
+    assert "trace.json" not in serialized
+    assert "provider_metadata" not in serialized
+    assert str(tmp_path) not in serialized
+
+
+def test_report_runner_keeps_static_chart_fallback_when_echarts_builder_fails(tmp_path, monkeypatch):
+    import workspaces.report_chart_artifacts as report_chart_artifacts
+
+    store, workspace = _create_workspace_with_chartable_recent_orders(tmp_path)
+
+    def fail_option_builder(*args, **kwargs):
+        return {"success": False, "validation_error": "Column 收入 requires numeric values"}
+
+    monkeypatch.setattr(report_chart_artifacts, "build_echarts_option", fail_option_builder)
+
+    result = run_workspace_report(
+        store,
+        workspace["workspace_id"],
+        "business_review",
+        "生成一份最近90天经营复盘报告，关注收入结构和趋势变化。",
+    )
+
+    report = result["report"]
+    chart_artifacts = report["chart_artifacts"]
+
+    assert result["success"] is True
+    assert chart_artifacts
+    assert any(chart["image_path"] and chart["image_url"] for chart in chart_artifacts)
+    assert all("echarts_option" not in chart or not chart["echarts_option"] for chart in chart_artifacts)
+    assert any(chart["renderer"] == "image" for chart in chart_artifacts)
+    trace = Path(report["trace_path"]).read_text(encoding="utf-8")
+    markdown = Path(report["markdown_path"]).read_text(encoding="utf-8")
+
+    assert "Column 收入 requires numeric values" in trace
+    assert "Column 收入 requires numeric values" not in markdown
+    assert "echarts_option" not in markdown
+
+
 def test_report_runner_composes_once_without_section_business_answers(tmp_path, monkeypatch):
     import workspaces.report_runner as report_runner
 

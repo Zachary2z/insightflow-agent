@@ -178,8 +178,20 @@ class ReportEvidenceChart:
     title: str
     source_chapter_id: str
     chart_type: str = ""
+    renderer: str = ""
+    chart_spec: dict[str, Any] = field(default_factory=dict)
+    echarts_option: dict[str, Any] = field(default_factory=dict)
     path: str = ""
     url: str = ""
+    image_path: str = ""
+    image_url: str = ""
+    rendering_status: str = ""
+    unit: str = ""
+    value_label: bool = False
+    business_annotation: str = ""
+    evidence_refs: list[str] = field(default_factory=list)
+    source: str = ""
+    data_row_count: int = 0
     description: str = ""
     evidence_ref: str = ""
     artifact_id: str = ""
@@ -196,8 +208,20 @@ class ReportEvidenceChart:
             title=str(data.get("title") or ""),
             source_chapter_id=str(data.get("source_chapter_id") or ""),
             chart_type=str(data.get("chart_type") or ""),
+            renderer=str(data.get("renderer") or ""),
+            chart_spec=dict(data.get("chart_spec")) if isinstance(data.get("chart_spec"), dict) else {},
+            echarts_option=dict(data.get("echarts_option")) if isinstance(data.get("echarts_option"), dict) else {},
             path=str(data.get("path") or ""),
             url=str(data.get("url") or ""),
+            image_path=str(data.get("image_path") or ""),
+            image_url=str(data.get("image_url") or ""),
+            rendering_status=str(data.get("rendering_status") or ""),
+            unit=str(data.get("unit") or ""),
+            value_label=bool(data.get("value_label", False)),
+            business_annotation=str(data.get("business_annotation") or ""),
+            evidence_refs=[str(item) for item in data.get("evidence_refs", [])],
+            source=str(data.get("source") or ""),
+            data_row_count=int(data.get("data_row_count") or 0),
             description=str(data.get("description") or ""),
             evidence_ref=str(data.get("evidence_ref") or ""),
             artifact_id=str(data.get("artifact_id") or ""),
@@ -547,11 +571,13 @@ class ReportRecord:
     json_path: str = ""
     trace_path: str = ""
     artifact_dir: str = ""
+    chart_artifacts: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[ReportArtifactRecord] = field(default_factory=list)
     tool_calls: list[ReportToolCallRecord] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = field(default_factory=utc_now_iso)
     provider_metadata: dict[str, Any] = field(default_factory=dict)
+    external_publish_results: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -596,6 +622,11 @@ class ReportRecord:
             json_path=str(data.get("json_path", "")),
             trace_path=str(data.get("trace_path", "")),
             artifact_dir=str(data.get("artifact_dir", "")),
+            chart_artifacts=[
+                dict(item)
+                for item in data.get("chart_artifacts", [])
+                if isinstance(item, dict)
+            ],
             artifacts=[
                 ReportArtifactRecord.from_dict(item)
                 for item in data.get("artifacts", [])
@@ -609,4 +640,9 @@ class ReportRecord:
             created_at=str(data.get("created_at", utc_now_iso())),
             updated_at=str(data.get("updated_at", utc_now_iso())),
             provider_metadata=dict(data.get("provider_metadata", {})),
+            external_publish_results={
+                str(platform): dict(result)
+                for platform, result in dict(data.get("external_publish_results", {})).items()
+                if isinstance(result, dict)
+            },
         )

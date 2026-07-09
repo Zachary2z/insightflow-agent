@@ -88,19 +88,24 @@ export type WorkspaceSettings = {
 export type RunAnalysisRequest = {
   userQuestion?: string;
   initialSql?: string;
-  pendingRunId?: string;
-  clarificationAnswer?: string;
   forceReanalysis?: boolean;
 };
 
 export type QuestionThread = {
+  thread_id?: string;
   original_question?: string;
   system_understanding?: string;
   clarification_question?: string;
   clarification_answer?: string;
   resolved_question?: string;
-  pending_run_id?: string;
   status?: string;
+  turns?: Array<Record<string, unknown>>;
+  current_business_lens?: Record<string, unknown>;
+  evidence_refs?: string[];
+  answer_summary?: string;
+  pending_clarification?: Record<string, unknown> | null;
+  latest_status?: string;
+  latest_resolved_question?: string;
 };
 
 export type BusinessAnswer = {
@@ -121,15 +126,45 @@ export type EvidenceSummary = {
   evidence_notes?: string[];
   validation_status?: string;
   fact_payload?: Record<string, unknown>;
+  ledger_summary?: {
+    ledger_id?: string;
+    time_policy_note?: string;
+    facts?: Array<Record<string, unknown>>;
+    derived_metrics?: Array<Record<string, unknown>>;
+    data_limits?: string[];
+    business_data_limits?: string[];
+    task_groups?: Array<{
+      title?: string;
+      status?: string;
+      facts?: string[];
+    }>;
+    evidence_refs?: string[];
+    chart_refs?: string[];
+    confidence?: string;
+  };
 };
 
 export type ChartArtifact = {
+  artifact_id?: string;
   title?: string;
+  renderer?: string;
+  chart_type?: string;
+  chart_spec?: Record<string, unknown>;
+  echarts_option?: Record<string, unknown>;
   path?: string;
   url?: string;
+  image_path?: string;
+  image_url?: string;
   rendering_status?: string;
   unit?: string;
+  value_label?: boolean;
   business_annotation?: string;
+  evidence_refs?: string[];
+  source?: string;
+  data_row_count?: number;
+  skip_reason?: string;
+  failure_reason?: string;
+  chart_input_source?: string;
 };
 
 export type ProgressStep = {
@@ -256,6 +291,41 @@ export type ReportArtifactRecord = {
   error?: string;
 };
 
+export type WorkspaceReportExportResponse = {
+  success: boolean;
+  workspace_id: string;
+  report_id: string;
+  document_path: string;
+  download_name: string;
+  download_url: string;
+  warnings: string[];
+  artifact: ReportArtifactRecord & {
+    download_name?: string;
+    chart_asset_count?: number;
+  };
+};
+
+export type ExternalPublishResult = {
+  platform: string;
+  status: "published" | "warning" | "failed" | string;
+  title: string;
+  url?: string | null;
+  document_id?: string | null;
+  external_id?: string | null;
+  created_at?: string | null;
+  inserted_chart_count?: number;
+  failed_chart_count?: number;
+  warnings?: string[];
+  tool_calls?: Array<Record<string, unknown>>;
+};
+
+export type WorkspaceReportPublishResponse = {
+  success: boolean;
+  workspace_id: string;
+  report_id: string;
+  publish_result: ExternalPublishResult;
+};
+
 export type ReportToolCallRecord = {
   tool_call_id?: string;
   tool_name?: string;
@@ -283,8 +353,10 @@ export type WorkspaceReport = {
   json_path?: string;
   trace_path?: string;
   artifact_dir?: string;
+  chart_artifacts?: ChartArtifact[];
   artifacts?: ReportArtifactRecord[];
   tool_calls?: ReportToolCallRecord[];
+  external_publish_results?: Record<string, ExternalPublishResult>;
   created_at?: string;
   updated_at?: string;
   provider_metadata?: Record<string, unknown>;
@@ -393,11 +465,6 @@ export async function runAnalysis(
   const payload =
     typeof request === "string"
       ? { user_question: request }
-      : request.pendingRunId
-        ? {
-            pending_run_id: request.pendingRunId,
-            clarification_answer: request.clarificationAnswer ?? "",
-          }
       : {
           user_question: request.userQuestion ?? "",
           ...(request.initialSql?.trim() ? { initial_sql: request.initialSql.trim() } : {}),
@@ -409,6 +476,19 @@ export async function runAnalysis(
     body: JSON.stringify(payload),
   });
   return parseJsonResponse(response, "Failed to run analysis");
+}
+
+export async function followUpAnalysis(
+  workspaceId: string,
+  runId: string,
+  request: { message: string },
+): Promise<WorkspaceRunResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/runs/${runId}/follow-ups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: request.message }),
+  });
+  return parseJsonResponse(response, "Failed to continue analysis thread");
 }
 
 export async function listWorkspaceRuns(workspaceId: string): Promise<WorkspaceRunsResponse> {
@@ -451,6 +531,26 @@ export async function getWorkspaceReport(
 
 export function getWorkspaceReportDownloadUrl(workspaceId: string, reportId: string): string {
   return `${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}/download`;
+}
+
+export async function exportWorkspaceReportDocx(
+  workspaceId: string,
+  reportId: string,
+): Promise<WorkspaceReportExportResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}/export`, {
+    method: "POST",
+  });
+  return parseJsonResponse(response, "Failed to export report");
+}
+
+export async function publishFeishuReport(
+  workspaceId: string,
+  reportId: string,
+): Promise<WorkspaceReportPublishResponse> {
+  const response = await fetch(`${API_BASE}/api/workspaces/${workspaceId}/reports/${reportId}/publish/feishu`, {
+    method: "POST",
+  });
+  return parseJsonResponse(response, "Failed to publish report to Feishu");
 }
 
 export function resolveApiUrl(url: string): string {

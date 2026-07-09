@@ -3,9 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-from llm_ops.provider import LLMProvider, LLMRequest
-from llm_ops.structured_output import run_validated_llm_request, validate_prompt_output
+from llm_ops.structured_output import validate_prompt_output
 from workspaces.answer_evidence import (
     contains_cjk,
     entity_key,
@@ -69,6 +67,22 @@ _ASCII_STOPWORDS = {
     "which",
     "wins",
 }
+_KNOWN_METRIC_ACRONYMS = {
+    "AOV",
+    "CAC",
+    "CPA",
+    "CPC",
+    "CPM",
+    "CTR",
+    "CVR",
+    "GMV",
+    "ROI",
+    "ROAS",
+}
+_METRIC_ALIASES = {
+    "roi": {"roas", "return_on_ad_spend", "net_return"},
+    "roas": {"roi", "return_on_ad_spend"},
+}
 
 
 def review_answer(
@@ -78,67 +92,14 @@ def review_answer(
     evidence_result: dict[str, Any] | None = None,
     draft_business_answer: dict[str, Any],
     profile_context: dict[str, Any] | None = None,
-    provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
-    if provider is not None:
-        provider_review = _provider_review(
-            provider=provider,
-            user_question=user_question,
-            execution_result=execution_result,
-            evidence_result=evidence_result or {},
-            draft_business_answer=draft_business_answer,
-            profile_context=profile_context or {},
-        )
-        if provider_review:
-            return provider_review
+    del profile_context
     return _deterministic_review(
         user_question=user_question,
         execution_result=execution_result,
         evidence_result=evidence_result or {},
         draft_business_answer=draft_business_answer,
     )
-
-
-def _provider_review(
-    *,
-    provider: LLMProvider,
-    user_question: str,
-    execution_result: dict[str, Any],
-    evidence_result: dict[str, Any],
-    draft_business_answer: dict[str, Any],
-    profile_context: dict[str, Any],
-) -> dict[str, Any]:
-    rendered = DEFAULT_PROMPT_REGISTRY.render(
-        "answer_reviewer",
-        {
-            "user_question": user_question,
-            "execution_result": execution_result,
-            "evidence_result": evidence_result,
-            "draft_business_answer": draft_business_answer,
-            "profile_context": profile_context,
-        },
-    )
-    if not rendered.get("success"):
-        return {}
-    request = LLMRequest(
-        prompt=rendered["prompt"],
-        prompt_id=rendered["prompt_id"],
-        prompt_version=rendered["prompt_version"],
-        model=getattr(provider, "model", "unknown"),
-        metadata={"node": "answer_reviewer_agent"},
-    )
-    response = run_validated_llm_request(
-        provider,
-        request,
-        schema_context={
-            "user_question": user_question,
-            "execution_result": execution_result,
-            "evidence_result": evidence_result,
-            "draft_business_answer": draft_business_answer,
-        },
-    )
-    content = response.get("content")
-    return content if response.get("success") and isinstance(content, dict) else {}
 
 
 def _deterministic_review(
@@ -261,6 +222,8 @@ def _unsupported_entity_mentions(text: str, supported_entities: list[str], suppo
     supported_metric_labels = {metric.lower() for metric in supported_metrics}
     candidates = []
     for token in re.findall(r"\b[A-Z][A-Za-z0-9_-]{1,40}\b", text):
+        if _is_supported_metric_token(token, supported_metric_labels):
+            continue
         if (
             token in supported
             or token in supported_entity_parts
@@ -271,6 +234,19 @@ def _unsupported_entity_mentions(text: str, supported_entities: list[str], suppo
         if token not in candidates:
             candidates.append(token)
     return candidates
+
+
+def _is_supported_metric_token(token: str, supported_metric_labels: set[str]) -> bool:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return False
+    upper = normalized.upper()
+    lower = normalized.lower()
+    if upper in _KNOWN_METRIC_ACRONYMS:
+        return True
+    if lower in supported_metric_labels:
+        return True
+    return bool(_METRIC_ALIASES.get(lower, set()) & supported_metric_labels)
 
 
 def _unsupported_metric_mentions(text: str, supported_metrics: list[str], supported_entities: list[str]) -> list[str]:

@@ -98,7 +98,7 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
     from llm_ops.deepseek_provider import DeepSeekConfig, DeepSeekProvider
     from llm_ops.provider import LLMRequest
 
-    client = _FakeClient('{"claims": ["GMV 为 100"]}')
+    client = _FakeClient('{"sql_candidates": [{"sql": "SELECT 1", "rationale": "smoke"}]}')
     provider = DeepSeekProvider(
         DeepSeekConfig(
             api_key="sk-test-secret",
@@ -110,15 +110,15 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
 
     content = provider.generate(
         LLMRequest(
-            prompt="Return JSON claims.",
-            prompt_id="guarded_insight_claims",
+            prompt="Return JSON SQL candidates.",
+            prompt_id="guarded_sql_candidate",
             prompt_version="v1",
             model=provider.model,
         )
     )
 
     call = client.chat.completions.calls[0]
-    assert json.loads(content) == {"claims": ["GMV 为 100"]}
+    assert json.loads(content) == {"sql_candidates": [{"sql": "SELECT 1", "rationale": "smoke"}]}
     assert call["model"] == "deepseek-v4-pro"
     assert call["temperature"] == 0
     assert call["response_format"] == {"type": "json_object"}
@@ -126,12 +126,12 @@ def test_deepseek_provider_uses_json_response_format_without_token_cap():
     assert "sk-test-secret" not in str(call)
 
 
-def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
+def test_business_answer_prompt_and_schema_use_business_answer_contract():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
     from llm_ops.structured_output import validate_prompt_output
 
     rendered = DEFAULT_PROMPT_REGISTRY.render(
-        "insight_drafter",
+        "business_answer",
         {
             "user_question": "哪个渠道该加预算？",
             "execution_result": {
@@ -150,7 +150,7 @@ def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
     assert "draft_summary" not in rendered["prompt"]
 
     accepted = validate_prompt_output(
-        "insight_drafter",
+        "business_answer",
         {
             "candidate_claims": ["paid_search 收入为 200.0。"],
             "business_answer": {
@@ -166,7 +166,7 @@ def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
         schema_context={"user_question": "哪个渠道该加预算？"},
     )
     rejected = validate_prompt_output(
-        "insight_drafter",
+        "business_answer",
         {
             "candidate_claims": ["paid_search 收入为 200.0。"],
             "draft_summary": "建议优先关注 paid_search。",
@@ -180,11 +180,11 @@ def test_insight_drafter_prompt_and_schema_use_business_answer_contract():
     assert "business_answer" in rejected["error"]
 
 
-def test_insight_drafter_prompt_includes_business_consistency_constraints():
+def test_business_answer_prompt_includes_business_consistency_constraints():
     from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 
     rendered = DEFAULT_PROMPT_REGISTRY.render(
-        "insight_drafter",
+        "business_answer",
         {
             "user_question": "最近90天按渠道看收入、ROI 和投放成本，哪个渠道最值得加预算？",
             "execution_result": {
@@ -207,15 +207,18 @@ def test_insight_drafter_prompt_includes_business_consistency_constraints():
     assert "field=value" in prompt
     assert "decision basis" in prompt
     assert "tradeoff" in prompt
+    assert "fact_text" in prompt
+    assert "business_object" in prompt
+    assert "instead of saying only 'ranked first'" in prompt
     assert "Do not recommend budget changes without sufficient comparative evidence" in prompt
     assert "business_answer is product-facing business prose" in prompt
 
 
-def test_insight_drafter_validation_rejects_budget_action_from_single_row_evidence():
+def test_business_answer_validation_rejects_budget_action_from_single_row_evidence():
     from llm_ops.structured_output import validate_prompt_output
 
     result = validate_prompt_output(
-        "insight_drafter",
+        "business_answer",
         {
             "candidate_claims": ["自然流量 ROI 为 16.22。"],
             "business_answer": {
@@ -244,11 +247,11 @@ def test_insight_drafter_validation_rejects_budget_action_from_single_row_eviden
     assert "comparative evidence" in result["error"] or "比较证据" in result["error"]
 
 
-def test_insight_drafter_validation_allows_evidence_gathering_recommendation_from_single_row():
+def test_business_answer_validation_allows_evidence_gathering_recommendation_from_single_row():
     from llm_ops.structured_output import validate_prompt_output
 
     result = validate_prompt_output(
-        "insight_drafter",
+        "business_answer",
         {
             "candidate_claims": ["自然流量 ROI 为 16.22。"],
             "business_answer": {
@@ -278,11 +281,11 @@ def test_insight_drafter_validation_allows_evidence_gathering_recommendation_fro
     ]
 
 
-def test_insight_drafter_validation_rejects_internal_report_section_prompt_in_business_answer():
+def test_business_answer_validation_rejects_internal_report_section_prompt_in_business_answer():
     from llm_ops.structured_output import validate_prompt_output
 
     result = validate_prompt_output(
-        "insight_drafter",
+        "business_answer",
         {
             "candidate_claims": ["渠道收入已按当前执行结果汇总。"],
             "business_answer": {

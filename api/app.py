@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +17,13 @@ from api.models import (
     WorkspaceProfileResponse,
     WorkspaceReportCreateRequest,
     WorkspaceReportCreateResponse,
+    WorkspaceReportExportResponse,
+    WorkspaceReportPublishResponse,
     WorkspaceReportResponse,
     WorkspaceReportsResponse,
     WorkspaceResponse,
     WorkspaceRunCreateRequest,
+    WorkspaceRunFollowUpRequest,
     WorkspaceRunResponse,
     WorkspaceRunsResponse,
     WorkspaceSemanticResponse,
@@ -31,12 +35,15 @@ from api.models import (
 from llm_ops.runtime_provider import build_report_composer_provider
 from workspaces.analysis_runner import (
     execute_workspace_analysis_job,
-    run_workspace_analysis_continuation,
+    run_workspace_analysis_follow_up,
     submit_workspace_analysis_run,
 )
 from workspaces.importers import import_csv, import_excel, import_sqlite
-from workspaces.pending_clarification_store import PendingClarificationNotFoundError
+from workspaces.document_export import export_report_docx
+from workspaces.export_package import build_report_export_package
+from workspaces.feishu_publisher import CliFeishuPublisher
 from workspaces.profiler import profile_workspace_database
+from workspaces.report_models import ReportArtifactRecord, ReportToolCallRecord
 from workspaces.report_runner import run_workspace_report
 from workspaces.report_store import ReportNotFoundError, WorkspaceReportStore
 from workspaces.run_store import RunNotFoundError, WorkspaceRunStore
@@ -50,6 +57,32 @@ ReportRunner = Callable[..., dict[str, Any]]
 
 def _workspace_not_found(workspace_id: str) -> HTTPException:
     return HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
+
+
+def _workspace_artifact_url(workspace_id: str, relative_path: str) -> str:
+    encoded_path = "/".join(
+        quote(part, safe="")
+        for part in str(relative_path).split("/")
+        if part
+    )
+    return f"/api/workspaces/{workspace_id}/artifacts/{encoded_path}"
+
+
+def _friendly_export_warnings(warnings: list[str]) -> list[str]:
+    friendly: list[str] = []
+    for warning in warnings:
+        text = str(warning or "").strip()
+        if not text:
+            continue
+        if "SVG" in text or "静态图" in text or "无法插入" in text:
+            friendly.append("部分图表当前以占位说明展示。")
+        else:
+            friendly.append(text)
+    return list(dict.fromkeys(friendly))
+
+
+def _build_feishu_publisher(*, workspace_root: Path | None = None) -> CliFeishuPublisher:
+    return CliFeishuPublisher(workspace_root=workspace_root)
 
 
 def create_app(
@@ -160,31 +193,53 @@ def create_app(
     @app.post("/api/workspaces/{workspace_id}/runs", response_model=WorkspaceRunResponse)
     def create_workspace_run(workspace_id: str, request: WorkspaceRunCreateRequest) -> dict:
         try:
-            if request.pending_run_id:
-                result = run_workspace_analysis_continuation(
-                    store=store,
-                    workspace_id=workspace_id,
-                    pending_run_id=request.pending_run_id,
-                    clarification_answer=request.clarification_answer or "",
+            result = submit_workspace_analysis_run(
+                store=store,
+                workspace_id=workspace_id,
+                user_question=request.user_question or "",
+                initial_sql=request.initial_sql,
+                force_reanalysis=request.force_reanalysis,
+            )
+            if start_background_analysis and result.get("status") == "running" and result.get("run_id"):
+                analysis_executor.submit(
+                    execute_workspace_analysis_job,
+                    store,
+                    workspace_id,
+                    str(result["run_id"]),
+                    request.user_question or "",
+                    request.initial_sql,
                 )
-            else:
-                result = submit_workspace_analysis_run(
-                    store=store,
-                    workspace_id=workspace_id,
-                    user_question=request.user_question or "",
-                    initial_sql=request.initial_sql,
-                    force_reanalysis=request.force_reanalysis,
-                )
-                if start_background_analysis and result.get("status") == "running" and result.get("run_id"):
-                    analysis_executor.submit(
-                        execute_workspace_analysis_job,
-                        store,
-                        workspace_id,
-                        str(result["run_id"]),
-                        request.user_question or "",
-                        request.initial_sql,
-                    )
-        except PendingClarificationNotFoundError as exc:
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "success": result.get("status") != "failed",
+            "workspace_id": workspace_id,
+            "run_id": result.get("run_id"),
+            "status": result.get("status"),
+            "matched_run_id": result.get("matched_run_id"),
+            "message": result.get("message"),
+            "data_version": result.get("data_version"),
+            "normalized_question": result.get("normalized_question"),
+            "result": result,
+            "product_result": result.get("product_result"),
+        }
+
+    @app.post("/api/workspaces/{workspace_id}/runs/{run_id}/follow-ups", response_model=WorkspaceRunResponse)
+    def create_workspace_run_follow_up(
+        workspace_id: str,
+        run_id: str,
+        request: WorkspaceRunFollowUpRequest,
+    ) -> dict:
+        try:
+            result = run_workspace_analysis_follow_up(
+                store=store,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                message=request.message,
+            )
+        except RunNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except FileNotFoundError:
             raise _workspace_not_found(workspace_id)
@@ -281,6 +336,124 @@ def create_app(
             "workspace_id": workspace_id,
             "report_id": report_id,
             "report": report.to_dict(),
+        }
+
+    @app.post(
+        "/api/workspaces/{workspace_id}/reports/{report_id}/export",
+        response_model=WorkspaceReportExportResponse,
+    )
+    def export_workspace_report(workspace_id: str, report_id: str) -> dict:
+        try:
+            workspace = store.get_workspace(workspace_id)
+            report = report_store.load_report(workspace_id, report_id)
+        except ReportNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+
+        workspace_root = Path(workspace["root_path"]).resolve()
+        export_package = build_report_export_package(report, workspace_root=workspace_root)
+        export_result = export_report_docx(export_package, workspace_root=workspace_root)
+        if not export_result.get("success"):
+            detail = "; ".join(str(item) for item in export_result.get("warnings", []) if item)
+            raise HTTPException(status_code=500, detail=detail or "Report Word export failed")
+
+        document_path = str(export_result.get("document_path") or "")
+        try:
+            absolute_document_path = store.resolve_workspace_path(workspace_id, document_path)
+        except ValueError as exc:
+            raise HTTPException(status_code=500, detail="Report Word export path is unsafe") from exc
+        if not absolute_document_path.exists() or not absolute_document_path.is_file():
+            raise HTTPException(status_code=500, detail="Report Word export file was not created")
+
+        download_url = _workspace_artifact_url(workspace_id, document_path)
+        artifact = dict(export_result.get("artifact") or {})
+        artifact["relative_path"] = document_path
+        artifact["download_url"] = download_url
+        artifact["download_name"] = str(export_result.get("download_name") or artifact.get("download_name") or "")
+        report.artifacts = [
+            artifact_record
+            for artifact_record in report.artifacts
+            if artifact_record.artifact_id != artifact.get("artifact_id")
+        ]
+        report.artifacts.append(
+            ReportArtifactRecord(
+                artifact_id=str(artifact.get("artifact_id") or f"artifact_docx_{report_id}"),
+                artifact_type="word_document",
+                title=str(artifact.get("title") or report.title or "Word 报告"),
+                relative_path=document_path,
+                download_url=download_url,
+                source="document_export",
+                evidence_ids=list(export_package.evidence_refs),
+                chart_ids=[
+                    str(chart.get("artifact_id") or chart.get("chart_id"))
+                    for chart in export_package.chart_artifacts
+                    if isinstance(chart, dict) and (chart.get("artifact_id") or chart.get("chart_id"))
+                ],
+                status="completed",
+                created_at=str(artifact.get("created_at") or report.updated_at or report.created_at),
+            )
+        )
+        report.tool_calls.append(
+            ReportToolCallRecord(
+                tool_call_id=f"tool_call_docx_{report_id}",
+                tool_name="document_export",
+                input_summary=f"导出 Word 报告：{report.title}",
+                referenced_evidence_ids=list(export_package.evidence_refs),
+                output_artifact_ids=[str(artifact.get("artifact_id") or f"artifact_docx_{report_id}")],
+                status="completed",
+            )
+        )
+        report_store.save_report(report, event_type="report_docx_exported")
+
+        return {
+            "success": True,
+            "workspace_id": workspace_id,
+            "report_id": report_id,
+            "document_path": document_path,
+            "download_name": str(export_result.get("download_name") or ""),
+            "download_url": download_url,
+            "warnings": _friendly_export_warnings(list(export_result.get("warnings") or [])),
+            "artifact": artifact,
+        }
+
+    @app.post(
+        "/api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu",
+        response_model=WorkspaceReportPublishResponse,
+    )
+    def publish_workspace_report_to_feishu(workspace_id: str, report_id: str) -> dict:
+        try:
+            workspace = store.get_workspace(workspace_id)
+            report = report_store.load_report(workspace_id, report_id)
+        except ReportNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except FileNotFoundError:
+            raise _workspace_not_found(workspace_id)
+
+        try:
+            workspace_root = Path(workspace["root_path"]).resolve()
+            export_package = build_report_export_package(
+                report,
+                workspace_root=workspace_root,
+                static_asset_target_format="png",
+            )
+            publish_result = _build_feishu_publisher(workspace_root=workspace_root).publish_report(export_package)
+            safe_result = publish_result.to_safe_dict()
+            report.external_publish_results = {
+                **dict(report.external_publish_results or {}),
+                "feishu": safe_result,
+            }
+            report_store.save_report(report, event_type="report_published_feishu")
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001 - only unexpected program errors become API 500.
+            raise HTTPException(status_code=500, detail="Feishu publish failed unexpectedly") from exc
+
+        return {
+            "success": safe_result.get("status") in {"published", "warning"},
+            "workspace_id": workspace_id,
+            "report_id": report_id,
+            "publish_result": safe_result,
         }
 
     @app.get("/api/workspaces/{workspace_id}/reports/{report_id}/download")

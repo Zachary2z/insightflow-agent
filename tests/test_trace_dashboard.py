@@ -20,7 +20,7 @@ def test_trace_dashboard_summarizes_agent_tool_sql_and_eval_metrics(tmp_path):
                 {"node": "schema_agent", "tool_name": "get_database_schema", "latency_ms": 5, "status": "success"},
                 {"node": "sql_reviewer_agent", "tool_name": "validate_sql", "latency_ms": 7, "status": "success"},
                 {"node": "sql_executor_node", "tool_name": "run_sql", "latency_ms": 11, "status": "success"},
-                {"node": "insight_agent", "tool_name": "", "latency_ms": 3, "status": "success"},
+                {"node": "business_answer_agent", "tool_name": "", "latency_ms": 3, "status": "success"},
             ],
         },
     )

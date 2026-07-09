@@ -8,8 +8,7 @@ import EvidencePanel from "./EvidencePanel";
 import TechnicalDetailsDisclosure from "./TechnicalDetailsDisclosure";
 
 type ContinuePayload = {
-  pendingRunId: string;
-  clarificationAnswer: string;
+  message: string;
 };
 
 type FollowUpPayload = {

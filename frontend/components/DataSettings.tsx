@@ -17,9 +17,9 @@ const FEATURE_LABELS: Record<string, string> = {
   clarification: "追问判断",
   sql_planning: "SQL 规划",
   sql_candidate: "SQL 草案",
-  insight_drafting: "结论撰写",
-  claim_typing: "证据判断",
+  business_answer: "业务回答",
   visualization: "图表建议",
+  report_composer: "报告撰写",
 };
 
 const ROLE_LABELS: Record<string, string> = {

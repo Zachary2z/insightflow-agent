@@ -43,12 +43,10 @@ def _analysis_steps(route: str, *, chart_artifacts: list[dict[str, Any]]) -> lis
         "deep_judgment": "本次问题需要完整业务判断。",
         "standard_analysis": "本次问题走常规分析路径。",
     }.get(route, "已选择合适的分析路径。")
-    chart_status: ProgressStatus = "skipped" if route == "fast_fact" else "completed"
-    chart_summary = (
-        "事实快答不生成图表。"
-        if route == "fast_fact"
-        else "已完成图表生成或图表可用性检查。"
-    )
+    chart_status: ProgressStatus = "skipped" if route == "fast_fact" and not chart_artifacts else "completed"
+    chart_summary = "已完成图表生成。" if chart_artifacts else "已完成图表生成或图表可用性检查。"
+    if route == "fast_fact" and not chart_artifacts:
+        chart_summary = "事实快答未请求图表，已跳过图表生成。"
     if chart_status == "completed" and not chart_artifacts:
         chart_summary = "已检查图表需求，本轮没有可展示图表。"
     return [

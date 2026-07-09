@@ -8,6 +8,7 @@ from workspaces.time_range_defaults import full_range_default_note, resolve_time
 
 ALLOWED_TASK_TYPES = {"compare", "rank", "trend", "summary", "anomaly", "recommendation", "report", "clarification"}
 ALLOWED_CONFIDENCE = {"low", "medium", "high"}
+SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export", "external_action"}
 
 
 def compact_text(value: Any) -> str:
@@ -63,6 +64,8 @@ def normalize_analysis_task(
     time_field_candidates: list[dict[str, str]] = []
     specialized_missing_slots: list[str] = []
     resolved_question = str(provider_task.get("resolved_question") or question or "").strip()
+    if not metrics:
+        metrics = _default_metrics_for_recommendation(question, task_type=task_type, dimensions=dimensions, time_range=time_range)
 
     if time_range is None:
         default_decision = resolve_time_default(
@@ -176,7 +179,7 @@ def build_clarification_questions(missing_slots: list[str], task: dict[str, Any]
 
 
 def strategy_for_task(task: dict[str, Any], *, risk_flags: list[str] | None = None) -> str:
-    if risk_flags:
+    if any(str(flag) in SAFETY_RISK_FLAGS for flag in risk_flags or []):
         return "reject"
     if task.get("missing_slots"):
         return "clarify"
@@ -193,7 +196,20 @@ def canonical_metric_id(metric_label: str) -> str:
         return "roi"
     if compact in {"netreturn", "netroi", "净投放回报率", "净回报率", "净投放回报"}:
         return "net_return"
-    if compact in {"销售额", "收入", "营收", "成交额", "gmv", "sales", "salesamount", "revenue"}:
+    if compact in {
+        "销售额",
+        "收入",
+        "营收",
+        "成交额",
+        "gmv",
+        "sales",
+        "salesamount",
+        "sumsalesamount",
+        "totalsales",
+        "revenue",
+        "sumrevenue",
+        "totalrevenue",
+    }:
         return "gmv"
     if compact in {"订单量", "订单数", "订单数量", "ordercount"}:
         return "order_count"
@@ -221,7 +237,9 @@ def canonical_dimension_id(dimension_label: str) -> str:
         "客户": "user",
         "user": "user",
         "渠道": "channel",
+        "渠道名称": "channel",
         "channel": "channel",
+        "channelname": "channel",
         "门店": "store",
         "店铺": "store",
         "storename": "store",
@@ -356,7 +374,7 @@ def _normalize_string_list(value: Any) -> list[str]:
 def _question_metric_matches(question: str) -> list[str]:
     net_return_keywords = ("净投放回报率", "净回报率", "net return", "net_return", "net roi", "netroi")
     candidates = [
-        (("roas",), "ROAS"),
+        (("roas", "投放效率", "投产效率", "广告投入产出比"), "ROAS"),
         (("roi",), "ROI"),
         (("销售额", "成交额", "收入", "营收", "gmv", "sales amount", "sales", "revenue"), "销售额"),
         (("花费", "费用", "成本", "投放成本", "spend", "cost"), "花费"),
@@ -483,7 +501,7 @@ def _calculation_type(task_type: str, question: str) -> str:
         return "contribution"
     if contains_any(question, ("响应效率", "响应时长", "处理效率", "满意度", "客服运营")):
         return "operational_efficiency"
-    if contains_any(question, ("roas", "roi", "投放回报", "投产比", "净投放回报")):
+    if contains_any(question, ("roas", "roi", "投放回报", "投产比", "投放效率", "投产效率", "净投放回报", "加预算", "预算建议")):
         return "investment_efficiency"
     if task_type == "rank":
         return "ranking"
@@ -492,6 +510,23 @@ def _calculation_type(task_type: str, question: str) -> str:
     if task_type == "compare":
         return "comparison"
     return task_type or "summary"
+
+
+def _default_metrics_for_recommendation(
+    question: str,
+    *,
+    task_type: str,
+    dimensions: list[str],
+    time_range: dict[str, Any] | None,
+) -> list[str]:
+    if task_type != "recommendation" or not time_range:
+        return []
+    canonical_dimensions = {canonical_dimension_id(item) for item in dimensions}
+    if "channel" not in canonical_dimensions:
+        return []
+    if not contains_any(question, ("加预算", "增加预算", "预算建议")):
+        return []
+    return ["销售额", "花费", "ROAS"]
 
 
 def _order_metrics_for_calculation(metrics: list[str], calculation_type: str) -> list[str]:

@@ -1,12 +1,13 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
 import BusinessQAPreview from "../components/BusinessQAPreview";
 import BusinessAnswerCard from "../components/BusinessAnswerCard";
 import ChartArtifactGallery from "../components/ChartArtifactGallery";
 import DataSettings from "../components/DataSettings";
 import DatasetManager from "../components/DatasetManager";
+import EvidencePanel from "../components/EvidencePanel";
 import ProfileSummary from "../components/ProfileSummary";
 import ProfileWorkspace from "../components/ProfileWorkspace";
 import ReportGenerator from "../components/ReportGenerator";
@@ -27,7 +28,17 @@ import SemanticLayerPage from "../app/workspaces/[workspaceId]/semantic-layer/pa
 import SettingsPage from "../app/workspaces/[workspaceId]/settings/page";
 import WorkspacesPage from "../app/workspaces/page";
 
+const echartsMock = vi.hoisted(() => ({
+  init: vi.fn(),
+  setOption: vi.fn(),
+  resize: vi.fn(),
+  dispose: vi.fn(),
+}));
 const pushMock = vi.fn();
+
+vi.mock("echarts", () => ({
+  init: echartsMock.init,
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -40,6 +51,8 @@ vi.mock("../lib/api", () => ({
   createWorkspaceReport: vi.fn(),
   createSemanticDraft: vi.fn(),
   createWorkspace: vi.fn(),
+  exportWorkspaceReportDocx: vi.fn(),
+  followUpAnalysis: vi.fn(),
   getWorkspaceReport: vi.fn(),
   getWorkspaceArtifactUrl: (workspaceId: string, relativePath: string) =>
     `http://localhost:8000/api/workspaces/${workspaceId}/artifacts/${relativePath}`,
@@ -51,6 +64,7 @@ vi.mock("../lib/api", () => ({
   listWorkspaceRuns: vi.fn(),
   listSources: vi.fn(),
   listWorkspaces: vi.fn(),
+  publishFeishuReport: vi.fn(),
   resolveApiUrl: (url: string) => (url.startsWith("/api/") ? `http://localhost:8000${url}` : url),
   runAnalysis: vi.fn(),
   uploadSource: vi.fn(),
@@ -61,6 +75,8 @@ import {
   createWorkspaceReport,
   createSemanticDraft,
   createWorkspace,
+  exportWorkspaceReportDocx,
+  followUpAnalysis,
   getWorkspaceReport,
   getWorkspaceReportDownloadUrl,
   getWorkspaceRun,
@@ -70,11 +86,20 @@ import {
   listWorkspaceRuns,
   listSources,
   listWorkspaces,
+  publishFeishuReport,
   runAnalysis,
   uploadSource,
 } from "../lib/api";
 
 describe("workspace product components", () => {
+  beforeEach(() => {
+    echartsMock.init.mockReturnValue({
+      setOption: echartsMock.setOption,
+      resize: echartsMock.resize,
+      dispose: echartsMock.dispose,
+    });
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.resetAllMocks();
@@ -1413,9 +1438,8 @@ describe("workspace product components", () => {
     vi.mocked(listWorkspaceRuns)
       .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
       .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_pending", status: "waiting_for_clarification", question: "帮我分析渠道表现", headline: "需要补充时间范围", saved_at: "2026-06-29T12:00:00Z", has_chart: false, requires_clarification: true, failure_reason: "" }] })
-      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_done", status: "completed", question: "帮我分析渠道表现", headline: "paid_search 表现最好", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
-    vi.mocked(runAnalysis)
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_pending", status: "completed", question: "帮我分析渠道表现", headline: "paid_search 表现最好", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
+    vi.mocked(runAnalysis).mockResolvedValueOnce({
         success: true,
         workspace_id: "ws_1",
         run_id: "run_pending",
@@ -1424,7 +1448,6 @@ describe("workspace product components", () => {
             version: "p16.v1",
             status: "waiting_for_clarification",
             question_thread: {
-              pending_run_id: "pending_1",
               original_question: "帮我分析渠道表现",
               system_understanding: "需要按渠道比较表现",
               clarification_question: "你希望分析哪个时间范围？",
@@ -1444,11 +1467,11 @@ describe("workspace product components", () => {
             technical_details: {},
           },
         },
-      })
-      .mockResolvedValueOnce({
+      });
+    vi.mocked(followUpAnalysis).mockResolvedValueOnce({
         success: true,
         workspace_id: "ws_1",
-        run_id: "run_done",
+        run_id: "run_pending",
         result: {
           product_result: {
             version: "p16.v1",
@@ -1483,11 +1506,11 @@ describe("workspace product components", () => {
     fireEvent.click(screen.getByRole("button", { name: "继续分析" }));
 
     await waitFor(() =>
-      expect(runAnalysis).toHaveBeenLastCalledWith("ws_1", {
-        pendingRunId: "pending_1",
-        clarificationAnswer: "最近 90 天",
+      expect(followUpAnalysis).toHaveBeenCalledWith("ws_1", "run_pending", {
+        message: "最近 90 天",
       }),
     );
+    expect(runAnalysis).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(3));
     expect(await screen.findByText("用户补充")).toBeTruthy();
     expect(screen.getByText("整理后")).toBeTruthy();
@@ -1498,9 +1521,8 @@ describe("workspace product components", () => {
     vi.mocked(listWorkspaceRuns)
       .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [] })
       .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_done", status: "completed", question: "帮我分析最近90天哪些渠道收益比较好", headline: "email 渠道收益最好", saved_at: "2026-06-29T12:00:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] })
-      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_followup", status: "completed", question: "为什么 email 渠道收益最好？", headline: "email 的客单价更高", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
-    vi.mocked(runAnalysis)
-      .mockResolvedValueOnce({
+      .mockResolvedValueOnce({ workspace_id: "ws_1", runs: [{ run_id: "run_done", status: "completed", question: "帮我分析最近90天哪些渠道收益比较好", headline: "email 的客单价更高", saved_at: "2026-06-29T12:05:00Z", has_chart: false, requires_clarification: false, failure_reason: "" }] });
+    vi.mocked(runAnalysis).mockResolvedValueOnce({
         success: true,
         workspace_id: "ws_1",
         run_id: "run_done",
@@ -1528,19 +1550,24 @@ describe("workspace product components", () => {
             technical_details: {},
           },
         },
-      })
-      .mockResolvedValueOnce({
+      });
+    vi.mocked(followUpAnalysis).mockResolvedValueOnce({
         success: true,
         workspace_id: "ws_1",
-        run_id: "run_followup",
+        run_id: "run_done",
         result: {
           product_result: {
             version: "p16.v1",
             status: "completed",
             question_thread: {
-              original_question: "基于上一轮分析继续追问",
+              thread_id: "run_done",
+              original_question: "帮我分析最近90天哪些渠道收益比较好",
               resolved_question: "继续分析 email 渠道为什么收益最好。",
               status: "completed",
+              turns: [
+                { turn_id: "turn_1", user_input: "帮我分析最近90天哪些渠道收益比较好", resolved_question: "分析最近 90 天各渠道收益表现。", status: "completed", answer_summary: "email 渠道收益最好", business_lens: {}, evidence_refs: [], created_at: "2026-06-29T12:00:00Z" },
+                { turn_id: "turn_2", user_input: "为什么 email 渠道收益最好？", resolved_question: "继续分析 email 渠道为什么收益最好。", status: "completed", answer_summary: "email 的客单价更高", business_lens: {}, evidence_refs: [], created_at: "2026-06-29T12:05:00Z" },
+              ],
             },
             business_answer: {
               headline: "email 的客单价更高",
@@ -1570,16 +1597,144 @@ describe("workspace product components", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "发送追问" }));
 
-    await waitFor(() => expect(runAnalysis).toHaveBeenCalledTimes(2));
-    const followUpRequest = vi.mocked(runAnalysis).mock.calls[1][1];
-    expect(followUpRequest).toMatchObject({
-      userQuestion: expect.stringContaining("为什么 email 渠道收益最好？"),
-    });
-    expect(String((followUpRequest as { userQuestion?: string }).userQuestion)).toContain(
+    await waitFor(() =>
+      expect(followUpAnalysis).toHaveBeenCalledWith("ws_1", "run_done", {
+        message: "为什么 email 渠道收益最好？",
+      }),
+    );
+    expect(runAnalysis).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(followUpAnalysis).mock.calls)).not.toContain("基于上一轮分析继续追问");
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(3));
+    expect(screen.getAllByText("帮我分析最近90天哪些渠道收益比较好").length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText("email 的客单价更高")).toBeTruthy();
+    expect((screen.getByLabelText("业务问题") as HTMLTextAreaElement).value).toBe(
       "帮我分析最近90天哪些渠道收益比较好",
     );
-    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledTimes(3));
-    expect(await screen.findByText("email 的客单价更高")).toBeTruthy();
+  });
+
+  it("renders a coherent compact analysis thread with lens ledger turns and chart refs", () => {
+    const { container } = render(
+      <RunResult
+        result={{
+          product_result: {
+            version: "p16.v1",
+            status: "completed",
+            question_thread: {
+              thread_id: "run_thread_compact",
+              original_question: "各渠道投放花费和收入表现怎么样？",
+              system_understanding: "按渠道比较收入和投放花费。",
+              resolved_question: "分析各渠道收入、投放花费和投放效率。",
+              status: "completed",
+              current_business_lens: {
+                business_domain: "channel_performance",
+                metrics: [
+                  {
+                    label: "收入",
+                    source_table: "orders",
+                    source_field: "revenue",
+                    time_field: "order_date",
+                  },
+                  {
+                    label: "投放花费",
+                    source_table: "marketing_spend",
+                    source_field: "spend",
+                    time_field: "spend_date",
+                  },
+                ],
+                dimensions: [{ label: "渠道", source_table: "orders", source_field: "channel" }],
+                time_policy_note: "收入按 order_date 统计，投放花费按 spend_date 统计；未指定时间范围，默认使用完整数据范围。",
+              },
+              evidence_refs: ["question_evidence_ledger:qledger_123", "evidence:row:0:revenue"],
+              turns: [
+                {
+                  turn_id: "turn_1",
+                  user_input: "各渠道投放花费和收入表现怎么样？",
+                  resolved_question: "分析各渠道收入和投放花费。",
+                  status: "completed",
+                  answer_summary: "私域社群收入最高。",
+                  created_at: "2026-07-06T10:00:00Z",
+                },
+                {
+                  turn_id: "turn_2",
+                  user_input: "继续看投放效率",
+                  resolved_question: "继续分析各渠道投放效率。",
+                  status: "completed",
+                  answer_summary: "私域社群 ROAS 最高。",
+                  created_at: "2026-07-06T10:05:00Z",
+                },
+              ],
+            },
+            business_answer: {
+              headline: "私域社群综合表现最好",
+              direct_answer: "私域社群收入和投放效率都领先。",
+              why: "证据表显示私域社群收入为 300000，投放花费为 30000。",
+              evidence_bullets: ["私域社群收入为 300000。"],
+              recommendations: ["优先复盘私域社群打法。"],
+              caveats: ["收入和投放花费使用各自业务日期口径。"],
+              confidence: "medium",
+            },
+            evidence: {
+              validation_status: "validated",
+              ledger_summary: {
+                ledger_id: "qledger_123",
+                time_policy_note: "收入按 order_date 统计，投放花费按 spend_date 统计；未指定时间范围，默认使用完整数据范围。",
+                facts: [{ fact_id: "fact_1", label: "收入", value: 300000, evidence_ref: "evidence:row:0:revenue" }],
+                derived_metrics: [{ metric_id: "roas", label: "ROAS", value: 10, evidence_ref: "evidence:derived:roas:0" }],
+                task_groups: [
+                  {
+                    title: "收入证据",
+                    status: "已取得",
+                    facts: ["私域社群收入为 300000。"],
+                  },
+                  {
+                    title: "投放花费证据",
+                    status: "已取得",
+                    facts: ["私域社群投放花费为 30000。"],
+                  },
+                ],
+                business_data_limits: ["效率辅助证据未能完成；本次结论仍以收入和投放花费证据为准。"],
+                chart_refs: ["chart_channel_revenue"],
+                evidence_refs: ["evidence:row:0:revenue"],
+                confidence: "high",
+              },
+              table_preview: { columns: ["channel", "revenue"], rows: [["私域社群", 300000]] },
+            },
+            chart_artifacts: [
+              {
+                artifact_id: "chart_channel_revenue",
+                title: "渠道收入与投放花费",
+                echarts_option: { xAxis: { data: ["私域社群"] }, yAxis: {}, series: [{ data: [300000] }] },
+                evidence_refs: ["evidence:row:0:revenue"],
+              },
+            ],
+            technical_details: {
+              sql: "SELECT channel, SUM(revenue) FROM orders GROUP BY channel",
+              trace_path: "/tmp/ws/runs/run_thread_compact/trace.json",
+              provider_metadata: { business_answer_generation: { provider_called: true } },
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("各渠道投放花费和收入表现怎么样？").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("分析各渠道收入、投放花费和投放效率。")).toBeTruthy();
+    expect(screen.getByText("线程记录")).toBeTruthy();
+    expect(screen.getByText(/继续看投放效率/)).toBeTruthy();
+    expect(screen.getByText(/私域社群 ROAS 最高/)).toBeTruthy();
+    expect(screen.getAllByText(/收入按 order_date 统计/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("证据摘要")).toBeTruthy();
+    expect(screen.getByText("收入证据")).toBeTruthy();
+    expect(screen.getByText("投放花费证据")).toBeTruthy();
+    expect(screen.getAllByText("私域社群收入为 300000。").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/效率辅助证据未能完成/)).toBeTruthy();
+    expect(screen.getByText("渠道收入与投放花费")).toBeTruthy();
+    const mainText = container.textContent ?? "";
+    expect(mainText).not.toContain("qledger_123");
+    expect(mainText).not.toContain("chart_channel_revenue");
+    expect(mainText).not.toContain("SELECT channel");
+    expect(mainText).not.toContain("trace.json");
+    expect(mainText).not.toContain("provider_called");
   });
 
   it("renders the business answer before evidence and technical details", () => {
@@ -1680,6 +1835,91 @@ describe("workspace product components", () => {
     );
     expect(screen.getByText("付费搜索贡献最高。")).toBeTruthy();
     expect(screen.queryByText("runs/run_1/charts/channel.png")).toBeNull();
+  });
+
+  it("renders interactive echarts first when chart artifacts carry options and hides technical metadata", async () => {
+    const { container } = render(
+      <ChartArtifactGallery
+        artifacts={[
+          {
+            artifact_id: "chart_channel_revenue_001",
+            title: "渠道收入",
+            renderer: "echarts",
+            chart_type: "ranked_bar",
+            chart_spec: { chart_type: "ranked_bar", x: "channel", y: "revenue", raw_sql: "SELECT * FROM orders" },
+            echarts_option: { series: [{ type: "bar", data: [100, 200] }] },
+            path: "runs/run_1/charts/channel.png",
+            url: "/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png",
+            image_path: "runs/run_1/charts/channel.png",
+            image_url: "/api/workspaces/ws_1/artifacts/runs/run_1/charts/channel.png",
+            evidence_refs: ["question_evidence_pack"],
+            source: "analysis_workbench",
+            data_row_count: 2,
+            business_annotation: "付费搜索贡献最高。",
+            trace_path: "runs/run_1/trace.json",
+            provider_metadata: { model: "internal" },
+          },
+        ] as never}
+      />,
+    );
+
+    expect(await screen.findByTestId("echarts-chart")).toBeTruthy();
+    expect(echartsMock.init).toHaveBeenCalled();
+    expect(echartsMock.setOption).toHaveBeenCalledWith({ series: [{ type: "bar", data: [100, 200] }] }, true);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("付费搜索贡献最高。")).toBeTruthy();
+    expect(container.textContent).not.toContain("question_evidence_pack");
+    expect(container.textContent).not.toContain("SELECT");
+    expect(container.textContent).not.toContain("trace.json");
+    expect(container.textContent).not.toContain("provider_metadata");
+  });
+
+  it("renders chart skip reasons in business language without technical metadata", () => {
+    const { container } = render(
+      <ChartArtifactGallery
+        artifacts={[
+          {
+            title: "图表未生成",
+            rendering_status: "skipped",
+            skip_reason: "收入证据和客服压力证据的业务对象不同，不能在同一张图中混合。",
+            chart_spec: { raw_sql: "SELECT * FROM orders" },
+            trace_path: "runs/run_1/trace.json",
+            provider_metadata: { model: "internal" },
+          },
+        ] as never}
+      />,
+    );
+
+    expect(screen.getByText("收入证据和客服压力证据的业务对象不同，不能在同一张图中混合。")).toBeTruthy();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).not.toContain("SELECT");
+    expect(container.textContent).not.toContain("trace.json");
+    expect(container.textContent).not.toContain("provider_metadata");
+  });
+
+  it("filters internal task fields from the evidence panel main table", () => {
+    const { container } = render(
+      <EvidencePanel
+        evidence={{
+          validation_status: "validated",
+          table_preview: {
+            columns: ["task_id", "task_purpose", "channel", "revenue"],
+            rows: [["core_fact_income_channel", "core_fact", "私域社群", 300000]],
+          },
+          ledger_summary: {
+            facts: [{ label: "收入", value: 300000, dimension: { channel: "私域社群" } }],
+            confidence: "medium",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("channel")).toBeTruthy();
+    expect(screen.getByText("revenue")).toBeTruthy();
+    expect(screen.getByText("私域社群")).toBeTruthy();
+    expect(container.textContent).not.toContain("task_id");
+    expect(container.textContent).not.toContain("task_purpose");
+    expect(container.textContent).not.toContain("core_fact_income_channel");
   });
 
   it("shows an empty chart gallery state when no artifacts exist", () => {
@@ -1942,6 +2182,18 @@ describe("workspace product components", () => {
             status: "completed",
           },
           {
+            artifact_id: "artifact_docx_report_1",
+            artifact_type: "word_document",
+            title: "Word 报告",
+            relative_path: "exports/documents/管理层收入复盘报告_report_1.docx",
+            download_url: "/api/workspaces/ws_1/artifacts/exports/documents/%E7%AE%A1%E7%90%86%E5%B1%82.docx",
+            source: "document_export",
+            evidence_ids: ["ledger_fact_revenue_total"],
+            ledger_metric_ids: [],
+            chart_ids: ["revenue_structure_chart"],
+            status: "completed",
+          },
+          {
             artifact_id: "artifact_future_export_placeholder",
             artifact_type: "future_export",
             title: "未来外部导出占位",
@@ -2051,6 +2303,7 @@ describe("workspace product components", () => {
     expect(screen.getByText("报告产物")).toBeTruthy();
     expect(screen.getByText("图表：收入结构图表")).toBeTruthy();
     expect(screen.getByText("Markdown 报告：Markdown 报告")).toBeTruthy();
+    expect(screen.getByText("Word 文档：Word 报告")).toBeTruthy();
     expect(screen.getByText("外部导出准备：未来外部导出占位")).toBeTruthy();
     expect(screen.getByText("状态：待处理")).toBeTruthy();
     expect(screen.getByText("证据来自订单表按产品品类汇总。")).toBeTruthy();
@@ -2104,6 +2357,404 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: "下载 Markdown" }).getAttribute("href")).toBe(
       "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
     );
+  });
+
+  it("exports a report to Word and shows download warnings without internal paths", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(exportWorkspaceReportDocx).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      document_path: "exports/documents/管理层收入复盘报告_report_1.docx",
+      download_name: "管理层收入复盘报告_report_1.docx",
+      download_url: "/api/workspaces/ws_1/artifacts/exports/documents/%E7%AE%A1%E7%90%86%E5%B1%82.docx",
+      warnings: ["部分图表当前以占位说明展示。"],
+      artifact: {
+        artifact_id: "artifact_docx_report_1",
+        artifact_type: "word_document",
+        title: "管理层收入复盘报告",
+        relative_path: "exports/documents/管理层收入复盘报告_report_1.docx",
+        status: "completed",
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    const button = await screen.findByRole("button", { name: "导出 Word" });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(exportWorkspaceReportDocx).toHaveBeenCalledWith("ws_1", "report_1"));
+    expect(screen.getByText("部分图表当前以占位说明展示。")).toBeTruthy();
+    const downloadLink = screen.getByRole("link", { name: "下载 Word 文档" });
+    expect(downloadLink.getAttribute("href")).toBe(
+      "http://localhost:8000/api/workspaces/ws_1/artifacts/exports/documents/%E7%AE%A1%E7%90%86%E5%B1%82.docx",
+    );
+    expect(downloadLink.getAttribute("download")).toBe("管理层收入复盘报告_report_1.docx");
+    expect(screen.queryByText(/exports\/documents/)).toBeNull();
+    expect(screen.queryByText(/trace.json/)).toBeNull();
+  });
+
+  it("shows a report Word export failure reason", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(exportWorkspaceReportDocx).mockRejectedValue(new Error("导出失败：无法生成 Word 文档"));
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "导出 Word" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("导出失败：无法生成 Word 文档");
+  });
+
+  it("publishes a report to Feishu and shows the returned document link", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    let resolvePublish: (value: Awaited<ReturnType<typeof publishFeishuReport>>) => void = () => {};
+    vi.mocked(publishFeishuReport).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePublish = resolve;
+      }),
+    );
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
+    expect(screen.getByRole("button", { name: "发布中" })).toBeTruthy();
+    resolvePublish({
+      success: true,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      publish_result: {
+        platform: "feishu",
+        status: "published",
+        title: "管理层收入复盘报告",
+        url: "https://example.feishu.cn/docx/doccn123",
+        document_id: "doccn123",
+        warnings: [],
+        tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: true }],
+      },
+    });
+
+    await waitFor(() => expect(publishFeishuReport).toHaveBeenCalledWith("ws_1", "report_1"));
+    const link = await screen.findByRole("link", { name: "打开飞书文档" });
+    expect(link.getAttribute("href")).toBe("https://example.feishu.cn/docx/doccn123");
+    expect(screen.getByText("已发布到飞书")).toBeTruthy();
+    expect(screen.queryByText(/lark-cli/)).toBeNull();
+    expect(screen.queryByText(/token/)).toBeNull();
+    expect(screen.queryByText(/stdout/)).toBeNull();
+  });
+
+  it("shows Feishu publish warnings with the link when publish succeeds with warnings", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(publishFeishuReport).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      publish_result: {
+        platform: "feishu",
+        status: "warning",
+        title: "管理层收入复盘报告",
+        url: "https://example.feishu.cn/docx/doccn_warning",
+        document_id: "doccn_warning",
+        inserted_chart_count: 2,
+        failed_chart_count: 1,
+        warnings: ["飞书文档已创建，但部分图表尚未插入。"],
+        tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: true }],
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
+
+    expect(await screen.findByText("已发布到飞书，存在提醒")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开飞书文档" }).getAttribute("href")).toBe(
+      "https://example.feishu.cn/docx/doccn_warning",
+    );
+    expect(screen.getByText("已插入 2 张图表，1 张图表未插入。")).toBeTruthy();
+    expect(screen.getByText("飞书文档已创建，但部分图表尚未插入。")).toBeTruthy();
+  });
+
+  it("only shows safe Feishu publish summary fields in the report viewer", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(publishFeishuReport).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      publish_result: {
+        platform: "feishu",
+        status: "warning",
+        title: "管理层收入复盘报告",
+        url: "https://example.feishu.cn/docx/doccn_safe",
+        document_id: "doccn_internal_only",
+        inserted_chart_count: 1,
+        failed_chart_count: 1,
+        warnings: [
+          "部分图表未插入，可稍后重试。",
+          "stdout token=secret SELECT * FROM orders trace_path=/Users/me/trace.json prompt_tokens=123",
+        ],
+        tool_calls: [
+          {
+            operation: "insert_chart_image",
+            command_name: "lark-cli",
+            success: false,
+            stderr: "token=secret",
+            raw_rows: [[1]],
+            provider_metadata: { model: "deepseek" },
+          },
+        ],
+      },
+    });
+
+    const { container } = render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
+
+    expect(await screen.findByText("已发布到飞书，存在提醒")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开飞书文档" }).getAttribute("href")).toBe(
+      "https://example.feishu.cn/docx/doccn_safe",
+    );
+    expect(screen.getByText("已插入 1 张图表，1 张图表未插入。")).toBeTruthy();
+    expect(screen.getByText("部分图表未插入，可稍后重试。")).toBeTruthy();
+    const renderedText = container.textContent ?? "";
+    for (const forbidden of [
+      "doccn_internal_only",
+      "lark-cli",
+      "stdout",
+      "stderr",
+      "token",
+      "secret",
+      "SELECT",
+      "raw_rows",
+      "trace_path",
+      "/Users/",
+      "provider_metadata",
+      "prompt_tokens",
+    ]) {
+      expect(renderedText).not.toContain(forbidden);
+    }
+  });
+
+  it("shows a generic Feishu warning when all detailed warnings are filtered", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(publishFeishuReport).mockResolvedValue({
+      success: true,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      publish_result: {
+        platform: "feishu",
+        status: "warning",
+        title: "管理层收入复盘报告",
+        url: "https://example.feishu.cn/docx/doccn_safe",
+        document_id: "doccn_safe",
+        inserted_chart_count: 0,
+        failed_chart_count: 2,
+        warnings: [
+          "stdout token=secret SELECT * FROM orders trace_path=/Users/me/trace.json prompt_tokens=123",
+        ],
+        tool_calls: [{ operation: "insert_chart_image", command_name: "lark-cli", success: false }],
+      },
+    });
+
+    const { container } = render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
+
+    expect(await screen.findByText("已发布到飞书，存在提醒")).toBeTruthy();
+    expect(screen.getByText("已插入 0 张图表，2 张图表未插入。")).toBeTruthy();
+    expect(screen.getByText("部分图表未插入飞书文档。")).toBeTruthy();
+    const renderedText = container.textContent ?? "";
+    expect(renderedText).not.toContain("stdout");
+    expect(renderedText).not.toContain("token");
+    expect(renderedText).not.toContain("SELECT");
+    expect(renderedText).not.toContain("/Users/");
+    expect(renderedText).not.toContain("prompt_tokens");
+  });
+
+  it("shows a readable Feishu publish failure reason", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "收入结构清晰。",
+          sections: [{ section_id: "summary", title: "收入概览", body: "报告正文。" }],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+      },
+    });
+    vi.mocked(publishFeishuReport).mockResolvedValue({
+      success: false,
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      publish_result: {
+        platform: "feishu",
+        status: "failed",
+        title: "管理层收入复盘报告",
+        url: null,
+        document_id: null,
+        warnings: ["飞书 CLI 未登录，请先运行 lark-cli auth login。"],
+        tool_calls: [{ operation: "create_document", command_name: "lark-cli", success: false }],
+      },
+    });
+
+    render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
+
+    expect(await screen.findByText("发布到飞书失败")).toBeTruthy();
+    expect(screen.getByText("飞书 CLI 未登录，请先运行 lark-cli auth login。")).toBeTruthy();
+    expect(screen.queryByText(/stdout/)).toBeNull();
+    expect(screen.queryByText(/trace.json/)).toBeNull();
   });
 
   it("shows a friendly report chart empty state without internal visualization errors", async () => {
@@ -2164,6 +2815,83 @@ describe("workspace product components", () => {
     expect(screen.queryByAltText("收入趋势图表")).toBeNull();
     expect(screen.queryByText(/matplotlib backend error/)).toBeNull();
     expect(screen.queryByText(/internal-trace/)).toBeNull();
+  });
+
+  it("renders report center chart artifacts through the shared ECharts gallery", async () => {
+    vi.mocked(getWorkspaceReportDownloadUrl).mockReturnValue(
+      "http://localhost:8000/api/workspaces/ws_1/reports/report_1/download",
+    );
+    vi.mocked(getWorkspaceReport).mockResolvedValue({
+      workspace_id: "ws_1",
+      report_id: "report_1",
+      report: {
+        report_id: "report_1",
+        workspace_id: "ws_1",
+        report_type: "business_review",
+        report_goal: "生成管理层收入复盘报告",
+        title: "管理层收入复盘报告",
+        status: "completed",
+        chart_artifacts: [
+          {
+            artifact_id: "artifact_chart_revenue_structure_chart",
+            title: "收入结构图表",
+            renderer: "echarts",
+            chart_type: "bar",
+            chart_spec: { chart_type: "bar", x: "产品品类", y: "收入", raw_sql: "SELECT * FROM orders" },
+            echarts_option: { series: [{ type: "bar", data: [20, 10] }] },
+            path: "reports/report_1/artifacts/revenue_structure.svg",
+            url: "/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.svg",
+            image_path: "reports/report_1/artifacts/revenue_structure.svg",
+            image_url: "/api/workspaces/ws_1/artifacts/reports/report_1/artifacts/revenue_structure.svg",
+            evidence_refs: ["query_revenue_by_category", "ledger_fact_revenue_total"],
+            source: "report_center",
+            data_row_count: 2,
+            business_annotation: "企业SaaS订阅收入贡献最高。",
+            provider_metadata: { model: "internal" },
+            trace_path: "reports/report_1/trace.json",
+          } as never,
+        ],
+        evidence_pack: {
+          facts: [{ fact_id: "revenue_total", label: "总收入", display_value: "200.00" }],
+          tables: [],
+          charts: [],
+        },
+        document: {
+          title: "管理层收入复盘报告",
+          time_range: "最近90天",
+          data_sources: ["orders"],
+          opening_summary: "管理层摘要：收入结构清晰。",
+          sections: [
+            {
+              section_id: "revenue_by_channel",
+              title: "渠道收入复盘",
+              body: "本章节基于报告证据表生成。",
+              evidence_refs: ["revenue_total"],
+              chart_refs: ["revenue_structure_chart"],
+            },
+          ],
+          action_recommendations: [],
+          data_boundaries: [],
+        },
+        validation: { status: "passed", checked_facts: ["revenue_total"] },
+        artifacts: [],
+        tool_calls: [],
+        updated_at: "2026-07-02T15:30:00Z",
+        provider_metadata: { generation_flow: "ledger_backed_report_center" },
+      },
+    });
+
+    const { container } = render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
+
+    expect(await screen.findByTestId("echarts-chart")).toBeTruthy();
+    expect(echartsMock.init).toHaveBeenCalled();
+    expect(echartsMock.setOption).toHaveBeenCalledWith({ series: [{ type: "bar", data: [20, 10] }] }, true);
+    expect(screen.getByText("企业SaaS订阅收入贡献最高。")).toBeTruthy();
+    expect(container.textContent).not.toContain("SELECT");
+    expect(container.textContent).not.toContain("query_revenue_by_category");
+    expect(container.textContent).not.toContain("ledger_fact_revenue_total");
+    expect(container.textContent).not.toContain("provider_metadata");
+    expect(container.textContent).not.toContain("trace.json");
   });
 
   it("keeps report detail Chinese-first even for an English report goal", async () => {

@@ -6,6 +6,7 @@ from typing import Any
 
 from workspaces.models import utc_now_iso
 from workspaces.profiler import profile_workspace_database
+from workspaces.report_chart_artifacts import build_report_chart_artifacts
 from workspaces.report_composer import compose_report_document, repair_report_document
 from workspaces.report_evidence import collect_report_evidence
 from workspaces.report_ledger import build_evidence_ledger
@@ -90,6 +91,10 @@ def run_workspace_report(
         artifact_base_path=artifact_base_path,
     )
     evidence_ledger = build_evidence_ledger(plan=plan, evidence_pack=evidence_pack)
+    chart_artifacts, chart_artifact_trace_events = build_report_chart_artifacts(
+        evidence_pack=evidence_pack,
+        workspace_id=workspace_id,
+    )
     composer_provider = _report_composer_provider(providers)
     document = compose_report_document(
         plan=plan,
@@ -158,6 +163,7 @@ def run_workspace_report(
     report.status = "completed" if validation.status == "passed" else "partial"
     report.plan = plan
     report.evidence_pack = evidence_pack
+    report.chart_artifacts = chart_artifacts
     report.document = document
     report.validation = validation
     document.technical_appendix = {
@@ -204,7 +210,9 @@ def run_workspace_report(
                 "fact_count": len(evidence_pack.facts),
                 "table_count": len(evidence_pack.tables),
                 "chart_count": len(evidence_pack.charts),
+                "chart_artifact_count": len(chart_artifacts),
             },
+            *chart_artifact_trace_events,
             {
                 "event": "report_evidence_ledger_built",
                 "fact_count": len(evidence_ledger.facts),
@@ -319,7 +327,7 @@ def _build_report_artifacts(
                     artifact_type="chart",
                     title=chart.title or "报告图表",
                     relative_path=chart.path,
-                    download_url=chart.url,
+                    download_url=chart.url or chart.image_url,
                     source="local_renderer",
                     evidence_ids=list(chart.evidence_ids),
                     ledger_metric_ids=list(chart.ledger_metric_ids),

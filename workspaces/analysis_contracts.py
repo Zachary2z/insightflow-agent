@@ -18,6 +18,8 @@ class AnalysisTask:
     missing_slots: list[str] = field(default_factory=list)
     clarification_question: str = ""
     route_hint: str = ""
+    business_lens: dict[str, Any] = field(default_factory=dict)
+    evidence_task_plan: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -34,6 +36,8 @@ class AnalysisTask:
             missing_slots=_str_list(data.get("missing_slots")),
             clarification_question=str(data.get("clarification_question") or ""),
             route_hint=str(data.get("route_hint") or ""),
+            business_lens=_dict(data.get("business_lens")),
+            evidence_task_plan=_dict(data.get("evidence_task_plan")),
         )
 
 

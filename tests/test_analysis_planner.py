@@ -87,7 +87,7 @@ def test_analysis_planner_agent_writes_state_and_trace_without_sql():
     assert result["trace"][-1]["fallback_used"] is False
 
 
-def test_core_workflow_adds_analysis_planner_trace_without_bypassing_sql_boundaries(tmp_path):
+def test_core_workflow_adds_evidence_planning_trace_without_bypassing_sql_boundaries(tmp_path):
     from graph.workflow import run_workflow
 
     result = run_workflow(
@@ -99,9 +99,11 @@ def test_core_workflow_adds_analysis_planner_trace_without_bypassing_sql_boundar
     )
 
     assert result["status"] == "completed"
+    assert result["evidence_planning"]["query_strategy"]
     assert result["analysis_plan"]["scenario_type"] == "quick_metric_lookup"
     assert result["review_result"]["approved"] is True
     assert result["execution_result"]["success"] is True
     trace_nodes = [event["node"] for event in result["trace"]]
-    assert trace_nodes.index("analysis_planner_agent") < trace_nodes.index("schema_agent")
+    assert trace_nodes.index("evidence_planning_agent") < trace_nodes.index("schema_agent")
+    assert "analysis_planner_agent" not in trace_nodes
     assert trace_nodes.index("sql_reviewer_agent") < trace_nodes.index("sql_executor_node")

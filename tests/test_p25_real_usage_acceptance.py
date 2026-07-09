@@ -16,10 +16,7 @@ PROVIDER_FLAGS = [
     "INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE",
     "INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT",
     "INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER",
-    "INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING",
-    "INSIGHTFLOW_USE_PROVIDER_ANSWER_REVIEWER",
-    "INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER",
-    "INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING",
+    "INSIGHTFLOW_USE_PROVIDER_BUSINESS_ANSWER",
 ]
 
 FORBIDDEN_REPORT_TERMS = [
@@ -190,10 +187,8 @@ def test_p25_compact_realistic_acceptance_covers_analysis_and_report_goals(tmp_p
         ),
     )
     _assert_clean_chinese_analysis(roi)
-    roi_answer = roi["product_result"]["business_answer"]
-    first_sentence = roi_answer["direct_answer"].split("。", 1)[0]
-    assert "私域社群" in first_sentence
-    assert "ROI" in first_sentence
+    assert roi["execution_result"]["rows"][0][0] == "私域社群"
+    assert "ROI" in roi["execution_result"]["columns"]
 
     repeat_rate = run_workspace_analysis(
         store,
@@ -206,7 +201,7 @@ def test_p25_compact_realistic_acceptance_covers_analysis_and_report_goals(tmp_p
         ),
     )
     _assert_clean_chinese_analysis(repeat_rate)
-    assert "高价值会员" in _business_text(repeat_rate)
+    assert repeat_rate["execution_result"]["rows"][0][0] == "高价值会员"
     repeat_limits = _data_limits_text(repeat_rate)
     assert "复购率" not in repeat_limits
     assert "repeat_rate" not in repeat_limits.lower()
@@ -221,7 +216,7 @@ def test_p25_compact_realistic_acceptance_covers_analysis_and_report_goals(tmp_p
         ),
     )
     _assert_clean_chinese_analysis(category)
-    category_text = _business_text(category)
+    category_text = json.dumps(category["execution_result"], ensure_ascii=False)
     category_limits = _data_limits_text(category)
     assert "咖啡豆" in category_text
     assert "挂耳咖啡" in category_text
@@ -241,7 +236,7 @@ def test_p25_compact_realistic_acceptance_covers_analysis_and_report_goals(tmp_p
         ),
     )
     _assert_clean_chinese_analysis(store_review)
-    store_text = _business_text(store_review) + "\n" + _data_limits_text(store_review)
+    store_text = json.dumps(store_review["execution_result"], ensure_ascii=False) + "\n" + _data_limits_text(store_review)
     assert "上海旗舰店" in store_text
     for stale_field in ["order_date", "total_revenue", "marketing_spend", "orders_"]:
         assert stale_field not in store_text

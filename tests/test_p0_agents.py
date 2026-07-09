@@ -102,8 +102,8 @@ def test_error_fix_agent_repairs_known_column_error_once_without_running_sql():
     assert state["trace"][-1]["node"] == "error_fix_agent"
 
 
-def test_insight_agent_answers_only_from_execution_result_rows():
-    from agents.insight_agent import run_insight_agent
+def test_business_answer_agent_without_provider_does_not_compose_from_execution_rows():
+    from workspaces.business_answer_agent import run_business_answer_agent
 
     state = _base_state()
     state["execution_result"] = {
@@ -113,23 +113,26 @@ def test_insight_agent_answers_only_from_execution_result_rows():
         "row_count": 2,
     }
 
-    state = run_insight_agent(state)
+    state = run_business_answer_agent(state)
 
-    output = state["insight"]
-    assert output["success"] is True
+    output = state["business_answer_generation"]
+    assert output["success"] is False
     assert output["data_used"] is True
-    assert "Laptop Pro 14" in output["final_answer"]
-    assert "511248.56" in output["final_answer"]
+    assert output["fallback_used"] is True
+    assert output["source"] == "provider_unavailable"
+    assert "业务回答生成失败" in output["final_answer"] or "Answer generation failed" in output["final_answer"]
+    assert "Laptop Pro 14" not in output["final_answer"]
+    assert "511248.56" not in output["final_answer"]
     assert state["final_answer"] == output["final_answer"]
 
 
-def test_insight_agent_returns_error_when_execution_result_is_missing():
-    from agents.insight_agent import run_insight_agent
+def test_business_answer_agent_returns_error_when_execution_result_is_missing():
+    from workspaces.business_answer_agent import run_business_answer_agent
 
     state = _base_state()
 
-    state = run_insight_agent(state)
+    state = run_business_answer_agent(state)
 
-    assert state["insight"]["success"] is False
-    assert state["insight"]["data_used"] is False
-    assert "execution_result" in state["insight"]["error"]
+    assert state["business_answer_generation"]["success"] is False
+    assert state["business_answer_generation"]["data_used"] is False
+    assert "execution_result" in state["business_answer_generation"]["error"]

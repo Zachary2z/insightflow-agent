@@ -186,36 +186,9 @@ def test_reviewer_accepts_answer_aligned_with_evidence():
     assert "score_value" in review["supported_metrics"]
 
 
-def test_reviewer_uses_provider_result_when_available():
+def test_reviewer_does_not_expose_provider_parameter():
+    import inspect
+
     from agents.answer_reviewer import review_answer
-    from llm_ops.provider import MockLLMProvider
 
-    review = review_answer(
-        user_question="Which entity should we prioritize?",
-        execution_result=_execution_result(),
-        evidence_result={"validation_status": "validated"},
-        draft_business_answer=_draft_answer(),
-        provider=MockLLMProvider(
-            {
-                "status": "revise",
-                "language": "en",
-                "supported_entities": ["Alpha"],
-                "unsupported_entities": ["Gamma"],
-                "supported_metrics": ["score_value"],
-                "unsupported_metrics": [],
-                "issues": [
-                    {
-                        "type": "entity_mismatch",
-                        "message": "Gamma is unsupported.",
-                        "affected_fields": ["direct_answer"],
-                    }
-                ],
-                "revision_instructions": ["Remove Gamma."],
-                "confidence": "high",
-            }
-        ),
-    )
-
-    assert set(review) == REVIEW_KEYS
-    assert review["status"] == "revise"
-    assert review["unsupported_entities"] == ["Gamma"]
+    assert "provider" not in inspect.signature(review_answer).parameters

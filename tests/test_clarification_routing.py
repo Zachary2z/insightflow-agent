@@ -20,7 +20,6 @@ def test_partial_continuation_answer_still_stops_for_missing_time_range() -> Non
         {
             "routing_strategy": "clarify",
             "stop_for_clarification": False,
-            "pending_run_id": "pending_123",
             "clarification_answer": "花费",
             "resolved_question": "帮我分析渠道表现，看看哪个渠道该加预算。补充条件：花费。",
             "question_understanding": {"source": "provider", "strategy": "clarify"},
@@ -41,7 +40,6 @@ def test_complete_continuation_answer_can_resume_analysis() -> None:
         {
             "routing_strategy": "clarify",
             "stop_for_clarification": False,
-            "pending_run_id": "pending_123",
             "clarification_answer": "最近 90 天",
             "resolved_question": "帮我分析渠道表现，看看哪个渠道该加预算。补充条件：花费，最近 90 天。",
             "question_understanding": {"source": "deterministic", "strategy": "llm_candidate"},

@@ -105,6 +105,8 @@ def test_question_understanding_builds_complete_chinese_analysis_task_contract()
     assert task["confidence"] == "high"
     assert result["missing_slots"] == []
     assert result["clarification_questions"] == []
+    assert "business_lens" not in result
+    assert "business_lens" not in task
 
 
 def test_question_understanding_keeps_roas_as_independent_metric():

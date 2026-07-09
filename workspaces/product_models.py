@@ -5,16 +5,51 @@ from typing import Any
 
 PRODUCT_RESULT_VERSION = "p16.v1"
 
+LEGACY_CHART_ARTIFACT_FIELDS = (
+    "title",
+    "path",
+    "url",
+    "rendering_status",
+    "unit",
+    "value_label",
+    "business_annotation",
+)
+
+P30_CHART_ARTIFACT_OPTIONAL_FIELDS = (
+    "artifact_id",
+    "renderer",
+    "chart_type",
+    "chart_spec",
+    "echarts_option",
+    "image_path",
+    "image_url",
+    "evidence_refs",
+    "source",
+    "data_row_count",
+    "skip_reason",
+    "failure_reason",
+    "chart_input_source",
+)
+
+CHART_ARTIFACT_FIELDS = LEGACY_CHART_ARTIFACT_FIELDS + P30_CHART_ARTIFACT_OPTIONAL_FIELDS
+
 
 def empty_question_thread() -> dict[str, Any]:
     return {
+        "thread_id": "",
         "original_question": "",
         "system_understanding": "",
         "clarification_question": "",
         "clarification_answer": "",
         "resolved_question": "",
-        "pending_run_id": "",
         "status": "",
+        "turns": [],
+        "current_business_lens": {},
+        "evidence_refs": [],
+        "answer_summary": "",
+        "pending_clarification": None,
+        "latest_status": "",
+        "latest_resolved_question": "",
     }
 
 

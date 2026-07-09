@@ -13,18 +13,19 @@ class AgentState(TypedDict, total=False):
     clarification_question: str
     clarification_answer: str
     resolved_question: str
-    pending_run_id: str
     question_thread_status: str
     stop_for_clarification: bool
     clarification_questions: list[str]
     llm_sql_enhancement: dict[str, Any]
-    llm_insight_enhancement: dict[str, Any]
-    claim_typing_result: dict[str, Any]
     question_understanding: dict[str, Any]
     analysis_task: dict[str, Any]
     analysis_task_contract: dict[str, Any]
     analysis_route: dict[str, Any]
+    evidence_task_plan: dict[str, Any]
+    evidence_task_results: list[dict[str, Any]]
+    evidence_task_runner: dict[str, Any]
     question_evidence_pack: dict[str, Any]
+    question_evidence_ledger: dict[str, Any]
     question_evidence_cache: dict[str, Any]
     workbench_tool_calls: list[dict[str, Any]]
     evidence_agent_early_response: bool
@@ -33,6 +34,7 @@ class AgentState(TypedDict, total=False):
     routing_strategy: str
     clarification_result: dict[str, Any]
     sql_planning: dict[str, Any]
+    evidence_planning: dict[str, Any]
     sql_routing_strategy: str
     comparison_scope_adjustment: dict[str, Any]
     analysis_plan: dict[str, Any]
@@ -63,6 +65,7 @@ class AgentState(TypedDict, total=False):
     audit_result: dict[str, Any]
     claims_to_validate: list[str]
     chart_result: dict[str, Any]
+    chart_warning: str
     chart_path: str
     chart_paths: list[str]
     selected_tables: list[str]
@@ -85,9 +88,9 @@ class AgentState(TypedDict, total=False):
     fixed_sql: str
     retry_count: int
 
-    insight: dict[str, Any]
-    answer_review: dict[str, Any]
-    answer_composition: dict[str, Any]
+    business_answer_generation: dict[str, Any]
+    candidate_claims: list[str]
+    candidate_claims_typed: list[dict[str, Any]]
     business_answer: dict[str, Any]
     final_answer: str
     data_used: bool

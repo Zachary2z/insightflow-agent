@@ -29,6 +29,23 @@ def _write_run(workspace: dict, run_id: str, payload: dict) -> Path:
     return path
 
 
+def _assert_missing_business_answer(answer: dict) -> None:
+    text = " ".join(
+        [
+            str(answer.get("headline") or ""),
+            str(answer.get("direct_answer") or ""),
+            str(answer.get("why") or ""),
+            *[str(item) for item in answer.get("evidence_bullets") or []],
+            *[str(item) for item in answer.get("recommendations") or []],
+            *[str(item) for item in answer.get("caveats") or []],
+        ]
+    )
+    assert "业务回答缺失" in text or "Business answer missing" in text
+    assert "SELECT" not in text.upper()
+    assert "raw_rows" not in text
+    assert "provider_metadata" not in text
+
+
 def test_list_workspace_runs_includes_all_statuses_and_sorts_latest_first(tmp_path):
     client, _store, workspace = _client_and_workspace(tmp_path)
     workspace_id = workspace["workspace_id"]
@@ -85,7 +102,6 @@ def test_list_workspace_runs_includes_all_statuses_and_sorts_latest_first(tmp_pa
             "question_thread": {
                 "original_question": "帮我看看销售情况",
                 "clarification_question": "你希望分析哪个时间范围？",
-                "pending_run_id": "pending_123",
                 "status": "waiting_for_clarification",
             },
         },
@@ -149,7 +165,7 @@ def test_get_workspace_run_returns_result_and_product_result(tmp_path):
     assert payload["run_id"] == "run_detail1"
     assert payload["result"]["generated_sql"].startswith("SELECT channel")
     assert payload["result"]["execution_result"]["rows"] == [["email", 100.0]]
-    assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高。"
+    _assert_missing_business_answer(payload["product_result"]["business_answer"])
 
 
 def test_create_workspace_run_returns_cache_candidate_for_completed_same_version_question(tmp_path):
@@ -233,6 +249,92 @@ def test_create_workspace_run_can_return_recoverable_running_shell_before_backgr
     assert history.json()["runs"][0]["status"] == "running"
 
 
+def test_history_returns_one_thread_card_after_same_thread_follow_up(tmp_path, monkeypatch):
+    client, store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_threadhistory",
+        {
+            "status": "completed",
+            "workspace_id": workspace_id,
+            "workspace_root": workspace["root_path"],
+            "original_question": "帮我分析最近90天哪些渠道收益比较好",
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "email 渠道收入最高。",
+                "why": "证据表显示 email 收入最高。",
+                "evidence_bullets": ["email 收入最高。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "analysis_thread_memory": {
+                "thread_id": "run_threadhistory",
+                "original_question": "帮我分析最近90天哪些渠道收益比较好",
+                "turns": [
+                    {
+                        "turn_id": "turn_1",
+                        "user_input": "帮我分析最近90天哪些渠道收益比较好",
+                        "resolved_question": "分析最近 90 天各渠道收益表现。",
+                        "status": "completed",
+                        "answer_summary": "email 渠道收入最高。",
+                        "business_lens": {"metrics": [{"label": "收入"}]},
+                        "evidence_refs": ["question_evidence_pack"],
+                        "created_at": "2026-07-06T10:00:00Z",
+                    }
+                ],
+                "current_business_lens": {"metrics": [{"label": "收入"}]},
+                "evidence_refs": ["question_evidence_pack"],
+                "answer_summary": "email 渠道收入最高。",
+                "pending_clarification": None,
+                "latest_status": "completed",
+                "latest_resolved_question": "分析最近 90 天各渠道收益表现。",
+            },
+            "execution_result": {"success": True, "columns": ["channel"], "rows": [["email"]]},
+        },
+    )
+
+    def follow_up_workflow(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        assert run_id == "run_threadhistory"
+        assert "为什么 email 渠道收益最好" in user_question
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {"resolved_question": user_question, "business_lens": {"metrics": [{"label": "客单价"}]}},
+            "business_answer": {
+                "headline": "email 的客单价更高",
+                "direct_answer": "email 渠道收益高主要来自客单价。",
+                "why": "本轮证据补充了客单价比较。",
+                "evidence_bullets": ["email 客单价更高。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["channel"], "rows": [["email"]]},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", follow_up_workflow)
+
+    response = client.post(
+        f"/api/workspaces/{workspace_id}/runs/run_threadhistory/follow-ups",
+        json={"message": "为什么 email 渠道收益最好？"},
+    )
+    history = client.get(f"/api/workspaces/{workspace_id}/runs")
+
+    assert response.status_code == 200
+    assert history.status_code == 200
+    summaries = history.json()["runs"]
+    assert len(summaries) == 1
+    assert summaries[0]["run_id"] == "run_threadhistory"
+    assert summaries[0]["headline"] == "email 的客单价更高"
+    detail = client.get(f"/api/workspaces/{workspace_id}/runs/run_threadhistory").json()
+    assert len(detail["product_result"]["question_thread"]["turns"]) == 2
+
+
 def test_get_workspace_run_builds_product_result_for_older_run_json(tmp_path):
     client, _store, workspace = _client_and_workspace(tmp_path)
     workspace_id = workspace["workspace_id"]
@@ -252,8 +354,92 @@ def test_get_workspace_run_builds_product_result_for_older_run_json(tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["product_result"]["question_thread"]["original_question"] == "哪个渠道收入最高？"
-    assert payload["product_result"]["business_answer"]["headline"] == "邮件渠道收入最高。"
-    assert payload["result"]["product_result"]["business_answer"]["direct_answer"] == "邮件渠道收入最高。"
+    _assert_missing_business_answer(payload["product_result"]["business_answer"])
+    _assert_missing_business_answer(payload["result"]["product_result"]["business_answer"])
+
+
+def test_get_workspace_run_restores_multi_task_evidence_and_charts(tmp_path):
+    client, _store, workspace = _client_and_workspace(tmp_path)
+    workspace_id = workspace["workspace_id"]
+    _write_run(
+        workspace,
+        "run_multitask_restore",
+        {
+            "status": "completed",
+            "workspace_root": workspace["root_path"],
+            "original_question": "最近30天按渠道比较收入和投放花费",
+            "business_answer": {
+                "headline": "私域社群综合表现最好",
+                "direct_answer": "私域社群收入和投放效率都领先。",
+                "why": "收入和投放花费证据均支持私域社群领先。",
+                "evidence_bullets": ["私域社群收入为 300000。"],
+                "recommendations": ["优先复盘私域社群。"],
+                "caveats": ["当前结论只基于本次查询返回的数据。"],
+                "confidence": "medium",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["task_id", "channel", "revenue", "spend"],
+                "rows": [["core_fact_income_channel", "私域社群", 300000.0, None]],
+            },
+            "question_evidence_ledger": {
+                "ledger_id": "qledger_restore",
+                "facts": [
+                    {
+                        "fact_id": "fact_1",
+                        "label": "收入",
+                        "value": 300000.0,
+                        "task_id": "core_fact_income_channel",
+                        "dimension": {"channel": "私域社群"},
+                        "evidence_ref": "evidence:core_fact_income_channel:row:0:revenue",
+                    }
+                ],
+                "derived_metrics": [],
+                "data_limits": [],
+                "tool_calls": [],
+                "evidence_refs": ["evidence:core_fact_income_channel:row:0:revenue"],
+                "chart_refs": [],
+                "task_refs": ["core_fact_income_channel"],
+                "source_pack_id": "merged_question_evidence_pack",
+                "confidence": "medium",
+            },
+            "evidence_task_results": [
+                {"task_id": "core_fact_income_channel", "status": "executed", "columns": ["channel", "revenue"]}
+            ],
+            "chart_artifacts": [
+                {
+                    "artifact_id": "chart_restore",
+                    "title": "渠道收入",
+                    "echarts_option": {"series": [{"type": "bar", "data": [300000.0]}]},
+                    "evidence_refs": ["evidence:core_fact_income_channel:row:0:revenue"],
+                }
+            ],
+            "product_result": {
+                "version": "p16.v1",
+                "status": "completed",
+                "question_thread": {"original_question": "最近30天按渠道比较收入和投放花费"},
+                "business_answer": {
+                    "headline": "私域社群综合表现最好",
+                    "direct_answer": "私域社群收入和投放效率都领先。",
+                    "why": "收入和投放花费证据均支持私域社群领先。",
+                    "evidence_bullets": ["私域社群收入为 300000。"],
+                    "recommendations": ["优先复盘私域社群。"],
+                    "caveats": ["当前结论只基于本次查询返回的数据。"],
+                    "confidence": "medium",
+                },
+                "evidence": {"ledger_summary": {"ledger_id": "qledger_restore"}},
+                "chart_artifacts": [],
+            },
+        },
+    )
+
+    payload = client.get(f"/api/workspaces/{workspace_id}/runs/run_multitask_restore").json()
+
+    assert payload["result"]["evidence_task_results"][0]["task_id"] == "core_fact_income_channel"
+    assert payload["result"]["question_evidence_ledger"]["ledger_id"] == "qledger_restore"
+    assert payload["product_result"]["question_evidence_ledger"]["task_groups"][0]["title"] == "收入证据"
+    assert payload["product_result"]["chart_artifacts"][0]["artifact_id"] == "chart_restore"
+    assert payload["product_result"]["chart_artifacts"][0]["echarts_option"]["series"][0]["type"] == "bar"
 
 
 def test_get_workspace_run_rebuilds_stale_product_result_versions(tmp_path):
@@ -294,7 +480,7 @@ def test_get_workspace_run_rebuilds_stale_product_result_versions(tmp_path):
         "caveats",
         "confidence",
     }
-    assert answer["direct_answer"] == "邮件渠道收入最高。"
+    _assert_missing_business_answer(answer)
     assert "summary" not in answer
 
 
@@ -336,7 +522,7 @@ def test_get_workspace_run_rebuilds_invalid_current_product_result(tmp_path):
     product = response.json()["product_result"]
     answer = product["business_answer"]
     assert product["version"] == "p16.v1"
-    assert answer["direct_answer"] == "email 渠道收入最高。"
+    _assert_missing_business_answer(answer)
     business_text = " ".join(
         [
             answer["headline"],
@@ -556,41 +742,38 @@ def test_completed_chinese_run_with_english_final_answer_is_built_as_chinese_p16
 
     assert history.status_code == 200
     summary = history.json()["runs"][0]
-    assert summary["headline"].startswith("当前数据中")
+    assert summary["headline"] == "业务回答缺失"
     assert "Based on the data" not in summary["headline"]
 
     assert detail.status_code == 200
     answer = detail.json()["product_result"]["business_answer"]
-    assert answer["direct_answer"].startswith("当前数据中")
-    assert "当前数据中" in answer["why"]
+    _assert_missing_business_answer(answer)
     assert "Based on the data" not in answer["direct_answer"]
 
 
-def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp_path):
+def test_only_waiting_runs_require_clarification_from_current_status(tmp_path):
     client, _store, workspace = _client_and_workspace(tmp_path)
     workspace_id = workspace["workspace_id"]
     _write_run(
         workspace,
-        "run_donepending",
+        "run_done_thread",
         {
             "status": "completed",
             "saved_at": "2026-06-29T15:00:00Z",
             "question_thread": {
                 "original_question": "继续分析后的完成 run",
-                "pending_run_id": "pending_123",
                 "status": "completed",
             },
         },
     )
     _write_run(
         workspace,
-        "run_failpending",
+        "run_fail_thread",
         {
             "status": "failed",
             "saved_at": "2026-06-29T14:00:00Z",
             "question_thread": {
                 "original_question": "继续分析后的失败 run",
-                "pending_run_id": "pending_123",
                 "status": "failed",
             },
             "error_message": "SQL review rejected",
@@ -598,13 +781,12 @@ def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp
     )
     _write_run(
         workspace,
-        "run_waitpending",
+        "run_wait_thread",
         {
             "status": "waiting_for_clarification",
             "saved_at": "2026-06-29T13:00:00Z",
             "question_thread": {
                 "original_question": "真正等待澄清的 run",
-                "pending_run_id": "pending_123",
                 "status": "waiting_for_clarification",
             },
         },
@@ -614,6 +796,6 @@ def test_only_waiting_runs_require_clarification_when_pending_id_is_retained(tmp
 
     assert response.status_code == 200
     summaries = {run["run_id"]: run for run in response.json()["runs"]}
-    assert summaries["run_donepending"]["requires_clarification"] is False
-    assert summaries["run_failpending"]["requires_clarification"] is False
-    assert summaries["run_waitpending"]["requires_clarification"] is True
+    assert summaries["run_done_thread"]["requires_clarification"] is False
+    assert summaries["run_fail_thread"]["requires_clarification"] is False
+    assert summaries["run_wait_thread"]["requires_clarification"] is True

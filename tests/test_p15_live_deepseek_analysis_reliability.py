@@ -7,12 +7,12 @@ import pytest
 from llm_ops.deepseek_provider import load_deepseek_config
 from llm_ops.runtime_provider import (
     product_live_mode_enabled,
-    provider_insight_drafting_enabled,
+    provider_business_answer_enabled,
     provider_question_understanding_enabled,
     provider_sql_candidate_enabled,
     provider_sql_planning_enabled,
 )
-from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_continuation
+from workspaces.analysis_runner import run_workspace_analysis, run_workspace_analysis_follow_up
 from workspaces.importers import import_csv
 from workspaces.profiler import profile_workspace_database
 from workspaces.run_store import WorkspaceRunStore
@@ -37,8 +37,8 @@ def _require_live_deepseek() -> None:
         pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_SQL_PLANNING=1.")
     if not provider_sql_candidate_enabled():
         pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE=1.")
-    if not provider_insight_drafting_enabled():
-        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING=1.")
+    if not provider_business_answer_enabled():
+        pytest.skip("Set INSIGHTFLOW_USE_PROVIDER_BUSINESS_ANSWER=1.")
     config = load_deepseek_config(require_api_key=True)
     if not config.success:
         pytest.skip("Set DEEPSEEK_API_KEY to run the live P15 DeepSeek regression.")
@@ -117,8 +117,8 @@ def _assert_provider_product_path(result: dict) -> None:
     assert result["sql_planning"]["provider_called"] is True
     if result.get("llm_sql_enhancement"):
         assert result["llm_sql_enhancement"]["provider_called"] is True
-    if result.get("insight"):
-        assert result["insight"]["provider_called"] is True
+    if result.get("business_answer_generation"):
+        assert result["business_answer_generation"]["provider_called"] is True
 
 
 def _assert_completed_product_result(result: dict, *, continued: bool) -> None:
@@ -179,14 +179,14 @@ def test_live_deepseek_p15_clarification_answer_continues_and_history_restores_p
     continued = first_result["status"] == "waiting_for_clarification"
     if continued:
         first_thread = first_result["product_result"]["question_thread"]
-        assert first_thread["pending_run_id"]
+        assert first_thread["thread_id"] == first_result["run_id"]
         assert first_thread["clarification_question"]
         assert any(run["status"] == "waiting_for_clarification" for run in first_history)
-        final_result = run_workspace_analysis_continuation(
+        final_result = run_workspace_analysis_follow_up(
             store=store,
             workspace_id=workspace_id,
-            pending_run_id=first_thread["pending_run_id"],
-            clarification_answer=CLARIFICATION_ANSWER,
+            run_id=first_result["run_id"],
+            message=CLARIFICATION_ANSWER,
         )
         _assert_provider_product_path(final_result)
     else:

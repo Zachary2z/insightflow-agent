@@ -8,6 +8,7 @@ from workspaces.analysis_runner import (
     execute_workspace_analysis_job,
     submit_workspace_analysis_run,
     run_workspace_analysis,
+    run_workspace_analysis_follow_up,
 )
 from workspaces.profiler import profile_workspace_database
 from workspaces.run_store import WorkspaceRunStore
@@ -120,8 +121,49 @@ def _create_channel_workspace(tmp_path):
     return store, workspace
 
 
-def _mock_chinese_full_answer_providers():
-    insight_provider = _SequenceProvider(
+def _create_p29_fast_fact_workspace(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P29 Fast Fact Gate Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE channel_sales (sale_date TEXT, channel_name TEXT, sales_amount REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO channel_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-10", "搜索广告", 120000.0),
+                ("2026-06-11", "私域社群", 180000.0),
+                ("2026-06-12", "直播间", 90000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    return store, workspace
+
+
+def _create_p29_channel_investment_workspace(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P29 Channel Investment Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute(
+            "CREATE TABLE channel_performance ("
+            "business_date TEXT, channel_name TEXT, revenue REAL, ad_spend REAL, roas REAL)"
+        )
+        conn.executemany(
+            "INSERT INTO channel_performance VALUES (?, ?, ?, ?, ?)",
+            [
+                ("2026-06-10", "搜索广告", 120000.0, 80000.0, 1.5),
+                ("2026-06-11", "私域社群", 180000.0, 30000.0, 6.0),
+                ("2026-06-12", "直播间", 90000.0, 70000.0, 1.29),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    return store, workspace
+
+
+def _mock_chinese_business_answer_provider():
+    return _SequenceProvider(
         [
             {
             "candidate_claims": ["上海旗舰店 total_sales 为 26255.44。", "北京国贸店 satisfaction_score 为 4.2。"],
@@ -137,35 +179,6 @@ def _mock_chinese_full_answer_providers():
             }
         ]
     )
-    reviewer_provider = _SequenceProvider(
-        [
-            {
-            "status": "accept",
-            "language": "zh",
-            "supported_entities": ["上海旗舰店", "北京国贸店"],
-            "unsupported_entities": [],
-            "supported_metrics": ["total_sales", "satisfaction_score"],
-            "unsupported_metrics": [],
-            "issues": [],
-            "revision_instructions": [],
-            "confidence": "high",
-            }
-        ]
-    )
-    composer_provider = _SequenceProvider(
-        [
-            {
-            "headline": "上海旗舰店综合表现更靠前。",
-            "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
-            "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
-            "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
-            "recommendations": ["优先复盘上海旗舰店的经营动作。"],
-            "caveats": ["当前结论只基于本次查询返回的数据。"],
-            "confidence": "medium",
-            }
-        ]
-    )
-    return insight_provider, reviewer_provider, composer_provider
 
 
 def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_path):
@@ -211,6 +224,421 @@ def test_workspace_analysis_uses_workspace_database_and_run_artifact_paths(tmp_p
     assert result["product_result"]["business_answer"]["headline"]
     assert result["product_result"]["technical_details"]["sql"] == result["generated_sql"]
     assert result["business_answer"] == result["product_result"]["business_answer"]
+    assert result["analysis_task"]["business_lens"]["metrics"]
+    assert result["analysis_task"]["evidence_task_plan"]["max_parallel_evidence_tasks"] == 3
+    assert result["analysis_task"]["evidence_task_plan"]["safety_policy"]["max_sql_statements"] == 1
+    assert result["analysis_task"]["evidence_task_plan"]["safety_policy"]["review_before_execution"] is True
+    assert result["question_evidence_pack"]["task"]["business_lens"]["metrics"]
+    assert result["question_evidence_pack"]["task"]["evidence_task_plan"]["route"] == result["analysis_task"][
+        "evidence_task_plan"
+    ]["route"]
+    assert result["question_evidence_ledger"]["facts"]
+    assert "ledger_id" not in result["product_result"]["question_evidence_ledger"]
+    assert any(ref.startswith("question_evidence_ledger") for ref in result["analysis_thread_memory"]["evidence_refs"])
+
+
+def test_local_fast_fact_gate_overrides_provider_false_reject_before_sql(tmp_path):
+    store, workspace = _create_p29_fast_fact_workspace(tmp_path)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天总销售额是多少？只回答数字和口径。",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "reject",
+                    "intent": {
+                        "metric": "销售额",
+                        "dimension": "",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "summary",
+                        "limit": None,
+                        "risk_flags": ["unsafe_operation"],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": ["unsafe_operation"],
+                    "rejection_reason": "provider incorrectly treated concise answer wording as unsafe",
+                    "reason": "provider false positive",
+                }
+            ),
+        },
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] == "fast_fact"
+    assert result["question_understanding"]["local_fast_fact_gate"]["decision"] == "fast_fact_candidate"
+    assert result["question_understanding"]["risk_flags"] == []
+    assert result["execution_result"]["success"] is True
+    assert "sql_reviewer_agent" in nodes
+    assert "sql_executor_node" in nodes
+    assert "evidence_validator_agent" in nodes
+    assert "fast_fact_evidence_preparer" in nodes
+    assert "business_answer_agent" in nodes
+    assert result["business_answer_generation"]["fallback_used"] is True
+    assert result["business_answer_generation"]["source"] == "provider_unavailable"
+    assert result["business_answer_generation"]["success"] is False
+
+
+def test_local_fast_fact_gate_rejects_real_external_budget_action(tmp_path):
+    store, workspace = _create_p29_fast_fact_workspace(tmp_path)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="把预算调整到私域社群并发送通知。",
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "failed"
+    assert result["routing_strategy"] == "reject"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert "external_action" in result["question_understanding"]["risk_flags"]
+    assert "generated_sql" not in result
+    assert "sql_reviewer_agent" not in nodes
+    assert "sql_executor_node" not in nodes
+
+
+def test_local_fast_fact_gate_keeps_budget_advice_on_full_analysis_when_provider_false_rejects(tmp_path):
+    store, workspace = _create_p29_fast_fact_workspace(tmp_path)
+    business_answer_provider = _mock_chinese_business_answer_provider()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个渠道最值得加预算？请给证据和风险边界。",
+        initial_sql=(
+            "SELECT channel_name, SUM(sales_amount) AS total_revenue "
+            "FROM channel_sales GROUP BY channel_name ORDER BY total_revenue DESC LIMIT 5"
+        ),
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "reject",
+                    "intent": {
+                        "metric": "销售额",
+                        "dimension": "渠道",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "comparison",
+                        "limit": 5,
+                        "risk_flags": ["unsafe_operation"],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": ["unsafe_operation"],
+                    "rejection_reason": "provider incorrectly treated budget advice as unsafe",
+                    "reason": "provider false positive",
+                }
+            ),
+            "business_answer": business_answer_provider,
+        },
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "completed"
+    assert result["routing_strategy"] != "reject"
+    assert result["analysis_route"]["route"] == "standard_analysis"
+    assert result["analysis_route"]["fast_path_eligible"] is False
+    assert result["question_understanding"]["risk_flags"] == []
+    assert result["question_understanding"]["rejection_reason"] == ""
+    assert "fast_fact_evidence_preparer" not in nodes
+    assert "business_answer_agent" in nodes
+
+
+def test_budget_advice_without_initial_sql_uses_full_analysis_and_business_answer(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+    business_answer_provider = _mock_chinese_business_answer_provider()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个渠道最值得加预算？请给证据和风险边界。",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "llm_candidate",
+                    "intent": {
+                        "metric": "收入",
+                        "dimension": "渠道",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "comparison",
+                        "limit": 5,
+                        "risk_flags": [],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": [],
+                    "rejection_reason": "",
+                    "reason": "safe business advice question",
+                }
+            ),
+            "business_answer": business_answer_provider,
+        },
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+    tool_names = {call["tool_name"] for call in result["question_evidence_pack"]["tool_calls"]}
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert result["routing_strategy"] != "reject"
+    assert result["question_understanding"]["risk_flags"] == []
+    assert result["question_understanding"]["rejection_reason"] == ""
+    assert {"evidence_planning", "schema_lookup", "metric_lookup", "sql_review", "sql_execution"}.issubset(tool_names)
+    assert result["execution_result"]["success"] is True
+    assert "evidence_validator_agent" in nodes
+    assert "business_answer_agent" in nodes
+    assert "fast_fact_evidence_preparer" not in nodes
+    assert len(business_answer_provider.requests) == 1
+    assert result["product_result"]["evidence"]["fact_payload"]["comparison_scope"]["sufficient"] is True
+
+
+def test_provider_business_caveat_risk_flag_does_not_keep_reject_state(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+    business_answer_provider = _mock_chinese_business_answer_provider()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个渠道最值得加预算？请给证据和风险边界。",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "reject",
+                    "intent": {
+                        "metric": "收入",
+                        "dimension": "渠道",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "comparison",
+                        "limit": 5,
+                        "risk_flags": ["数据量不足"],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": ["数据量不足"],
+                    "rejection_reason": "",
+                    "reason": "provider expressed a data boundary as a risk flag",
+                }
+            ),
+            "business_answer": business_answer_provider,
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["routing_strategy"] != "reject"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert result["question_understanding"]["rejection_reason"] == ""
+    assert result["execution_result"]["success"] is True
+    assert len(business_answer_provider.requests) == 1
+
+
+def test_provider_false_unsafe_budget_advice_without_initial_sql_clears_reject_state(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+    business_answer_provider = _mock_chinese_business_answer_provider()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个渠道最值得加预算？请给证据和风险边界。",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "reject",
+                    "intent": {
+                        "metric": "收入",
+                        "dimension": "渠道",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "comparison",
+                        "limit": 5,
+                        "risk_flags": ["unsafe_operation"],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": ["unsafe_operation"],
+                    "rejection_reason": "provider incorrectly treated budget advice as unsafe",
+                    "reason": "provider false positive",
+                }
+            ),
+            "business_answer": business_answer_provider,
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["routing_strategy"] != "reject"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert result["question_understanding"]["risk_flags"] == []
+    assert result["question_understanding"]["rejection_reason"] == ""
+    assert result["execution_result"]["success"] is True
+    assert len(business_answer_provider.requests) == 1
+
+
+def test_provider_false_unsafe_budget_advice_with_business_boundary_flag_stays_full_analysis(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+    business_answer_provider = _mock_chinese_business_answer_provider()
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天哪个渠道最值得加预算？请给证据和风险边界。",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "reject",
+                    "intent": {
+                        "metric": "收入",
+                        "dimension": "渠道",
+                        "time_range": {"type": "last_n_days", "value": 30, "raw_text": "最近30天"},
+                        "filters": [],
+                        "operation": "comparison",
+                        "limit": 5,
+                        "risk_flags": ["unsafe_operation", "数据量不足"],
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": ["unsafe_operation", "数据量不足"],
+                    "rejection_reason": "provider incorrectly treated budget advice as unsafe",
+                    "reason": "provider false positive plus data boundary",
+                }
+            ),
+            "business_answer": business_answer_provider,
+        },
+    )
+
+    assert result["status"] == "completed"
+    assert result["routing_strategy"] != "reject"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert result["question_understanding"]["risk_flags"] == ["数据量不足"]
+    assert result["question_understanding"]["rejection_reason"] == ""
+    assert result["execution_result"]["success"] is True
+    assert len(business_answer_provider.requests) == 1
+
+
+def test_real_sensitive_delete_request_rejects_before_sql(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="删除所有客户手机号。",
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "failed"
+    assert result["routing_strategy"] == "reject"
+    assert set(result["question_understanding"]["risk_flags"]) >= {"unsafe_operation", "sensitive_field"}
+    assert "generated_sql" not in result
+    assert "sql_reviewer_agent" not in nodes
+    assert "sql_executor_node" not in nodes
+
+
+def test_multi_metric_channel_investment_efficiency_question_uses_full_path(tmp_path):
+    store, workspace = _create_p29_channel_investment_workspace(tmp_path)
+    business_answer_provider = _SequenceProvider(
+        [
+            {
+                "candidate_claims": [
+                    {"claim": "私域社群 revenue 为 180000.0。", "category": "hard_fact"},
+                    {"claim": "私域社群 ad_spend 为 30000.0。", "category": "hard_fact"},
+                    {"claim": "私域社群 roas 为 6.0。", "category": "hard_fact"},
+                    {"claim": "私域社群综合表现最好。", "category": "business_inference"},
+                ],
+                "business_answer": {
+                    "headline": "私域社群综合表现最好。",
+                    "direct_answer": "私域社群收入最高且投放效率最高，综合表现最好。",
+                    "why": "证据显示私域社群收入为 180000.0，投放金额为 30000.0，ROAS 为 6.0。",
+                    "evidence_bullets": ["私域社群收入 180000.0、投放金额 30000.0、ROAS 6.0。"],
+                    "recommendations": ["优先复盘私域社群打法，再评估是否扩大预算。"],
+                    "caveats": ["当前结论只基于最近30天同表渠道数据。"],
+                    "confidence": "medium",
+                },
+            }
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天按渠道比较收入、投放金额和投放效率，哪个渠道表现最好？",
+        providers={"business_answer": business_answer_provider},
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+    columns = result["execution_result"]["columns"]
+    answer_text = _business_answer_text(result["business_answer"])
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] != "fast_fact"
+    assert result["routing_strategy"] != "reject"
+    assert result["question_understanding"]["risk_flags"] == []
+    assert result["execution_result"]["success"] is True
+    assert "business_answer_agent" in nodes
+    assert "fast_fact_evidence_preparer" not in nodes
+    assert len(business_answer_provider.requests) == 1
+    assert any("收入" in column or "销售额" in column or "revenue" in column for column in columns)
+    assert any("投放" in column or "spend" in column for column in columns)
+    assert any("ROAS" in column.upper() or "效率" in column for column in columns)
+    assert "私域社群" in answer_text
+    assert result["product_result"]["evidence"]["fact_payload"]["comparison_scope"]["sufficient"] is True
+    assert result["business_answer"]["caveats"]
+
+
+def test_cross_table_revenue_and_spend_question_uses_multi_task_evidence(tmp_path):
+    store, workspace = _create_channel_workspace(tmp_path)
+    business_answer_provider = _SequenceProvider(
+        [
+            {
+                "candidate_claims": [
+                    {"claim": "私域社群收入和投放花费均有证据。", "category": "business_inference"}
+                ],
+                "business_answer": {
+                    "headline": "已合并收入和投放证据。",
+                    "direct_answer": "已基于收入和投放花费的多任务证据生成一个业务回答。",
+                    "why": "收入和投放花费来自不同数据表，因此分别执行安全证据任务后合并判断。",
+                    "evidence_bullets": ["收入任务和投放任务均返回了按渠道汇总结果。"],
+                    "recommendations": ["优先关注收入和投放差异较大的渠道。"],
+                    "caveats": ["当前结论基于本次已审核查询返回的数据。"],
+                    "confidence": "medium",
+                },
+            }
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近30天按渠道比较收入和投放花费，哪个渠道更值得关注？",
+        providers={"business_answer": business_answer_provider},
+    )
+
+    task_results = result["evidence_task_results"]
+    ledger = result["question_evidence_ledger"]
+
+    assert result["status"] == "completed"
+    assert result["evidence_task_runner"]["max_parallel_evidence_tasks"] == 3
+    assert len(task_results) >= 2
+    assert {item["status"] for item in task_results} == {"executed"}
+    assert result["execution_result"]["success"] is True
+    assert result["execution_result"]["row_count"] >= 2
+    assert ledger["source_pack_id"] == "merged_question_evidence_pack"
+    assert ledger["question_evidence_plan"]["groups"]
+    assert len(ledger["evidence_groups"]) >= 2
+    assert all(group["facts"] for group in ledger["evidence_groups"])
+    assert all(group["source"]["tables"] for group in ledger["evidence_groups"])
+    assert all(group["metrics"] for group in ledger["evidence_groups"])
+    assert len({group["group_id"] for group in ledger["evidence_groups"]}) == len(ledger["evidence_groups"])
+    assert {item["task_id"] for item in task_results}.issubset({fact["task_id"] for fact in ledger["facts"]})
+    assert len(business_answer_provider.requests) == 1
 
 
 def test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows(tmp_path):
@@ -245,7 +673,8 @@ def test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows(tmp_p
     assert result["analysis_route"]["fast_path_eligible"] is True
     assert result["product_result"]["analysis_route"] == result["analysis_route"]
     assert not any(event.get("node") == "insight_agent" for event in result["trace"])
-    assert any(event.get("node") == "fast_fact_composer" for event in result["trace"])
+    assert any(event.get("node") == "fast_fact_evidence_preparer" for event in result["trace"])
+    assert any(event.get("node") == "business_answer_agent" for event in result["trace"])
     assert fact_payload["comparison_scope"]["row_count"] == 3
     assert fact_payload["comparison_scope"]["sufficient"] is True
     assert fact_payload["rows"] == result["execution_result"]["rows"]
@@ -256,7 +685,7 @@ def test_workspace_analysis_fact_payload_keeps_non_channel_comparison_rows(tmp_p
     assert result["product_result"]["technical_details"]["sql"].startswith("SELECT store_name")
 
 
-def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path):
+def test_workspace_analysis_uses_single_business_answer_provider_surface(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     workspace = store.create_workspace("Reviewer Composer Workspace")
     with sqlite3.connect(workspace["analysis_db_path"]) as conn:
@@ -265,47 +694,15 @@ def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path
     profile = profile_workspace_database(store, workspace["workspace_id"])
     generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
 
-    result = run_workspace_analysis(
-        store=store,
-        workspace_id=workspace["workspace_id"],
-        user_question="Which entity should we prioritize?",
-        initial_sql="SELECT entity_name, score_value FROM results ORDER BY score_value DESC LIMIT 20",
-        providers={
-            "insight_drafting": MockLLMProvider(
-                {
-                    "candidate_claims": ["Alpha score_value is 91.0", "Beta score_value is 83.0"],
-                    "business_answer": {
-                        "headline": "Gamma wins on margin_rate",
-                        "direct_answer": "Prioritize Gamma because margin_rate is strongest.",
-                        "why": "Gamma margin_rate is 0.42.",
-                        "evidence_bullets": ["Gamma margin_rate is 0.42."],
-                        "recommendations": ["Move resources to Gamma using margin_rate."],
-                        "caveats": [],
-                        "confidence": "high",
-                    },
-                }
-            ),
-            "answer_reviewer": MockLLMProvider(
-                {
-                    "status": "revise",
-                    "language": "en",
-                    "supported_entities": ["Alpha", "Beta"],
-                    "unsupported_entities": ["Gamma"],
-                    "supported_metrics": ["score_value"],
-                    "unsupported_metrics": ["margin_rate"],
-                    "issues": [
-                        {
-                            "type": "entity_mismatch",
-                            "message": "Gamma is absent from evidence.",
-                            "affected_fields": ["direct_answer"],
-                        }
-                    ],
-                    "revision_instructions": ["Remove unsupported entity and metric."],
-                    "confidence": "high",
-                }
-            ),
-            "final_answer_composer": MockLLMProvider(
-                {
+    business_answer_provider = _SequenceProvider(
+        [
+            {
+                "candidate_claims": [
+                    {"claim": "Alpha score_value is 91.0", "category": "hard_fact"},
+                    {"claim": "Beta score_value is 83.0", "category": "hard_fact"},
+                    {"claim": "Prioritize Alpha as the next review focus.", "category": "recommendation"},
+                ],
+                "business_answer": {
                     "headline": "Alpha is the supported priority",
                     "direct_answer": "Prioritize Alpha because the returned evidence ranks it first on score_value.",
                     "why": "The result rows show Alpha at 91.0 versus Beta at 83.0.",
@@ -313,11 +710,22 @@ def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path
                     "recommendations": ["Use Alpha as the next review focus."],
                     "caveats": ["This only uses the current query result."],
                     "confidence": "medium",
-                }
-            ),
+                },
+            }
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="Which entity should we prioritize?",
+        initial_sql="SELECT entity_name, score_value FROM results ORDER BY score_value DESC LIMIT 20",
+        providers={
+            "business_answer": business_answer_provider,
         },
     )
 
+    nodes = [event.get("node") for event in result.get("trace") or []]
     assert result["status"] == "completed"
     answer_text = " ".join(
         [
@@ -329,11 +737,23 @@ def test_workspace_analysis_uses_answer_reviewer_and_composer_providers(tmp_path
             *result["business_answer"]["caveats"],
         ]
     )
-    assert result["insight"]["answer_review"]["status"] == "revise"
-    assert result["insight"]["answer_composition"]["source"] == "provider"
+    assert "business_answer_agent" in nodes
+    assert "insight_agent" not in nodes
+    assert len(business_answer_provider.requests) == 1
+    assert result["business_answer_generation"]["provider_called"] is True
     assert result["audit_result"]["supported_facts"]
     assert result["audit_result"]["unsupported_claims"] == []
     assert result["product_result"]["technical_details"]["audit_result"] == result["audit_result"]
+    assert set(result["business_answer"]) == {
+        "headline",
+        "direct_answer",
+        "why",
+        "evidence_bullets",
+        "recommendations",
+        "caveats",
+        "confidence",
+    }
+    assert result["candidate_claims"]
     assert "Alpha" in answer_text
     assert "Gamma" not in answer_text
     assert "margin_rate" not in answer_text
@@ -367,6 +787,66 @@ def test_workspace_analysis_persists_full_product_result_for_history_detail(tmp_
     ]["rows"]
     assert stored["product_result"]["technical_details"]["sql"] == result["generated_sql"]
     assert stored["result"]["product_result"]["question_thread"]["original_question"] == "按渠道汇总收入"
+
+
+def test_workspace_analysis_history_restores_p30_chart_artifact_fields(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P30 Chart History Workspace")
+    run_id = "run_p30_chart_history"
+    run_dir = Path(workspace["root_path"]) / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    run_path = run_dir / f"{run_id}.json"
+    run_payload = {
+        "run_id": run_id,
+        "result": {
+            "run_id": run_id,
+            "workspace_id": workspace["workspace_id"],
+            "workspace_root": workspace["root_path"],
+            "status": "completed",
+            "user_question": "按渠道比较收入并画图",
+            "business_answer": {
+                "headline": "付费搜索收入最高。",
+                "direct_answer": "付费搜索收入最高，为 200.0。",
+                "why": "证据显示付费搜索高于邮件渠道。",
+                "evidence_bullets": ["付费搜索收入为 200.0。", "邮件收入为 100.0。"],
+                "recommendations": [],
+                "caveats": ["当前结论只基于本次查询返回的数据。"],
+                "confidence": "medium",
+            },
+            "execution_result": {
+                "success": True,
+                "columns": ["channel", "revenue"],
+                "rows": [["email", 100.0], ["paid_search", 200.0]],
+            },
+            "visualization_delivery_result": {
+                "artifact_id": "chart_channel_revenue_001",
+                "renderer": "echarts",
+                "chart_type": "ranked_bar",
+                "chart_spec": {"chart_type": "ranked_bar", "x": "channel", "y": "revenue"},
+                "echarts_option": {"series": [{"type": "bar", "data": [100.0, 200.0]}]},
+                "artifact_path": str(run_dir / "charts" / "channel.png"),
+                "image_path": str(run_dir / "charts" / "channel.png"),
+                "evidence_refs": ["question_evidence_pack"],
+                "source": "analysis_workbench",
+                "data_row_count": 2,
+            },
+        },
+    }
+    run_path.write_text(json.dumps(run_payload, ensure_ascii=False), encoding="utf-8")
+
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], run_id)
+    artifact = stored["product_result"]["chart_artifacts"][0]
+
+    assert artifact["artifact_id"] == "chart_channel_revenue_001"
+    assert artifact["renderer"] == "echarts"
+    assert artifact["chart_type"] == "ranked_bar"
+    assert "chart_spec" not in artifact
+    assert artifact["echarts_option"]["series"][0]["data"] == [100.0, 200.0]
+    assert artifact["image_path"] == f"runs/{run_id}/charts/channel.png"
+    assert artifact["image_url"] == f"/api/workspaces/{workspace['workspace_id']}/artifacts/runs/{run_id}/charts/channel.png"
+    assert artifact["evidence_refs"] == ["question_evidence_pack"]
+    assert artifact["source"] == "analysis_workbench"
+    assert artifact["data_row_count"] == 2
 
 
 def test_workspace_analysis_returns_cache_candidate_for_same_data_version_and_normalized_question(
@@ -540,44 +1020,7 @@ def test_workspace_analysis_standard_route_is_not_forced_into_fast_fact_context_
         )
     profile = profile_workspace_database(store, workspace["workspace_id"])
     generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
-    insight_provider = MockLLMProvider(
-        {
-            "candidate_claims": ["上海旗舰店 total_sales 为 26255.44。", "北京国贸店 satisfaction_score 为 4.2。"],
-            "business_answer": {
-                "headline": "上海旗舰店综合表现更靠前。",
-                "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
-                "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
-                "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
-                "recommendations": ["优先复盘上海旗舰店的经营动作。"],
-                "caveats": ["当前结论只基于本次查询返回的数据。"],
-                "confidence": "medium",
-            },
-        }
-    )
-    reviewer_provider = MockLLMProvider(
-        {
-            "status": "accept",
-            "language": "zh",
-            "supported_entities": ["上海旗舰店", "北京国贸店"],
-            "unsupported_entities": [],
-            "supported_metrics": ["total_sales", "satisfaction_score"],
-            "unsupported_metrics": [],
-            "issues": [],
-            "revision_instructions": [],
-            "confidence": "high",
-        }
-    )
-    composer_provider = MockLLMProvider(
-        {
-            "headline": "上海旗舰店综合表现更靠前。",
-            "direct_answer": "上海旗舰店在销售额和满意度上都更靠前，可作为优先复盘对象。",
-            "why": "返回数据中上海旗舰店销售额为 26255.44，满意度为 4.8。",
-            "evidence_bullets": ["上海旗舰店销售额为 26255.44，满意度为 4.8。"],
-            "recommendations": ["优先复盘上海旗舰店的经营动作。"],
-            "caveats": ["当前结论只基于本次查询返回的数据。"],
-            "confidence": "medium",
-        }
-    )
+    business_answer_provider = _mock_chinese_business_answer_provider()
 
     result = run_workspace_analysis(
         store=store,
@@ -587,11 +1030,7 @@ def test_workspace_analysis_standard_route_is_not_forced_into_fast_fact_context_
             "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
             "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
         ),
-        providers={
-            "insight_drafting": insight_provider,
-            "answer_reviewer": reviewer_provider,
-            "final_answer_composer": composer_provider,
-        },
+        providers={"business_answer": business_answer_provider},
     )
 
     assert result["analysis_route"]["route"] != "fast_fact"
@@ -634,26 +1073,22 @@ def test_workspace_analysis_non_channel_judgment_answer_reads_like_business_chin
 
     assert result["status"] == "completed"
     assert result["analysis_route"]["route"] != "fast_fact"
-    assert "退款咨询" in text
-    assert "工单数" in text or "ticket_count" not in text
+    assert "业务回答生成失败" in text
+    assert "退款咨询" not in text
     assert "第 1 行" not in text
     assert "issue_type 为" not in text
     assert "ticket_count 为" not in text
     assert "ticket_count" not in text
     assert "avg_response_minutes" not in text
-    evidence_text = " ".join(answer["evidence_bullets"])
-    if evidence_text:
-        assert "退款咨询" in evidence_text
-        assert "工单" in evidence_text
-        assert "第 1 行" not in evidence_text
-        assert "issue_type 为" not in evidence_text
-    assert "不能直接证明原因" in answer["why"]
-    assert any(marker in answer["why"] for marker in ("问题发生频次", "处理复杂度", "服务流程"))
+    assert answer["evidence_bullets"] == []
+    assert "不能直接证明原因" not in answer["why"]
     assert "证据表第一行显示" not in text
+    assert result["business_answer_generation"]["source"] == "provider_unavailable"
     assert "本轮排序证据中" not in text
     assert "execution_result" not in text
     assert "channel" not in text.lower()
-    assert answer["recommendations"]
+    assert answer["recommendations"] == []
+    assert result["product_result"]["evidence"]["table_preview"]["rows"]
     assert answer["direct_answer"] not in answer["recommendations"]
 
 
@@ -668,7 +1103,7 @@ def test_standard_analysis_without_chart_request_keeps_full_answer_path_but_skip
         )
     profile = profile_workspace_database(store, workspace["workspace_id"])
     generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
-    insight_provider, reviewer_provider, composer_provider = _mock_chinese_full_answer_providers()
+    business_answer_provider = _mock_chinese_business_answer_provider()
 
     result = run_workspace_analysis(
         store=store,
@@ -679,9 +1114,7 @@ def test_standard_analysis_without_chart_request_keeps_full_answer_path_but_skip
             "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
         ),
         providers={
-            "insight_drafting": insight_provider,
-            "answer_reviewer": reviewer_provider,
-            "final_answer_composer": composer_provider,
+            "business_answer": business_answer_provider,
         },
     )
 
@@ -689,12 +1122,90 @@ def test_standard_analysis_without_chart_request_keeps_full_answer_path_but_skip
 
     assert result["status"] == "completed"
     assert result["analysis_route"]["route"] != "fast_fact"
-    assert "insight_agent" in nodes
-    assert len(insight_provider.requests) == 1
-    assert len(reviewer_provider.requests) == 1
-    assert len(composer_provider.requests) == 1
+    assert "business_answer_agent" in nodes
+    assert "insight_agent" not in nodes
+    assert len(business_answer_provider.requests) == 1
     assert "visualization_agent" not in nodes
     assert result["product_result"]["chart_artifacts"] == []
+
+
+def test_chartable_deep_analysis_generates_echarts_artifact_and_history_keeps_option(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("P30 H3 Deep Chart Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL, satisfaction_score REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [("上海旗舰店", 26255.44, 4.8), ("北京国贸店", 18400.0, 4.2), ("深圳湾店", 9800.0, 3.9)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="请对比各门店销售额和满意度，哪个门店最值得优先复盘？请给证据和风险边界。",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 3"
+        ),
+        providers={"business_answer": _mock_chinese_business_answer_provider()},
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+    artifact = result["product_result"]["chart_artifacts"][0]
+    stored = WorkspaceRunStore(store).load_run_response(workspace["workspace_id"], result["run_id"])
+    restored_artifact = stored["product_result"]["chart_artifacts"][0]
+
+    assert result["status"] == "completed"
+    assert result["analysis_route"]["route"] == "deep_judgment"
+    assert "visualization_agent" in nodes
+    assert artifact["renderer"] == "echarts"
+    assert artifact["echarts_option"]["series"][0]["type"] in {"bar", "scatter"}
+    assert artifact["image_path"].endswith(".png")
+    assert artifact["image_url"].startswith(f"/api/workspaces/{workspace['workspace_id']}/artifacts/")
+    assert artifact["evidence_refs"] == ["question_evidence_pack"]
+    assert restored_artifact["echarts_option"] == artifact["echarts_option"]
+    assert restored_artifact["image_url"] == artifact["image_url"]
+
+
+def test_chart_generation_failure_does_not_block_business_answer(tmp_path, monkeypatch):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Chart Failure Isolation Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (store_name TEXT, sales_amount REAL, satisfaction_score REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [("上海旗舰店", 26255.44, 4.8), ("北京国贸店", 18400.0, 4.2)],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    def explode_visualization(*args, **kwargs):
+        raise RuntimeError("chart renderer exploded after answer")
+
+    monkeypatch.setattr("graph.nodes.run_visualization_agent", explode_visualization)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="请对比各门店销售额和满意度，用图表展示哪个门店最值得优先复盘？",
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales, AVG(satisfaction_score) AS satisfaction_score "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 2"
+        ),
+        providers={"business_answer": _mock_chinese_business_answer_provider()},
+    )
+
+    nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["status"] == "completed"
+    assert result["business_answer"]["headline"]
+    assert result["product_result"]["business_answer"] == result["business_answer"]
+    assert result["product_result"]["chart_artifacts"] == []
+    assert result["chart_warning"] == "chart renderer exploded after answer"
+    assert "business_answer_agent" in nodes
+    assert "visualization_agent" in nodes
 
 
 def test_workspace_analysis_support_issue_priority_aliases_are_business_labeled(tmp_path):
@@ -734,14 +1245,12 @@ def test_workspace_analysis_support_issue_priority_aliases_are_business_labeled(
     assert result["status"] == "completed"
     answer = result["product_result"]["business_answer"]
     text = _business_answer_text(answer)
-    assert "退款咨询" in text
-    assert "物流延迟" in text
-    assert "工单数" in text or "总工单数" in text
-    assert "平均响应时长" in text
-    assert "优先级评分" in text or "判断口径" in text
-    assert any(marker in text for marker in ("按平均响应时长", "判断口径", "不同指标", "如果目标"))
-    assert "不能直接证明原因" in answer["why"]
-    assert answer["recommendations"]
+    assert "业务回答生成失败" in text
+    assert "退款咨询" not in text
+    assert "不能直接证明原因" not in answer["why"]
+    assert answer["recommendations"] == []
+    assert answer["evidence_bullets"] == []
+    assert result["product_result"]["evidence"]["table_preview"]["rows"]
     for forbidden in (
         "total_tickets",
         "avg_response",
@@ -816,11 +1325,9 @@ def test_workspace_analysis_provider_priority_question_preserves_comparison_scop
     assert "LIMIT 1" not in result["generated_sql"].upper()
     answer = result["product_result"]["business_answer"]
     text = _business_answer_text(answer)
-    assert "退款咨询" in text
-    assert "物流延迟" in text
-    assert "工单数" in text or "总工单数" in text
-    assert "平均响应时长" in text
-    assert "优先级评分" in text or "判断口径" in text
+    assert "业务回答生成失败" in text
+    assert "退款咨询" not in text
+    assert result["product_result"]["evidence"]["table_preview"]["rows"]
     for forbidden in (
         "total_tickets",
         "avg_response",
@@ -869,6 +1376,116 @@ def test_workspace_analysis_generates_generic_store_ranking_evidence_without_ini
     assert requirement["time_range"]["raw_text"] == "最近 90 天"
     assert requirement["calculation_type"] == "ranking"
     assert requirement["missing_evidence"] == []
+
+
+def test_workspace_analysis_exposes_single_evidence_planning_surface(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Single Evidence Planning Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE store_sales (sale_date TEXT, store_name TEXT, sales_amount REAL)")
+        conn.executemany(
+            "INSERT INTO store_sales VALUES (?, ?, ?)",
+            [
+                ("2026-06-01", "上海旗舰店", 300000.0),
+                ("2026-06-02", "北京国贸店", 100000.0),
+                ("2026-06-03", "深圳湾店", 80000.0),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个门店销售额最高，为什么？",
+    )
+
+    trace_nodes = [event.get("node") for event in result.get("trace") or []]
+    tool_names = [call["tool_name"] for call in result["question_evidence_pack"]["tool_calls"]]
+
+    assert result["status"] == "completed"
+    assert tool_names.count("evidence_planning") == 1
+    assert "sql_planning" not in tool_names
+    assert "evidence_planning_agent" in trace_nodes
+    assert "sql_planning_router_agent" not in trace_nodes
+    assert "analysis_planner_agent" not in trace_nodes
+    assert trace_nodes.index("evidence_planning_agent") < trace_nodes.index("schema_agent")
+    assert "sql_reviewer_agent" in trace_nodes
+    assert "sql_executor_node" in trace_nodes
+    assert result["execution_result"]["success"] is True
+
+
+def test_provider_backed_evidence_planning_uses_one_planning_provider_surface(tmp_path):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Provider Evidence Planning Workspace")
+    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
+        conn.execute("CREATE TABLE support_issues (issue_type TEXT, business_date TEXT, ticket_count INTEGER)")
+        conn.executemany(
+            "INSERT INTO support_issues VALUES (?, ?, ?)",
+            [
+                ("退款咨询", "2026-06-01", 320),
+                ("物流延迟", "2026-06-02", 180),
+            ],
+        )
+    profile = profile_workspace_database(store, workspace["workspace_id"])
+    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    planning_provider = _SequenceProvider(
+        [
+            {
+                "strategy": "template",
+                "matched_template": "",
+                "confidence": 0.9,
+                "missing_slots": [],
+                "clarification_questions": [],
+                "risk_flags": [],
+                "reason": "当前语义层可生成确定性证据 SQL。",
+            }
+        ]
+    )
+
+    result = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="最近90天哪个客服问题最需要优先处理，为什么？",
+        providers={
+            "question_understanding": MockLLMProvider(
+                {
+                    "strategy": "llm_candidate",
+                    "intent": {
+                        "metric": "工单数",
+                        "dimension": "客服问题",
+                        "time_range": {"type": "last_n_days", "value": 90, "raw_text": "最近90天"},
+                        "filters": [],
+                        "operation": "recommendation",
+                        "limit": 20,
+                    },
+                    "missing_slots": [],
+                    "clarification_questions": [],
+                    "risk_flags": [],
+                    "reason": "问题槽位完整，可以生成证据规划。",
+                }
+            ),
+            "sql_planning": planning_provider,
+        },
+    )
+
+    planning_trace = [
+        event
+        for event in result.get("trace") or []
+        if event.get("node")
+        in {"evidence_planning_agent", "sql_planning_router_agent", "analysis_planner_agent"}
+    ]
+    tool_names = [call["tool_name"] for call in result["question_evidence_pack"]["tool_calls"]]
+
+    assert result["status"] == "completed"
+    assert len(planning_provider.requests) == 1
+    assert [event.get("node") for event in planning_trace] == ["evidence_planning_agent"]
+    assert planning_trace[0]["provider_called"] is True
+    assert result["evidence_planning"]["provider_called"] is True
+    assert result["sql_planning"]["provider_called"] is True
+    assert tool_names.count("evidence_planning") == 1
+    assert "sql_review" in tool_names
+    assert "sql_execution" in tool_names
 
 
 def test_workspace_analysis_reuses_question_evidence_pack_cache_for_same_task(tmp_path):
@@ -1280,9 +1897,8 @@ def test_workspace_analysis_job_persists_waiting_for_clarification_for_recovery(
 
     assert result["status"] == "waiting_for_clarification"
     assert result["run_id"] == shell["run_id"]
-    assert result["pending_run_id"].startswith("pending_")
     assert stored["result"]["status"] == "waiting_for_clarification"
-    assert stored["product_result"]["question_thread"]["pending_run_id"] == result["pending_run_id"]
+    assert stored["product_result"]["question_thread"]["thread_id"] == shell["run_id"]
     assert stored["product_result"]["question_thread"]["clarification_question"] == "请补充时间范围，例如最近90天。"
 
 
@@ -1319,7 +1935,7 @@ def test_submit_workspace_analysis_run_cache_candidate_does_not_create_backgroun
     assert len(WorkspaceRunStore(store).list_runs(workspace["workspace_id"])) == 1
 
 
-def test_workspace_analysis_persists_pending_clarification_run(tmp_path):
+def test_workspace_analysis_persists_waiting_clarification_thread(tmp_path):
     store, workspace = _create_ecommerce_workspace(tmp_path)
 
     result = run_workspace_analysis(
@@ -1329,146 +1945,364 @@ def test_workspace_analysis_persists_pending_clarification_run(tmp_path):
     )
 
     assert result["status"] == "waiting_for_clarification"
-    assert result["pending_run_id"].startswith("pending_")
     thread = result["product_result"]["question_thread"]
     assert thread["status"] == "waiting_for_clarification"
+    assert thread["thread_id"] == result["run_id"]
     assert thread["original_question"] == "帮我看看销售情况"
     assert thread["clarification_question"]
-    assert thread["pending_run_id"] == result["pending_run_id"]
     assert "generated_sql" not in result
 
 
-def test_workspace_analysis_continuation_resolves_question_and_calls_workflow(tmp_path):
-    from workspaces.analysis_runner import run_workspace_analysis_continuation
+def test_waiting_for_clarification_follow_up_updates_same_run_id(tmp_path, monkeypatch):
+    store, workspace = _create_ecommerce_workspace(tmp_path)
+    calls = []
 
-    store = WorkspaceStore(tmp_path / "workspaces")
-    workspace = store.create_workspace("Continuation Current Product Workspace")
-    with sqlite3.connect(workspace["analysis_db_path"]) as conn:
-        conn.execute("CREATE TABLE product_sales (sale_date TEXT, product_name TEXT, paid_amount REAL)")
-        conn.executemany(
-            "INSERT INTO product_sales VALUES (?, ?, ?)",
-            [
-                ("2026-06-01", "咖啡豆", 3000.0),
-                ("2026-06-02", "挂耳咖啡", 1800.0),
-            ],
-        )
-    profile = profile_workspace_database(store, workspace["workspace_id"])
-    generate_semantic_layer_draft(store, workspace["workspace_id"], profile)
+    def workflow_sequence(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        calls.append({"run_id": run_id, "user_question": user_question, "trace_dir": trace_dir})
+        if len(calls) == 1:
+            return {
+                "status": "waiting_for_clarification",
+                "run_id": run_id,
+                "workspace_root": workspace_root,
+                "trace_path": str(trace_dir / f"{run_id}.json"),
+                "original_question": user_question,
+                "question_understanding": {"missing_slots": ["time_range"]},
+                "analysis_task": {
+                    "resolved_question": user_question,
+                    "missing_slots": ["time_range"],
+                    "business_lens": {"business_domain": "sales", "metrics": [{"label": "销售额"}]},
+                },
+                "clarification_result": {
+                    "requires_clarification": True,
+                    "missing_slots": ["time_range"],
+                    "clarification_questions": ["请补充时间范围，例如最近90天。"],
+                },
+                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+                "final_answer": "需要补充信息后才能继续分析。",
+                "execution_result": {},
+                "trace": [],
+            }
+        assert run_id == calls[0]["run_id"]
+        assert "帮我看看销售情况" in user_question
+        assert "最近 90 天" in user_question
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {
+                "resolved_question": user_question,
+                "business_lens": {"business_domain": "sales", "metrics": [{"label": "销售额"}]},
+            },
+            "business_answer": {
+                "headline": "最近 90 天销售额已完成分析",
+                "direct_answer": "最近 90 天销售额为 250。",
+                "why": "证据表汇总了 paid 订单。",
+                "evidence_bullets": ["销售额合计为 250。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["revenue"], "rows": [[250.0]]},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", workflow_sequence)
+
     pending = run_workspace_analysis(
         store=store,
         workspace_id=workspace["workspace_id"],
         user_question="帮我看看销售情况",
     )
-
-    result = run_workspace_analysis_continuation(
+    result = run_workspace_analysis_follow_up(
         store=store,
         workspace_id=workspace["workspace_id"],
-        pending_run_id=pending["pending_run_id"],
-        clarification_answer="按商品，最近 90 天，看 Top 5",
+        run_id=pending["run_id"],
+        message="最近 90 天",
     )
+    history = WorkspaceRunStore(store).list_runs(workspace["workspace_id"])
 
     assert result["status"] == "completed"
-    assert result["execution_result"]["success"] is True
-    assert result["generated_sql"].lower().startswith("select")
-    trace_nodes = [event["node"] for event in result["trace"]]
-    assert "sql_generator_agent" in trace_nodes
-    assert "sql_reviewer_agent" in trace_nodes
-    assert "sql_executor_node" in trace_nodes
-    thread = result["product_result"]["question_thread"]
-    assert thread["status"] == "completed"
-    assert thread["original_question"] == "帮我看看销售情况"
-    assert thread["clarification_answer"] == "按商品，最近 90 天，看 Top 5"
-    assert "最近 90 天" in thread["resolved_question"]
-    assert "商品" in thread["resolved_question"]
+    assert result["run_id"] == pending["run_id"]
+    assert len(history) == 1
+    assert history[0]["run_id"] == pending["run_id"]
+    memory = result["analysis_thread_memory"]
+    assert memory["thread_id"] == pending["run_id"]
+    assert memory["original_question"] == "帮我看看销售情况"
+    assert memory["latest_status"] == "completed"
+    assert memory["pending_clarification"] is None
+    assert len(memory["turns"]) == 2
+    assert memory["turns"][1]["user_input"] == "最近 90 天"
+    assert result["product_result"]["question_thread"]["thread_id"] == pending["run_id"]
 
 
-def test_workspace_analysis_partial_continuation_remains_waiting_for_clarification(tmp_path, monkeypatch):
-    from workspaces.analysis_runner import run_workspace_analysis_continuation
-    from workspaces.pending_clarification_store import PendingClarificationStore
+def test_completed_run_follow_up_appends_new_turn_to_same_thread(tmp_path, monkeypatch):
+    store, workspace = _create_channel_workspace(tmp_path)
+    calls = []
 
-    store, workspace = _create_ecommerce_workspace(tmp_path)
-    pending_store = PendingClarificationStore(store)
-    pending = pending_store.create_pending_run(
-        workspace_id=workspace["workspace_id"],
-        run_id="run_pending",
-        original_question="帮我分析渠道表现，看看哪个渠道该加预算",
-        question_understanding={
-            "strategy": "clarify",
-            "analysis_task": {
-                "task_type": "recommendation",
-                "dimensions": ["渠道"],
-                "metrics": [],
-                "time_range": None,
-                "filters": [],
-                "decision_goal": "判断哪个渠道该加预算",
-                "missing_slots": ["metric", "time_range"],
-                "defaults_applied": [],
-                "resolved_question": "帮我分析渠道表现，看看哪个渠道该加预算",
-                "output_language": "zh",
-                "confidence": "medium",
-            },
-            "missing_slots": ["metric", "time_range"],
-        },
-        clarification_question="请补充要分析的指标和时间范围，例如：最近90天看销售额。",
-        raw_result={"status": "waiting_for_clarification"},
-        missing_fields=["metric", "time_range"],
-    )
-
-    def wait_for_more_info(*, user_question, **kwargs):
-        assert "帮我分析渠道表现" in user_question
-        assert "花费" in user_question
-        return {
-            "status": "waiting_for_clarification",
-            "run_id": kwargs["run_id"],
-            "workspace_root": workspace["root_path"],
-            "trace_path": "",
-            "question_understanding": {
-                "strategy": "clarify",
+    def workflow_sequence(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        calls.append(user_question)
+        if len(calls) == 1:
+            return {
+                "status": "completed",
+                "run_id": run_id,
+                "workspace_root": workspace_root,
+                "trace_path": str(trace_dir / f"{run_id}.json"),
                 "analysis_task": {
-                    "task_type": "recommendation",
-                    "dimensions": ["渠道"],
-                    "metrics": ["花费"],
-                    "time_range": None,
-                    "filters": [],
-                    "decision_goal": "判断哪个渠道该加预算",
-                    "missing_slots": ["time_range"],
-                    "defaults_applied": [],
                     "resolved_question": user_question,
-                    "output_language": "zh",
+                    "business_lens": {
+                        "business_domain": "channel_performance",
+                        "metrics": [{"label": "收入", "source_table": "orders", "source_field": "revenue"}],
+                        "dimensions": [{"label": "渠道", "source_table": "orders", "source_field": "channel"}],
+                    },
+                },
+                "business_answer": {
+                    "headline": "email 渠道收入最高",
+                    "direct_answer": "email 渠道收入最高。",
+                    "why": "证据表显示 email 收入最高。",
+                    "evidence_bullets": ["email 收入为 240。"],
+                    "recommendations": [],
+                    "caveats": [],
                     "confidence": "medium",
                 },
-                "missing_slots": ["time_range"],
-                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+                "question_evidence_pack": {
+                    "task": {
+                        "business_lens": {
+                            "business_domain": "channel_performance",
+                            "metrics": [{"label": "收入"}],
+                        }
+                    },
+                    "rows": [{"channel": "email", "revenue": 240.0}],
+                    "columns": ["channel", "revenue"],
+                },
+                "question_evidence_ledger": {
+                    "ledger_id": "qledger_first",
+                    "business_lens": {"business_domain": "channel_performance"},
+                    "question_evidence_plan": {"plan_id": "qplan_first", "groups": ["group_first"]},
+                    "evidence_groups": [
+                        {
+                            "group_id": "group_first",
+                            "purpose": "关键事实",
+                            "source": {"tables": ["orders"], "fields": ["channel", "revenue"]},
+                            "dimension": {"role": "dimension", "label": "渠道", "source_columns": ["channel"]},
+                            "metrics": [
+                                {
+                                    "role": "metric",
+                                    "label": "收入",
+                                    "source_column": "revenue",
+                                    "source_fields": ["revenue"],
+                                    "unit": "currency",
+                                }
+                            ],
+                            "time_policy": "最近90天",
+                            "row_grain": "渠道",
+                            "supports_answer": True,
+                            "supports_chart": True,
+                            "evidence_refs": ["evidence:row:0:revenue"],
+                            "facts": [
+                                {
+                                    "fact_id": "fact_1",
+                                    "label": "收入",
+                                    "value": 240.0,
+                                    "dimension": {"channel": "email"},
+                                    "source_columns": ["channel", "revenue"],
+                                    "evidence_ref": "evidence:row:0:revenue",
+                                }
+                            ],
+                            "derived_metrics": [],
+                        }
+                    ],
+                    "facts": [
+                        {
+                            "fact_id": "fact_1",
+                            "label": "收入",
+                            "value": 240.0,
+                            "unit": "",
+                            "dimension": {"channel": "email"},
+                            "source_columns": ["channel", "revenue"],
+                            "source_row_refs": ["row:0"],
+                            "evidence_ref": "evidence:row:0:revenue",
+                        }
+                    ],
+                    "derived_metrics": [],
+                    "data_limits": [],
+                    "tool_calls": [],
+                    "evidence_refs": ["evidence:row:0:revenue"],
+                    "chart_refs": [],
+                    "source_pack_id": "question_evidence_pack",
+                    "confidence": "medium",
+                },
+                "execution_result": {"success": True, "columns": ["channel", "revenue"], "rows": [["email", 240.0]]},
+                "trace": [],
+            }
+        assert "帮我分析最近90天哪些渠道收益比较好" in user_question
+        assert "email 渠道收入最高" in user_question
+        assert "为什么 email 渠道收益最好" in user_question
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {
+                "resolved_question": user_question,
+                "business_lens": {"business_domain": "channel_performance", "metrics": [{"label": "客单价"}]},
             },
+            "business_answer": {
+                "headline": "email 的客单价更高",
+                "direct_answer": "email 渠道收益高主要来自客单价。",
+                "why": "本轮证据补充比较了客单价。",
+                "evidence_bullets": ["email 客单价更高。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "question_evidence_ledger": {
+                "ledger_id": "qledger_follow_up",
+                "business_lens": {"business_domain": "channel_performance"},
+                "question_evidence_plan": {"plan_id": "qplan_follow_up", "groups": ["group_follow_up"]},
+                "evidence_groups": [
+                    {
+                        "group_id": "group_follow_up",
+                        "purpose": "关键事实",
+                        "source": {"tables": ["orders"], "fields": ["channel", "avg_order_value"]},
+                        "dimension": {"role": "dimension", "label": "渠道", "source_columns": ["channel"]},
+                        "metrics": [
+                            {
+                                "role": "metric",
+                                "label": "客单价",
+                                "source_column": "avg_order_value",
+                                "source_fields": ["avg_order_value"],
+                                "unit": "currency",
+                            }
+                        ],
+                        "time_policy": "最近90天",
+                        "row_grain": "渠道",
+                        "supports_answer": True,
+                        "supports_chart": True,
+                        "evidence_refs": ["evidence:row:0:avg_order_value"],
+                        "facts": [
+                            {
+                                "fact_id": "fact_1",
+                                "label": "客单价",
+                                "value": 120.0,
+                                "dimension": {"channel": "email"},
+                                "source_columns": ["channel", "avg_order_value"],
+                                "evidence_ref": "evidence:row:0:avg_order_value",
+                            }
+                        ],
+                        "derived_metrics": [],
+                    }
+                ],
+                "facts": [
+                    {
+                        "fact_id": "fact_1",
+                        "label": "客单价",
+                        "value": 120.0,
+                        "unit": "",
+                        "dimension": {"channel": "email"},
+                        "source_columns": ["channel", "avg_order_value"],
+                        "source_row_refs": ["row:0"],
+                        "evidence_ref": "evidence:row:0:avg_order_value",
+                    }
+                ],
+                "derived_metrics": [],
+                "data_limits": [],
+                "tool_calls": [],
+                "evidence_refs": ["evidence:row:0:avg_order_value"],
+                "chart_refs": [],
+                "source_pack_id": "question_evidence_pack",
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["channel", "avg_order_value"], "rows": [["email", 120.0]]},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", workflow_sequence)
+
+    first = run_workspace_analysis(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        user_question="帮我分析最近90天哪些渠道收益比较好",
+    )
+    follow_up = run_workspace_analysis_follow_up(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        run_id=first["run_id"],
+        message="为什么 email 渠道收益最好？",
+    )
+
+    assert follow_up["run_id"] == first["run_id"]
+    memory = follow_up["analysis_thread_memory"]
+    assert memory["thread_id"] == first["run_id"]
+    assert memory["answer_summary"] == "email 渠道收益高主要来自客单价。"
+    assert memory["latest_status"] == "completed"
+    assert memory["latest_resolved_question"] == calls[1]
+    assert len(memory["turns"]) == 2
+    assert memory["turns"][0]["answer_summary"] == "email 渠道收入最高。"
+    assert memory["turns"][1]["user_input"] == "为什么 email 渠道收益最好？"
+    assert "question_evidence_ledger:qledger_follow_up" in memory["evidence_refs"]
+    product_text = json.dumps(follow_up["product_result"], ensure_ascii=False)
+    assert "qledger_follow_up" not in product_text
+    assert follow_up["product_result"]["question_thread"]["evidence_refs"] == ["question_evidence_pack"]
+    assert follow_up["product_result"]["question_evidence_ledger"]["question_evidence_plan"]["groups"] == [
+        "group_follow_up"
+    ]
+    assert follow_up["product_result"]["question_evidence_ledger"]["evidence_groups"][0]["group_id"] == "group_follow_up"
+    assert WorkspaceRunStore(store).list_runs(workspace["workspace_id"])[0]["run_id"] == first["run_id"]
+
+
+def test_partial_clarification_follow_up_remains_waiting_in_same_thread(tmp_path, monkeypatch):
+    store, workspace = _create_ecommerce_workspace(tmp_path)
+    calls = []
+
+    def workflow_sequence(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        calls.append(user_question)
+        question = "请补充时间范围，例如最近90天。" if len(calls) == 2 else "请补充要分析的指标和时间范围。"
+        missing = ["time_range"] if len(calls) == 2 else ["metric", "time_range"]
+        return {
+            "status": "waiting_for_clarification",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {
+                "resolved_question": user_question,
+                "metrics": ["花费"] if len(calls) == 2 else [],
+                "missing_slots": missing,
+                "business_lens": {"business_domain": "channel_performance", "metrics": []},
+            },
+            "question_understanding": {"missing_slots": missing},
             "clarification_result": {
                 "requires_clarification": True,
-                "missing_slots": ["time_range"],
-                "clarification_questions": ["请补充时间范围，例如最近90天。"],
+                "missing_slots": missing,
+                "clarification_questions": [question],
             },
-            "clarification_questions": ["请补充时间范围，例如最近90天。"],
-            "final_answer": "需要补充信息后才能继续分析：请补充时间范围，例如最近90天。",
+            "clarification_questions": [question],
+            "final_answer": "需要补充信息后才能继续分析。",
             "execution_result": {},
             "trace": [],
         }
 
-    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", wait_for_more_info)
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", workflow_sequence)
 
-    result = run_workspace_analysis_continuation(
+    pending = run_workspace_analysis(
         store=store,
         workspace_id=workspace["workspace_id"],
-        pending_run_id=pending["pending_run_id"],
-        clarification_answer="花费",
+        user_question="帮我分析渠道表现，看看哪个渠道该加预算",
+    )
+    result = run_workspace_analysis_follow_up(
+        store=store,
+        workspace_id=workspace["workspace_id"],
+        run_id=pending["run_id"],
+        message="花费",
     )
 
     assert result["status"] == "waiting_for_clarification"
-    assert result["pending_run_id"] == pending["pending_run_id"]
-    assert result["clarification_question"] == "请补充时间范围，例如最近90天。"
-    assert "花费" in result["resolved_question"]
-    stored = pending_store.load_pending_run(workspace["workspace_id"], pending["pending_run_id"])
-    assert stored["status"] == "pending"
-    assert stored["missing_fields"] == ["time_range"]
-    assert stored["clarification_answer"] == "花费"
-    assert "花费" in stored["resolved_question"]
+    assert result["run_id"] == pending["run_id"]
+    assert len(WorkspaceRunStore(store).list_runs(workspace["workspace_id"])) == 1
+    memory = result["analysis_thread_memory"]
+    assert memory["latest_status"] == "waiting_for_clarification"
+    assert memory["pending_clarification"]["clarification_question"] == "请补充时间范围，例如最近90天。"
+    assert memory["turns"][1]["user_input"] == "花费"
 
 
 def test_resolved_question_uses_generic_context_merge_without_channel_budget_template():
@@ -1489,43 +2323,6 @@ def test_resolved_question_uses_generic_context_merge_without_channel_budget_tem
     assert "你希望分析哪个时间范围" not in resolved
     assert "投放成本" not in resolved
     assert "ROI" not in resolved
-
-
-def test_workspace_analysis_continuation_marks_pending_failed_when_workflow_errors(tmp_path, monkeypatch):
-    from workspaces.analysis_runner import run_workspace_analysis_continuation
-    from workspaces.pending_clarification_store import PendingClarificationStore
-
-    store, workspace = _create_ecommerce_workspace(tmp_path)
-    pending_store = PendingClarificationStore(store)
-    pending = pending_store.create_pending_run(
-        workspace_id=workspace["workspace_id"],
-        run_id="run_pending",
-        original_question="帮我看看销售情况",
-        question_understanding={"missing_slots": ["time_range"]},
-        clarification_question="你希望分析哪个时间范围？",
-        raw_result={"status": "waiting_for_clarification"},
-    )
-
-    def fail_workflow(*args, **kwargs):
-        raise RuntimeError("workflow exploded")
-
-    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", fail_workflow)
-
-    try:
-        run_workspace_analysis_continuation(
-            store=store,
-            workspace_id=workspace["workspace_id"],
-            pending_run_id=pending["pending_run_id"],
-            clarification_answer="最近 90 天",
-        )
-    except RuntimeError:
-        pass
-
-    stored = pending_store.load_pending_run(workspace["workspace_id"], pending["pending_run_id"])
-    assert stored["status"] == "failed"
-    assert stored["clarification_answer"] == "最近 90 天"
-    assert stored["resolved_question"]
-    assert "workflow exploded" in stored["error"]
 
 
 def test_workspace_analysis_repairs_schema_mismatch_once(tmp_path):

@@ -579,6 +579,93 @@ th {
 
 .thread-item dd {
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.thread-turns,
+.ledger-summary {
+  border-top: 1px solid #e3e9f4;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.thread-turns h4,
+.ledger-summary h4 {
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.thread-turns ol {
+  display: grid;
+  gap: 8px;
+  list-style: decimal;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.thread-turns li {
+  color: var(--product-muted);
+  display: grid;
+  gap: 3px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.thread-turns li strong {
+  color: var(--product-ink);
+}
+
+.ledger-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ledger-summary-grid span {
+  background: var(--product-surface-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 8px;
+  color: var(--product-muted);
+  font-size: 0.84rem;
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+}
+
+.ledger-task-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.ledger-task-group {
+  border-left: 3px solid #8fb3ff;
+  display: grid;
+  gap: 6px;
+  padding-left: 10px;
+}
+
+.ledger-task-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ledger-task-heading strong {
+  color: var(--product-ink);
+}
+
+.ledger-task-heading span {
+  color: var(--product-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.ledger-summary p {
+  color: var(--product-muted);
+  line-height: 1.55;
+  margin: 0;
 }
 
 .clarification-form {
@@ -653,6 +740,11 @@ th {
 .chart-artifact img {
   display: block;
   max-width: 100%;
+}
+
+.echarts-artifact {
+  width: 100%;
+  min-height: 320px;
 }
 
 .chart-artifact figcaption {
@@ -1154,6 +1246,13 @@ th {
   display: flex;
   gap: 18px;
   justify-content: space-between;
+}
+
+.report-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .report-reader-head h2,

@@ -13,7 +13,7 @@ _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "se
 _UNSAFE_TERMS = ("删除", "更新", "写入", "插入", "drop", "delete", "update", "insert")
 _SENSITIVE_TERMS = ("手机号", "电话", "邮箱", "email", "phone", "地址", "身份证", "payment")
 _BULK_TERMS = ("导出所有", "全部用户", "所有用户", "批量导出")
-_SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export"}
+_SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export", "external_action"}
 _METRIC_ALIASES = {
     "roas": "roas",
     "ROAS": "roas",

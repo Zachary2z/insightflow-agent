@@ -60,28 +60,26 @@ class WorkspaceSettingsResponse(BaseModel):
 class WorkspaceRunCreateRequest(BaseModel):
     user_question: str | None = None
     initial_sql: str | None = None
-    pending_run_id: str | None = None
-    clarification_answer: str | None = None
     force_reanalysis: bool = False
 
     @model_validator(mode="after")
     def validate_run_mode(self) -> "WorkspaceRunCreateRequest":
         user_question = (self.user_question or "").strip()
-        pending_run_id = (self.pending_run_id or "").strip()
-        clarification_answer = (self.clarification_answer or "").strip()
-        has_question = bool(user_question)
-        has_continuation = bool(pending_run_id or clarification_answer)
+        if not user_question:
+            raise ValueError("Provide user_question.")
+        self.user_question = user_question
+        return self
 
-        if has_question and has_continuation:
-            raise ValueError("Provide either user_question or pending_run_id with clarification_answer, not both.")
-        if has_question:
-            self.user_question = user_question
-            return self
-        if pending_run_id and clarification_answer:
-            self.pending_run_id = pending_run_id
-            self.clarification_answer = clarification_answer
-            return self
-        raise ValueError("Provide user_question or pending_run_id with clarification_answer.")
+
+class WorkspaceRunFollowUpRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def validate_message(self) -> "WorkspaceRunFollowUpRequest":
+        self.message = self.message.strip()
+        if not self.message:
+            raise ValueError("Provide a follow-up message.")
+        return self
 
 
 class WorkspaceRunResponse(BaseModel):
@@ -135,3 +133,21 @@ class WorkspaceReportResponse(BaseModel):
     workspace_id: str
     report_id: str
     report: dict[str, Any]
+
+
+class WorkspaceReportExportResponse(BaseModel):
+    success: bool
+    workspace_id: str
+    report_id: str
+    document_path: str = ""
+    download_name: str = ""
+    download_url: str = ""
+    warnings: list[str] = Field(default_factory=list)
+    artifact: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkspaceReportPublishResponse(BaseModel):
+    success: bool
+    workspace_id: str
+    report_id: str
+    publish_result: dict[str, Any]

@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 from llm_ops.provider import MockLLMProvider
+from workspaces.analysis_contracts import AnalysisTask, QuestionEvidencePack
 
 
 def _execution_result(rows: list[list[object]] | None = None) -> dict:
@@ -63,6 +64,26 @@ def _provider_output(delivery_tool_id: str = "local_renderer", **overrides) -> d
     }
     payload.update(overrides)
     return payload
+
+
+def _channel_pack(rows, columns, *, metric_label="收入"):
+    return QuestionEvidencePack(
+        task=AnalysisTask(
+            resolved_question="最近90天按渠道比较指标",
+            metrics=[metric_label],
+            dimensions=["渠道"],
+            time_range={"raw_text": "最近90天"},
+            business_lens={
+                "business_domain": "channel_performance",
+                "metrics": [{"label": metric_label, "source_table": "orders", "source_field": "revenue"}],
+                "dimensions": [{"label": "渠道", "source_table": "orders", "source_field": "channel"}],
+                "time_policy_note": "收入按下单日期统计，时间范围为最近90天。",
+            },
+        ),
+        rows=rows,
+        columns=columns,
+        metrics=[metric_label],
+    )
 
 
 def _xlsx_values(path: Path) -> str:
@@ -142,6 +163,203 @@ def test_provider_valid_output_selects_local_renderer_and_calls_real_renderer(tm
     assert delivery["external_tool_called"] is True
     assert delivery["rendered_rows"] == _execution_result()["rows"]
     assert delivery["fabricated_data"] is False
+    assert delivery["renderer"] == "echarts"
+    assert delivery["echarts_option"]["series"][0]["type"] == "bar"
+    assert delivery["echarts_option"]["series"][0]["data"] == [1200.0, 900.0]
+    assert delivery["image_path"] == delivery["artifact_path"]
+    assert delivery["evidence_refs"] == ["question_evidence_pack"]
+    assert delivery["source"] == "analysis_workbench"
+    assert result["visualization_trace"]["renderer"] == "echarts"
+    assert result["visualization_trace"]["echarts_option"]["series"][0]["data"] == [1200.0, 900.0]
+    assert result["visualization_trace"]["image_path"] == delivery["artifact_path"]
+
+
+def test_multi_task_sparse_execution_rows_without_grouped_ledger_skip_chart(tmp_path):
+    from agents.visualization_agent import run_visualization_agent
+
+    state = _state("run_multi_task_sparse_chart")
+    state["user_question"] = "最近30天按渠道比较收入和投放花费，用图表展示哪个渠道更值得关注？"
+    state["execution_result"] = {
+        "success": True,
+        "columns": ["task_id", "task_purpose", "channel", "sum_spend", "sum_revenue"],
+        "rows": [
+            ["corefact_投放成本_渠道", "core_fact", "私域社群", 30000.0, None],
+            ["corefact_投放成本_渠道", "core_fact", "搜索广告", 80000.0, None],
+            ["corefact_销售额_渠道", "core_fact", "私域社群", None, 180000.0],
+            ["corefact_销售额_渠道", "core_fact", "搜索广告", None, 120000.0],
+        ],
+        "row_count": 4,
+    }
+
+    result = run_visualization_agent(
+        state,
+        provider=MockLLMProvider(_provider_output("local_renderer")),
+        output_dir=tmp_path,
+    )
+
+    assert result["visualization_decision"]["success"] is False
+    assert result["visualization_decision"]["chart_input_source"] == "question_evidence_ledger.evidence_groups"
+    assert "缺少可用于图表的分组证据" in result["visualization_decision"]["skip_reason"]
+    assert result["visualization_delivery_result"]["rendering_status"] == "skipped"
+    assert "chart_path" not in result or not result["chart_path"]
+
+
+def test_grouped_ledger_candidate_renders_revenue_spend_grouped_bar_chart(tmp_path):
+    import workspaces.question_evidence_ledger as qel
+    from agents.visualization_agent import run_visualization_agent
+
+    revenue = qel.build_question_evidence_ledger(
+        question_evidence_pack=_channel_pack(
+            [
+                {"channel": "私域社群", "total_revenue": 300000.0},
+                {"channel": "搜索广告", "total_revenue": 100000.0},
+            ],
+            ["channel", "total_revenue"],
+        ),
+        task_id="revenue_by_channel",
+    )
+    spend_pack = _channel_pack(
+        rows=[
+            {"channel": "私域社群", "total_spend": 30000.0},
+            {"channel": "搜索广告", "total_spend": 80000.0},
+        ],
+        columns=["channel", "total_spend"],
+        metric_label="投放花费",
+    )
+    spend_pack.task.business_lens["metrics"] = [
+        {"label": "投放花费", "source_table": "marketing_spend", "source_field": "spend"}
+    ]
+    spend = qel.build_question_evidence_ledger(question_evidence_pack=spend_pack, task_id="spend_by_channel")
+
+    state = _state("run_grouped_ledger_chart")
+    state["user_question"] = "最近90天各渠道投放花费和收入表现怎么样？哪个渠道更值得关注？"
+    state["question_evidence_ledger"] = qel.merge_question_evidence_ledgers([revenue, spend])
+    state["execution_result"] = {
+        "success": True,
+        "columns": ["task_id", "task_purpose", "channel", "sum_spend", "sum_revenue"],
+        "rows": [
+            ["corefact_投放成本_渠道", "core_fact", "私域社群", 30000.0, None],
+            ["corefact_销售额_渠道", "core_fact", "私域社群", None, 180000.0],
+        ],
+        "row_count": 2,
+    }
+
+    result = run_visualization_agent(state, provider=MockLLMProvider(_provider_output("local_renderer")), output_dir=tmp_path)
+
+    delivery = result["visualization_delivery_result"]
+    option = delivery["echarts_option"]
+    assert delivery["success"] is True
+    assert delivery["renderer"] == "echarts"
+    assert delivery["chart_type"] == "grouped_bar"
+    assert delivery["chart_spec"]["title"] == "最近90天渠道收入与投放花费对比"
+    assert delivery["chart_spec"]["x"] == "渠道"
+    assert delivery["chart_spec"]["series"] == "指标"
+    assert delivery["chart_spec"]["y"] == "金额"
+    assert option["title"]["text"] == "最近90天渠道收入与投放花费对比"
+    assert option["legend"]["data"] == ["收入", "投放花费"]
+    assert option["xAxis"]["name"] == "渠道"
+    assert option["yAxis"]["name"] == "金额 (元)"
+    assert {series["name"] for series in option["series"]} == {"收入", "投放花费"}
+    assert result["visualization_decision"]["chart_input_source"] == "question_evidence_ledger.evidence_groups"
+    assert "task_id" not in json.dumps(delivery, ensure_ascii=False)
+    assert "task_purpose" not in json.dumps(delivery, ensure_ascii=False)
+
+
+def test_visualization_refuses_broad_flat_ledger_chart_projection(tmp_path):
+    from agents.visualization_agent import run_visualization_agent
+
+    state = _state("run_ledger_safe_chart")
+    state["user_question"] = "最近30天按渠道比较收入和投放花费，用图表展示。"
+    state["execution_result"] = {
+        "success": True,
+        "columns": ["task_id", "task_purpose", "channel", "total_revenue", "total_spend"],
+        "rows": [
+            ["core_fact_income_channel", "core_fact", "私域社群", 300000.0, None],
+            ["core_fact_spend_channel", "core_fact", "私域社群", None, 28000.0],
+        ],
+        "row_count": 2,
+    }
+    state["question_evidence_ledger"] = {
+        "ledger_id": "qledger_safe_chart",
+        "facts": [
+            {
+                "fact_id": "fact_income_1",
+                "label": "收入",
+                "value": 300000.0,
+                "unit": "currency",
+                "task_id": "core_fact_income_channel",
+                "dimension": {"channel": "私域社群"},
+                "evidence_ref": "evidence:core_fact_income_channel:row:0:total_revenue",
+            },
+            {
+                "fact_id": "fact_spend_1",
+                "label": "投放花费",
+                "value": 28000.0,
+                "unit": "currency",
+                "task_id": "core_fact_spend_channel",
+                "dimension": {"channel": "私域社群"},
+                "evidence_ref": "evidence:core_fact_spend_channel:row:0:total_spend",
+            },
+        ],
+        "derived_metrics": [],
+        "data_limits": [],
+        "tool_calls": [],
+        "evidence_refs": [
+            "evidence:core_fact_income_channel:row:0:total_revenue",
+            "evidence:core_fact_spend_channel:row:0:total_spend",
+        ],
+        "chart_refs": [],
+        "task_refs": ["core_fact_income_channel", "core_fact_spend_channel"],
+        "tables": [],
+        "source_pack_id": "merged_question_evidence_pack",
+        "confidence": "medium",
+    }
+
+    result = run_visualization_agent(
+        state,
+        provider=MockLLMProvider(_provider_output("local_renderer")),
+        output_dir=tmp_path,
+    )
+
+    decision_text = json.dumps(result["visualization_decision"], ensure_ascii=False)
+    delivery_text = json.dumps(result["visualization_delivery_result"], ensure_ascii=False)
+
+    assert result["visualization_decision"]["success"] is False
+    assert result["visualization_decision"]["chart_input_source"] == "question_evidence_ledger.evidence_groups"
+    assert result["visualization_delivery_result"]["rendering_status"] == "skipped"
+    assert "私域社群" not in delivery_text
+    assert "收入" not in delivery_text
+    assert "task_id" not in decision_text
+    assert "task_purpose" not in decision_text
+    assert "core_fact_income_channel" not in delivery_text
+
+
+def test_echarts_builder_failure_keeps_static_fallback_and_records_trace_reason(tmp_path):
+    from agents.visualization_agent import run_visualization_agent
+
+    funnel_output = _provider_output("local_renderer")
+    funnel_output["chart_spec"] = {
+        **funnel_output["chart_spec"],
+        "chart_type": "funnel",
+        "title": "Category Funnel",
+    }
+    result = run_visualization_agent(
+        _state("run_echarts_builder_fallback"),
+        provider=MockLLMProvider(funnel_output),
+        output_dir=tmp_path,
+    )
+
+    delivery = result["visualization_delivery_result"]
+    trace = result["visualization_trace"]
+
+    assert delivery["success"] is True
+    assert delivery["chart_type"] == "funnel"
+    assert Path(delivery["artifact_path"]).exists()
+    assert delivery["image_path"] == delivery["artifact_path"]
+    assert "echarts_option" not in delivery
+    assert delivery["renderer"] == "image"
+    assert trace["echarts_fallback_reason"]
+    assert "Unsupported chart_type: funnel" in trace["echarts_fallback_reason"]
 
 
 def test_provider_output_with_sql_is_rejected_and_falls_back(tmp_path):
@@ -305,7 +523,7 @@ def test_powerbi_mock_delivery_tool_is_not_a_runtime_option(tmp_path, monkeypatc
     assert "Unknown delivery tool: powerbi_publisher_mock" in result["error"]
 
 
-def test_workflow_visualization_trace_records_provider_fallback_when_mock_saas_is_requested(tmp_path):
+def test_workflow_visualization_trace_uses_grouped_ledger_candidate_before_provider_tool_choice(tmp_path):
     from graph.workflow import run_workflow
 
     result = run_workflow(
@@ -327,15 +545,17 @@ def test_workflow_visualization_trace_records_provider_fallback_when_mock_saas_i
     )
 
     trace_event = next(event for event in result["trace"] if event.get("node") == "visualization_agent")
-    assert result["visualization_trace"]["provider_called"] is True
-    assert result["visualization_trace"]["fallback_used"] is True
+    assert result["visualization_trace"]["provider_called"] is False
+    assert result["visualization_trace"]["fallback_used"] is False
     assert result["visualization_trace"]["delivery_tool_id"] == "local_renderer"
     assert result["visualization_trace"]["external_tool_called"] is True
-    assert result["visualization_trace"]["prompt_id"] == "visualization_agent"
-    assert "powerbi_publisher_mock" in result["visualization_trace"]["validation_error"]
+    assert result["visualization_trace"]["prompt_id"] == ""
+    assert result["visualization_trace"]["validation_error"] == ""
+    assert result["visualization_trace"]["chart_input_source"] == "question_evidence_ledger.evidence_groups"
+    assert "task_id" not in json.dumps(result["visualization_trace"], ensure_ascii=False)
     assert result["visualization_trace"]["provider_error"] == ""
-    assert trace_event["provider_called"] is True
-    assert trace_event["fallback_used"] is True
+    assert trace_event["provider_called"] is False
+    assert trace_event["fallback_used"] is False
     assert trace_event["delivery_tool_id"] == "local_renderer"
     assert trace_event["external_tool_called"] is True
-    assert trace_event["prompt_id"] == "visualization_agent"
+    assert trace_event["prompt_id"] == ""

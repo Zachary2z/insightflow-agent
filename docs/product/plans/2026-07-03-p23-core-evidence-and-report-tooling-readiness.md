@@ -1,5 +1,7 @@
 # P23 Core Evidence And Report Tooling Readiness Implementation Plan
 
+Historical / Superseded note: this phase record describes P23-era answer rewrite/composer work. P33-H2 deleted `agents/final_answer_composer.py`, deleted `workspaces/answer_consistency.py`, and removed the old rewrite tests from active expectations. Keep the references below as historical implementation notes only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stabilize the shared factual evidence layer, Chinese business answer writing, and one-pass report generation path so InsightFlow can move next into stronger general business data understanding before real external chart/document/export tools.

@@ -8,11 +8,13 @@ venv/
 env/
 tmp/
 .superpowers/
+.superpowers/*
 frontend/.next/
 frontend/node_modules/
 docs/superpowers/plans/*
 data/ecommerce.db
 data/action_ops.db
+data/*.db
 eval/report.md
 logs/traces/*.json
 logs/traces/**/*.json
@@ -28,6 +30,8 @@ reports/**
 !reports/markdown/.gitkeep
 sample_data/
 workspaces/*
+workspaces/*/runs/*
+workspaces/*/reports/*
 !workspaces/
 !workspaces/*.py
 !logs/traces/.gitkeep

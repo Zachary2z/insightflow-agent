@@ -6,9 +6,10 @@ from llm_ops.provider import LLMProvider
 from question_understanding.route_policy import classify_analysis_route
 from workspaces.analysis_contracts import AnalysisTask, CoordinatorDecision
 from workspaces.data_understanding_agent import understand_data_question
+from workspaces.evidence_tasks import plan_evidence_tasks
 
 
-_SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export"}
+_SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export", "external_action"}
 
 
 def coordinate_analysis_question(
@@ -39,9 +40,18 @@ def coordinate_analysis_question(
         route_policy_result=route_policy_result,
     )
     task.route_hint = decision.route
+    evidence_task_plan = plan_evidence_tasks(task, route=decision.route)
+    task.evidence_task_plan = evidence_task_plan.to_dict()
+    analysis_task_dict = {
+        **(data_understanding.get("analysis_task_dict") or {}),
+        "route_hint": decision.route,
+        "business_lens": task.business_lens,
+        "evidence_task_plan": task.evidence_task_plan,
+    }
     return {
         **data_understanding,
         "analysis_task": task,
+        "analysis_task_dict": analysis_task_dict,
         "coordinator_decision": decision,
         "analysis_route": route_policy_result,
     }

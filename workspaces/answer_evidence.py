@@ -35,6 +35,11 @@ BUSINESS_FIELD_LABELS_ZH = {
     "cost": "成本",
     "roi": "ROI",
     "roas": "ROAS",
+    "efficiency": "效率指标",
+    "profit": "毛利润",
+    "gross_profit": "毛利润",
+    "margin": "利润率",
+    "profit_margin": "利润率",
     "repeat_rate": "复购率",
     "repurchase_rate": "复购率",
     "retention_rate": "留存率",
@@ -86,6 +91,11 @@ BUSINESS_FIELD_LABELS_EN = {
     "cost": "cost",
     "roi": "ROI",
     "roas": "ROAS",
+    "efficiency": "efficiency",
+    "profit": "profit",
+    "gross_profit": "gross profit",
+    "margin": "margin",
+    "profit_margin": "profit margin",
     "repeat_rate": "repeat purchase rate",
     "repurchase_rate": "repeat purchase rate",
     "retention_rate": "retention rate",
@@ -167,6 +177,8 @@ def _unique_columns(columns: list[str]) -> list[str]:
 def entity_key(rows: list[dict[str, Any]]) -> str:
     for row in rows:
         for key, value in row.items():
+            if _is_internal_entity_key(key) or _is_internal_entity_value(value):
+                continue
             if not is_number(value):
                 return key
     return ""
@@ -175,7 +187,9 @@ def entity_key(rows: list[dict[str, Any]]) -> str:
 def entity_values(rows: list[dict[str, Any]]) -> list[str]:
     values: list[str] = []
     for row in rows:
-        for value in row.values():
+        for key, value in row.items():
+            if _is_internal_entity_key(key) or _is_internal_entity_value(value):
+                continue
             if is_number(value):
                 continue
             text = str(value or "").strip()
@@ -188,11 +202,36 @@ def metric_keys(rows: list[dict[str, Any]], execution_result: dict[str, Any] | N
     metrics: list[str] = []
     for row in rows:
         for key, value in row.items():
+            if _is_internal_entity_key(key):
+                continue
             if is_number(value) and key not in metrics:
                 metrics.append(key)
     if metrics or execution_result is None:
         return metrics
     return [str(column) for column in execution_result.get("columns") or [] if str(column).strip()]
+
+
+def _is_internal_entity_key(key: Any) -> bool:
+    return str(key or "").strip().lower() in {"task_id", "task_purpose"}
+
+
+def _is_internal_entity_value(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    if not text:
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "corefact",
+            "core_fact",
+            "explanationsupport",
+            "explanation_support",
+            "trendoranomalysupport",
+            "trend_or_anomaly_support",
+            "task_id",
+            "task_purpose",
+        )
+    )
 
 
 def primary_entity(rows: list[dict[str, Any]], *, entity_key_value: str, metric_key_values: list[str]) -> str:
@@ -337,6 +376,7 @@ def metric_tradeoff_summary(
 ) -> list[str]:
     leaders = metric_leaders(rows, metric_key_values=metric_key_values, chinese=chinese)
     sentences: list[str] = []
+    seen: set[tuple[str, str, str]] = set()
     for leader in leaders:
         metric = str(leader.get("metric") or "")
         label = str(leader.get("metric_label") or business_field_label(metric, chinese=chinese))
@@ -345,11 +385,30 @@ def metric_tradeoff_summary(
         if not metric or not entity or value is None:
             continue
         formatted = _format_leader_value(value, metric=metric)
+        signature = (_metric_family(metric, label), entity, formatted)
+        if signature in seen:
+            continue
+        seen.add(signature)
         if chinese:
             sentences.append(f"按{label}看，{entity}领先，数值为 {formatted}。")
         else:
             sentences.append(f"By {label}, {entity} leads with {formatted}.")
     return sentences
+
+
+def _metric_family(metric: str, label: str) -> str:
+    lowered_metric = str(metric or "").lower()
+    lowered_label = str(label or "").lower()
+    text = f"{lowered_metric} {lowered_label}"
+    if any(token in text for token in ("revenue", "sales", "gmv", "income", "收入", "营收", "销售额")):
+        return "revenue"
+    if any(token in text for token in ("spend", "cost", "expense", "成本", "花费", "投放")):
+        return "cost"
+    if any(token in text for token in ("profit", "毛利", "利润")):
+        return "profit"
+    if any(token in text for token in ("roi", "roas", "efficiency", "效率")):
+        return "efficiency"
+    return lowered_label or lowered_metric
 
 
 def _rank_rows_by_metric(

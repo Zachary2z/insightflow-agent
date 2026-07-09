@@ -21,7 +21,8 @@ class PromptTemplate:
     safety_contract: list[str]
 
     def render(self, variables: dict[str, Any]) -> dict[str, Any]:
-        missing = [name for name in self.required_variables if name not in variables]
+        resolved_variables = {**_default_prompt_variables(), **variables}
+        missing = [name for name in self.required_variables if name not in resolved_variables]
         if missing:
             return {
                 "success": False,
@@ -33,7 +34,7 @@ class PromptTemplate:
                 "error": f"missing required variables: {', '.join(missing)}",
             }
 
-        rendered_variables = {name: _json_text(variables[name]) for name in self.required_variables}
+        rendered_variables = {name: _json_text(resolved_variables[name]) for name in self.required_variables}
         return {
             "success": True,
             "prompt_id": self.prompt_id,
@@ -50,6 +51,12 @@ class PromptTemplate:
             "required_variables": list(self.required_variables),
             "safety_contract": list(self.safety_contract),
         }
+
+
+def _default_prompt_variables() -> dict[str, Any]:
+    return {
+        "question_evidence_ledger": {},
+    }
 
 
 class PromptRegistry:
@@ -130,65 +137,6 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "workspace tables when you need a max date.\n"
                 "Safety: never execute SQL, never bypass validate_sql, never access sensitive fields, "
                 "and never use DML or DDL."
-            ),
-        ),
-        PromptTemplate(
-            prompt_id="guarded_insight_claims",
-            version="v1",
-            description="Suggest insight claims that Evidence Validator must verify before use.",
-            required_variables=[
-                "user_question",
-                "execution_result",
-                "business_context",
-                "metric_context",
-                "current_final_answer",
-            ],
-            safety_contract=[
-                "must_not_bypass_evidence_validator",
-                "must_not_add_unsupported_claims",
-                "must_not_create_final_claims_without_data",
-            ],
-            template=(
-                "Task: guarded insight claim suggestion.\n"
-                "User question: {user_question}\n"
-                "Execution result: {execution_result}\n"
-                "Business context: {business_context}\n"
-                "Metric context: {metric_context}\n"
-                "Current deterministic answer: {current_final_answer}\n"
-                "Return JSON with claims only.\n"
-                "Safety: Evidence Validator must verify every claim before it can be used."
-            ),
-        ),
-        PromptTemplate(
-            prompt_id="insight_claim_typer",
-            version="v1",
-            description="Classify candidate insight claims before Evidence Validator makes the final evidence decision.",
-            required_variables=[
-                "user_question",
-                "candidate_claims",
-                "execution_result",
-                "business_context",
-                "metric_context",
-            ],
-            safety_contract=[
-                "must_not_generate_sql",
-                "must_not_execute_sql",
-                "must_not_bypass_evidence_validator",
-                "must_not_create_final_claims_without_data",
-            ],
-            template=(
-                "Task: guarded insight claim typing.\n"
-                "User question: {user_question}\n"
-                "Candidate claims: {candidate_claims}\n"
-                "Execution result: {execution_result}\n"
-                "Business context: {business_context}\n"
-                "Metric context: {metric_context}\n"
-                "Return JSON only with typed_claims and risk_flags.\n"
-                "Schema: typed_claims is an array of objects with claim, claim_type, and rationale. "
-                "Allowed claim_type values: data_supported_finding, hypothesis, unsupported. "
-                "risk_flags is a string array.\n"
-                "Safety: classify claims only; do not generate SQL; do not execute SQL; "
-                "do not bypass Evidence Validator. Evidence Validator still decides which claims can be used."
             ),
         ),
         PromptTemplate(
@@ -325,17 +273,15 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
             ),
         ),
         PromptTemplate(
-            prompt_id="insight_drafter",
-            version="v3",
-            description="Draft candidate insight claims and a clean business_answer from real execution rows before evidence validation.",
+            prompt_id="business_answer",
+            version="v5",
+            description="Generate one guarded Analysis Workbench business_answer from the clean question evidence ledger.",
             required_variables=[
                 "user_question",
-                "execution_result",
-                "business_context",
-                "metric_context",
+                "question_evidence_ledger",
             ],
             safety_contract=[
-                "must_only_use_execution_result_rows",
+                "must_only_use_question_evidence_ledger",
                 "must_not_generate_sql",
                 "must_not_execute_sql",
                 "must_not_generate_final_claims",
@@ -343,139 +289,50 @@ DEFAULT_PROMPT_REGISTRY = PromptRegistry(
                 "must_not_bypass_evidence_validator",
             ],
             template=(
-                "Task: insight drafting.\n"
+                "Task: Analysis Workbench business answer generation.\n"
+                "You are a Chinese business analysis assistant for InsightFlow Agent. "
                 "User question: {user_question}\n"
-                "Execution result: {execution_result}\n"
-                "Business context: {business_context}\n"
-                "Metric context: {metric_context}\n"
+                "Question evidence ledger: {question_evidence_ledger}\n"
                 "Return JSON only. Do not wrap it in markdown.\n"
                 "Exact schema: {{\"candidate_claims\": [], \"business_answer\": "
                 "{{\"headline\": \"\", \"direct_answer\": \"\", \"why\": \"\", "
                 "\"evidence_bullets\": [], \"recommendations\": [], \"caveats\": [], "
                 "\"confidence\": \"medium\"}}}}.\n"
-                "candidate_claims must be factual candidate claims that can be checked by Evidence Validator. "
-                "business_answer is product-facing business prose, not a technical log. "
+                "candidate_claims should be strings or objects with claim and category. "
+                "Use category hard_fact for evidence numbers, rankings, dates, percentages, amounts, or counts; "
+                "business_inference for interpretations; recommendation for suggested actions; "
+                "data_limit for caveats about missing or limited evidence. "
+                "business_answer is product-facing business prose, not a technical log or fixed section template. "
                 "Language: write all business_answer fields in the same language as the user question unless "
                 "the user explicitly asks for another language. If the user question is Chinese, headline, "
                 "direct_answer, why, evidence_bullets, recommendations, and caveats must be Chinese while "
                 "preserving business terms such as email, ROI, channel names, and currency values when useful. "
-                "headline must be one concise business conclusion. direct_answer must directly answer the user. "
-                "why must explain the reasoning supported by the current execution/evidence context. "
-                "evidence_bullets must come only from execution_result rows or provided evidence context; "
+                "Write naturally, clearly, and directly: first answer the user's core question, then explain key "
+                "evidence, then give suggestions and boundaries when useful. Do not output a fixed chapter layout "
+                "or report-style section template. headline must be one concise business conclusion. "
+                "direct_answer must directly answer the user. why must explain the reasoning supported by the "
+                "clean grouped evidence ledger. Use only the Question evidence ledger evidence_groups and "
+                "data_limits for hard facts, derived metrics, time policy, and data limits. "
+                "For each hard fact, prefer the ledger fact_text, business_object, label, value, and unit fields; "
+                "when answering ranking or best/worst questions, name the business object and include the key "
+                "supported value instead of saying only 'ranked first' or 'ranked second'. "
+                "evidence_bullets must come only from ledger facts/derived_metrics; "
                 "do not invent evidence. recommendations are allowed only when the evidence supports them; "
                 "leave recommendations empty when evidence is weak or only descriptive. caveats are required "
                 "when evidence is weak, limited, missing, truncated, or not enough for action advice. "
+                "If evidence is insufficient, explain what is missing instead of pretending the analysis is complete. "
+                "Do not invent numbers outside the grouped ledger. "
                 "When the question asks for best, should, recommend, priority, or budget decisions and multiple "
                 "metrics are present, state the decision basis in prose. If metrics point to different entities, "
                 "present the tradeoff instead of forcing one winner. Do not recommend budget changes without "
                 "sufficient comparative evidence. "
                 "confidence must be low, medium, or high.\n"
-                "Do not output raw field=value dumps, raw rows, SQL, trace ids, provider metadata, internal "
+                "Do not output raw field=value dumps, raw rows, SQL, internal technical metadata, provider metadata, internal "
                 "prompt text, credentials, secrets, or implementation details in any business_answer field. "
                 "Do not present unsupported causal claims or unverifiable recommendations as final truth.\n"
-                "Safety: use only execution_result rows and provided context; do not generate SQL, final claims, "
+                "Safety: use only the clean evidence ledger; do not generate SQL, final claims, "
                 "action payloads, approval fields, credentials, or secrets. Evidence Validator decides which "
-                "candidate_claims survive."
-            ),
-        ),
-        PromptTemplate(
-            prompt_id="answer_reviewer",
-            version="v1",
-            description="Review whether a draft business_answer is supported by execution/evidence rows without writing final prose.",
-            required_variables=[
-                "user_question",
-                "execution_result",
-                "evidence_result",
-                "draft_business_answer",
-                "profile_context",
-            ],
-            safety_contract=[
-                "must_not_write_final_user_prose",
-                "must_not_generate_sql",
-                "must_not_execute_sql",
-                "must_only_review_evidence_support",
-                "must_not_return_business_answer",
-            ],
-            template=(
-                "Task: answer evidence review.\n"
-                "User question: {user_question}\n"
-                "Execution result: {execution_result}\n"
-                "Evidence result: {evidence_result}\n"
-                "Draft business_answer: {draft_business_answer}\n"
-                "Profile or semantic context: {profile_context}\n"
-                "Return JSON only. Do not wrap it in markdown.\n"
-                "Exact schema: {{\"status\": \"accept|revise|downgrade_to_insufficient_evidence\", "
-                "\"language\": \"zh|en\", \"supported_entities\": [], \"unsupported_entities\": [], "
-                "\"supported_metrics\": [], \"unsupported_metrics\": [], \"issues\": [{{\"type\": "
-                "\"entity_mismatch|metric_mismatch|insufficient_evidence|tradeoff_missing|unsupported_claim\", "
-                "\"message\": \"\", \"affected_fields\": []}}], \"revision_instructions\": [], "
-                "\"confidence\": \"low|medium|high\"}}.\n"
-                "Responsibilities: check whether named entities and metrics in the draft are present in the "
-                "execution/evidence rows; mark unsupported claims; mark tradeoff_missing when multiple returned "
-                "metrics point to different leaders but the draft forces one conclusion; choose downgrade when "
-                "evidence is absent or cannot support the answer. For decision questions such as best, should, "
-                "prioritize, or budget allocation, verify the decision basis instead of accepting the first "
-                "returned metric as the only winner. Mark metric_mismatch when the draft discusses ROI, profit, "
-                "cost, conversion, or causality but those fields or time comparisons are absent. Do not write "
-                "the final business answer. "
-                "Do not return business_answer, SQL, prompts, trace paths, raw provider metadata, action payloads, "
-                "credentials, or secrets."
-            ),
-        ),
-        PromptTemplate(
-            prompt_id="final_answer_composer",
-            version="v1",
-            description="Compose the final P16 business_answer from draft answer, reviewer result, and execution/evidence rows.",
-            required_variables=[
-                "user_question",
-                "execution_result",
-                "evidence_result",
-                "draft_business_answer",
-                "reviewer_result",
-            ],
-            safety_contract=[
-                "must_preserve_p16_business_answer_shape",
-                "must_not_generate_sql",
-                "must_not_execute_sql",
-                "must_not_expose_reviewer_json",
-                "must_not_add_unsupported_claims",
-            ],
-            template=(
-                "Task: final answer composition.\n"
-                "User question: {user_question}\n"
-                "Execution result: {execution_result}\n"
-                "Evidence result: {evidence_result}\n"
-                "Draft business_answer: {draft_business_answer}\n"
-                "Reviewer result: {reviewer_result}\n"
-                "Return JSON only. Do not wrap it in markdown.\n"
-                "Exact schema: {{\"headline\": \"\", \"direct_answer\": \"\", \"why\": \"\", "
-                "\"evidence_bullets\": [], \"recommendations\": [], \"caveats\": [], "
-                "\"confidence\": \"low|medium|high\"}}.\n"
-                "Think internally in these business slots before writing the schema: factual_conclusion, "
-                "evidence_based_reasons, business_interpretations, recommendations, missing_data, caveats. "
-                "Do not output these internal slot names; map them into the P16 fields naturally.\n"
-                "Language: write the answer in the same language as the user question unless explicitly asked "
-                "otherwise. If reviewer status is accept, keep the useful draft answer but normalize the shape "
-                "and remove any unsafe/internal text. If status is revise, remove unsupported entities, "
-                "unsupported metrics, and unsupported claims while preserving supported business judgment. "
-                "If status is downgrade_to_insufficient_evidence but execution rows still contain supported "
-                "facts, keep the supported conclusion and explain what cannot be concluded. Only say evidence "
-                "is insufficient when the returned data truly cannot answer the question. Main business prose should use readable business labels instead "
-                "of raw field names when possible: total_revenue/revenue = 收入 or total revenue, "
-                "order_count = 订单数 or order count, avg_order_value/avg_revenue_per_order = 客单价 or "
-                "average order value, total_spend/spend = 投放成本 or spend, channel = 渠道 or channel, "
-                "segment = 客户分群 or segment, ROI stays ROI. For multi-metric decisions, state the tradeoff: "
-                "for example revenue scale may point to one entity while ROI points to another. "
-                "Hard facts such as amounts, dates, rankings, percentages, highest/lowest values, and chart values "
-                "must come from execution/evidence rows. Business explanations and recommendations are allowed, "
-                "but unsupported causes must be phrased as hypotheses using wording such as 可能、在当前证据下、"
-                "需要进一步验证. Recommendations must be supported by evidence; otherwise phrase them as further "
-                "validation or caveats. Do not turn revenue rankings into profit, ROI, conversion, repeat-purchase, "
-                "or causal conclusions when those fields are missing; instead say the missing data plainly. "
-                "Avoid table-row/debug phrasing, raw execution-result labels, and internal run statuses such as "
-                "completed, failed, waiting_for_clarification. Do not expose reviewer JSON, prompt text, SQL, trace paths, "
-                "provider metadata, raw rows, action payloads, credentials, or secrets. Do not execute SQL or "
-                "invent new evidence."
+                "hard_fact candidate_claims survive."
             ),
         ),
         PromptTemplate(

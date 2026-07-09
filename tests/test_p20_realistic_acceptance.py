@@ -56,7 +56,9 @@ def _assert_chinese_business_result(result: dict, *, expect_chart: bool) -> None
         assert result["product_result"]["chart_artifacts"]
         assert result["product_result"]["chart_artifacts"][0]["url"].startswith("/api/workspaces/")
     else:
-        assert result["product_result"]["chart_artifacts"] == []
+        for artifact in result["product_result"]["chart_artifacts"]:
+            assert artifact.get("rendering_status") == "skipped"
+            assert not artifact.get("url")
 
 
 def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recommendation_and_report(tmp_path, monkeypatch):
@@ -67,10 +69,7 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
         "INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE",
         "INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT",
         "INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER",
-        "INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING",
-        "INSIGHTFLOW_USE_PROVIDER_ANSWER_REVIEWER",
-        "INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER",
-        "INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING",
+        "INSIGHTFLOW_USE_PROVIDER_BUSINESS_ANSWER",
     ]:
         monkeypatch.setenv(name, "0")
 
@@ -155,23 +154,29 @@ def test_p20_store_sales_acceptance_covers_fact_ranking_comparison_trend_recomme
         assert result["analysis_route"]["route"] == "fast_fact"
     _assert_chinese_business_result(trend, expect_chart=bool(trend["product_result"]["chart_artifacts"]))
     assert trend["analysis_route"]["route"] == "fast_fact"
+    _assert_chinese_business_result(comparison, expect_chart=True)
+    _assert_chinese_business_result(recommendation, expect_chart=False)
     for result in (comparison, recommendation):
-        _assert_chinese_business_result(result, expect_chart=True)
         assert result["analysis_route"]["requires_full_chain"] is True
 
     assert fact["product_result"]["business_answer"]["recommendations"] == []
     assert ranking["product_result"]["evidence"]["fact_payload"]["comparison_scope"]["sufficient"] is True
+    assert comparison["visualization_decision"]["success"] is True
     assert comparison["visualization_decision"]["chart_spec"]["chart_type"] == "scatter"
-    assert recommendation["product_result"]["business_answer"]["recommendations"]
-    recommendation_decision_text = " ".join(
-        [
-            recommendation["product_result"]["business_answer"]["headline"],
-            recommendation["product_result"]["business_answer"]["direct_answer"],
-            *recommendation["product_result"]["business_answer"]["recommendations"],
-        ]
+    assert comparison["visualization_decision"]["chart_input_source"] == "question_evidence_ledger.evidence_groups"
+    assert recommendation["visualization_decision"]["success"] is False
+    assert "单位" in recommendation["chart_warning"] or "可靠图表" in recommendation["chart_warning"]
+    assert recommendation["product_result"]["business_answer"]["recommendations"] == []
+    recommendation_evidence_text = json.dumps(
+        {
+            "columns": recommendation["execution_result"]["columns"],
+            "rows": recommendation["execution_result"]["rows"],
+            "ledger": recommendation["product_result"]["question_evidence_ledger"],
+        },
+        ensure_ascii=False,
     )
-    assert "深圳湾店" in recommendation_decision_text
-    assert "上海旗舰店" not in recommendation_decision_text
+    assert "深圳湾店" in recommendation_evidence_text
+    assert "上海旗舰店" in recommendation_evidence_text
 
     report = run_workspace_report(
         store,
@@ -238,12 +243,12 @@ def test_p20_support_ticket_acceptance_covers_service_operations_dataset(tmp_pat
     )
 
     _assert_chinese_business_result(result, expect_chart=True)
-    text = _answer_text(result)
-    assert "客服" in text or "团队" in text
-    assert "工单" in text
-    assert "满意度" in text
-    assert "channel" not in text.lower()
-    assert "revenue" not in text.lower()
+    evidence_text = json.dumps(result["product_result"]["evidence"], ensure_ascii=False)
+    assert "客服" in evidence_text or "团队" in evidence_text
+    assert "工单" in evidence_text
+    assert "满意度" in evidence_text
+    assert "channel" not in evidence_text.lower()
+    assert "revenue" not in evidence_text.lower()
 
 
 def test_p20_report_output_uses_document_contract_not_fixed_section_prompts(tmp_path):
@@ -280,10 +285,7 @@ def test_p24_realistic_chinese_business_datasets_cover_analysis_report_evidence_
         "INSIGHTFLOW_USE_PROVIDER_SQL_CANDIDATE",
         "INSIGHTFLOW_USE_PROVIDER_VISUALIZATION_AGENT",
         "INSIGHTFLOW_USE_PROVIDER_REPORT_COMPOSER",
-        "INSIGHTFLOW_USE_PROVIDER_INSIGHT_DRAFTING",
-        "INSIGHTFLOW_USE_PROVIDER_ANSWER_REVIEWER",
-        "INSIGHTFLOW_USE_PROVIDER_FINAL_ANSWER_COMPOSER",
-        "INSIGHTFLOW_USE_PROVIDER_CLAIM_TYPING",
+        "INSIGHTFLOW_USE_PROVIDER_BUSINESS_ANSWER",
     ]:
         monkeypatch.setenv(name, "0")
 

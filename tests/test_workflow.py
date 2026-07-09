@@ -30,7 +30,8 @@ def test_workflow_completes_success_path_and_saves_trace(tmp_path):
     assert "sql_generator_agent" in trace_nodes
     assert "sql_reviewer_agent" in trace_nodes
     assert "sql_executor_node" in trace_nodes
-    assert "insight_agent" in trace_nodes
+    assert "business_answer_agent" in trace_nodes
+    assert "insight_agent" not in trace_nodes
 
 
 def test_workflow_rejects_dangerous_sql_before_execution(tmp_path):

@@ -16,7 +16,7 @@ MAIN_PATH_FILES = (
     "workspaces/evidence_auditor.py",
     "workspaces/business_answer_agent.py",
     "workspaces/product_result_builder.py",
-    "agents/final_answer_composer.py",
+    "agents/evidence_planning.py",
     "agents/answer_reviewer.py",
     "tools/evidence_tool.py",
     "agents/schema_repair.py",
@@ -94,13 +94,12 @@ def test_p20_main_product_chain_keeps_current_agent_tool_boundaries():
     main_source = "\n".join(_source(path) for path in MAIN_PATH_FILES)
     required_boundaries = (
         "run_question_understanding_agent",
-        "run_sql_planning_router_agent",
+        "run_evidence_planning_agent",
         "run_sql_reviewer",
         "run_schema_repair_agent",
         "run_sql",
         "validate_evidence",
         "review_answer",
-        "compose_final_answer",
         "run_evidence_agent_question_mode",
         "run_evidence_auditor_agent",
         "run_business_answer_agent",

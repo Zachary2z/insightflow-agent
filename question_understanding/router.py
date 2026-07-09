@@ -50,7 +50,7 @@ def _extract_metric(question: str) -> str:
         return "gmv"
     if _contains(question, "花费", "费用", "成本", "投放成本", "spend", "cost"):
         return "spend"
-    if _contains(question, "roas"):
+    if _contains(question, "roas", "投放效率", "投产效率", "广告投入产出比"):
         return "roas"
     if _contains(question, "roi"):
         return "roi"
@@ -82,7 +82,7 @@ def _extract_operation(question: str) -> str:
         return "trend"
     if _contains(question, "下降", "下滑", "降低", "跌"):
         return "decline"
-    if _contains(question, "roi", "roas", "投放成本", "加预算", "预算建议", "预算", "推荐", "建议"):
+    if _contains(question, "roi", "roas", "投放效率", "投产效率", "投放成本", "加预算", "预算建议", "预算", "推荐", "建议"):
         return "comparison"
     if _contains(question, "对比", "比较", "环比", "同比"):
         return "comparison"

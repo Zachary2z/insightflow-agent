@@ -1,5 +1,7 @@
 # P20 General Business Analysis Foundation Implementation Plan
 
+Historical / Superseded note: this phase record predates P33-H2. Any references to `agents/final_answer_composer.py` are historical; P33-H2 deleted that module from the active Analysis Workbench path.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Refactor InsightFlow from a channel-marketing demo-shaped product into a clean, general business data analysis multi-agent foundation that can work with different uploaded business datasets.

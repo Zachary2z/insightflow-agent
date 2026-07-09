@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-05
+Last updated: 2026-07-09
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,17 +8,17 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P27 Analysis Workbench Multi-Agent Refactor |
-| Current task | P27-H6 complete; P27 ready for next phase planning |
-| Next planned task | Post-P27 phase planning |
-| Last completed task | P27-H6 Cleanup, Regression, And Documentation |
+| Current phase | P36 Feishu Document Publishing |
+| Current task | P36-H6 Feishu document layout and in-context chart placement complete |
+| Next planned task | Post-P36 follow-up planning |
+| Last completed task | P36-H6 Feishu Document Layout And In-Context Chart Placement |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
-| Active analysis entry | `POST /api/workspaces/{workspace_id}/runs` |
+| Active analysis entry | `POST /api/workspaces/{workspace_id}/runs`; same-thread follow-ups use `POST /api/workspaces/{workspace_id}/runs/{run_id}/follow-ups` |
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and coherent Chinese report documents |
-| Out of scope for P27 | Report Center rewrite, external SaaS integrations, auth/RBAC, deployment, vector databases, scheduled reports, aggressive semantic search cache, fixed SQL templates, keyword-heavy business rules, table-specific demo logic, and old demo restoration |
+| Out of scope for P36 | DingTalk/WeCom/Tencent Docs/Power BI/Slack/Jira/email/Google Sheets integrations, OAuth UI, RBAC, deployment, scheduled publishing, vector databases, long-term personal memory, fixed-template answer/report rewriting, report re-planning during publish, LLM-generated chart data/options, fake-success SaaS connectors, and merging Report Center into Analysis Workbench |
 
 ## Phase Overview
 
@@ -42,6 +42,203 @@ This is the concise current status surface for InsightFlow Agent.
 | P25 | `[x]` Complete | H1-H4 complete; safe missing-time cases now default to full available data range while ambiguous time fields and trend grain gaps still clarify |
 | P26 | `[x]` Complete | Cleanup-only phase before external tools; kept history, removed tracked generated artifacts, generated local test DB on demand |
 | P27 | `[x]` Complete | H1-H6 complete; Analysis Workbench multi-agent refactor, latency cleanup, dead-path cleanup, regression, and docs closeout finished; Report Center remains independent |
+| P28 | `[x]` Complete | H1-H4 complete. Analysis Workbench node consolidation preserves SQL/evidence safety and Report Center independence |
+| P29 | `[x]` Complete | Fast fact and risk routing stabilization before external tool integrations; H1-H4 complete |
+| P30 | `[x]` Complete | Chart artifact and ECharts enhancement before external platform publishing; H1-H6 complete |
+| P31 | `[x]` Complete | Business Lens and Analysis Thread Memory before external connector implementation; H1-H4 complete |
+| P32 | `[x]` Complete | Multi Evidence Task Planning for Analysis Workbench: preserve fast facts, add safe multi-task evidence for standard/deep questions, keep Report Center independent |
+| P33 | `[x]` Complete | H1-H3 plus repair complete: answer input is ledger-only, fast/standard/deep use Business Answer, routing uses evidence complexity, Product Result Builder is an assembler, old template paths are removed, charts consume ledger/sanitized evidence, and strict live follow-up acceptance rejects missing/generated-failed answers |
+| P34 | `[x]` Complete | H1-H4 complete; Report Center can trigger backend Word export and download real `.docx` files without report rewriting or simulated SaaS connectors |
+| P35 | `[x]` Complete | Analysis Workbench evidence planning and chart reliability: H1 grouped ledger, H2 grouped-answer/audit, H3 deterministic grouped-chart implementation, and H4 live-closeout repair are complete |
+| P36 | `[x]` Complete | Feishu document publishing: H1 CLI publisher boundary, H2 Report Center API/UI wiring, H3 chart image insertion, H4 deterministic/live-gated acceptance, H5 table/PNG publish repair, and H6 layout/section chart placement are complete |
+
+P34 planning is recorded in `docs/product/plans/2026-07-07-p34-real-export-tooling.md`. The core rule is: generated report content follows `ReportDocument`; export tools provide stable layout and real file generation only. Word export does not call the LLM, rewrite conclusions, force fixed business chapters, stitch Analysis Workbench answers into reports, or restore simulated SaaS/action/chart paths. Report Center now has the first visible export UI; Analysis Workbench keeps safe export package support for later connectors.
+
+P35 planning is recorded in `docs/product/plans/2026-07-07-p35-analysis-chart-and-ledger-reliability.md`. P35 is complete. Analysis Workbench now has a question-level `QuestionEvidencePlan`, grouped ledger sections by purpose/source/dimension/metric/grain/time policy, answer-safe grouped evidence for Business Answer, non-destructive hard-fact audit, coherent grouped chart candidates, compatible metric-subset chart selection, top-N fast-fact evidence, Product Result answer preservation, source-compatible Business Lens grounding, rank/percentage-aware fact support, and one safe-review LLM rewrite when a provider draft is rejected or scrubbed into an empty answer. This keeps conclusions model-written instead of falling back to deterministic templates. Report Center remains independent on its `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument` path.
+
+P36 planning is recorded in `docs/product/plans/2026-07-08-p36-feishu-document-publishing.md`. P36-H1 through P36-H6 are complete. It publishes existing Report Center reports to Feishu Docs through the open-source `lark-cli`, using `ReportDocument`, `p34.export_package.v1`, and P30/P34 chart static assets as the source of truth. Publishing is a delivery tool only: it does not call the LLM, execute SQL, rewrite report content, force fixed report chapters, stitch Analysis Workbench answers, generate chart data, or introduce fake-success SaaS connectors. Interactive ECharts remains in the InsightFlow UI; Feishu receives complete report Markdown including evidence tables plus safe local PNG/JPEG/GIF chart images when available. H6 removed duplicate body title rendering, kept evidence tables near their report sections without flooding the Feishu outline, and inserts chart images at matching section anchors instead of appending every image at the bottom.
+
+## P35 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P35-H1 | `[x]` Complete | Question Evidence Plan and grouped ledger: evidence groups, source-column/semantic-role labels, chartability metadata, grouped answer input, and narrowed flat chart projection |
+| P35-H2 | `[x]` Complete | Grouped answer generation and non-destructive audit: provider input requires answer-safe grouped ledger evidence, unsupported auxiliary hard facts are removed without erasing supported conclusions, and no-provider mode returns explicit generation failure instead of ledger/row-derived prose |
+| P35-H3 | `[x]` Complete | Grouped chart selection, ECharts polish, acceptance, and cleanup: grouped-ledger candidates, business-readable legends/titles/axes, safe skip reasons, and old broad task-row fallback deletion/narrowing |
+| P35-H4 | `[x]` Complete | Live-closeout repair: structured fast_fact routing with top-N evidence, compatible chart metric subsets, valid answer preservation, metric-label integrity, Business Lens source compatibility, main payload internal-ref scrubbing, rank/percentage-aware fact support, safe-review LLM rewrite on rejected drafts, and real DeepSeek acceptance |
+
+## P36 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P36-H1 | `[x]` Complete | Feishu publisher contract and CLI adapter: `ExternalPublishResult`, `CliFeishuPublisher`, safe command runner, CLI availability/auth failures, JSON parsing, safe serialization, and report-package-only publishing guard |
+| P36-H2 | `[x]` Complete | Report Center publish API and UI: `POST /reports/{report_id}/publish/feishu`, safe `external_publish_results.feishu` persistence, `发布到飞书` frontend states, and no report rewrite |
+| P36-H3 | `[x]` Complete | Chart image insertion: reuses P34 static chart assets, inserts PNG/JPEG/GIF files through Feishu CLI media commands, counts inserted/failed charts, and preserves document success with warnings when chart insertion fails |
+| P36-H4 | `[x]` Complete | Acceptance, live Feishu verification gate, docs, and cleanup: deterministic full publish path, frontend safe summary display, opt-in live test, artifact hygiene, and old-path audit |
+| P36-H5 | `[x]` Complete | Live Feishu repair: publish evidence tables from existing reports, generate/reuse PNG chart fallbacks for Feishu Docs, surface safe warnings, and replace conflicting simplified publish body paths |
+| P36-H6 | `[x]` Complete | Feishu document layout polish: section-local evidence table labels, no duplicate body title, in-context chart placement through section anchors, safe placement warnings, and no old append-only active path |
+
+## Latest P36-H6 Result
+
+P36-H6 kept the same delivery-only publish path and improved only the Feishu document projection. The runtime remains `ReportDocument -> p34.export_package.v1 -> CliFeishuPublisher -> lark-cli`; it does not call the LLM, execute SQL, rerun Report Runner, rewrite report prose, stitch Analysis Workbench answers, or generate chart data. Feishu now owns the title, the Markdown body starts with business-readable metadata and report content, evidence tables sit under matching report sections without noisy `###` outline entries, chart anchors use readable notes, and `docs +media-insert --selection-with-ellipsis` places PNG/JPEG/GIF images at those anchors. A post-H6 real document readback found that report chart artifacts can use wrapped ids such as `artifact_chart_<chart_id>` while report sections reference the shorter `chart_id`; the export package now preserves `chart_id`, `chart_ids`, and `source_chapter_id` from `ReportEvidencePack.charts`, and the Feishu publisher matches section `chart_refs` against those aliases before falling back to `图表说明`. If chart placement fails, the user sees a safe warning instead of raw CLI output or internal paths. Verification passed: `python3 -m pytest tests/test_feishu_publisher.py tests/test_workspace_report_api.py tests/test_chart_static_export.py tests/test_export_package.py -q` (`66 passed`). Live Feishu verification was not run in this repair pass.
+
+## Latest P36-H5 Result
+
+P36-H5 completed on 2026-07-08:
+
+- `p34.export_package.v1` now carries sanitized `evidence_tables` from existing `ReportEvidencePack.tables`.
+- `CliFeishuPublisher._package_to_markdown()` now renders the complete report publish body: title, metadata, opening summary, sections, evidence tables, chart captions, action recommendations, and data boundaries. It escapes table pipes/newlines, caps large tables to 10 rows, and keeps raw SQL/rows/provider/trace/debug fields out.
+- Feishu publish API requests PNG-target chart static assets from existing chart artifacts/ECharts options before publishing. The default static export path still keeps SVG/ECharts for web, Markdown, and Word fallback.
+- `CliFeishuPublisher` inserts only workspace-root-safe local PNG/JPEG/GIF files; SVG, URL-only, missing, unsafe, or unsupported assets become safe visible warnings.
+- Report Center UI shows Feishu link, inserted/failed chart counts, safe warnings, and a generic `部分图表未插入飞书文档。` fallback when detailed warnings are filtered.
+- The repair did not call the LLM, execute SQL, rerun Report Runner, rewrite reports, stitch Analysis Workbench answers, add Feishu Sheets/Base native charts, or introduce fake-success connector behavior.
+- Verification passed: `python3 -m pytest tests/test_feishu_publisher.py tests/test_workspace_report_api.py tests/test_chart_static_export.py -q` (`54 passed`), `python3 -m pytest tests/test_export_package.py tests/test_document_export.py -q` (`17 passed`), and `cd frontend && npm test -- workspace-flow.test.tsx` (`66 passed`). Live Feishu verification was not run in this repair pass.
+
+## Latest P36-H4 Result
+
+P36-H4 completed on 2026-07-08:
+
+- Deterministic acceptance now covers Report Center export package -> `CliFeishuPublisher` -> official `docs +create` -> local PNG `docs +media-insert` -> safe `external_publish_results.feishu` persistence.
+- The acceptance test verifies publish does not call the report composer provider, does not open SQLite/execute SQL, does not rewrite the existing `ReportDocument`, and does not publish Analysis Workbench `business_answer` as a report.
+- Safe result checks cover stdout/stderr, absolute paths, SQL, raw rows, trace, provider metadata, prompts, tokens, secrets, and temp/workspace paths.
+- Report Center frontend coverage verifies only status, Feishu link, chart insertion counts, and safe warnings are rendered; raw command/tool-call metadata and malicious warning content are hidden.
+- Added `tests/test_feishu_live_publish.py`, skipped unless `INSIGHTFLOW_FEISHU_LIVE=1` and `LARK_CLI_BIN` are explicitly set. It uses real `lark-cli`, assumes local auth is already configured, creates a minimal Chinese report with a PNG chart, optionally reads back via `docs +fetch`, and prints only a safe summary.
+- Deterministic verification was added; live Feishu verification was not run in this closeout environment because the explicit live environment variables were not set.
+- Artifact hygiene and old-path audit were checked. Remaining chart-agent/planner/tool, action/mock/fake-success hits are historical/superseded documentation, negative tests, or provider rejection tests, not active product publish paths.
+
+## Latest P36-H3 Result
+
+P36-H3 Chart Image Insertion From ECharts Static Assets completed on 2026-07-08:
+
+- `CliFeishuPublisher` now creates the Feishu document first, then reads `p34.export_package.v1` `static_assets` and inserts eligible local chart images through `lark-cli docs +media-insert`.
+- The publisher validates static asset paths against the workspace root and inserts only local PNG/JPEG/GIF images. SVG assets, URL-only assets, unsupported formats, missing files, and unsafe paths become safe warnings and increment `failed_chart_count`; they are not reported as successful inserts.
+- The media command uses the official path: `lark-cli docs +media-insert --doc <document_id> --file <safe local file> --type image --align center --caption <caption> --width 800`. When create returns a `/wiki/...` URL, media insert still uses the returned `document_id`.
+- Document creation remains the boundary: if create fails, status is `failed`; if create succeeds and all chart inserts succeed, status is `published`; if create succeeds but any chart insert or asset eligibility check fails, status is `warning` and the Feishu URL/document id are preserved.
+- `inserted_chart_count`, `failed_chart_count`, `warnings`, and `tool_calls` are returned and persisted through `ExternalPublishResult.to_safe_dict()` under `external_publish_results.feishu`. Tool calls record only `create_document` / `insert_chart_image`, command name, success, elapsed time, and exit code; raw stdout/stderr, absolute paths, SQL, rows, trace, provider metadata, prompts, tokens, and secrets are stripped.
+- Report Center now displays the safe chart insertion summary such as `已插入 2 张图表，1 张图表未插入。` without exposing internal tool calls.
+- H3 did not call the LLM, did not rewrite reports, did not rerun Report Runner, did not execute SQL, did not publish Analysis Workbench answers as reports, did not add live Feishu tests, and did not restore mock SaaS/action paths.
+- Focused verification passed: `python3 -m pytest tests/test_feishu_publisher.py tests/test_workspace_report_api.py -q` (`39 passed`), `python3 -m pytest tests/test_chart_static_export.py tests/test_export_package.py -q` (`16 passed`), and `cd frontend && npm test -- workspace-flow.test.tsx` (`64 passed`).
+
+## Latest P36-H2 Result
+
+P36-H2 completed on 2026-07-08:
+
+- Added `POST /api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu` in `api/app.py` and `WorkspaceReportPublishResponse` in `api/models.py`.
+- The endpoint loads an existing Report Center report, builds `p34.export_package.v1` through `build_report_export_package()`, calls `CliFeishuPublisher.publish_report()`, saves only `ExternalPublishResult.to_safe_dict()` under `report.external_publish_results.feishu`, and returns that safe result.
+- Business publish failures are product results, not server crashes: publisher `status="failed"` returns `200` with readable warnings; missing reports return `404`; only unexpected program errors become `500`.
+- `ReportRecord` now persists/restores `external_publish_results`, so Report Center detail can recover the latest Feishu state after reload.
+- `frontend/lib/api.ts` now exposes `publishFeishuReport()` and safe publish-result types. `ReportViewer` now shows `发布到飞书`, `发布中`, success link, warning link, and failed warning states while hiding raw command/stdout/stderr, tokens, trace, SQL, prompts, and tool-call internals.
+- H2 did not change the H1 official CLI create command, did not insert charts, did not run live Feishu tests, did not call the LLM, did not rewrite reports, and did not rerun Report Runner.
+- Verification passed: `python3 -m pytest tests/test_feishu_publisher.py tests/test_workspace_report_api.py -q` (`34 passed`), `python3 -m pytest tests/test_export_package.py tests/test_workspace_report_runner.py tests/test_document_export.py -q` (`37 passed`), `cd frontend && npm test` (`81 passed`), and `cd frontend && npm run build` passed.
+
+## Latest P36-H1 Result
+
+P36-H1 completed on 2026-07-08:
+
+- Added `workspaces.external_publishing.ExternalPublishResult`, safe publish serialization, common report-package validation helpers, and the `FeishuPublisher` protocol.
+- Added `workspaces.feishu_publisher.CliFeishuPublisher` with `CommandRunner`, `SubprocessCommandRunner`, `CommandExecutionResult`, centralized official document-create command construction, `LARK_CLI_BIN` configuration with `lark-cli` fallback, JSON parsing, and clear failure/warning normalization.
+- The adapter publishes only existing Report Center export packages, turns package content into Markdown for `lark-cli docs +create --doc-format markdown --title <title> --content <markdown>`, rejects Analysis Workbench export packages and dicts missing explicit `package_version == p34.export_package.v1`, and does not call the LLM, execute SQL, rewrite reports, create fixed templates, insert charts, or restore old mock/action connectors.
+- Official nested JSON is supported: `ok=true` with `data.document.document_id/url` publishes, `ok=false` fails, and `ok=true` without `data.document` warns instead of pretending success.
+- Safe artifact output keeps only platform/status/title/link/id/timestamps/chart counts/warnings and tool-call summaries. Raw stdout/stderr, local absolute paths, token/secret/API key markers, raw SQL/rows, trace paths, provider metadata, prompts, and debug fields are stripped or hidden.
+- Deterministic fake-runner coverage includes official command construction, default `lark-cli` binary behavior, official nested JSON parsing, `ok=false`, missing `data.document`, missing CLI/runner failures, non-zero exit, non-JSON stdout, missing field warnings, safe serialization, and non-report package/version rejection.
+
+## Latest P35-H1 Result
+
+P35-H1 completed on 2026-07-07:
+
+- Analysis Workbench `question_evidence_ledger` now has primary `question_evidence_plan` and `evidence_groups` sections. Groups preserve purpose, source tables/fields, dimension role/label, metric role/label/source column/source fields/unit, time policy, row grain, answer/chart support, evidence refs, facts, and derived metrics.
+- Business Answer prompt input now uses grouped answer-safe evidence, with safe group/evidence refs and no raw SQL, raw rows, provider metadata, task ids, row refs, ledger ids, source pack ids, trace paths, or local paths.
+- Metric labels are bound by returned source columns and semantic metric metadata instead of planner metric order, fixing swapped labels when SQL returns metrics in a different order.
+- Merged multi-task evidence keeps channel, spend, support pressure, and sales-owner/support issue evidence in separate groups; same-thread follow-up and product summaries preserve grouped context.
+- `build_chart_safe_table()` now only projects one coherent chartable evidence group and refuses broad multi-group mixing. H3 will replace the remaining visualization fallback behavior with grouped chart candidate selection.
+- Product Result Builder remains an assembler and only exposes scrubbed grouped ledger summaries in the main payload. Report Center remains independent.
+
+## Latest P35-H2 Result
+
+P35-H2 completed on 2026-07-07:
+
+- `BusinessAnswerAgent` now calls the provider only with `build_answer_input_ledger()` output and requires at least one answer-safe `evidence_groups` entry. The prompt tells the model to act as a Chinese business analysis assistant, answer naturally from grouped evidence/data limits, avoid fixed report-style templates, and not invent numbers outside the ledger.
+- Raw execution rows, SQL, task ids/purposes, ledger/source-pack ids, trace paths, provider metadata, local paths, and prompt/debug fields are not placed in the main answer prompt. Empty/no-key provider mode returns an explicit `业务回答生成失败` boundary while preserving evidence/table previews separately; it does not compose a natural answer from rows or ledger facts.
+- Repair is non-destructive: typed hard-fact claims are checked against the grouped ledger, unsupported auxiliary numbers are removed at sentence/item level, and supported primary conclusions are preserved when still usable. Only internal leaks, empty primary answers after scrub, provider validation failure, or broadly unsupported primary facts become generation-failed output.
+- Product Result Builder remains an assembler. It passes through usable `business_answer` objects and shows missing/generation-failed answer states without synthesizing direct answers from `execution_result.rows`.
+- Report Center remains independent on `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`; the report runner/API tests were rerun unchanged.
+
+## Latest P35-H3 Result
+
+P35-H3 completed deterministic implementation and regression on 2026-07-07:
+
+- Analysis Workbench charts now start with `build_grouped_chart_candidate()` from `question_evidence_ledger.evidence_groups`. Candidates include business dimension, metric labels, display unit, row grain, evidence refs, safe chart rows/columns, and deterministic chart spec.
+- One coherent evidence group can chart by default. Multiple groups can combine only when dimension signature, row grain, and metric unit family match; revenue plus spend by channel is allowed, while revenue plus ROI or channel revenue plus support issue evidence is skipped with a business-readable reason.
+- Visualization no longer turns broad `task_id`/`task_purpose` sparse execution rows into mixed long chart tables. The remaining fallback is restricted to legacy single-dimension/single-metric execution results with no internal columns.
+- ECharts grouped-bar legends now use real metric names such as `收入` and `投放花费`; titles/axes/units come from the grouped candidate, e.g. `最近90天渠道收入与投放花费对比`, `渠道`, and `金额 (元)`. The deterministic option builder rejects incompatible grouped metric units.
+- Chart artifacts and the frontend can show safe skip/failure reasons without exposing SQL, raw rows, task ids, ledger ids, provider metadata, trace paths, or raw option/spec JSON in the main UI.
+- Report Center remains independent on `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`; it did not call Analysis Workbench chart selection.
+
+## Latest P35-H4 Result
+
+P35-H4 Live Closeout Repair Without Templates completed on 2026-07-08:
+
+- Fast-fact ranking now keeps comparison candidates: rank/top questions with one grounded metric and one dimension use the fast path when structurally simple, and provider SQL that returns `LIMIT 1` is widened to top-N evidence before the model writes the final answer.
+- Chart selection now chooses a compatible metric subset from grouped ledger evidence. Revenue plus spend can render a `grouped_bar` on the amount axis while ROAS/ROI/rate/share/rank metrics stay out of that axis unless explicitly comparable.
+- Product Result Builder still does not compose conclusions. It now preserves successful structured `business_answer_generation.business_answer` objects, normalizes extra model fields, and does not erase a valid model answer just because auxiliary evidence is weak.
+- Post-review live-test repair fixed answer scrubber number handling so time-window numbers such as `最近90天` do not cause supported amounts such as `90,000元` to be removed or displayed as malformed fragments.
+- Product Result main payload summaries scrub internal ledger/source/task refs from grouped ledger and question-thread displays. Technical details remain available separately, while the main answer/chart/evidence payload avoids raw SQL, raw rows, task ids, ledger ids, provider metadata, trace paths, and prompt/debug text.
+- Business Lens grounding now prefers metric/dimension source compatibility from the selected dimension tables, supports store margin-like fields, and avoids silently binding product/customer/store dimensions to unrelated channel-spend metrics when labels are merely similar.
+- Deterministic verification passed: route/fast/workspace group `83 passed`; grouped-ledger/chart/ECharts group `50 passed`; product-answer/business-lens group `94 passed`; full backend `715 passed, 14 skipped`; frontend Vitest `77 passed`; `git diff --check` passed.
+- Real DeepSeek closeout used `deepseek-v4-flash` on 2026-07-08. `最近30天哪个渠道收入最高？只回答事实和口径。` completed in 26.03s as `fast_fact`, called question understanding, SQL planning, SQL candidate, and Business Answer once each, kept 1 grouped evidence section with multiple channel candidates, produced no chart, and main payload leak flags were all false. Key nodes: supervisor, question understanding, clarification router, evidence planning, schema, metric, guarded SQL candidate, SQL review, SQL execution, evidence validation, fast-fact evidence preparer, Business Answer, evidence auditor.
+- Real DeepSeek closeout chart case `最近90天比较各渠道收入和投放金额，哪个渠道投放效率更值得关注？请生成图表。` completed in 41.79s as `deep_judgment`, called question understanding, SQL planning, SQL candidate, and Business Answer once each, produced 1 grouped evidence section and 1 `grouped_bar` chart. Chart labels were `私域社群`, `搜索广告`, `直播间`; series were `销售额` and `投放成本`; unit `元`; ROAS/ROI stayed in the answer instead of the amount axis; main payload leak flags were all false.
+- Real DeepSeek closeout store case `结合门店销售额、毛利率和满意度，哪个门店下一步最值得优先复盘？请给建议和风险边界。` completed in 70.86s as `deep_judgment`, called question understanding, SQL planning, SQL candidate, and Business Answer once each, produced 1 grouped evidence section, displayed the model-written recommendation for `深圳湾店`, and main payload leak flags were all false. A scatter chart was produced from the chartable numeric pair with evidence refs mapped to `question_evidence_pack`.
+
+## P34 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P34-H1 | `[x]` Complete | `p34.export_package.v1` unified safe output contract for Report Center and Analysis Workbench, with no raw SQL/rows/trace/provider/secret/path/task/prompt leakage |
+| P34-H2 | `[x]` Complete | Chart static asset export from ChartArtifact/ECharts/image fallback for document insertion; option-only ECharts can generate workspace-relative SVG when data/root are sufficient |
+| P34-H3 | `[x]` Complete | `workspaces.document_export` renders report export packages into local Word `.docx` files using existing ReportDocument content, safe chart assets or placeholders, recommendations, data boundaries, and evidence appendix |
+| P34-H4 | `[x]` Complete | Report export API, frontend Word download entry, warning/failure states, acceptance, real DeepSeek report-to-docx verification, and cleanup |
+
+## Latest P34-H1 Result
+
+P34-H1 Export Package unified output contract completed on 2026-07-07:
+
+- `workspaces.export_package` now emits `p34.export_package.v1` with `source_type` values `report` and `analysis`, `generated_at`, business/document summaries, ordered report sections, action recommendations, data boundaries, chart artifacts, static assets, evidence refs, evidence summary, and warnings.
+- Report packages preserve `ReportDocument.sections` order and titles exactly and do not force fixed business chapters.
+- Analysis packages export the current `business_answer`, evidence summary/refs, and chart artifacts only; `sections=[]` prevents turning workbench answers into report-like templates.
+- The package builder remains a deterministic projection layer: no LLM calls, no SQL execution, no report rewriting, no missing-answer synthesis, and no fake static fallback images.
+- Safety filtering covers raw SQL, raw rows, trace paths, provider metadata, API keys/secrets, database paths, local absolute paths, path traversal, secret-bearing URLs, task ids/purposes, debug ids, prompt text/ids/tokens, and raw `chart_spec` JSON.
+- Verification passed: `tests/test_export_package.py` (`8 passed`), related backend regression (`64 passed`), P30 live helper (`1 skipped`), P33 live acceptance (`1 skipped`), and frontend Vitest (`73 passed`).
+
+## Latest P34-H2 Result
+
+P34-H2 Chart Static Asset Export completed on 2026-07-07:
+
+- Added `workspaces.chart_static_export` for deterministic local chart static asset export.
+- Legacy PNG/SVG and ECharts artifacts with safe `image_path` / `image_url` / `path` / `url` are reused.
+- ECharts artifacts without image fallback can generate workspace-relative SVG files from existing `echarts_option` series data under `exports/charts/`.
+- Missing option data, unsafe paths/URLs, or absent workspace output roots return warnings instead of fake success.
+- `workspaces.export_package` now sources `static_assets` from the new static export logic while preserving H1 safety filtering.
+- No LLM calls, business re-analysis, report rewriting, fixed business templates, old chart-agent/planner/tool path, simulated external publishing path, or action-delivery path were introduced.
+
+## Latest P34-H3 Result
+
+P34-H3 Word Document Export Tool completed on 2026-07-07:
+
+- Added `workspaces.document_export.export_report_docx()` to render Report Center export packages into real local Word `.docx` files.
+- The exporter consumes only `p34.export_package.v1` report fields: title, generated metadata, opening summary/business content summary, ordered sections, section chart refs, action recommendations, data boundaries, evidence refs, and compact evidence summary counts.
+- PNG/JPEG-compatible static chart assets are inserted into the document. Missing chart assets, unsafe paths, or SVG-only assets produce a visible placeholder and warning rather than a fake image success.
+- Analysis Workbench export packages are rejected by default for full Word report export, preserving the boundary that workbench answers are not report documents.
+- No LLM calls, report rewriting, fixed business templates, raw SQL/rows, trace/provider metadata, API keys, database paths, local absolute paths, prompt/task/debug fields, old chart-agent/planner/tool paths, or simulated SaaS/action-delivery paths were introduced.
+
+## Latest P34-H4 Result
+
+P34-H4 API, Frontend Download, Acceptance, And Cleanup completed on 2026-07-07:
+
+- Added `POST /api/workspaces/{workspace_id}/reports/{report_id}/export` to load an existing report, build a safe export package, call `export_report_docx()`, verify the generated `.docx` stays under the workspace, persist a `word_document` artifact, and return safe download metadata.
+- Reused `/api/workspaces/{workspace_id}/artifacts/{relative_path}` for `.docx` download; API/frontend expose workspace-relative paths and URL-encoded download URLs, not local absolute paths.
+- Report Center shows `导出 Word`, exporting/success/warning/failure states, and a Word download link. SVG-only or missing embeddable chart assets remain usable with the business-friendly warning `部分图表当前以占位说明展示。`.
+- Real DeepSeek acceptance generated `最近90天经营复盘报告` from goal `生成一份最近90天渠道经营复盘报告，覆盖收入结构、投放效率、客服压力、关键风险和下一步建议。`, completed through `ledger_backed_report_center` with `provider_supplied=true`, exported Word in 27.30s, and verified title, summary, sections, recommendations, data boundaries, one chart-placeholder warning, and no SQL/trace/provider/API-key/database/prompt/task/local-path leakage.
+- Verification passed: `tests/test_document_export.py tests/test_workspace_report_api.py tests/test_workspace_report_runner.py` (`46 passed`), `tests/test_export_package.py tests/test_chart_static_export.py tests/test_p30_acceptance.py` (`17 passed`), full backend regression (`688 passed, 14 skipped`), full frontend Vitest (`76 passed`), and `cd frontend && npm run build`.
 
 ## P20 Task Status
 
@@ -86,6 +283,198 @@ P26 planning is recorded in `docs/product/plans/2026-07-04-p26-repository-cleanu
 
 P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbench-multi-agent-refactor.md`. P27 primarily refactors Analysis Workbench. The goal is to make the current workflow look and behave more like real multi-agent collaboration instead of a long list of small nodes: Coordinator handles route/state; Data Understanding handles question understanding, clarification, continuation, and `AnalysisTask`; Evidence Agent question mode handles schema/metric/SQL/evidence tool calls; Evidence Auditor handles facts, inferences, unsupported claims, and data limits; Business Answer Agent handles the final Chinese answer; Visualization is on-demand. Report Center remains on its independent report path and must not call Analysis Workbench nodes or stitch Analysis Workbench answers into report sections.
 
+P28 planning is recorded in `docs/product/plans/2026-07-05-p28-analysis-node-consolidation.md`. P28 is complete. It deliberately stayed narrower than a new routing architecture: SQL planning plus analysis planning are now one Evidence Planning surface, normal successful complex answers use one Business Answer generation surface plus deterministic local checks/repair, and claim typing now comes from Business Answer candidate categories plus deterministic Evidence Auditor hard-fact checks. SQL review, SQL execution, evidence validation, `QuestionEvidencePack`, `AuditResult`, Chinese product output, and Report Center independence remain required.
+
+P29 planning is recorded in `docs/product/plans/2026-07-05-p29-fast-fact-and-risk-routing.md`. P29 is complete. It ran before external export/tool integrations because live P28 testing showed two product-routing gaps: simple factual questions could still take the full standard/deep path, and safe wording such as `只回答数字和口径` or business-analysis wording such as `加预算`, `最值得`, and `优先复盘` could be rejected too early. P29 added a conservative local fast-fact gate, kept fast facts on the safe SQL/evidence path without unnecessary Business Answer provider calls, split normal business advice from real external action risk, and verified deterministic plus opt-in live DeepSeek tests with varied ranges such as 最近30天, 最近90天, 本月, and omitted-time questions that safely default to the full available data range when the workspace has one safe time field.
+
+P30 planning is recorded in `docs/product/plans/2026-07-06-p30-chart-artifact-and-echarts-enhancement.md`. P30 is complete. H1 completed the unified `ChartArtifact` contract and compatibility layer: product results and run-history restoration preserve legacy PNG/SVG image fields plus optional P30 ECharts/image/evidence metadata. H2 added deterministic `ChartSpec -> ECharts option` generation from reviewed evidence rows. H3 connected ECharts options to Analysis Workbench chart artifacts and frontend rendering while keeping static image fallback, route policy, and run-history restoration intact. H4 connected Report Center to the same chart artifact contract from report evidence tables while keeping Report Center independent and preserving SVG/image fallback for Markdown/download. H5 added an internal export package contract that projects report records and analysis product results into safe future-connector payloads with chart artifacts, static assets, evidence refs, and warnings while excluding raw SQL, trace paths, provider metadata, API keys, database paths, and local absolute paths. H6 closed P30 with focused acceptance, frontend verification, cleanup, artifact hygiene, and opt-in live DeepSeek chart/report/export validation.
+
+P31 planning is recorded in `docs/product/plans/2026-07-06-p31-business-lens-and-analysis-thread-memory.md`. P31 is complete before real external connector implementation because manual P30 testing showed two Analysis Workbench issues that affected product credibility: cross-table business questions could ask users to pick one global time field even when each metric had its own business date, and clarification/follow-up inputs could create separate runs instead of continuing one coherent analysis thread. P31 keeps question understanding first for general data and varied user wording, then adds Business Lens grounding, per-metric time bindings, lightweight Question Evidence Ledger, and Analysis Thread Memory. The current Analysis Workbench path is question understanding -> Business Lens -> clarification if needed -> Evidence Planning -> guarded SQL candidate -> SQL review -> schema repair -> SQL execution -> evidence validation -> lightweight question evidence ledger -> Business Answer -> Evidence Auditor -> optional ChartArtifact -> same-thread memory/history -> Next.js UI. Follow-ups use `POST /runs/{run_id}/follow-ups` and keep one run/thread. Report Center remains independent on its full `ReportEvidencePack + EvidenceLedger + ReportDocument` path. P31-H4 removed the active `pending_run_id` / `PendingClarificationStore` continuation path, stale tests, and duplicate-run follow-up UI behavior. A manual real DeepSeek check after P31 confirmed same-thread follow-up but found complex multi-metric questions can fail when the provider returns multiple SQL statements in one candidate. External Feishu/DingTalk/WeCom/Tencent Docs/Power BI/Word/PPT connectors remain deferred until the P32 evidence-task foundation is stable.
+
+P32 planning is recorded in `docs/product/plans/2026-07-06-p32-multi-evidence-task-planning.md`. P32 is complete. It targets the Analysis Workbench gap found in live testing: some real business questions need several pieces of evidence, but each SQL execution step must still be one reviewed safe `SELECT`. P32-H1 added compact evidence-task contracts and deterministic planning metadata while keeping fast facts as the low-latency one-task path. H2 ran planned tasks through the existing safe SQL boundary, merged successful task results into the lightweight analysis evidence ledger, and generated one Chinese business answer from the merged ledger. H3 polished the product surface: task evidence is grouped with business labels, data limits avoid internal ids/SQL/provider metadata, chart artifacts preserve evidence refs where possible, same-thread/history restoration keeps multi-task evidence and charts, and Report Center remains independent. P32 reuses Report Center's evidence-ledger ideas and unified chart artifact standards, but does not migrate Report Center or make reports stitch Analysis Workbench answers.
+
+P33 planning is recorded in `docs/product/plans/2026-07-07-p33-analysis-workbench-ledger-answer-cleanup.md`. P33 is complete as the Analysis Workbench closeout before external connector work. H1 made the Business Answer provider prompt consume only answer-safe question evidence ledger projections, routed fast facts through the unified Business Answer seam after lightweight evidence prep, removed the old fast_fact deterministic composer, and moved Standard/Deep routing to evidence complexity. H2 made Product Result Builder an assembler and removed old consistency/composer helpers from active conclusion generation. H3 made Analysis Workbench chart artifacts consume ledger/sanitized evidence, kept chart failures from blocking Business Answer, hid raw SQL/raw rows/task ids/trace/provider metadata/chart_spec JSON from the main product/UI payload, and kept Report Center independent. The H3 repair tightened live acceptance so missing/generated-failed answers fail the test, fixed same-thread follow-up by allowing provider output structure/metric-alias normalization, and confirmed provider failures no longer fall back to ledger-template business conclusions.
+
+## P31 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P31-H1 | `[x]` Complete | Added Business Lens contracts and semantic-layer grounding so model-understood intent maps to current metrics, dimensions, source fields, per-metric time fields, default time policy, clarification state, and data limits |
+| P31-H2 | `[x]` Complete | Added Analysis Thread Memory and same-thread follow-up continuation for both waiting clarification and completed analysis states |
+| P31-H3 | `[x]` Complete | Added lightweight Question Evidence Ledger and wired it into Evidence Agent, Business Answer, Evidence Auditor, product_result, and thread memory refs |
+| P31-H4 | `[x]` Complete | Frontend thread UX, realistic acceptance, opt-in live DeepSeek verification gating, old-path cleanup/audit, artifact hygiene, and docs closeout |
+
+## P32 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P32-H1 | `[x]` Complete | Evidence Task Contract And Planning: defined `EvidenceTask`, `EvidenceTaskPlan`, `EvidenceTaskResult`, one-SQL task policy metadata, fast_fact one-task planning, standard/deep 1-4 task planning, max task/parallel defaults, and clarification/data-limit plans |
+| P32-H2 | `[x]` Complete | Task Runner And Analysis Ledger Integration: cross-table multi-core Analysis Workbench tasks now execute through one SQL candidate/review/execution per task, unsafe multi-statement candidates are rejected before execution, task failures merge into data limits, and successful task facts merge into the lightweight question evidence ledger with task provenance |
+| P32-H3 | `[x]` Complete | Product Acceptance And Cleanup: one answer from merged evidence, frontend summary polish, chart/evidence ref binding, same-thread/history restoration, live DeepSeek tests, cleanup audit, and Report Center independence verification |
+
+## P33 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P33-H1 | `[x]` Complete | Answer contract and route semantics: ledger-only answer input, model-written fast/standard/deep conclusions, combined understanding/lens grounding, and evidence-complexity route tests |
+| P33-H2 | `[x]` Complete | Remove template/rewrite paths: Product Result Builder is an assembler and old raw-row/consistency answer generators are deleted or reduced to validation/scrubbing |
+| P33-H3 | `[x]` Complete | Parallel chart and acceptance cleanup: chart artifacts consume ledger/sanitized evidence, old path audit passes, frontend/backend tests pass, and real DeepSeek tests report route, elapsed time, answer, evidence, chart behavior, and Report Center independence |
+
+## Latest P33-H3 Result
+
+P33-H3 Parallel Chart And Acceptance Cleanup plus repair completed on 2026-07-07:
+
+- Chart generation now prefers `build_chart_safe_table(question_evidence_ledger)` and records `chart_input_source="question_evidence_ledger"` when ledger projection is available. Sanitized fallbacks are still converted to business labels/units/row counts/evidence refs before becoming chart artifacts.
+- `fast_fact` remains chartless unless the user explicitly asks for charts/visualization. `standard_analysis` and `deep_judgment` can generate ECharts when evidence is chartable and policy allows. Visualization failures are caught and recorded without blocking or replacing Business Answer.
+- Main Analysis Workbench product/UI payload no longer exposes raw SQL, raw rows, `task_id`, `task_purpose`, trace paths, provider metadata, `tool_calls`, local absolute paths, or `chart_spec` JSON. Technical details remain collapsed by default. Frontend chart display prefers ECharts and keeps static image fallback.
+- BusinessAnswerAgent keeps valid provider answers, normalizes minor provider structure issues such as string list fields, recognizes supported metric aliases such as ROI/ROAS, and scrubs unsupported explanation details/internal leaks. If provider output is unsafe or unavailable, it returns a clear generation-failed boundary instead of composing from ledger facts or rows. Product Result Builder still does not compose from rows.
+- Strict live DeepSeek acceptance passed with `deepseek-v4-flash`: fast fact (`fast_fact`, no chart), standard one-table (`standard_analysis`, no chart), deep multi-evidence (`deep_judgment`, no chart), same-thread follow-up on the same run with a natural Chinese answer, explicit chart request (`standard_analysis`, one ECharts chart), and Report Center smoke (`ledger_backed_report_center`, report ECharts from Report Center). The live test now rejects `业务回答缺失`, `业务回答生成失败`, and `没有可安全展示`; all Analysis Workbench live cases reported `leak_free_main_payload=true`.
+- Verification passed: backend deterministic required groups (`54 passed`, `126 passed`, `44 passed`, `18 passed`, `8 passed`), `cd frontend && npm test` (`73 passed`), `cd frontend && npm run build`, full backend regression (`665 passed, 14 skipped`), strict live P33 acceptance (`1 passed`), and `git diff --check`.
+
+## Latest P33-H2 Result
+
+P33-H2 Remove Template/Rewriter Paths completed on 2026-07-07:
+
+- Product Result Builder passes through usable `business_answer` and assembles evidence, ledger summaries, chart artifacts, progress, history display, and technical details. Missing or invalid business answers now produce a clear missing/generation-failed state instead of row-derived conclusions.
+- BusinessAnswerAgent preserves valid provider answers, scrubs unsupported facts/internal leaks, and returns a clear answer-generation failure when the provider answer is unsafe. It no longer calls the old deterministic final-answer composer in the active path.
+- Cleanup fix deleted `agents/final_answer_composer.py`, `tests/test_final_answer_composer.py`, and `workspaces/answer_consistency.py`; `tests/test_answer_consistency.py` now only protects module removal, chart annotation leak scrubbing, provider-answer preservation, and missing-answer behavior. Chart annotation safety moved to `workspaces/chart_annotation_safety.py` and cannot synthesize or realign business conclusions.
+- Fast fact, standard, and deep routes still enter BusinessAnswerAgent for the final answer. No-key fallback is explicit and does not affect the true provider path.
+- Report Center remains independent and unchanged.
+
+## Latest P33-H1 Result
+
+P33-H1 Answer Contract And Route Semantics completed on 2026-07-07:
+
+- Added an answer-safe question evidence ledger projection for Business Answer prompts. It keeps business facts, derived metrics, time口径, data limits, chart refs, confidence, and remapped evidence refs while excluding raw SQL, execution rows, task ids/purposes, task refs, ledger ids, source pack ids, trace/provider metadata, local paths, and secret-like values.
+- Fast facts now run `fast_fact_evidence_preparer` for evidence validation/context only, then enter `business_answer_agent`; the final answer no longer comes from a deterministic fast-fact template. The old `fast_fact_composer.py` final-answer module was deleted and replaced by `fast_fact_claims.py`.
+- Route policy now treats Standard/Deep as evidence-complexity semantics. Multiple core evidence tasks, multiple source tables, or multi-metric tradeoffs route Deep; single-table/single-core evidence questions stay Standard even if they contain words like 建议/风险/原因/优先级.
+- Question Understanding plus Business Lens now behave as one logical front door: model/language understanding first, dataset口径 grounding second, with the grounded metrics/source/time contract feeding route and evidence planning.
+- Report Center remains independent and unchanged.
+
+## Latest P32-H3 Result
+
+P32-H3 Product Acceptance, Live Verification, And Cleanup completed on 2026-07-07:
+
+- Analysis Workbench multi-task evidence still produces one `business_answer`; no mini-answer stitching was introduced.
+- Evidence summaries now show business-readable groups such as `收入证据`, `投放花费证据`, and `效率辅助证据`; failed auxiliary/core evidence is explained in business language.
+- Main UI hides task ids, ledger ids, raw evidence refs, chart refs, raw SQL, trace paths, provider metadata, `chart_spec`, and `echarts_option`. Technical detail remains collapsed.
+- Chart artifacts inherit question-ledger `evidence_refs` when missing, prefer ECharts, and keep image fallback.
+- Same-thread follow-up keeps evidence refs internally but displays business-readable continuity. History restoration rebuilds stale pre-H3 product results when raw `evidence_task_results`, `question_evidence_ledger`, or `chart_artifacts` would otherwise be lost.
+- Report Center remains independent on `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`; report code does not call `run_workspace_analysis` or stitch Analysis Workbench answers into reports.
+- Post-review fixes closed the live multi-task chart gap and the old answer-consistency leak. Sparse multi-task execution rows are transformed into a long chart table for visualization only, so explicit multi-task chart requests now produce ECharts `grouped_bar` artifacts without changing the underlying execution/evidence ledger. The answer evidence and consistency layers now share entity detection, skip internal `task_id`/`task_purpose` values, localize labels such as efficiency/profit, and de-duplicate synonymous metric rows in the main product answer.
+- Real DeepSeek acceptance was rerun on temporary Chinese business workspaces. `fast_fact` (`最近30天哪个渠道收入最高？只回答事实。`) completed in 14.68s without the task runner or charts. Multi-task chart analysis (`最近30天按渠道比较收入和投放花费，用图表展示哪个渠道更值得关注？`) completed in 56.42s through `evidence_task_runner` with 4 tasks, produced 1 ECharts `grouped_bar` chart with `question_evidence_pack` refs, and returned one merged answer without internal task ids. Deep judgment (`结合最近30天收入、投放花费和客服投诉，哪个渠道最需要优先优化？请给出证据和建议。`) completed in 80.55s through the task runner and produced 1 ECharts grouped chart; the answer is evidence-bound but still needs cleaner risk/optimization phrasing in a future polish phase. Report Center live provider acceptance (`生成一份最近30天渠道经营复盘报告，覆盖收入结构、投放花费、客服投诉、关键风险和下一步建议。`) completed in 21.88s with `provider_supplied=true`, `generation_flow=ledger_backed_report_center`, 4 ECharts-compatible chart artifacts, and model-written report prose validated against the evidence ledger.
+- Verification passed: required backend pytest groups, `cd frontend && npm test`, `cd frontend && npm run build`, and `git diff --check`.
+
+## Latest P32-H2 Result
+
+P32-H2 Task Runner And Analysis Ledger Integration completed on 2026-07-06:
+
+- Added `workspaces.evidence_task_runner.run_evidence_task_plan`. The runner narrows each planned `EvidenceTask` into its own Analysis Workbench state, delegates to the existing Evidence Agent safe chain, and preserves the required sequence inside every task: SQL candidate -> SQL review -> optional schema repair/execution fix where already supported -> approved SQL execution -> evidence validation.
+- The graph now uses the task runner only for the P32 target gap: standard/deep Analysis Workbench plans with multiple core evidence tasks spanning more than one source table. Fast facts and explicit `initial_sql` stay on the existing one-task low-latency path, and same-table/helper-only questions keep the current single-SQL path.
+- Cross-task execution is parallelized with `max_parallel_evidence_tasks=3` by default, capped by the plan, and configurable through the runner argument or `INSIGHTFLOW_MAX_PARALLEL_EVIDENCE_TASKS`. A single task remains sequential and cannot execute before review approval.
+- `question_evidence_ledger` now preserves `task_id` on facts, derived metrics, table refs, task refs, and evidence refs. Merged ledgers combine successful task evidence and task-level data limits while sanitizing SQL, trace paths, provider metadata, API keys/secrets, and local absolute paths from the business-safe ledger.
+- Multi-statement SQL from a provider is never executed directly. The guarded candidate/reviewer path rejects it, no `sql_execution` tool call is recorded for that task, and the task contributes a data limit instead of weakening SQL review.
+- Failed non-core/support tasks no longer fail the whole analysis when core evidence succeeded. If all core tasks fail, the runner returns a business-friendly evidence-insufficient state.
+- Business Answer still runs once from the merged ledger/evidence result; it does not stitch mini answers per task.
+- Report Center remains independent on `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`; P32-H2 did not call `run_workspace_analysis` from report code or migrate report execution.
+- No old active code path was deleted in H2. Instead, graph routing was narrowed so the previous single-SQL Analysis Workbench path remains the current path for fast facts, explicit SQL, same-table multi-metric questions, and helper-only questions.
+- Verification passed:
+  - `python3 -m pytest tests/test_evidence_tasks.py tests/test_evidence_task_runner.py tests/test_question_evidence_ledger.py -q` (`18 passed`)
+  - `python3 -m pytest tests/test_fast_fact_path.py tests/test_workspace_analysis_runner.py -q` (`62 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_workspace_api.py tests/test_workspace_run_history_api.py -q` (`63 passed`)
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`73 passed`)
+  - `cd frontend && npm test` (`72 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P32-H1 Result
+
+P32-H1 Evidence Task Contract And Planning completed on 2026-07-06:
+
+- Added `workspaces.evidence_tasks` with `EvidenceTask`, `EvidenceTaskPlan`, `EvidenceTaskResult`, and `ONE_SQL_TASK_POLICY`.
+- Each evidence task carries `task_id`, `question`, `purpose`, `metrics`, `dimensions`, `time_policy`, `priority`, `max_rows`, `status`, `data_limits`, and one-SQL-only policy metadata.
+- `EvidenceTaskPlan` carries `route`, `tasks`, `max_evidence_tasks=4`, `max_parallel_evidence_tasks=3`, `status`, `planner_source`, `needs_clarification`, `data_limits`, and shared safety policy metadata.
+- Coordinator now attaches deterministic evidence-task planning metadata to `AnalysisTask`, `analysis_task`, `analysis_task_contract`, and state-level `evidence_task_plan` without changing the current single-SQL Evidence Agent runner.
+- Fast facts remain one high-priority low-latency task. Standard/deep questions can plan 1-4 tasks from Business Lens metrics/dimensions; revenue plus spend plans separate revenue/spend core facts plus an efficiency support task.
+- Broad unsupported questions produce `needs_clarification` / `data_limits` plans instead of fabricated evidence tasks.
+- Report Center remains independent on `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`; H1 did not call or refactor the Report Center planner.
+
+## Latest P31-H4 Result
+
+P31-H4 Frontend Thread UX, Realistic Acceptance, Live Verification, Cleanup Closeout completed on 2026-07-06:
+
+- Analysis Workbench now shows one compact coherent thread with original question, system understanding, resolved question, clarification/follow-up turns, Business Lens time口径, business answer, safe ledger/evidence summary, chart artifacts, compact history, and collapsed technical details.
+- Waiting clarification and completed-answer follow-ups both use `POST /api/workspaces/{workspace_id}/runs/{run_id}/follow-ups`, update the same run/thread, and preserve turns. The completed follow-up form no longer feels like a new-question entry and no longer rewrites the main question box.
+- Removed the active old `pending_run_id` continuation path from `api/models.py`, `workspaces/analysis_runner.py`, graph state/workflow, Product Result, frontend types, and stale tests; deleted `workspaces/pending_clarification_store.py`. A negative API boundary test remains to prove the superseded pending body is rejected.
+- Realistic acceptance coverage includes omitted-time Business Lens full-data口径, cross-table per-metric time fields, waiting-clarification same-run completion, completed-answer same-run follow-up turns, and answer/evidence/chart refs connected through the ledger summary.
+- Report Center remains independent on `ReportEvidencePack + EvidenceLedger + ReportDocument`; no external connector publishing was added.
+- Live DeepSeek verification was skipped because `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS` was not enabled, `INSIGHTFLOW_PRODUCT_LIVE_MODE` was not enabled, and `DEEPSEEK_API_KEY` was absent.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_api.py tests/test_workspace_run_history_api.py -q` (`73 passed`)
+  - `python3 -m pytest tests/test_business_lens.py tests/test_question_evidence_ledger.py tests/test_product_result_builder.py -q` (`52 passed`)
+  - `python3 -m pytest tests/test_p25_time_range_defaults.py tests/test_p29_acceptance.py -q` (`16 passed`)
+  - `python3 -m pytest tests/test_clarification_routing.py tests/test_workflow.py tests/test_workspace_analysis_runner.py tests/test_workspace_api.py tests/test_workspace_run_history_api.py -q` (`81 passed`)
+  - `cd frontend && npm test` (`72 passed`)
+  - `cd frontend && npm run build` passed
+  - `python3 -m pytest -q` (`658 passed, 13 skipped`)
+
+## Latest P31-H3 Result
+
+P31-H3 Lightweight Question Evidence Ledger integration completed on 2026-07-06:
+
+- Added `workspaces.question_evidence_ledger` with the lightweight `QuestionEvidenceLedger` projection for Analysis Workbench, separate from Report Center's full `ReportEvidenceLedger`.
+- Ledger fields are `ledger_id`, `business_lens`, `time_policy_note`, `facts`, `derived_metrics`, `data_limits`, `tool_calls`, `evidence_refs`, `chart_refs`, `source_pack_id`, and `confidence`.
+- Facts are generated from `QuestionEvidencePack` / reviewed execution rows, with `fact_id`, `label`, `value`, `unit`, `dimension`, `source_columns`, `source_row_refs`, and `evidence_ref`. Derived metrics come from existing fact payload derived metrics, preserving formula/source columns.
+- Evidence Agent now emits `question_evidence_ledger` for successful, failed, fast-fact, standard, and cached question-evidence paths. Failed/missing evidence paths produce data limits instead of fake facts.
+- Tool-call summaries and product payloads are scrubbed of raw SQL, trace paths, provider metadata, API keys/secrets, and local absolute paths.
+- Business Answer Agent now sends the safe ledger into the provider prompt and preserves ledger `time_policy_note` plus `data_limits` through deterministic repair.
+- Evidence Auditor checks hard factual claims against ledger facts/derived metrics first. Typed recommendations and business inferences still land in `reasonable_inferences` when they are bounded by ledger context.
+- `product_result` exposes top-level `question_evidence_ledger` and `evidence.ledger_summary`; full technical SQL/raw rows remain only in technical details.
+- `AnalysisThreadMemory.evidence_refs` stores compact ledger refs such as `question_evidence_ledger:<ledger_id>` plus evidence refs, not the full ledger per turn.
+- H3 review fixed Product Result chart-ref enrichment for ledgers created before visualization, optional empty-ledger prompt rendering for older business-answer callers, and ledger hard-fact matching for Chinese display units such as `5.7 万` while ignoring time-window numbers such as `最近90天`.
+- Report Center remains independent on `ReportEvidencePack + EvidenceLedger + ReportDocument`; H3 did not migrate or call report generation paths from Analysis Workbench.
+- Verification passed:
+  - `python3 -m pytest tests/test_question_evidence_ledger.py tests/test_evidence_agent.py -q` (`13 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_evidence_auditor_claim_categories.py -q` (`23 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`88 passed`)
+  - `python3 -m pytest tests/test_business_lens.py tests/test_analysis_coordinator_data_understanding.py -q` (`18 passed`)
+  - `python3 -m pytest tests/test_workspace_api.py tests/test_workspace_run_history_api.py -q` (`25 passed`)
+  - `python3 -m pytest` (`664 passed, 13 skipped`)
+  - `cd frontend && npm test` (`71 passed`)
+
+## Latest P31-H2 Result
+
+P31-H2 Analysis Thread Memory and same-thread follow-up continuation completed on 2026-07-06:
+
+- Added `workspaces.analysis_thread_memory` with `thread_id`, `original_question`, `turns`, `current_business_lens`, `evidence_refs`, `answer_summary`, `pending_clarification`, `latest_status`, and `latest_resolved_question`.
+- Turns carry `turn_id`, `user_input`, `resolved_question`, `status`, `answer_summary`, `business_lens`, `evidence_refs`, and `created_at`.
+- Waiting clarification follow-ups now update the original run/thread, append a turn, and either complete the analysis or keep `pending_clarification` on the same thread.
+- Completed analysis follow-ups now combine original question, latest resolved question, prior answer summary, existing business lens/evidence refs, and the new user message before rerunning the safe chain and appending a turn.
+- Added `POST /api/workspaces/{workspace_id}/runs/{run_id}/follow-ups`. `POST /runs` no longer accepts `pending_run_id` continuation as an active duplicate-run path.
+- Frontend 用户补充 and 继续追问 both call the same-thread API with `run_id`; `buildFollowUpQuestion` and the old `基于上一轮分析继续追问...` new-question packaging were removed.
+- History remains one analysis thread/card because follow-ups overwrite the original run JSON instead of creating an independent run.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_workspace_api.py tests/test_workspace_run_history_api.py -q` (`76 passed`)
+  - `python3 -m pytest tests/test_business_lens.py tests/test_analysis_coordinator_data_understanding.py -q` (`18 passed`)
+  - `python3 -m pytest tests/test_p25_real_usage_acceptance.py tests/test_p29_acceptance.py -q` (`5 passed`)
+  - `cd frontend && npm test` (`71 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P31-H1 Result
+
+P31-H1 Business Lens Contracts And Per-Metric Time Bindings completed on 2026-07-06:
+
+- Added `question_understanding.business_lens` with `BusinessLens`, `BusinessLensMetric`, and `BusinessLensDimension` contracts. The lens carries `business_domain`, `metrics`, `dimensions`, `time_range`, `time_policy_note`, `needs_clarification`, `clarification_question`, and `data_limits`; each metric carries `label`, `source_table`, `source_field`, `time_field`, and `metric_role`.
+- The question-understanding LLM/provider/fallback still runs first and owns natural-language intent. Business Lens runs after it in Data Understanding and grounds that intent against the current workspace semantic layer, field aliases, metric meanings, table/field metadata, and profile time ranges.
+- Single-metric questions bind time fields by the metric's source table: revenue-like metrics use order/sales/business dates from their revenue table, spend-like metrics use spend/marketing dates from their spend table, support metrics use ticket/support dates, and customer-registration counts use registration dates when the customer table has a safe id/date pair.
+- Cross-table revenue plus spend questions can carry separate metric time fields in one Business Lens. If the user omits time range and the per-metric fields have safe profile ranges, the lens records a full-data default and a `time_policy_note` explaining each metric's date口径 instead of asking the user to pick one global date field.
+- H1 repair tightened the safety condition for omitted time ranges: Business Lens now defaults to full data only when every metric-specific time field has non-empty profile `min/max` values. Missing or partial profile ranges leave `time_range` empty, preserve the `time_range/date_field` clarification path, and add a data limit explaining that the data profile is insufficient for a safe full-range default.
+- Clarification remains for truly broad or unsafe口径, such as `各渠道表现怎么样？`, missing computable metric fields, missing per-metric time fields, or unsupported customer-registration evidence. The router-level question-understanding contract deliberately does not emit `business_lens`; the grounding layer is separate.
+- `AnalysisTask` now serializes `business_lens`, and `QuestionEvidencePack.task` preserves it for P31-H2/H3 thread memory and lightweight evidence-ledger work.
+- Verification passed:
+  - `python3 -m pytest tests/test_business_lens.py tests/test_analysis_coordinator_data_understanding.py -q` (`18 passed`)
+  - `python3 -m pytest tests/test_question_understanding_router.py tests/test_workspace_analysis_runner.py -q` (`67 passed`)
+  - `python3 -m pytest tests/test_p25_real_usage_acceptance.py tests/test_p29_acceptance.py -q` (`5 passed`)
+
 ## P27 Task Status
 
 | Task | Status | Notes |
@@ -96,6 +485,259 @@ P27 planning is recorded in `docs/product/plans/2026-07-04-p27-analysis-workbenc
 | P27-H4 | `[x]` Complete | Evidence Auditor + Business Answer Agent: consolidated evidence validation/claim typing and answer drafting/review/composition surfaces |
 | P27-H5 | `[x]` Complete | Latency optimization: earlier fast path normalization, conditional heavy calls, QuestionEvidencePack cache, initial_sql bypass, and on-demand visualization |
 | P27-H6 | `[x]` Complete | Cleanup, regression, docs closeout, old-node deletion, state cleanup, and Report Center independence verification |
+
+## P28 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P28-H1 | `[x]` Complete | Evidence Planning consolidation: one validated planning surface instead of separate SQL planning and analysis planning provider calls |
+| P28-H2 | `[x]` Complete | Business Answer consolidation: one provider-backed answer generation surface plus deterministic checks instead of normal-path insight/reviewer/final-composer chaining |
+| P28-H3 | `[x]` Complete | Claim typing and Evidence Auditor simplification: Business Answer emits claim categories; Evidence Auditor checks hard facts deterministically by default |
+| P28-H4 | `[x]` Complete | Cleanup, regression, frontend verification, tracked-artifact audit, old-path audit, live DeepSeek acceptance, and docs closeout |
+
+## P29 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P29-H1 | `[x]` Complete | Local Fast Fact Gate before provider risk rejection; obvious safe factual totals/rankings/trends can proceed without full-path overclassification, provider alias duplicates are canonicalized, and true external actions are not fast-pathed |
+| P29-H2 | `[x]` Complete | Historical fast-fact execution stabilization; P33 supersedes the old provider-skip answer behavior so fast facts now use BusinessAnswerAgent after lightweight evidence prep |
+| P29-H3 | `[x]` Complete | Business risk policy split: normal advice/judgment analysis is allowed with evidence boundaries; provider false safety rejects are relaxed for analysis/advice; real external actions, sensitive access, bulk export, and unsafe writes/deletes stop before SQL |
+| P29-H4 | `[x]` Complete | Deterministic and opt-in live DeepSeek acceptance using variable time ranges, recorded times, route, provider calls, answer, evidence rows, and chart behavior |
+
+## P30 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P30-H1 | `[x]` Complete | Unified `ChartArtifact` contract with legacy PNG/SVG compatibility, optional ECharts/image/evidence metadata, and history persistence |
+| P30-H2 | `[x]` Complete | Deterministic `ChartSpec -> ECharts option` builder and validation from evidence rows |
+| P30-H3 | `[x]` Complete | Analysis Workbench ECharts rendering with image fallback and route-based chart generation policy |
+| P30-H4 | `[x]` Complete | Report Center chart artifact reuse/create path from report evidence tables with ECharts web rendering and static Markdown/download fallback |
+| P30-H5 | `[x]` Complete | Static export fallback plus internal export package contract for later platform connectors |
+| P30-H6 | `[x]` Complete | Focused acceptance, frontend verification, cleanup, artifact hygiene, and opt-in live DeepSeek chart/report/export verification |
+
+## Latest P30-H6 Result
+
+P30-H6 Acceptance, Cleanup, And Live Verification completed on 2026-07-06:
+
+- Added `tests/test_p30_acceptance.py` to prove the H1-H5 contract as one focused acceptance path: explicit Analysis Workbench chart requests produce ECharts chart artifacts with static fallback and `evidence_refs`; no-chart `fast_fact` requests stay chartless; Report Center chart artifacts use `source="report_center"`; Markdown excludes `echarts_option`, `chart_spec`, SQL, trace, and provider metadata; report and analysis export packages include chart artifacts, static assets, and evidence refs; and missing static fallback records `export_warnings` rather than failing.
+- Added `tests/test_p30_live_chart_acceptance.py` for opt-in live DeepSeek P30 acceptance. The live run used model `deepseek-v4-flash`.
+- Live Analysis Workbench question: `最近90天按渠道比较收入并生成图表。` It completed through route `standard_analysis` in `38874 ms`, called question understanding, SQL planning, SQL candidate, Business Answer, and Visualization providers once each, produced one `analysis_workbench` ECharts artifact with static fallback and `question_evidence_pack`, and built an analysis export package with one chart artifact, one static asset, one evidence ref, and no export warnings.
+- Live Report Center goal: `生成一份最近90天经营复盘报告，关注收入结构、客户分群和趋势变化。` It completed through `ledger_backed_report_center` in `18323 ms`, called the report composer once, produced three `report_center` ECharts artifacts with static fallback and ledger/evidence refs, and built a report export package with three chart artifacts, three static assets, 79 evidence refs, and no export warnings.
+- Old-path and artifact hygiene were verified. Remaining `chart_agent`, `visualization_planner`, `chart_tool`, `powerbi_publisher_mock`, `jira_ticket_mock`, fixed-template, deterministic-action-template, and keyword-inference hits are Historical/Superseded docs or negative boundary tests. No generated database, report, chart, trace, `.next`, or `node_modules` artifact was added to source tracking.
+- P30 did not add Feishu, DingTalk, WeCom, Tencent Docs, Power BI, Word, PPT, or other external connector publishing. Real connector publishing remains deferred until after P31; P31 starts from the now-stable analysis/report evidence, chart artifact, static fallback, and export package contracts.
+- Verification passed:
+  - `python3 -m pytest tests/test_p30_acceptance.py tests/test_p30_live_chart_acceptance.py -q` (`1 passed, 1 skipped`)
+  - `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 python3 -m pytest tests/test_deepseek_live_smoke.py tests/test_product_live_mode.py -q` (`5 passed`)
+  - `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 python3 -m pytest tests/test_p30_live_chart_acceptance.py -q -s` (`1 passed`)
+  - `python3 -m pytest tests/test_export_package.py tests/test_echarts_option_builder.py tests/test_visualization_agent_external_tools.py tests/test_workspace_analysis_runner.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q` (`135 passed`)
+  - `python3 -m pytest tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_p29_acceptance.py -q` (`57 passed`)
+  - `cd frontend && npm test` (`71 passed`)
+  - `cd frontend && npm run build` passed
+  - `python3 -m pytest -q` (`638 passed, 13 skipped`)
+  - `git diff --check` passed
+
+## Latest P30-H5 Result
+
+P30-H5 Static Export Fallback And Artifact Package completed on 2026-07-06:
+
+- Added `workspaces/export_package.py` with the `p30.export_package.v1` `ExportPackage` dataclass and pure builders for Report Center records and Analysis Workbench product results.
+- Export packages carry `workspace_id`, `source_type`, `source_id`, `title`, `created_at`, `language="zh"`, `document`, `business_answer`, `chart_artifacts`, `static_assets`, `markdown_path`, `document_path`, `evidence_refs`, and `export_warnings`.
+- Report Center can build packages from report records with report document content, Markdown/report-document relative paths, unified chart artifacts, static image fallback assets, and evidence refs. It stays on the independent Report Center path.
+- Analysis Workbench can build packages from product results with the P16 business answer, ECharts chart artifacts, static PNG/SVG/image fallback assets, and question evidence refs.
+- Chart artifacts are export-whitelisted to `artifact_id`, `title`, `renderer`, `chart_type`, `path`/`url`, `image_path`/`image_url`, `rendering_status`, `business_annotation`, `evidence_refs`, `source`, `data_row_count`, and optional `echarts_option`; internal `chart_spec` is not exported.
+- Static fallback remains the default for external platform/Markdown/static export consumers. If a chart has only `echarts_option` and no static image/path/url fallback, package creation succeeds and records an `export_warnings` entry.
+- Packages exclude raw SQL, trace paths, provider metadata, API keys, database paths, local absolute paths, path-traversal references, and chart asset URLs carrying secret-like query parameters. No Feishu/DingTalk/WeCom/Tencent Docs/Power BI/Word/PPT connector, generated manifest persistence, old chart agent/planner/tool, generated artifact, database, trace, `.next`, or `node_modules` source tracking was added.
+- Verification passed:
+  - `python3 -m pytest tests/test_export_package.py tests/test_workspace_report_runner.py tests/test_product_result_builder.py -q` (`61 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_echarts_option_builder.py tests/test_visualization_agent_external_tools.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`127 passed`)
+  - `cd frontend && npm test` (`71 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P30-H4 Result
+
+P30-H4 Report Center Chart Artifact Reuse completed on 2026-07-06:
+
+- Report Center now creates unified chart artifacts from collected report evidence tables with deterministic `build_echarts_option`; it does not call Analysis Workbench nodes and does not ask an LLM to generate final ECharts options.
+- Report payloads now expose top-level `chart_artifacts`, and evidence-pack charts preserve the P30 fields including ECharts option, chart spec, image fallback, evidence refs, source `report_center`, business annotation, and row count.
+- Existing SVG/image fallback remains available. When ECharts option generation fails, the report still completes with static fallback or chart intent, and the technical fallback reason is recorded in trace events rather than report正文.
+- ReportViewer reads `report.chart_artifacts` and reuses `ChartArtifactGallery`, so web report details prefer interactive ECharts. Legacy evidence-pack chart image rendering remains as fallback when unified artifacts are absent.
+- Markdown/download output stays static-only and does not embed raw `echarts_option`, `chart_spec`, SQL, raw rows, trace/provider metadata, local paths, or internal ids in the main report.
+- External publishing and static export package work were not added; Feishu/DingTalk/WeCom/Tencent Docs/Power BI remain deferred to P30-H5/H6 or P31.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py tests/test_product_result_builder.py -q` (`107 passed`)
+  - `python3 -m pytest tests/test_echarts_option_builder.py tests/test_visualization_agent_external_tools.py tests/test_workspace_analysis_runner.py -q` (`74 passed`)
+  - `cd frontend && npm test` (`71 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P30-H3 Result
+
+P30-H3 Analysis Workbench ECharts Rendering completed on 2026-07-06:
+
+- Visualization Agent now enriches successful local static chart artifacts with deterministic ECharts options from reviewed execution rows; it does not ask an LLM to generate final ECharts options.
+- Chart artifacts now include ECharts metadata plus PNG/SVG/image fallback fields, evidence refs, source, row counts, and the existing business-facing title/unit/annotation fields.
+- ECharts option builder failures do not fail the analysis; static fallback remains available and the technical reason stays in trace metadata.
+- Analysis Workbench frontend now uses a client-only ECharts wrapper initialized in `useEffect` via the existing `echarts` dependency, with image fallback when no option exists or initialization fails.
+- The main chart UI hides SQL, trace/provider metadata, evidence refs, and local paths.
+- Route policy is unchanged: no default fast-fact charts, explicit fast-fact chart requests allowed, standard/deep chartable evidence allowed, clarify/reject no chart.
+- Report Center chart reuse was not changed and remains P30-H4.
+- Verification passed:
+  - `python3 -m pytest tests/test_echarts_option_builder.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py tests/test_visualization_intelligence.py tests/test_visualization_agent_external_tools.py -q` (`114 passed`)
+  - `python3 -m pytest tests/test_p29_acceptance.py -q` (`4 passed`)
+  - `python3 -m pytest tests/test_fast_fact_path.py -q` (`13 passed`)
+  - `cd frontend && npm test` (`70 passed`)
+  - `cd frontend && npm run build` passed
+
+## Latest P30-H2 Result
+
+P30-H2 Deterministic ECharts Option Builder completed on 2026-07-06:
+
+- Added `visualization/echarts_option_builder.py` and exported `build_echarts_option` from `visualization.__init__`.
+- Supported deterministic chart option generation for `ranked_bar`, `bar`, `line`, `grouped_bar`, `scatter`, and `dual_axis_line`; `table` returns a table/static fallback reason without `echarts_option`.
+- The builder consumes only reviewed `execution_result` / equivalent evidence table rows plus `chart_spec` and optional unit/business-label inputs. It does not call an LLM, does not execute SQL, and does not accept model-written final ECharts options.
+- Evidence table rows support the existing `columns + list[list]` shape and tolerate `list[dict]`. Required fields are validated against evidence columns, numeric roles must safely convert to finite numbers, empty/missing/unsupported inputs fail clearly, and large tables are bounded with `data_limit` / sampled row counts.
+- The emitted option is JSON-only: no formatter functions, arbitrary JavaScript functions, raw SQL, trace/provider metadata, or local absolute paths. JavaScript-like, SQL-like, path-like, and trace/provider metadata title text is stripped; the same unsafe text in category/label evidence values fails validation instead of being embedded.
+- H2 did not change frontend rendering, add ECharts dependencies, remove matplotlib PNG rendering, remove Report Center SVG fallback, add platform connectors, or restore old chart agent/planner/tool paths.
+- Legacy P30-H1 PNG/SVG compatibility remains intact: existing `title`, `path`, `url`, `rendering_status`, `unit`, `value_label`, and `business_annotation` fields are unchanged.
+- Verification passed:
+  - `python3 -m pytest tests/test_echarts_option_builder.py -q` (`11 passed`)
+  - `python3 -m pytest tests/test_product_result_builder.py tests/test_visualization_intelligence.py tests/test_visualization_agent_external_tools.py -q` (`54 passed`)
+  - `python3 -m pytest tests/test_p29_acceptance.py -q` (`4 passed`)
+
+## Latest P29-H4 Result
+
+P29-H4 Acceptance Tests And Live DeepSeek Verification completed on 2026-07-05:
+
+- Added `tests/test_p29_acceptance.py`, a deterministic matrix for eight real Chinese business questions. Each case records route/routing strategy, provider calls, Business Answer provider use, SQL generation/execution, evidence rows/fact payload summary, answer summary, chart generation, trace nodes, and elapsed milliseconds.
+- Acceptance paths:
+  - `最近30天总销售额是多少？` -> `fast_fact`; SQL/evidence present; no Business Answer provider; no chart.
+  - `最近90天哪个渠道收入金额最高？` -> `fast_fact`; SQL/evidence present; leader `私域社群`; no Business Answer provider; no chart.
+  - `本月哪个门店销售额最高？` -> `fast_fact`; `this_month`; no Business Answer provider; no chart.
+  - `收入最高的客户分群是谁？` -> `fast_fact`; safe `full_data_range`; no Business Answer provider; no chart.
+  - `最近90天按渠道比较收入、投放金额和投放效率，哪个渠道表现最好？` -> `deep_judgment`; Business Answer provider called; SQL/evidence/audit present.
+  - `最近30天哪个渠道最值得加预算？请给证据和风险边界。` -> `deep_judgment`; Business Answer provider called; SQL/evidence/audit present; not rejected.
+  - `把预算调整到私域社群并发送通知。` -> `reject`; stopped before SQL; no provider/SQL/chart.
+  - `最近90天哪个渠道收入最高？给我画图。` -> `fast_fact`; no Business Answer provider; SQL/evidence present; chart generated because explicitly requested.
+- H4 found and fixed one deterministic fallback gap: time-bounded channel budget advice could clarify for a missing metric without provider help. The fix narrowly defaults such questions to existing investment-efficiency evidence metrics (`销售额`, `花费`, `ROAS`) and keeps no-time budget advice in clarification.
+- Live DeepSeek tests now require explicit process opt-in flags (`INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1`, `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`) plus a key. Ordinary runs skip live checks clearly; explicit live verification ran real DeepSeek and passed (`5 passed in 64.63s`).
+- Verification passed:
+  - `python3 -m pytest tests/test_p29_acceptance.py -q` (`4 passed`)
+  - `python3 -m pytest tests/test_analysis_route_policy.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`73 passed`)
+  - `python3 -m pytest tests/test_question_understanding_router.py tests/test_provider_backed_question_understanding.py tests/test_analysis_coordinator_data_understanding.py -q` (`48 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_evidence_auditor_claim_categories.py tests/test_product_result_builder.py -q` (`53 passed`)
+  - `python3 -m pytest tests/test_deepseek_live_smoke.py tests/test_product_live_mode.py -q` (`3 passed, 2 skipped`)
+  - `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS=1 INSIGHTFLOW_PRODUCT_LIVE_MODE=1 python3 -m pytest tests/test_deepseek_live_smoke.py tests/test_product_live_mode.py -q` (`5 passed`)
+
+## Latest P29-H3 Result
+
+P29-H3 Business Risk Policy Split completed on 2026-07-05:
+
+- Normal business advice/judgment questions now remain eligible for the full Analysis Workbench path, including `最近30天哪个渠道最值得加预算？请给证据和风险边界。`, `哪个门店最值得优先复盘，为什么？`, and multi-metric channel performance questions.
+- Real external actions, sensitive data access, bulk export, and unsafe write/delete/update requests still reject before SQL. Covered examples include adjusting a real budget and sending notifications, and deleting all customer phone numbers.
+- Provider false `unsafe_operation` flags are cleared for analysis/advice wording when no real external action is present, including mixed cases such as `unsafe_operation + 数据量不足`. Non-safety provider boundary flags such as data-volume caveats no longer keep a stale `reject` strategy.
+- Full advice/judgment runs keep Evidence Planning, schema/metric lookup, SQL review, SQL execution, evidence validation, `QuestionEvidencePack`, Business Answer Agent, deterministic Evidence Auditor, and evidence-bound caveats/recommendations.
+- `投放效率` now maps to the existing same-table investment-efficiency path, preserving revenue, spend, and ROAS-style evidence without adding table-specific rules.
+- Verification passed:
+  - `python3 -m pytest tests/test_analysis_route_policy.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`73 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_evidence_auditor_claim_categories.py tests/test_product_result_builder.py -q` (`53 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
+
+## Latest P29-H2 Result
+
+P29-H2 Stable Fast Fact Execution Path completed on 2026-07-05:
+
+- Historical / Superseded by P33-H1 and P35-H2: P29 originally routed fast facts through `fast_fact_composer`. The active path now keeps the same safe SQL/evidence chain but sends final answer generation through BusinessAnswerAgent with an answer-safe grouped ledger; when no provider/model answer is available it returns generation failed instead of composing from rows or ledger facts.
+- Historical P29 behavior skipped Business Answer provider generation; P33 supersedes that answer path. Fast facts now keep the lightweight SQL/evidence route but generate the final answer through BusinessAnswerAgent from the clean evidence ledger, while still skipping unnecessary visualization, report generation, and old insight/reviewer/final-composer/provider claim typing paths.
+- Fast facts still preserve SQL review, SQL execution, evidence validation, fact payload / evidence table preview, technical SQL details, route metadata, audit result, and history persistence.
+- Business Answer and Visualization providers are now lazy node-level construction, so a no-chart fast fact does not initialize those providers; explicit chart requests still allow visualization after the fast fact answer.
+- Added regression coverage for no-`initial_sql` channel ranking, `本月` store ranking, omitted-time full-data defaults with one safe time field, provider request count staying zero, no heavy provider construction, and history restoration of `business_answer`, `analysis_route`, `evidence`, and `technical_details`.
+- Verification passed:
+  - `python3 -m pytest tests/test_fast_fact_path.py tests/test_analysis_route_policy.py tests/test_workspace_analysis_runner.py -q` (`66 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_evidence_auditor_claim_categories.py tests/test_product_result_builder.py -q` (`53 passed`)
+
+## Latest P29-H1 Result
+
+P29-H1 Local Fast Fact Gate completed on 2026-07-05:
+
+- Added `question_understanding/local_fast_fact_gate.py` and wired it into `workspaces/data_understanding_agent.py` before Coordinator rejection.
+- Safe factual totals/rankings can now override provider false-positive `unsafe_operation` risk flags and proceed as `fast_fact` / `fast_fact_candidate`; true sensitive/bulk/external-action risks still stop.
+- Provider duplicate aliases such as `销售额 + sum_sales_amount` and `渠道 + channel_name` now canonicalize to one metric and one dimension for fast_fact routing.
+- True external actions such as `把预算调整到私域社群并发送通知。` are marked `external_action` and rejected before SQL; advice questions such as `最值得加预算` remain out of fast_fact and stay eligible for full analysis, including when a provider falsely labels them as `unsafe_operation`.
+- Manual no-`initial_sql` checks for `最近90天哪个渠道收入金额最高？` and `本月哪个门店销售额最高？` completed as `fast_fact` and did not call Business Answer provider.
+- Verification passed:
+  - `python3 -m pytest tests/test_fast_fact_path.py tests/test_analysis_route_policy.py tests/test_workspace_analysis_runner.py -q` (`62 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_evidence_auditor_claim_categories.py tests/test_product_result_builder.py -q` (`53 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
+  - `python3 -m pytest tests/test_provider_backed_question_understanding.py tests/test_question_understanding_router.py tests/test_analysis_coordinator_data_understanding.py -q` (`48 passed`)
+- Opt-in live DeepSeek acceptance was skipped because the shell environment did not set `INSIGHTFLOW_LIVE_DEEPSEEK_TESTS`, `INSIGHTFLOW_PRODUCT_LIVE_MODE`, or `DEEPSEEK_API_KEY`; skipped live tests are not counted as provider proof.
+
+## Latest P28-H4 Result
+
+P28-H4 Cleanup, Regression, And Live Verification completed on 2026-07-05:
+
+- Confirmed the active Analysis Workbench path is now question understanding/clarification -> Evidence Planning -> schema/metric/SQL candidate/SQL review/SQL execution/evidence validation -> Business Answer -> deterministic Evidence Auditor -> optional visualization -> save result.
+- Removed the obsolete `agents/insight_agent.py` active entry point, old insight/reviewer/final-composer runtime provider flags and builders, old provider prompt surfaces, and active `insight` state compatibility writes. Historical / Superseded by P33-H2: `agents/final_answer_composer.py` no longer remains as a guardrail helper; BusinessAnswerAgent owns minimal repair and chart annotation leak scrubbing moved to `workspaces/chart_annotation_safety.py`.
+- Added regression coverage that Evidence Agent validates reviewed execution rows before answer generation. SQL review, SQL execution, evidence validation, `QuestionEvidencePack`, and `AuditResult` remain present.
+- Report Center stayed independent on `ReportEvidencePack + EvidenceLedger + ReportDocument`; no Analysis Workbench node reuse and no stitched report sections were restored.
+- Live DeepSeek smoke ran because local `.env` has `DEEPSEEK_API_KEY` and `INSIGHTFLOW_PRODUCT_LIVE_MODE=1`. Question: `最近90天按门店比较销售额、毛利率和满意度，请总结表现差异、数据边界，并生成图表。`
+- Live provider-backed nodes called: question understanding, Evidence Planning (`sql_planning_router`), guarded SQL candidate, Business Answer (`business_answer`), and visualization. Workbench tool calls: evidence planning, schema lookup, metric lookup, SQL candidate builder, SQL review, and SQL execution. Evidence validation returned `validated`; the run completed as `standard_analysis`; one chart artifact was produced.
+- Live Business Answer summarized 上海旗舰店 as leading on sales, gross-margin aggregate, and satisfaction, with 北京国贸店 mid-table and 深圳湾店 weakest. `AuditResult` recorded supported row facts and reasonable inferences, `unsupported_claims=[]`, data limits for missing ROI/ROAS/profit-style evidence, and `confidence=medium`.
+- A first live wording attempt containing `风险边界/最值得优先复盘` was rejected by provider question understanding as a risk-flagged request before SQL; the successful smoke used equivalent multi-metric comparison wording with `数据边界`. This is recorded as live provider wording sensitivity, not an external-tool implementation item.
+- Verification passed:
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_evidence_auditor_claim_categories.py -q` (`59 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_consistency.py tests/test_workspace_report_runner.py -q` (`50 passed`)
+  - `python3 -m pytest tests/test_p20_architecture_cleanup_boundaries.py tests/test_project_initialization.py -q` (`9 passed`)
+  - `python3 -m pytest -q` (`590 passed, 11 skipped`)
+  - `cd frontend && npm test` (`69 passed`)
+  - `cd frontend && npm run build` passed
+  - `git diff --check` passed
+  - tracked artifact hygiene audit passed with no real generated artifacts tracked; the only matches were allowed placeholders/examples (`.env.example`, `logs/traces/.gitkeep`, `reports/charts/.gitkeep`, and `reports/markdown/.gitkeep`), with no tracked `.env`, `node_modules`, `.next`, caches, DBs, workspace runs/reports, generated report charts/markdown, traces, or eval report.
+
+P29 fast-fact and risk-routing stabilization is now complete. The next product planning step can move back to real external business tool-call/export enhancement; P28-H4 itself did not implement external tools.
+
+## Latest P28-H1 Result
+
+P28-H1 Evidence Planning Consolidation completed on 2026-07-05:
+
+- Added `agents/evidence_planning.py` as the single Analysis Workbench planning surface. It reuses the validated SQL planning provider/fallback path and fills task fields, comparison scope, query strategy, chart intent, scenario context, and evidence/data limits in one `evidence_planning` state object.
+- Updated `workspaces/evidence_agent.py` so the active evidence chain records one `WorkbenchToolCall` named `evidence_planning` before schema lookup, metric lookup, SQL candidate building, SQL review, SQL execution, and evidence pack construction.
+- Removed the active `analysis_planner_provider` path and runtime provider builder so complex Analysis Workbench runs no longer call both `sql_planning_router_agent` and `analysis_planner_agent` as separate planning surfaces.
+- Kept SQL safety boundaries intact: SQL candidate generation still feeds SQL review; rejected SQL is not executed; execution remains a deterministic tool call; `QuestionEvidencePack` and downstream evidence validation/audit remain present.
+- Report Center remains independent on its report runner/evidence ledger/document path and does not call the Analysis Workbench Evidence Planning node.
+- Verification passed:
+  - `python3 -m pytest tests/test_evidence_agent.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py -q` (`52 passed`)
+  - `python3 -m pytest tests/test_analysis_coordinator_data_understanding.py tests/test_workspace_report_runner.py -q` (`25 passed`)
+  - `python3 -m pytest tests/test_evidence_agent.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_analysis_coordinator_data_understanding.py tests/test_workspace_report_runner.py -q` (`77 passed`)
+  - `python3 -m pytest tests/test_provider_assisted_sql_planning_workflow.py tests/test_analysis_planner.py tests/test_provider_backed_analysis_planner.py tests/test_sql_planning_router.py tests/test_intent_sql_planning_cleanup.py -q` (`28 passed`)
+
+## Latest P28-H3 Result
+
+P28-H3 Claim Typing And Evidence Audit Simplification completed on 2026-07-05:
+
+- Reworked `workspaces/evidence_auditor.py` so Evidence Auditor no longer accepts or calls a claim typing provider. It deterministically separates hard facts, business inferences, recommendations, and data limits from Business Answer typed candidate claims or, when categories are missing, from the `business_answer` field structure.
+- Hard facts are checked against `QuestionEvidencePack`, `evidence_result`, and `execution_result`; numeric-only pack support was tightened so a wrong entity cannot be supported just because the same number appears in another evidence row.
+- Recommendations and business inferences now enter `AuditResult.reasonable_inferences`, while caveats and typed `data_limit` claims remain in `AuditResult.data_limits`. `AuditResult.supported_facts`, `reasonable_inferences`, `unsupported_claims`, `data_limits`, and `confidence` remain stable for fast facts and standard/deep analysis.
+- Removed the obsolete provider claim typing path: `agents/insight_claim_typer.py`, the live claim typing workflow test, runtime provider flag/builder, prompt-registry template, structured-output validator branch, old state/provider metadata field, and related provider tests.
+- Fast facts still use the lightweight composer and still emit `AuditResult`; Report Center remains independent on `ReportEvidencePack + EvidenceLedger + ReportDocument`.
+- Verification passed:
+  - `python3 -m pytest tests/test_evidence_auditor_claim_categories.py tests/test_business_answer_quality.py tests/test_answer_consistency.py -q` (`37 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_workspace_report_runner.py -q` (`63 passed`)
+  - `python3 -m pytest tests/test_runtime_provider.py tests/test_product_live_mode.py tests/test_llm_provider_promptops.py tests/test_deepseek_provider_structured_output.py -q` (`33 passed`)
+  - `python3 -m pytest tests/test_workflow.py tests/test_p20_architecture_cleanup_boundaries.py -q` (`7 passed`)
+
+## Latest P28-H2 Result
+
+P28-H2 Business Answer Consolidation completed on 2026-07-05:
+
+- Reworked `workspaces/business_answer_agent.py` so normal successful complex answers use one provider-backed Business Answer generation surface, followed by deterministic review/repair using existing answer guardrails.
+- Updated the active Analysis Workbench workflow and runner to accept `business_answer` providers and stop calling normal-path `insight_drafting`, `answer_reviewer`, `final_answer_composer`, or provider claim-typing surfaces.
+- Business Answer output still normalizes to the P16 `business_answer` contract and now carries `candidate_claims` plus optional typed claim categories for the Evidence Auditor. Product-facing answer fields keep only headline, direct answer, why, evidence bullets, recommendations, caveats, and confidence.
+- Evidence Auditor now respects Business Answer claim categories: hard facts are checked strictly while recommendations and business inferences are treated as reasonable inferences instead of unsupported hard facts.
+- Fast facts still use the lightweight fast-fact composer, and Report Center remains independent on `ReportEvidencePack + EvidenceLedger + ReportDocument`.
+- Verification passed:
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py -q` (`59 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_workspace_report_runner.py -q` (`63 passed`)
+  - `python3 -m pytest tests/test_business_answer_quality.py tests/test_answer_consistency.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_workspace_report_runner.py -q` (`96 passed`)
+  - `python3 -m pytest tests/test_runtime_provider.py tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_workspace_report_runner.py -q` (`67 passed`)
 
 ## Latest P27-H6 Result
 
@@ -164,7 +806,7 @@ P27-H4 Evidence Auditor And Business Answer Agent completed on 2026-07-04:
   - `python3 -m pytest tests/test_workspace_report_runner.py::test_report_center_runtime_does_not_depend_on_analysis_workbench_entrypoint -q` (`1 passed`)
   - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py -q` (`103 passed`)
   - `python3 -m pytest tests/test_workspace_report_runner.py tests/test_report_planner_evidence.py tests/test_report_composer_validator.py -q` (`70 passed`)
-  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py tests/test_guarded_insight_claim_typing.py tests/test_p20_realistic_acceptance.py -q` (`110 passed`)
+  - `python3 -m pytest tests/test_workspace_analysis_runner.py tests/test_fast_fact_path.py tests/test_evidence_agent.py tests/test_business_answer_quality.py tests/test_answer_reviewer.py tests/test_final_answer_composer.py tests/test_answer_consistency.py tests/test_evidence_auditor_claim_categories.py tests/test_p20_realistic_acceptance.py -q` (`110 passed`)
   - `python3 -m pytest -q` (`579 passed, 12 skipped`)
 
 ## Latest P27-H5 Result
@@ -618,8 +1260,8 @@ P21-H1 conservative route policy completed on 2026-07-02:
 
 P21-H2 fast fact path completed on 2026-07-02:
 
-- Added `workspaces.fast_fact_composer` for concise Chinese P16 `business_answer` output for low-risk factual totals, rankings, and simple trends.
-- The workflow now routes successful `fast_fact` executions through `fast_fact_composer` after SQL review, SQL execution, and evidence validation, then skips `insight_agent`, Answer Reviewer, Final Answer Composer, and claim typing.
+- Historical / Superseded by P33-H1 and P35-H2: P21-H2 added `workspaces.fast_fact_composer` for concise Chinese P16 `business_answer` output, but that is no longer an active final-answer path.
+- Current behavior keeps the fast fact SQL/evidence route, then uses BusinessAnswerAgent with the answer-safe grouped ledger for final answer generation; no-provider mode returns generation failed instead of composing from rows or the compact pack.
 - Fast fact answers keep `recommendations: []`, avoid raw SQL/raw rows/parameter dumps in the main answer, and preserve SQL, raw rows, and `fact_payload` in technical details.
 - Ranking answers include the leader, metric value, and comparison scope; trend answers summarize directional movement without generating advice.
 - Non-fast questions such as why/复盘, budget advice, reports, and multi-metric综合判断 still use the full P20 chain.
@@ -668,7 +1310,7 @@ P21-H6 lightweight context packs completed on 2026-07-02:
 - Added `workspaces.context_pack_builder.build_fast_fact_context_pack()` as the compact, fixed-shape evidence contract used only by `fast_fact`.
 - Fast fact context packs retain the user question, route, task type, metric/dimension ids and Chinese labels, time range, comparison scope, top evidence rows, formulas, units, display values, warnings, data limits, caveats, and evidence validation status.
 - The compact pack excludes raw SQL, trace, provider metadata, full workspace profile, full semantic layer, full raw rows, historical runs, prompts, and unrelated report sections. Raw SQL and raw rows remain only in existing technical details/fact payload areas.
-- `fast_fact_node` now builds and persists `fast_fact_context_pack`; `fast_fact_composer` prefers it for answer generation and falls back to minimal execution/evidence inputs if the pack is unavailable.
+- Historical / Superseded by P33-H1 and P35-H2: `fast_fact_context_pack` remains useful as compact evidence/debug context, but `fast_fact_composer` no longer owns final answer generation and no fallback composes from minimal execution/evidence inputs.
 - `technical_details.fast_fact_context_pack` is available for fast fact debugging and tests. `standard_analysis`, `deep_judgment`, and `report` are not forced into this compact context pack and keep the richer evidence path.
 - Focused verification passed: `python3 -m pytest tests/test_fast_fact_path.py tests/test_product_result_builder.py tests/test_workspace_analysis_runner.py -q` (`53 passed`).
 
@@ -827,7 +1469,7 @@ Latest P18-H6 closeout result on 2026-07-01:
 P19 planning note on 2026-07-01:
 
 - Real local DeepSeek product mode was enabled for manual product testing with `INSIGHTFLOW_PRODUCT_LIVE_MODE=1` in the untracked `.env`.
-- A real channel budget question produced provider-backed analysis (`provider_called: true` across question understanding, SQL planning/candidate, insight drafting, and claim typing), proving the live path works.
+- A real channel budget question produced provider-backed analysis (`provider_called: true` across question understanding, SQL planning/candidate, insight drafting, and claim typing), proving the then-current live path worked. This P19 path is historical and was superseded by the P28 Business Answer + deterministic Evidence Auditor path.
 - The output quality review found remaining product gaps: recommendations can cite a different entity than their evidence, raw metric names can leak into business copy, recommendations can be empty or repetitive, and reports read like stitched section output rather than synthesized management reports.
 - P19 is therefore focused on business-output/report quality before external publishing integrations.
 - Direction update: P19 should not become an expanding deterministic patch list for every possible model mistake. The next design direction is an Answer Reviewer Agent plus Final Answer Composer, with small deterministic checks as the last safety guardrail.

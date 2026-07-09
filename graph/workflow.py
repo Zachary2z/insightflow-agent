@@ -23,12 +23,8 @@ from graph.nodes import (
 from graph.state import AgentState
 from llm_ops.provider import LLMProvider
 from llm_ops.runtime_provider import (
-    build_analysis_planner_provider,
-    build_answer_reviewer_provider,
     build_clarification_provider,
-    build_final_answer_composer_provider,
-    build_claim_typing_provider,
-    build_insight_drafting_provider,
+    build_business_answer_provider,
     build_question_understanding_provider,
     build_visualization_agent_provider,
     build_sql_candidate_provider,
@@ -40,13 +36,9 @@ def build_workflow(
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
-    analysis_planner_provider: LLMProvider | None = None,
     visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
-    insight_drafting_provider: LLMProvider | None = None,
-    answer_reviewer_provider: LLMProvider | None = None,
-    final_answer_composer_provider: LLMProvider | None = None,
-    claim_typing_provider: LLMProvider | None = None,
+    business_answer_provider: LLMProvider | None = None,
 ):
     workflow = StateGraph(AgentState)
     workflow.add_node(
@@ -66,7 +58,6 @@ def build_workflow(
         lambda state: evidence_agent_node(
             dict(state),
             sql_planning_provider=sql_planning_provider,
-            analysis_planner_provider=analysis_planner_provider,
             sql_candidate_provider=sql_candidate_provider,
         ),
     )
@@ -75,15 +66,15 @@ def build_workflow(
         "business_answer",
         lambda state: business_answer_node(
             dict(state),
-            provider=insight_drafting_provider,
-            answer_reviewer_provider=answer_reviewer_provider,
-            final_answer_composer_provider=final_answer_composer_provider,
-            evidence_auditor_provider=claim_typing_provider,
+            provider=business_answer_provider or build_business_answer_provider(),
         ),
     )
     workflow.add_node(
         "visualization_agent",
-        lambda state: visualization_agent_node(dict(state), provider=visualization_agent_provider),
+        lambda state: visualization_agent_node(
+            dict(state),
+            provider=visualization_agent_provider or build_visualization_agent_provider(),
+        ),
     )
     workflow.add_node("fail", fail_response_node)
     workflow.add_node("early_response", early_response_node)
@@ -101,11 +92,7 @@ def build_workflow(
         route_after_evidence_agent,
         {"business_answer": "business_answer", "fast_fact": "fast_fact", "fail": "fail", "early_response": "early_response"},
     )
-    workflow.add_conditional_edges(
-        "fast_fact",
-        route_after_answer_for_visualization,
-        {"visualization_agent": "visualization_agent", "save_trace": "save_trace"},
-    )
+    workflow.add_edge("fast_fact", "business_answer")
     workflow.add_conditional_edges(
         "business_answer",
         route_after_answer_for_visualization,
@@ -129,7 +116,6 @@ def run_workflow(
     clarification_question: str | None = None,
     clarification_answer: str | None = None,
     resolved_question: str | None = None,
-    pending_run_id: str | None = None,
     stop_for_clarification: bool = False,
     workspace_id: str | None = None,
     workspace_root: str | Path | None = None,
@@ -140,20 +126,15 @@ def run_workflow(
     question_understanding_provider: LLMProvider | None = None,
     clarification_provider: LLMProvider | None = None,
     sql_planning_provider: LLMProvider | None = None,
-    analysis_planner_provider: LLMProvider | None = None,
     visualization_agent_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
-    insight_drafting_provider: LLMProvider | None = None,
-    answer_reviewer_provider: LLMProvider | None = None,
-    final_answer_composer_provider: LLMProvider | None = None,
-    claim_typing_provider: LLMProvider | None = None,
+    business_answer_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     state = initialize_run(user_question, run_id=run_id, session_id=session_id)
     state["original_question"] = original_question or user_question
     state["clarification_question"] = clarification_question or ""
     state["clarification_answer"] = clarification_answer or ""
     state["resolved_question"] = resolved_question or ""
-    state["pending_run_id"] = pending_run_id or ""
     state["question_thread_status"] = ""
     state["stop_for_clarification"] = stop_for_clarification
     state["db_path"] = db_path
@@ -177,23 +158,13 @@ def run_workflow(
     question_provider = question_understanding_provider or build_question_understanding_provider()
     clarify_provider = clarification_provider or build_clarification_provider()
     planning_provider = sql_planning_provider or build_sql_planning_provider()
-    planner_provider = analysis_planner_provider or build_analysis_planner_provider()
-    viz_provider = visualization_agent_provider or build_visualization_agent_provider()
     candidate_provider = sql_candidate_provider or build_sql_candidate_provider()
-    insight_provider = insight_drafting_provider or build_insight_drafting_provider()
-    reviewer_provider = answer_reviewer_provider or build_answer_reviewer_provider()
-    composer_provider = final_answer_composer_provider or build_final_answer_composer_provider()
-    typing_provider = claim_typing_provider or build_claim_typing_provider()
     app = build_workflow(
         question_understanding_provider=question_provider,
         clarification_provider=clarify_provider,
         sql_planning_provider=planning_provider,
-        analysis_planner_provider=planner_provider,
-        visualization_agent_provider=viz_provider,
+        visualization_agent_provider=visualization_agent_provider,
         sql_candidate_provider=candidate_provider,
-        insight_drafting_provider=insight_provider,
-        answer_reviewer_provider=reviewer_provider,
-        final_answer_composer_provider=composer_provider,
-        claim_typing_provider=typing_provider,
+        business_answer_provider=business_answer_provider,
     )
     return dict(app.invoke(state))

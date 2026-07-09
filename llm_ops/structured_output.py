@@ -30,6 +30,20 @@ def _contains_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in str(text or ""))
 
 
+_KNOWN_METRIC_ACRONYMS = {
+    "AOV",
+    "CAC",
+    "CPA",
+    "CPC",
+    "CPM",
+    "CTR",
+    "CVR",
+    "GMV",
+    "ROI",
+    "ROAS",
+}
+
+
 def _requires_cjk_response(schema_context: dict[str, Any]) -> bool:
     user_question = str(schema_context.get("user_question") or "")
     if not _contains_cjk(user_question):
@@ -58,58 +72,6 @@ def _validate_guarded_sql_candidate(content: Any) -> dict[str, Any]:
         rationale = str(item.get("rationale") or item.get("reason") or "").strip()
         normalized.append({"sql": sql, "rationale": rationale})
     return _ok("guarded_sql_candidate", {"sql_candidates": normalized})
-
-
-def _validate_guarded_insight_claims(content: Any) -> dict[str, Any]:
-    if not isinstance(content, dict):
-        return _error("guarded_insight_claims", "guarded_insight_claims output must be an object")
-
-    claims = content.get("claims", [])
-    if not isinstance(claims, list):
-        return _error("guarded_insight_claims", "claims must be a list")
-    if not all(isinstance(claim, str) for claim in claims):
-        return _error("guarded_insight_claims", "claims must contain only strings")
-    return _ok("guarded_insight_claims", {"claims": [claim.strip() for claim in claims if claim.strip()]})
-
-
-def _validate_insight_claim_typer(content: Any) -> dict[str, Any]:
-    prompt_id = "insight_claim_typer"
-    if not isinstance(content, dict):
-        return _error(prompt_id, "insight_claim_typer output must be an object")
-
-    blocked_fields = {"sql", "generated_sql", "sql_candidates", "candidate_sql", "final_answer"}
-    leaked = sorted(blocked_fields & set(content))
-    if leaked:
-        return _error(prompt_id, f"insight_claim_typer must not return blocked fields: {', '.join(leaked)}")
-
-    typed_claims = content.get("typed_claims", [])
-    if not isinstance(typed_claims, list):
-        return _error(prompt_id, "typed_claims must be a list")
-
-    normalized_claims = []
-    allowed_types = {"data_supported_finding", "hypothesis", "unsupported"}
-    for index, item in enumerate(typed_claims):
-        if not isinstance(item, dict):
-            return _error(prompt_id, f"typed_claims[{index}] must be an object")
-        claim = str(item.get("claim", "")).strip()
-        if not claim:
-            return _error(prompt_id, f"typed_claims[{index}].claim is required")
-        claim_type = str(item.get("claim_type", "")).strip()
-        if claim_type not in allowed_types:
-            return _error(prompt_id, f"typed_claims[{index}].claim_type must be one of {', '.join(sorted(allowed_types))}")
-        normalized_claims.append(
-            {
-                "claim": claim,
-                "claim_type": claim_type,
-                "rationale": str(item.get("rationale", "")).strip(),
-            }
-        )
-
-    risk_ok, risk_flags, message = _string_list(content.get("risk_flags", []), "risk_flags")
-    if not risk_ok:
-        return _error(prompt_id, message)
-
-    return _ok(prompt_id, {"typed_claims": normalized_claims, "risk_flags": risk_flags})
 
 
 def _validate_answer_reviewer(content: Any) -> dict[str, Any]:
@@ -209,76 +171,10 @@ def _validate_answer_reviewer(content: Any) -> dict[str, Any]:
     )
 
 
-def _validate_final_answer_composer(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
-    prompt_id = "final_answer_composer"
+def _validate_business_answer(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
+    prompt_id = "business_answer"
     if not isinstance(content, dict):
-        return _error(prompt_id, "final_answer_composer output must be an object")
-
-    allowed_keys = {
-        "headline",
-        "direct_answer",
-        "why",
-        "evidence_bullets",
-        "recommendations",
-        "caveats",
-        "confidence",
-    }
-    extra_keys = sorted(set(content) - allowed_keys)
-    if extra_keys:
-        return _error(prompt_id, f"final_answer_composer must not return unsupported fields: {', '.join(extra_keys)}")
-
-    normalized_answer: dict[str, Any] = {}
-    for field in ("headline", "direct_answer", "why"):
-        value = content.get(field)
-        if not isinstance(value, str):
-            return _error(prompt_id, f"{field} must be a string")
-        value = value.strip()
-        if not value:
-            return _error(prompt_id, f"{field} must not be empty")
-        normalized_answer[field] = value
-
-    for field in ("evidence_bullets", "recommendations", "caveats"):
-        ok, items, message = _string_list(content.get(field), field)
-        if not ok:
-            return _error(prompt_id, message)
-        normalized_answer[field] = items
-
-    confidence = str(content.get("confidence", "")).strip()
-    if confidence not in {"low", "medium", "high"}:
-        return _error(prompt_id, "confidence must be one of low, medium, high")
-    normalized_answer["confidence"] = confidence
-
-    business_text_fields = [
-        normalized_answer["headline"],
-        normalized_answer["direct_answer"],
-        normalized_answer["why"],
-        *normalized_answer["evidence_bullets"],
-        *normalized_answer["recommendations"],
-        *normalized_answer["caveats"],
-    ]
-    for field_text in business_text_fields:
-        if _contains_internal_prompt_leak(field_text):
-            return _error(prompt_id, "business_answer fields must not contain internal prompt text")
-        if _contains_technical_leak(field_text):
-            return _error(prompt_id, "business_answer fields must not contain technical SQL, trace, or provider metadata")
-        if _looks_like_raw_parameter_dump(field_text):
-            return _error(prompt_id, "business_answer fields must not contain raw parameter dumps")
-        lowered = field_text.lower()
-        if "reviewer_result" in lowered or "unsupported_entities=" in lowered:
-            return _error(prompt_id, "business_answer fields must not expose reviewer internals")
-
-    if _requires_cjk_response(schema_context):
-        language_error = _cjk_business_answer_language_error(normalized_answer)
-        if language_error:
-            return _error(prompt_id, language_error)
-
-    return _ok(prompt_id, normalized_answer)
-
-
-def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
-    prompt_id = "insight_drafter"
-    if not isinstance(content, dict):
-        return _error(prompt_id, "insight_drafter output must be an object")
+        return _error(prompt_id, "business_answer output must be an object")
 
     blocked_fields = {
         "sql",
@@ -302,13 +198,14 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
     }
     leaked = sorted(blocked_fields & set(content))
     if leaked:
-        return _error(prompt_id, f"insight_drafter must not return blocked fields: {', '.join(leaked)}")
+        return _error(prompt_id, f"business_answer must not return blocked fields: {', '.join(leaked)}")
 
-    claims_ok, candidate_claims, message = _string_list(content.get("candidate_claims", []), "candidate_claims")
+    claims_ok, candidate_claims, message = _candidate_claim_list(
+        content.get("candidate_claims", []),
+        "candidate_claims",
+    )
     if not claims_ok:
         return _error(prompt_id, message)
-    if not candidate_claims:
-        return _error(prompt_id, "candidate_claims must not be empty")
 
     business_answer = content.get("business_answer")
     if not isinstance(business_answer, dict):
@@ -317,7 +214,7 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
     if extra_top_level:
         return _error(
             prompt_id,
-            f"insight_drafter must not return unsupported top-level fields: {', '.join(extra_top_level)}",
+            f"business_answer must not return unsupported top-level fields: {', '.join(extra_top_level)}",
         )
 
     allowed_keys = {
@@ -348,7 +245,7 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
     for field in ("evidence_bullets", "recommendations", "caveats"):
         if field not in business_answer:
             return _error(prompt_id, f"business_answer.{field} is required")
-        ok, items, message = _string_list(business_answer.get(field), f"business_answer.{field}")
+        ok, items, message = _business_answer_string_list(business_answer.get(field), f"business_answer.{field}")
         if not ok:
             return _error(prompt_id, message)
         normalized_answer[field] = items
@@ -391,7 +288,58 @@ def _validate_insight_drafter(content: Any, schema_context: dict[str, Any]) -> d
             "business_answer must not recommend budget or resource changes without sufficient comparative evidence",
         )
 
+    if not candidate_claims:
+        candidate_claims = _candidate_claims_from_business_answer(normalized_answer)
+    if not candidate_claims:
+        return _error(prompt_id, "candidate_claims must not be empty")
+
     return _ok(prompt_id, {"candidate_claims": candidate_claims, "business_answer": normalized_answer})
+
+
+def _candidate_claims_from_business_answer(answer: dict[str, Any]) -> list[dict[str, str]]:
+    claims: list[dict[str, str]] = []
+    direct_answer = str(answer.get("direct_answer") or "").strip()
+    if direct_answer:
+        claims.append({"claim": direct_answer, "category": "business_inference"})
+    for item in answer.get("evidence_bullets") or []:
+        text = str(item or "").strip()
+        if text:
+            claims.append({"claim": text, "category": "hard_fact"})
+    for item in answer.get("caveats") or []:
+        text = str(item or "").strip()
+        if text:
+            claims.append({"claim": text, "category": "data_limit"})
+    return claims[:12]
+
+
+def _candidate_claim_list(value: Any, field_name: str) -> tuple[bool, list[Any], str]:
+    if not isinstance(value, list):
+        return False, [], f"{field_name} must be a list"
+    normalized: list[Any] = []
+    allowed_categories = {"hard_fact", "business_inference", "recommendation", "data_limit"}
+    for index, item in enumerate(value):
+        if isinstance(item, str):
+            text = item.strip()
+            if text:
+                normalized.append(text)
+            continue
+        if not isinstance(item, dict):
+            return False, [], f"{field_name}[{index}] must be a string or object"
+        claim = str(item.get("claim") or "").strip()
+        if not claim:
+            return False, [], f"{field_name}[{index}].claim is required"
+        category = str(item.get("category") or item.get("claim_type") or "").strip()
+        if category and category not in allowed_categories:
+            return (
+                False,
+                [],
+                f"{field_name}[{index}].category must be one of {', '.join(sorted(allowed_categories))}",
+            )
+        normalized_item = {"claim": claim}
+        if category:
+            normalized_item["category"] = category
+        normalized.append(normalized_item)
+    return True, normalized, ""
 
 
 def _looks_like_raw_parameter_dump(text: str) -> bool:
@@ -401,10 +349,25 @@ def _looks_like_raw_parameter_dump(text: str) -> bool:
     dump_lines = 0
     for line in lines:
         stripped = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line)
-        assignments = re.findall(r"\b[A-Za-z_][\w. -]*\s*=", stripped)
+        assignments = [
+            key
+            for key in re.findall(r"\b([A-Za-z_][A-Za-z0-9_. -]*)\s*=", stripped)
+            if _looks_like_raw_assignment_key(key)
+        ]
         if len(assignments) >= 2 or (assignments and "," in stripped):
             dump_lines += 1
     return dump_lines >= max(1, len(lines) // 2)
+
+
+def _looks_like_raw_assignment_key(key: str) -> bool:
+    token = str(key or "").strip().split()[-1] if str(key or "").strip() else ""
+    if not token:
+        return False
+    if token.upper() in _KNOWN_METRIC_ACRONYMS:
+        return False
+    if token.isupper() and len(token) <= 5:
+        return False
+    return True
 
 
 def _contains_technical_leak(text: str) -> bool:
@@ -579,6 +542,13 @@ def _string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
         if item:
             normalized.append(item)
     return True, normalized, ""
+
+
+def _business_answer_string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
+    if isinstance(value, str):
+        text = value.strip()
+        return True, [text] if text else [], ""
+    return _string_list(value, field_name)
 
 
 def _string_or_string_list(value: Any, field_name: str) -> tuple[bool, list[str], str]:
@@ -1041,16 +1011,10 @@ def validate_prompt_output(
     context = schema_context or {}
     if prompt_id == "guarded_sql_candidate":
         return _validate_guarded_sql_candidate(content)
-    if prompt_id == "guarded_insight_claims":
-        return _validate_guarded_insight_claims(content)
-    if prompt_id == "insight_claim_typer":
-        return _validate_insight_claim_typer(content)
     if prompt_id == "answer_reviewer":
         return _validate_answer_reviewer(content)
-    if prompt_id == "final_answer_composer":
-        return _validate_final_answer_composer(content, context)
-    if prompt_id == "insight_drafter":
-        return _validate_insight_drafter(content, context)
+    if prompt_id == "business_answer":
+        return _validate_business_answer(content, context)
     if prompt_id == "question_understanding":
         return _validate_question_understanding(content)
     if prompt_id == "clarification_router":

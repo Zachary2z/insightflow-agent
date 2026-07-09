@@ -3,20 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agents.analysis_planner import run_analysis_planner_agent
+from agents.evidence_planning import run_evidence_planning_agent
+from agents.evidence_validator import run_evidence_validator_agent
 from agents.error_fixer import run_error_fix_agent
 from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
 from agents.metric_agent import run_metric_agent
 from agents.schema_agent import run_schema_agent
 from agents.schema_repair import is_schema_mismatch_review, run_schema_repair_agent
 from agents.sql_generator import run_sql_generator
-from agents.sql_planning_router import run_sql_planning_router_agent
 from agents.sql_reviewer import run_sql_reviewer
 from llm_ops.provider import LLMProvider
 from tools.sql_executor import run_sql
 from tools.trace_logger import append_trace
 from workspaces.analysis_contracts import AnalysisTask, QuestionEvidencePack, WorkbenchToolCall
 from workspaces.product_result_builder import build_evidence
+from workspaces.question_evidence_ledger import build_question_evidence_ledger
 from workspaces.question_evidence_cache import (
     load_question_evidence_cache,
     save_question_evidence_cache,
@@ -28,7 +29,6 @@ def run_evidence_agent_question_mode(
     state: dict[str, Any],
     *,
     sql_planning_provider: LLMProvider | None = None,
-    analysis_planner_provider: LLMProvider | None = None,
     sql_candidate_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     updated = with_question_evidence_cache_identity(dict(state))
@@ -38,28 +38,18 @@ def run_evidence_agent_question_mode(
         return _with_cached_pack(updated, cached)
 
     if not updated.get("initial_sql"):
-        updated = run_sql_planning_router_agent(updated, provider=sql_planning_provider)
+        updated = run_evidence_planning_agent(updated, provider=sql_planning_provider)
         _record(
             tool_calls,
-            "sql_planning",
-            "规划本轮问题需要的证据查询策略",
+            "evidence_planning",
+            "一次性规划本轮问题需要的指标、维度、查询策略和证据边界",
             updated.get("user_question", ""),
-            _planning_summary(updated.get("sql_planning")),
-            _status(updated.get("sql_planning")),
+            _planning_summary(updated.get("evidence_planning")),
+            _status(updated.get("evidence_planning")),
         )
         if _planning_stops_before_evidence(updated):
             updated["evidence_agent_early_response"] = True
             return _with_pack(updated, tool_calls, status="failed")
-
-        updated = run_analysis_planner_agent(updated, provider=analysis_planner_provider)
-        _record(
-            tool_calls,
-            "sql_planning",
-            "规划分析步骤和候选证据范围",
-            updated.get("user_question", ""),
-            f"scenario={updated.get('scenario_type', '')} steps={len(updated.get('analysis_steps') or [])}",
-            _status(updated.get("analysis_plan")),
-        )
 
     updated = run_schema_agent(updated, updated["db_path"])
     _record(
@@ -266,6 +256,8 @@ def _with_pack(
     pack = _build_question_evidence_pack(updated, tool_calls)
     updated["question_evidence_pack"] = pack.to_dict()
     updated["workbench_tool_calls"] = [call.to_dict() for call in tool_calls]
+    updated = _validate_pack_evidence(updated, pack, status=status)
+    updated["question_evidence_ledger"] = _build_question_ledger(updated, pack)
     save_question_evidence_cache(updated)
     _drop_cache_identity(updated)
     return updated
@@ -295,6 +287,15 @@ def _with_cached_pack(state: dict[str, Any], cached: dict[str, Any]) -> dict[str
         "selected_metrics": list(cached.get("selected_metrics") or []),
         "question_evidence_pack": pack.to_dict(),
         "workbench_tool_calls": tool_calls,
+        "question_evidence_ledger": _build_question_ledger(
+            {
+                **state,
+                "execution_result": dict(cached.get("execution_result") or {}),
+                "evidence_result": dict(cached.get("evidence_result") or {}),
+                "chart_artifacts": list(cached.get("chart_artifacts") or []),
+            },
+            pack,
+        ),
         "question_evidence_cache": {
             "hit": True,
             "cache_key": str(cached.get("cache_key") or ""),
@@ -347,6 +348,50 @@ def _build_question_evidence_pack(
         tool_calls=tool_calls,
         data_limits=data_limits,
     )
+
+
+def _build_question_ledger(state: dict[str, Any], pack: QuestionEvidencePack) -> dict[str, Any]:
+    evidence = build_evidence(state)
+    fact_payload = evidence.get("fact_payload") if isinstance(evidence.get("fact_payload"), dict) else {}
+    return build_question_evidence_ledger(
+        question_evidence_pack=pack,
+        execution_result=state.get("execution_result") if isinstance(state.get("execution_result"), dict) else {},
+        evidence_validation=state.get("evidence_result") if isinstance(state.get("evidence_result"), dict) else {},
+        chart_artifacts=state.get("chart_artifacts") if isinstance(state.get("chart_artifacts"), list) else [],
+        fact_payload=fact_payload,
+    )
+
+
+def _validate_pack_evidence(
+    state: dict[str, Any],
+    pack: QuestionEvidencePack,
+    *,
+    status: str,
+) -> dict[str, Any]:
+    if status != "executed" or not pack.rows:
+        return state
+    claims = _row_fact_claims(pack)
+    if not claims:
+        return state
+    validated = run_evidence_validator_agent({**state, "claims_to_validate": claims})
+    evidence_result = dict(validated.get("evidence_result") or {})
+    if evidence_result.get("success"):
+        evidence_result.setdefault("validation_status", "validated")
+        validated["evidence_result"] = evidence_result
+    return validated
+
+
+def _row_fact_claims(pack: QuestionEvidencePack, *, limit: int = 5) -> list[str]:
+    claims: list[str] = []
+    for row in pack.rows[:limit]:
+        parts = [
+            f"{column} 为 {row.get(column)}"
+            for column in pack.columns
+            if row.get(column) is not None and str(row.get(column)).strip()
+        ]
+        if parts:
+            claims.append("，".join(parts) + "。")
+    return claims
 
 
 def _analysis_task(state: dict[str, Any]) -> AnalysisTask:
@@ -484,7 +529,9 @@ def _metric_summary(metric_context: Any) -> str:
 def _planning_summary(planning: Any) -> str:
     if not isinstance(planning, dict):
         return ""
-    return f"strategy={planning.get('strategy', '')} template={planning.get('matched_template', '')}"
+    strategy = planning.get("query_strategy", planning.get("strategy", ""))
+    scenario = planning.get("scenario_type", "")
+    return f"strategy={strategy} scenario={scenario} missing={len(planning.get('missing_evidence') or [])}"
 
 
 def _candidate_input_summary(state: dict[str, Any]) -> str:

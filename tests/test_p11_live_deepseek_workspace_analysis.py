@@ -138,7 +138,7 @@ def test_live_deepseek_analyzes_uploaded_workspace_data(tmp_path):
     assert artifact_path.exists()
     assert artifact_path.is_relative_to(run_dir)
     assert _provider_trace(result, "question_understanding_agent")
-    assert _provider_trace(result, "sql_planning_router_agent")
+    assert _provider_trace(result, "evidence_planning_agent")
     assert _provider_trace(result, "guarded_sql_candidate_agent")
     assert _provider_trace(result, "visualization_agent")
     assert _trace_node(result, "sql_reviewer_agent")

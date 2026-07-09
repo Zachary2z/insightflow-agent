@@ -10,18 +10,15 @@ from question_understanding.route_policy import classify_analysis_route
 from tools.evidence_tool import build_evidence_payload
 from workspaces.time_range_defaults import full_range_default_note
 from workspaces.answer_evidence import (
-    business_evidence_sentence,
     business_field_label,
     business_field_labels,
-    business_row_sentences,
     localize_business_field_names,
-    reason_hypothesis_context,
-    rows_as_dicts,
 )
-from workspaces.answer_consistency import apply_answer_consistency, safe_chart_annotation
+from workspaces.chart_annotation_safety import safe_chart_annotation
 from workspaces.context_pack_builder import build_fast_fact_context_pack
 from workspaces.progress_steps import build_progress_steps
 from workspaces.product_models import (
+    P30_CHART_ARTIFACT_OPTIONAL_FIELDS,
     PRODUCT_RESULT_VERSION,
     empty_analysis_route,
     empty_business_answer,
@@ -29,6 +26,11 @@ from workspaces.product_models import (
     empty_evidence,
     empty_question_thread,
     empty_technical_details,
+)
+from workspaces.question_evidence_ledger import (
+    build_chart_safe_table,
+    build_question_evidence_ledger,
+    sanitize_question_evidence_ledger,
 )
 
 
@@ -40,6 +42,18 @@ BUSINESS_ANSWER_KEYS = {
     "recommendations",
     "caveats",
     "confidence",
+}
+_KNOWN_METRIC_ACRONYMS = {
+    "AOV",
+    "CAC",
+    "CPA",
+    "CPC",
+    "CPM",
+    "CTR",
+    "CVR",
+    "GMV",
+    "ROI",
+    "ROAS",
 }
 
 
@@ -59,6 +73,7 @@ def build_product_analysis_result(
         workspace_root=resolved_workspace_root,
         business_answer=business_answer,
     )
+    ledger_summary = build_question_evidence_ledger_summary({**raw, "chart_artifacts": chart_artifacts})
     return {
         "version": PRODUCT_RESULT_VERSION,
         "workspace_id": resolved_workspace_id,
@@ -72,7 +87,8 @@ def build_product_analysis_result(
             chart_artifacts=chart_artifacts,
         ),
         "business_answer": business_answer,
-        "evidence": build_evidence(raw),
+        "evidence": build_evidence({**raw, "question_evidence_ledger": ledger_summary}),
+        "question_evidence_ledger": ledger_summary,
         "chart_artifacts": chart_artifacts,
         "report": raw.get("report_result") or None,
         "technical_details": build_technical_details(raw),
@@ -83,24 +99,69 @@ def build_question_thread(raw: dict[str, Any]) -> dict[str, Any]:
     thread = empty_question_thread()
     original_question = raw.get("original_question") or raw.get("user_question") or raw.get("question") or ""
     question_understanding = raw.get("pending_question_understanding") or raw.get("question_understanding") or {}
+    memory = raw.get("analysis_thread_memory") if isinstance(raw.get("analysis_thread_memory"), dict) else {}
+    pending_memory = memory.get("pending_clarification") if isinstance(memory.get("pending_clarification"), dict) else {}
     thread.update(
         {
+            "thread_id": str(memory.get("thread_id") or raw.get("run_id") or ""),
             "original_question": str(original_question),
             "system_understanding": str(raw.get("system_understanding") or "")
             or _system_understanding(question_understanding, original_question=str(original_question)),
-            "clarification_question": _first_text(
+            "clarification_question": _scrub_internal_ref_text(_first_text(
                 raw.get("clarification_question"),
                 raw.get("clarification_questions"),
+                pending_memory.get("clarification_question"),
                 (raw.get("clarification_result") or {}).get("clarification_question"),
                 (raw.get("clarification_result") or {}).get("questions"),
-            ),
+            )),
             "clarification_answer": str(raw.get("clarification_answer") or ""),
-            "resolved_question": str(raw.get("resolved_question") or ""),
-            "pending_run_id": str(raw.get("pending_run_id") or ""),
-            "status": str(raw.get("question_thread_status") or raw.get("status") or ""),
+            "resolved_question": _scrub_internal_ref_text(
+                str(raw.get("resolved_question") or memory.get("latest_resolved_question") or "")
+            ),
+            "status": str(raw.get("question_thread_status") or memory.get("latest_status") or raw.get("status") or ""),
+            "turns": _safe_display_turns(memory.get("turns") or []),
+            "current_business_lens": dict(memory.get("current_business_lens") or {}),
+            "evidence_refs": _safe_display_evidence_refs(memory.get("evidence_refs") or []),
+            "answer_summary": _scrub_internal_ref_text(str(memory.get("answer_summary") or "")),
+            "pending_clarification": _scrub_internal_ref_keys(memory.get("pending_clarification")) if memory else None,
+            "latest_status": str(memory.get("latest_status") or ""),
+            "latest_resolved_question": _scrub_internal_ref_text(str(memory.get("latest_resolved_question") or "")),
         }
     )
     return thread
+
+
+def _safe_display_evidence_refs(value: Any) -> list[str]:
+    return _safe_chart_evidence_refs(value)
+
+
+def _safe_display_turns(value: Any) -> list[dict[str, Any]]:
+    turns: list[dict[str, Any]] = []
+    for item in value or []:
+        if not isinstance(item, dict):
+            continue
+        turn = {
+            str(key): _scrub_internal_ref_keys(data)
+            for key, data in item.items()
+            if str(key) not in {"evidence_ref", "evidence_refs"}
+        }
+        if item.get("evidence_refs"):
+            turn["evidence_refs"] = _safe_display_evidence_refs(item.get("evidence_refs") or [])
+        for key in ("resolved_question", "answer_summary", "user_input"):
+            if key in turn:
+                turn[key] = _scrub_internal_ref_text(str(turn.get(key) or ""))
+        turns.append(turn)
+    return turns
+
+
+def _scrub_internal_ref_text(value: str) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    text = re.sub(r"question_evidence_ledger:qledger_[A-Za-z0-9_:-]+", "question_evidence_pack", text)
+    text = re.sub(r"\bqledger_[A-Za-z0-9_:-]+\b", "question_evidence_pack", text)
+    text = re.sub(r"\bevidence:[^\s,，。;；]+", "question_evidence_pack", text)
+    return text.replace("source_pack_id", "evidence_source")
 
 
 def build_analysis_route(raw: dict[str, Any]) -> dict[str, Any]:
@@ -135,73 +196,59 @@ def build_business_answer(raw: dict[str, Any]) -> dict[str, Any]:
     if _is_sql_review_failure(raw):
         return _business_failure_answer(raw)
 
-    existing = raw.get("business_answer") if isinstance(raw.get("business_answer"), dict) else {}
+    existing_candidates = _business_answer_candidates(raw)
     user_question = str(raw.get("original_question") or raw.get("user_question") or raw.get("question") or "")
     chinese = _uses_chinese_business_answer(user_question)
     execution_result = raw.get("execution_result") if isinstance(raw.get("execution_result"), dict) else {}
     evidence_result = raw.get("evidence_result") if isinstance(raw.get("evidence_result"), dict) else {}
 
-    if business_answer_is_usable(existing, user_question, execution_result, evidence_result):
-        normalized = _complete_minimum_business_answer(
-            _normalize_business_answer(existing, chinese=chinese),
-            user_question=user_question,
-            execution_result=execution_result,
-            evidence_result=evidence_result,
-            chinese=chinese,
-        )
-        consistent = apply_answer_consistency(
-            user_question=user_question,
-            business_answer=normalized,
-            execution_result=execution_result,
-            evidence_result=evidence_result,
-        )
-        return _with_time_default_caveat(consistent, raw)
-
-    direct_answer, fallback_reason = _safe_direct_answer(raw, user_question, execution_result, chinese=chinese)
-    weak_evidence = _has_weak_evidence(execution_result, evidence_result)
-    unsafe_fallback = fallback_reason in {"unsafe_text", "language_mismatch"}
-    evidence_bullets = _business_evidence_bullets(
-        execution_result,
-        evidence_result,
-        user_question=user_question,
-        chinese=chinese,
-    )
-    caveats = _business_caveats(
-        [],
-        fallback_reason=fallback_reason,
-        weak_evidence=weak_evidence,
-        execution_result=execution_result,
-        chinese=chinese,
-    )
-
-    answer = _business_answer(
-        headline=_headline_from(direct_answer),
-        direct_answer=direct_answer,
-        why=_business_why(
-            direct_answer,
-            evidence_bullets,
+    for existing, from_successful_generation in existing_candidates:
+        if business_answer_is_usable(
+            existing,
+            user_question,
             execution_result,
-            user_question=user_question,
-            chinese=chinese,
-        ),
-        evidence_bullets=evidence_bullets,
-        recommendations=[] if weak_evidence or unsafe_fallback or not _should_include_recommendations(user_question) else _business_recommendations(
-            direct_answer,
-            user_question=user_question,
-            execution_result=execution_result,
-            chinese=chinese,
-        ),
-        caveats=caveats,
-        confidence="low" if weak_evidence or unsafe_fallback else "medium",
-        chinese=chinese,
+            evidence_result,
+            enforce_evidence_strength=not from_successful_generation,
+        ):
+            normalized = _normalize_business_answer(existing, chinese=chinese)
+            return _with_time_default_caveat(normalized, raw)
+
+    return _missing_business_answer(chinese=chinese)
+
+
+def _business_answer_candidates(raw: dict[str, Any]) -> list[tuple[dict[str, Any], bool]]:
+    candidates: list[tuple[dict[str, Any], bool]] = []
+    existing = raw.get("business_answer") if isinstance(raw.get("business_answer"), dict) else {}
+    if existing:
+        candidates.append((existing, False))
+    generation = raw.get("business_answer_generation") if isinstance(raw.get("business_answer_generation"), dict) else {}
+    generated = generation.get("business_answer") if isinstance(generation.get("business_answer"), dict) else {}
+    if generation.get("success") is True and generated:
+        candidates.append((generated, True))
+    return candidates
+
+
+def _missing_business_answer(*, chinese: bool) -> dict[str, Any]:
+    if chinese:
+        return _business_answer(
+            headline="业务回答缺失",
+            direct_answer="业务回答缺失：当前没有可安全展示的模型业务回答，系统不会根据原始查询行拼接最终结论。",
+            why="结果组装器只负责组装证据、图表和技术明细；最终业务结论需要由 BusinessAnswerAgent 基于证据账本生成。",
+            evidence_bullets=[],
+            recommendations=[],
+            caveats=["可以重新生成回答，或先查看证据区与技术明细确认本轮数据结果。"],
+            confidence="low",
+        )
+    return _business_answer(
+        headline="Business answer missing",
+        direct_answer="Business answer missing: no safe model-written business answer is available, and raw rows are not used to compose the final conclusion.",
+        why="Product Result Builder only assembles evidence, charts, and technical details; BusinessAnswerAgent owns the final business answer.",
+        evidence_bullets=[],
+        recommendations=[],
+        caveats=["Regenerate the answer or inspect the evidence and technical details for this run."],
+        confidence="low",
+        chinese=False,
     )
-    consistent = apply_answer_consistency(
-        user_question=user_question,
-        business_answer=answer,
-        execution_result=execution_result,
-        evidence_result=evidence_result,
-    )
-    return _with_time_default_caveat(consistent, raw)
 
 
 def _business_failure_answer(raw: dict[str, Any]) -> dict[str, Any]:
@@ -285,10 +332,12 @@ def business_answer_is_usable(
     user_question: str,
     execution_result: dict[str, Any] | None = None,
     evidence_result: dict[str, Any] | None = None,
+    *,
+    enforce_evidence_strength: bool = True,
 ) -> bool:
     if not existing:
         return False
-    if set(existing) != BUSINESS_ANSWER_KEYS:
+    if not BUSINESS_ANSWER_KEYS.issubset(set(existing)):
         return False
     required_strings = ("headline", "direct_answer", "why")
     required_lists = ("evidence_bullets", "recommendations", "caveats")
@@ -309,7 +358,7 @@ def business_answer_is_usable(
         return False
     if _needs_chinese_response(user_question) and not _business_answer_fields_contain_cjk(existing):
         return False
-    if execution_result is not None:
+    if enforce_evidence_strength and execution_result is not None:
         weak_evidence = _has_weak_evidence(execution_result, evidence_result or {})
         if weak_evidence and _list_of_text(existing.get("recommendations")):
             return False
@@ -327,47 +376,6 @@ def _normalize_business_answer(existing: dict[str, Any], *, chinese: bool) -> di
         recommendations=_list_of_text(existing.get("recommendations")),
         caveats=_list_of_text(existing.get("caveats")),
         confidence=str(existing.get("confidence") or "medium"),
-        chinese=chinese,
-    )
-
-
-def _complete_minimum_business_answer(
-    answer: dict[str, Any],
-    *,
-    user_question: str,
-    execution_result: dict[str, Any],
-    evidence_result: dict[str, Any],
-    chinese: bool,
-) -> dict[str, Any]:
-    weak_evidence = _has_weak_evidence(execution_result, evidence_result)
-    completed = dict(answer)
-    if (
-        not _list_of_text(completed.get("recommendations"))
-        and not weak_evidence
-        and _should_include_recommendations(user_question)
-    ):
-        completed["recommendations"] = _business_recommendations(
-            str(completed.get("direct_answer") or ""),
-            user_question=user_question,
-            execution_result=execution_result,
-            chinese=chinese,
-        )
-    if not _list_of_text(completed.get("caveats")):
-        completed["caveats"] = _business_caveats(
-            [],
-            fallback_reason="",
-            weak_evidence=weak_evidence,
-            execution_result=execution_result,
-            chinese=chinese,
-        )
-    return _business_answer(
-        headline=str(completed.get("headline") or ""),
-        direct_answer=str(completed.get("direct_answer") or ""),
-        why=str(completed.get("why") or ""),
-        evidence_bullets=_list_of_text(completed.get("evidence_bullets")),
-        recommendations=_list_of_text(completed.get("recommendations")),
-        caveats=_list_of_text(completed.get("caveats")),
-        confidence=str(completed.get("confidence") or "medium"),
         chinese=chinese,
     )
 
@@ -394,275 +402,6 @@ def _business_answer_fields_contain_cjk(answer: dict[str, Any]) -> bool:
     return True
 
 
-def _safe_direct_answer(
-    raw: dict[str, Any],
-    user_question: str,
-    execution_result: dict[str, Any],
-    *,
-    chinese: bool,
-) -> tuple[str, str]:
-    direct_answer = _candidate_direct_answer(raw)
-    if not direct_answer and execution_result.get("success"):
-        return _answer_from_evidence(user_question, execution_result, chinese=chinese), "missing_direct_answer"
-    if _looks_like_raw_parameter_dump(direct_answer) or _looks_like_mechanical_row_evidence(direct_answer) or _contains_technical_leak(direct_answer):
-        return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "unsafe_text"
-    if _needs_chinese_response(user_question) and direct_answer.strip() and not _contains_cjk(direct_answer):
-        return _fallback_direct_answer(user_question, execution_result, chinese=chinese), "language_mismatch"
-    return direct_answer, ""
-
-
-def _fallback_direct_answer(user_question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
-    if execution_result.get("success"):
-        return _answer_from_evidence(user_question, execution_result, chinese=chinese)
-    if not chinese:
-        return "The query completed, but the model returned technical parameter-style content; use the evidence table and charts for this result."
-    return "已完成查询，但模型返回了技术参数格式内容；请以证据表和图表为准查看本轮结果。"
-
-
-def _candidate_direct_answer(raw: dict[str, Any]) -> str:
-    for value in (
-        raw.get("final_answer"),
-        (raw.get("insight") or {}).get("final_answer") if isinstance(raw.get("insight"), dict) else "",
-    ):
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
-
-
-def _business_evidence_bullets(
-    execution_result: dict[str, Any],
-    evidence_result: dict[str, Any],
-    *,
-    user_question: str = "",
-    chinese: bool = True,
-    limit: int = 4,
-) -> list[str]:
-    notes = _evidence_notes(evidence_result)
-    if notes and not _list_language_mismatches_question(notes, user_question):
-        return notes[:limit]
-    return _evidence_bullets_from_rows(execution_result, chinese=chinese, limit=limit)
-
-
-def _list_language_mismatches_question(items: list[str], question: str) -> bool:
-    return _needs_chinese_response(question) and any(not _contains_cjk(item) for item in items)
-
-
-def _evidence_bullets_from_rows(execution_result: dict[str, Any], *, chinese: bool, limit: int = 4) -> list[str]:
-    normalized_rows = rows_as_dicts(execution_result)
-    if normalized_rows:
-        return business_row_sentences(normalized_rows, chinese=chinese, limit=limit)
-    rows = list(execution_result.get("rows") or [])[:limit]
-    columns = [str(column) for column in execution_result.get("columns") or []]
-    bullets: list[str] = []
-    for index, row in enumerate(rows, start=1):
-        pairs = _row_pairs(row, columns)
-        if pairs:
-            summary = _business_pairs_text(pairs[:5], chinese=chinese)
-            bullets.append(f"第 {index} 行：{summary}。" if chinese else f"Row {index}: {summary}.")
-    return bullets
-
-
-def _business_why(
-    direct_answer: str,
-    evidence_bullets: list[str],
-    execution_result: dict[str, Any],
-    *,
-    user_question: str = "",
-    chinese: bool,
-) -> str:
-    anchor = _evidence_anchor_sentence(execution_result, chinese=chinese)
-    if anchor:
-        if chinese and _asks_why(user_question):
-            normalized_rows = rows_as_dicts(execution_result)
-            return (
-                f"{anchor} 当前数据只能确认结果高低，不能直接证明原因。"
-                f"可能方向包括：{reason_hypothesis_context(user_question, normalized_rows, chinese=True)}，"
-                "但需要补充过程数据进一步验证。"
-            )
-        return anchor
-    if evidence_bullets:
-        return "；".join(evidence_bullets[:2]) if chinese else " ".join(evidence_bullets[:2])
-    if direct_answer:
-        return "该结论来自本轮已通过校验的数据查询结果。" if chinese else "This conclusion comes from the validated query result."
-    return ""
-
-
-def _business_recommendations(
-    direct_answer: str,
-    *,
-    user_question: str = "",
-    execution_result: dict[str, Any] | None = None,
-    chinese: bool,
-) -> list[str]:
-    supported = _supported_budget_recommendation(user_question, execution_result or {}, chinese=chinese)
-    if supported:
-        return [supported]
-    generic = _generic_evidence_recommendation(user_question, execution_result or {}, chinese=chinese)
-    if generic:
-        return [generic]
-    return []
-
-
-def _should_include_recommendations(user_question: str) -> bool:
-    text = str(user_question or "").lower()
-    if any(marker in text for marker in ("只回答事实", "不用建议", "不需要建议", "不要建议", "只看事实")):
-        return False
-    return any(
-        marker in text
-        for marker in (
-            "建议",
-            "推荐",
-            "应该",
-            "值得",
-            "优先",
-            "加预算",
-            "减少预算",
-            "优化",
-            "下一步",
-            "action",
-            "recommend",
-            "should",
-            "prioritize",
-            "budget",
-        )
-    )
-
-
-def _generic_evidence_recommendation(
-    user_question: str,
-    execution_result: dict[str, Any],
-    *,
-    chinese: bool,
-) -> str:
-    rows = execution_result.get("rows") or []
-    if not rows:
-        return ""
-    columns = [str(column) for column in execution_result.get("columns") or []]
-    pairs = _row_pairs(rows[0], columns)
-    entity = _first_business_entity(pairs)
-    if chinese:
-        if entity:
-            return f"建议将 {entity} 作为下一步复盘对象，并继续用同口径数据跟踪本次返回指标的变化。"
-        return "建议基于本次查询结果继续做同口径复盘，并在后续分析中补充更细的业务拆解。"
-    if entity:
-        return f"Use {entity} as the next review focus and keep tracking the returned metrics on the same basis."
-    return "Use this query result as the next review input and add more business detail in a follow-up analysis."
-
-
-def _first_business_entity(pairs: list[tuple[str, Any]]) -> str:
-    for key, value in pairs:
-        text = str(value or "").strip()
-        if not text:
-            continue
-        if _value_is_number(value):
-            continue
-        if str(key).lower() in {"order_date", "date", "month", "week", "created_at"}:
-            continue
-        return text
-    return ""
-
-
-def _value_is_number(value: Any) -> bool:
-    if isinstance(value, bool):
-        return False
-    if isinstance(value, int | float):
-        return True
-    if isinstance(value, str):
-        try:
-            float(value.replace(",", ""))
-        except ValueError:
-            return False
-        return True
-    return False
-
-
-def _supported_budget_recommendation(user_question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
-    if not _asks_for_budget_recommendation(user_question):
-        return ""
-    rows = execution_result.get("rows") or []
-    if not rows:
-        return ""
-    columns = [str(column) for column in execution_result.get("columns") or []]
-    pairs = _row_pairs(rows[0], columns)
-    if not pairs:
-        return ""
-    channel = _first_matching_pair_value(pairs, ("channel", "渠道"))
-    if not channel:
-        return ""
-    column_text = " ".join(str(column).lower() for column in execution_result.get("columns") or [])
-    has_efficiency = any(marker in column_text for marker in ("roi", "roas", "spend", "cost", "花费", "成本"))
-    if chinese:
-        if has_efficiency:
-            return f"建议优先评估 {channel} 的预算承接能力，并继续用同口径收入、成本和效率指标跟踪。"
-        return f"当前证据只能说明 {channel} 在本次返回指标中靠前；如要加预算，建议先补充成本、转化率和 ROI 数据。"
-    if has_efficiency:
-        return f"Evaluate {channel}'s budget capacity and keep tracking revenue, cost, and efficiency on the same basis."
-    return f"{channel} leads on the returned metric, but add cost, conversion, and ROI data before increasing budget."
-
-
-def _asks_for_budget_recommendation(question: str) -> bool:
-    lowered = str(question or "").lower()
-    markers = (
-        "加预算",
-        "预算",
-        "投放",
-        "加码",
-        "增加",
-        "should increase",
-        "increase budget",
-        "allocate budget",
-        "budget",
-    )
-    return any(marker in lowered for marker in markers)
-
-
-def _asks_why(question: str) -> bool:
-    lowered = str(question or "").lower()
-    return any(marker in lowered for marker in ("为什么", "原因", "why", "because"))
-
-
-def _first_matching_pair_value(pairs: list[tuple[str, Any]], markers: tuple[str, ...]) -> str:
-    for key, value in pairs:
-        lowered_key = str(key).lower()
-        if any(marker in lowered_key for marker in markers):
-            text = str(value).strip()
-            if text:
-                return text
-    return ""
-
-
-def _business_caveats(
-    existing_caveats: Any,
-    *,
-    fallback_reason: str,
-    weak_evidence: bool,
-    execution_result: dict[str, Any],
-    chinese: bool,
-) -> list[str]:
-    caveats = _list_of_text(existing_caveats)
-    if fallback_reason in {"unsafe_text", "language_mismatch"}:
-        caveats.append(
-            "当前主结论已按本次可验证数据重建，仍只覆盖本次查询范围。"
-            if chinese
-            else "The main conclusion was rebuilt from verifiable returned data and only covers this query scope."
-        )
-    elif fallback_reason == "missing_direct_answer":
-        caveats.append(
-            "当前回答已根据本次返回数据整理，结论范围受查询口径限制。"
-            if chinese
-            else "The answer was rebuilt from the returned data and is limited to this query scope."
-        )
-    if weak_evidence:
-        caveats.append(_weak_evidence_caveat(execution_result, chinese=chinese))
-    if not caveats:
-        caveats.append(
-            "当前结论只基于本次查询返回的数据和时间范围。"
-            if chinese
-            else "This conclusion only uses the data and time range returned by this query."
-        )
-    return list(dict.fromkeys(caveats))
-
-
 def _has_weak_evidence(execution_result: dict[str, Any], evidence_result: dict[str, Any]) -> bool:
     if not execution_result or execution_result.get("success") is False:
         return True
@@ -672,67 +411,6 @@ def _has_weak_evidence(execution_result: dict[str, Any], evidence_result: dict[s
     if validation_status in {"failed", "not_validated", "rejected"} and not _evidence_notes(evidence_result):
         return True
     return False
-
-
-def _weak_evidence_caveat(execution_result: dict[str, Any], *, chinese: bool) -> str:
-    if not execution_result.get("rows"):
-        return (
-            "当前查询没有返回可验证的数据行，不能据此给出确定建议。"
-            if chinese
-            else "The query returned no verifiable data rows, so it cannot support a firm recommendation."
-        )
-    return (
-        "当前证据未通过充分校验，建议只把本轮结果作为低置信度参考。"
-        if chinese
-        else "The current evidence was not fully validated, so treat this result as low-confidence context."
-    )
-
-
-def _evidence_anchor_sentence(execution_result: dict[str, Any], *, chinese: bool) -> str:
-    normalized_rows = rows_as_dicts(execution_result)
-    if not normalized_rows:
-        return ""
-    if chinese:
-        sentence = business_evidence_sentence(normalized_rows, chinese=True)
-        return f"当前数据中，{sentence}" if sentence else ""
-    rows = execution_result.get("rows") or []
-    columns = [str(column) for column in execution_result.get("columns") or []]
-    pairs = _row_pairs(rows[0], columns)
-    if not pairs:
-        return ""
-    summary = _business_pairs_text(pairs[:5], chinese=chinese)
-    return f"当前数据中，{summary}。" if chinese else f"The current data shows: {summary}."
-
-
-def _row_pairs(row: Any, columns: list[str]) -> list[tuple[str, Any]]:
-    if isinstance(row, dict):
-        return [(str(key), value) for key, value in row.items() if str(key).strip()]
-    if isinstance(row, (list, tuple)):
-        return [
-            (str(column), row[index])
-            for index, column in enumerate(_unique_columns(columns))
-            if str(column).strip() and index < len(row)
-        ]
-    return []
-
-
-def _unique_columns(columns: list[str]) -> list[str]:
-    counts: dict[str, int] = {}
-    unique: list[str] = []
-    for column in columns:
-        counts[column] = counts.get(column, 0) + 1
-        unique.append(column if counts[column] == 1 else f"{column}_{counts[column]}")
-    return unique
-
-
-def _business_pairs_text(pairs: list[tuple[str, Any]], *, chinese: bool) -> str:
-    separator = "，" if chinese else ", "
-    return separator.join(_business_pair_text(key, value, chinese=chinese) for key, value in pairs)
-
-
-def _business_pair_text(key: Any, value: Any, *, chinese: bool) -> str:
-    relation = " 为 " if chinese else " is "
-    return f"{business_field_label(key, chinese=chinese)}{relation}{value}"
 
 
 def _clean_business_text(text: Any, *, chinese: bool) -> str:
@@ -854,10 +532,7 @@ def build_evidence(
         execution_result = raw_or_execution_result
         evidence_result = evidence_result or {}
     evidence = empty_evidence()
-    evidence["table_preview"] = {
-        "columns": list(execution_result.get("columns") or []),
-        "rows": list(execution_result.get("rows") or [])[:20],
-    }
+    evidence["table_preview"] = _safe_table_preview(raw=raw, execution_result=execution_result)
     evidence["evidence_notes"] = _evidence_notes(evidence_result)
     evidence["validation_status"] = str(
         evidence_result.get("validation_status")
@@ -873,9 +548,256 @@ def build_evidence(
             "metrics": list(question_pack.get("metrics") or []),
             "chart_candidates": list(question_pack.get("chart_candidates") or []),
             "data_limits": list(question_pack.get("data_limits") or []),
-            "tool_calls": list(question_pack.get("tool_calls") or []),
         }
+    ledger = build_question_evidence_ledger_summary(raw)
+    if ledger:
+        evidence["ledger_summary"] = ledger
     return evidence
+
+
+def build_question_evidence_ledger_summary(raw: dict[str, Any]) -> dict[str, Any]:
+    existing = raw.get("question_evidence_ledger") if isinstance(raw.get("question_evidence_ledger"), dict) else {}
+    if existing:
+        ledger = sanitize_question_evidence_ledger(existing)
+        ledger["chart_refs"] = _unique_text(
+            [*list(ledger.get("chart_refs") or []), *_chart_artifact_refs(raw.get("chart_artifacts"))]
+        )
+        return _business_readable_ledger_summary(ledger, raw)
+    pack = _question_evidence_pack(raw)
+    if not pack:
+        return {}
+    execution_result = raw.get("execution_result") if isinstance(raw.get("execution_result"), dict) else {}
+    evidence_result = raw.get("evidence_result") if isinstance(raw.get("evidence_result"), dict) else {}
+    fact_payload = _fact_payload(raw=raw, execution_result=execution_result)
+    ledger = build_question_evidence_ledger(
+        question_evidence_pack=pack,
+        execution_result=execution_result,
+        evidence_validation=evidence_result,
+        chart_artifacts=raw.get("chart_artifacts") if isinstance(raw.get("chart_artifacts"), list) else [],
+        fact_payload=fact_payload,
+    )
+    return _business_readable_ledger_summary(ledger, raw)
+
+
+def _business_readable_ledger_summary(ledger: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
+    if not ledger:
+        return {}
+    summary = _scrub_display_ledger_refs(ledger)
+    summary["task_groups"] = _ledger_task_groups(ledger, raw)
+    summary["business_data_limits"] = _business_data_limits(ledger, raw)
+    summary["data_limits"] = list(summary["business_data_limits"])
+    return summary
+
+
+def _scrub_display_ledger_refs(ledger: dict[str, Any]) -> dict[str, Any]:
+    summary = dict(ledger)
+    summary.pop("ledger_id", None)
+    summary.pop("task_refs", None)
+    summary.pop("evidence_refs", None)
+    summary.pop("source_pack_id", None)
+    if isinstance(summary.get("question_evidence_plan"), dict):
+        summary["question_evidence_plan"] = _scrub_internal_ref_keys(summary["question_evidence_plan"])
+    for key in ("facts", "derived_metrics"):
+        cleaned_items: list[dict[str, Any]] = []
+        for item in summary.get(key) or []:
+            if not isinstance(item, dict):
+                continue
+            cleaned = dict(item)
+            cleaned.pop("task_id", None)
+            cleaned.pop("evidence_ref", None)
+            cleaned.pop("source_row_refs", None)
+            cleaned_items.append(cleaned)
+        summary[key] = cleaned_items
+    cleaned_groups: list[dict[str, Any]] = []
+    for group in summary.get("evidence_groups") or []:
+        if not isinstance(group, dict):
+            continue
+        cleaned_group = dict(group)
+        cleaned_group.pop("evidence_refs", None)
+        for key in ("facts", "derived_metrics"):
+            group_items: list[dict[str, Any]] = []
+            for item in cleaned_group.get(key) or []:
+                if not isinstance(item, dict):
+                    continue
+                cleaned = dict(item)
+                cleaned.pop("task_id", None)
+                cleaned.pop("evidence_ref", None)
+                cleaned.pop("source_row_refs", None)
+                group_items.append(cleaned)
+            cleaned_group[key] = group_items
+        cleaned_groups.append(cleaned_group)
+    if cleaned_groups:
+        summary["evidence_groups"] = cleaned_groups
+    for table in summary.get("tables") or []:
+        if isinstance(table, dict):
+            table.pop("task_id", None)
+    return summary
+
+
+def _scrub_internal_ref_keys(value: Any) -> Any:
+    internal_keys = {
+        "ledger_id",
+        "source_pack_id",
+        "task_id",
+        "task_purpose",
+        "evidence_ref",
+        "evidence_refs",
+        "source_row_refs",
+    }
+    if isinstance(value, dict):
+        return {
+            str(key): _scrub_internal_ref_keys(item)
+            for key, item in value.items()
+            if str(key) not in internal_keys
+        }
+    if isinstance(value, list):
+        return [_scrub_internal_ref_keys(item) for item in value]
+    return value
+
+
+def _ledger_task_groups(ledger: dict[str, Any], raw: dict[str, Any]) -> list[dict[str, Any]]:
+    grouped_sections = _ledger_evidence_group_summaries(ledger)
+    if grouped_sections:
+        return grouped_sections
+
+    facts = [fact for fact in ledger.get("facts") or [] if isinstance(fact, dict)]
+    derived = [metric for metric in ledger.get("derived_metrics") or [] if isinstance(metric, dict)]
+    entries = [*facts, *derived]
+    if not entries:
+        return []
+
+    task_results = {
+        str(item.get("task_id") or ""): item
+        for item in raw.get("evidence_task_results") or []
+        if isinstance(item, dict) and str(item.get("task_id") or "").strip()
+    }
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        key = str(entry.get("task_id") or "")
+        if not key:
+            key = _task_group_title("", [entry])
+        grouped.setdefault(key, []).append(entry)
+
+    groups: list[dict[str, Any]] = []
+    for task_key, items in grouped.items():
+        title = _task_group_title(task_key, items)
+        status = "已取得" if task_results.get(task_key, {}).get("status", "executed") == "executed" else "未完整取得"
+        groups.append(
+            {
+                "title": title,
+                "status": status,
+                "facts": [_business_fact_sentence(item) for item in items[:4] if _business_fact_sentence(item)],
+            }
+        )
+    return groups[:6]
+
+
+def _ledger_evidence_group_summaries(ledger: dict[str, Any]) -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for group in ledger.get("evidence_groups") or []:
+        if not isinstance(group, dict):
+            continue
+        title = str(group.get("purpose") or group.get("group_id") or "业务证据").strip()
+        facts = [
+            _business_fact_sentence(item)
+            for item in [*(group.get("facts") or []), *(group.get("derived_metrics") or [])]
+            if isinstance(item, dict) and _business_fact_sentence(item)
+        ]
+        summaries.append(
+            {
+                "title": title,
+                "status": "已取得" if facts else "未完整取得",
+                "facts": facts[:4],
+            }
+        )
+    return summaries[:6]
+
+
+def _task_group_title(task_key: str, items: list[dict[str, Any]]) -> str:
+    text = " ".join(
+        [
+            task_key,
+            *[str(item.get("label") or item.get("metric_id") or "") for item in items],
+        ]
+    ).lower()
+    if any(marker in text for marker in ("投放", "花费", "spend", "cost", "成本")):
+        return "投放花费证据"
+    if any(marker in text for marker in ("效率", "roi", "roas", "转化", "conversion")):
+        return "效率辅助证据"
+    if any(marker in text for marker in ("收入", "销售", "revenue", "sales", "gmv", "amount")):
+        return "收入证据"
+    if any(marker in text for marker in ("趋势", "trend", "anomaly", "异常")):
+        return "趋势辅助证据"
+    return "业务证据"
+
+
+def _business_fact_sentence(item: dict[str, Any]) -> str:
+    label = str(item.get("label") or item.get("metric_id") or "指标").strip()
+    value = item.get("value")
+    if not label or value is None or isinstance(value, dict | list):
+        return ""
+    dimension = item.get("dimension") if isinstance(item.get("dimension"), dict) else {}
+    dimension_values = [
+        str(value).strip()
+        for value in dimension.values()
+        if str(value).strip() and not _looks_internal_ref(str(value))
+    ]
+    prefix = "，".join(dimension_values)
+    if prefix:
+        return f"{prefix}{label}为 {value}。"
+    return f"{label}为 {value}。"
+
+
+def _business_data_limits(ledger: dict[str, Any], raw: dict[str, Any]) -> list[str]:
+    limits: list[str] = []
+    raw_limits = [str(item).strip() for item in ledger.get("data_limits") or [] if str(item).strip()]
+    failed_tasks = [
+        item for item in raw.get("evidence_task_results") or []
+        if isinstance(item, dict) and str(item.get("status") or "") not in {"", "executed"}
+    ]
+    if failed_tasks or any("证据任务" in item for item in raw_limits):
+        if _has_core_evidence(ledger):
+            limits.append("辅助证据未能完成；本次结论仍以已取得的核心证据为准。")
+        else:
+            limits.append("核心证据未能完整取得，因此当前数据不足以支持确定结论。")
+    for limit in raw_limits:
+        cleaned = _clean_business_limit(limit)
+        if cleaned and cleaned not in limits:
+            limits.append(cleaned)
+    return limits[:4]
+
+
+def _has_core_evidence(ledger: dict[str, Any]) -> bool:
+    return bool(ledger.get("facts") or ledger.get("derived_metrics"))
+
+
+def _clean_business_limit(text: str) -> str:
+    value = str(text or "").strip()
+    if not value:
+        return ""
+    if "证据任务" in value:
+        return ""
+    if _contains_technical_leak(value) or _looks_internal_ref(value):
+        return ""
+    return _clean_business_text(value, chinese=True)
+
+
+def _looks_internal_ref(text: str) -> bool:
+    value = str(text or "")
+    if re.search(r"\b(?:core_fact|trend_or_anomaly_support|explanation_support|task_id|evidence:|qledger_|question_evidence_ledger)\b", value, re.IGNORECASE):
+        return True
+    return bool(re.search(r"\b[A-Za-z]+_[A-Za-z0-9_]{8,}\b", value))
+
+
+def _chart_artifact_refs(value: Any) -> list[str]:
+    refs: list[str] = []
+    for chart in value or []:
+        if not isinstance(chart, dict):
+            continue
+        ref = str(chart.get("artifact_id") or chart.get("chart_id") or chart.get("title") or "").strip()
+        if ref:
+            refs.append(ref)
+    return refs
 
 
 def build_chart_artifacts(
@@ -885,6 +807,21 @@ def build_chart_artifacts(
     workspace_root: str | Path | None = None,
     business_answer: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    existing_artifacts = raw.get("chart_artifacts") if isinstance(raw.get("chart_artifacts"), list) else []
+    if existing_artifacts:
+        normalized_artifacts = [
+            _normalize_chart_artifact(
+                artifact,
+                workspace_id=workspace_id,
+                workspace_root=workspace_root,
+                business_answer=business_answer or build_business_answer(raw),
+                execution_result=raw.get("execution_result") if isinstance(raw.get("execution_result"), dict) else {},
+            )
+            for artifact in existing_artifacts
+            if isinstance(artifact, dict)
+        ]
+        return [_with_default_chart_evidence_refs(artifact, raw) for artifact in normalized_artifacts]
+
     visualization_trace = raw.get("visualization_trace") if isinstance(raw.get("visualization_trace"), dict) else {}
     delivery = (
         raw.get("visualization_delivery_result")
@@ -909,19 +846,37 @@ def build_chart_artifacts(
         [
             visualization_trace.get("artifact_path"),
             visualization_trace.get("chart_path"),
+            visualization_trace.get("image_path"),
             delivery.get("artifact_path"),
             delivery.get("chart_path"),
+            delivery.get("image_path"),
             raw.get("chart_path"),
             *(raw.get("chart_paths") or []),
         ]
     )
+    if not paths and _has_p30_chart_payload(visualization_trace, delivery):
+        paths = [""]
     artifacts: list[dict[str, Any]] = []
     for path in paths:
         display_path, url = _artifact_path_and_url(
             path,
             workspace_id=workspace_id,
             workspace_root=workspace_root,
-            artifact_url=str(visualization_trace.get("artifact_url") or delivery.get("artifact_url") or ""),
+            artifact_url=str(
+                visualization_trace.get("artifact_url")
+                or visualization_trace.get("image_url")
+                or delivery.get("artifact_url")
+                or delivery.get("image_url")
+                or ""
+            ),
+        )
+        image_path = str(delivery.get("image_path") or visualization_trace.get("image_path") or path or "")
+        image_url_hint = str(delivery.get("image_url") or visualization_trace.get("image_url") or "")
+        display_image_path, image_url = _artifact_path_and_url(
+            image_path,
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+            artifact_url=image_url_hint or url,
         )
         artifact = empty_chart_artifact()
         artifact.update(
@@ -929,14 +884,156 @@ def build_chart_artifacts(
                 "title": title,
                 "path": display_path,
                 "url": url,
-                "rendering_status": str(visualization_trace.get("rendering_status") or "rendered"),
+                "rendering_status": str(
+                    visualization_trace.get("rendering_status")
+                    or delivery.get("rendering_status")
+                    or "rendered"
+                ),
                 "unit": unit,
                 "value_label": value_label,
                 "business_annotation": safe_annotation,
             }
         )
-        artifacts.append(artifact)
+        artifact.update(
+            _p30_chart_artifact_fields(
+                visualization_trace,
+                delivery,
+                chart_spec=chart_spec,
+                image_path=display_image_path or display_path,
+                image_url=image_url or url,
+            )
+        )
+        artifacts.append(_with_default_chart_evidence_refs(artifact, raw))
     return artifacts
+
+
+def _with_default_chart_evidence_refs(artifact: dict[str, Any], raw: dict[str, Any]) -> dict[str, Any]:
+    if artifact.get("evidence_refs"):
+        return artifact
+    refs = _ledger_evidence_refs(raw)
+    if not refs:
+        return artifact
+    updated = dict(artifact)
+    updated["evidence_refs"] = refs
+    return updated
+
+
+def _ledger_evidence_refs(raw: dict[str, Any]) -> list[str]:
+    ledger = raw.get("question_evidence_ledger") if isinstance(raw.get("question_evidence_ledger"), dict) else {}
+    return _safe_chart_evidence_refs(ledger.get("evidence_refs") or [])
+
+
+def _normalize_chart_artifact(
+    artifact: dict[str, Any],
+    *,
+    workspace_id: str,
+    workspace_root: str | Path | None,
+    business_answer: dict[str, Any],
+    execution_result: dict[str, Any],
+) -> dict[str, Any]:
+    normalized = empty_chart_artifact()
+    chart_spec = artifact.get("chart_spec") if isinstance(artifact.get("chart_spec"), dict) else {}
+    title = str(artifact.get("title") or chart_spec.get("title") or "Chart")
+    unit = str(artifact.get("unit") or chart_spec.get("unit") or "")
+    value_label = bool(artifact.get("value_label") or chart_spec.get("value_label") or False)
+    annotation = str(artifact.get("business_annotation") or chart_spec.get("business_annotation") or "")
+    safe_annotation = safe_chart_annotation(
+        annotation=annotation,
+        business_answer=business_answer,
+        execution_result=execution_result,
+    )
+    path = str(artifact.get("path") or artifact.get("image_path") or "")
+    display_path, url = _artifact_path_and_url(
+        path,
+        workspace_id=workspace_id,
+        workspace_root=workspace_root,
+        artifact_url=str(artifact.get("url") or artifact.get("image_url") or ""),
+    )
+    image_path = str(artifact.get("image_path") or artifact.get("path") or "")
+    display_image_path, image_url = _artifact_path_and_url(
+        image_path,
+        workspace_id=workspace_id,
+        workspace_root=workspace_root,
+        artifact_url=str(artifact.get("image_url") or artifact.get("url") or ""),
+    )
+    normalized.update(
+        {
+            "title": title,
+            "path": display_path,
+            "url": url,
+            "rendering_status": str(artifact.get("rendering_status") or "rendered"),
+            "unit": unit,
+            "value_label": value_label,
+            "business_annotation": safe_annotation,
+        }
+    )
+    normalized.update(
+        _p30_chart_artifact_fields(
+            artifact,
+            chart_spec=chart_spec,
+            image_path=display_image_path or display_path,
+            image_url=image_url or url,
+        )
+    )
+    return normalized
+
+
+def _has_p30_chart_payload(*sources: dict[str, Any]) -> bool:
+    return any(
+        bool(
+            source.get("artifact_id")
+            or source.get("echarts_option")
+            or source.get("image_path")
+            or source.get("image_url")
+            or source.get("skip_reason")
+            or source.get("failure_reason")
+            or str(source.get("rendering_status") or "") == "skipped"
+        )
+        for source in sources
+    )
+
+
+def _p30_chart_artifact_fields(
+    *sources: dict[str, Any],
+    chart_spec: dict[str, Any] | None = None,
+    image_path: str = "",
+    image_url: str = "",
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    spec = chart_spec if isinstance(chart_spec, dict) else {}
+    for key in P30_CHART_ARTIFACT_OPTIONAL_FIELDS:
+        value = _first_chart_field(key, *sources)
+        if value in (None, ""):
+            continue
+        if key in {"chart_spec", "echarts_option"}:
+            if key == "echarts_option" and isinstance(value, dict):
+                fields[key] = _sanitize_chart_option(value)
+            continue
+        if key == "evidence_refs":
+            if isinstance(value, list):
+                fields[key] = _safe_chart_evidence_refs(value)
+            continue
+        if key == "data_row_count":
+            try:
+                fields[key] = int(value)
+            except (TypeError, ValueError):
+                continue
+            continue
+        fields[key] = str(value)
+    if spec.get("chart_type") and "chart_type" not in fields:
+        fields["chart_type"] = str(spec.get("chart_type"))
+    if image_path:
+        fields["image_path"] = image_path
+    if image_url:
+        fields["image_url"] = image_url
+    return fields
+
+
+def _first_chart_field(key: str, *sources: dict[str, Any]) -> Any:
+    for source in sources:
+        if isinstance(source, dict) and key in source:
+            return source.get(key)
+    return None
 
 
 def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
@@ -964,6 +1061,60 @@ def build_technical_details(raw: dict[str, Any]) -> dict[str, Any]:
     return details
 
 
+def _safe_table_preview(*, raw: dict[str, Any], execution_result: dict[str, Any]) -> dict[str, Any]:
+    columns = [str(column) for column in execution_result.get("columns") or []]
+    rows = list(execution_result.get("rows") or [])[:20]
+    if not _has_internal_table_columns(columns):
+        return {"columns": columns, "rows": rows}
+
+    chart_safe_table = build_chart_safe_table(
+        raw.get("question_evidence_ledger") if isinstance(raw.get("question_evidence_ledger"), dict) else {}
+    )
+    if chart_safe_table.get("success"):
+        return {
+            "columns": list(chart_safe_table.get("columns") or []),
+            "rows": list(chart_safe_table.get("rows") or [])[:20],
+        }
+    keep_indexes = [index for index, column in enumerate(columns) if not _is_internal_table_column(column)]
+    return {
+        "columns": [columns[index] for index in keep_indexes],
+        "rows": [
+            [value for index, value in enumerate(row) if index in keep_indexes]
+            if isinstance(row, (list, tuple))
+            else {key: value for key, value in dict(row).items() if not _is_internal_table_column(str(key))}
+            for row in rows
+        ],
+    }
+
+
+def _has_internal_table_columns(columns: list[str]) -> bool:
+    return any(_is_internal_table_column(column) for column in columns)
+
+
+def _is_internal_table_column(column: str) -> bool:
+    return str(column or "").strip().lower() in {"task_id", "task_purpose"}
+
+
+def _safe_chart_evidence_refs(value: Any) -> list[str]:
+    raw_refs = [str(item).strip() for item in value or [] if str(item).strip()]
+    if not raw_refs:
+        return []
+    safe_refs = [ref for ref in raw_refs if not _looks_internal_ref(ref)]
+    if len(safe_refs) != len(raw_refs) or not safe_refs:
+        return ["question_evidence_pack"]
+    return safe_refs[:20]
+
+
+def _sanitize_chart_option(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _sanitize_chart_option(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_chart_option(item) for item in value]
+    if isinstance(value, str) and (_contains_technical_leak(value) or _looks_internal_ref(value)):
+        return ""
+    return value
+
+
 def _question_evidence_pack(raw: dict[str, Any]) -> dict[str, Any]:
     value = raw.get("question_evidence_pack")
     return dict(value) if isinstance(value, dict) else {}
@@ -979,7 +1130,7 @@ def _fact_payload(*, raw: dict[str, Any], execution_result: dict[str, Any]) -> d
         return {}
     task = _analysis_task(raw)
     metric_registry = _metric_registry(raw)
-    return build_evidence_payload(
+    payload = build_evidence_payload(
         task=task,
         execution_result=execution_result,
         metric_registry=metric_registry,
@@ -987,6 +1138,17 @@ def _fact_payload(*, raw: dict[str, Any], execution_result: dict[str, Any]) -> d
         filters=list(task.get("filters") or []),
         business_aliases=_semantic_business_aliases(raw),
     )
+    return _main_payload_fact_payload(payload)
+
+
+def _main_payload_fact_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    cleaned = dict(payload or {})
+    technical_refs = cleaned.get("technical_refs")
+    if isinstance(technical_refs, dict):
+        refs = dict(technical_refs)
+        refs.pop("raw_rows", None)
+        cleaned["technical_refs"] = refs
+    return cleaned
 
 
 def _fast_fact_context_pack(
@@ -1123,49 +1285,6 @@ def _uses_chinese_business_answer(question: str) -> bool:
     return _needs_chinese_response(question)
 
 
-def _answer_from_evidence(question: str, execution_result: dict[str, Any], *, chinese: bool) -> str:
-    rows = execution_result.get("rows") or []
-    safe_question = "" if _contains_technical_leak(question) else question
-    if not rows:
-        if chinese:
-            suffix = f"原问题：{safe_question}" if safe_question else ""
-            return f"已完成本轮查询，但证据表没有返回数据行。{suffix}"
-        suffix = f" Original question: {safe_question}" if safe_question else ""
-        return f"The query completed, but the evidence table returned no data rows.{suffix}"
-    columns = list(execution_result.get("columns") or [])
-    summary = f"已完成本轮查询，共返回 {len(rows)} 行结果。" if chinese else f"The query returned {len(rows)} row{'s' if len(rows) != 1 else ''}."
-    if chinese:
-        sentence = business_evidence_sentence(rows_as_dicts(execution_result), chinese=True)
-        if sentence:
-            if _asks_ranked_fact_question(safe_question):
-                summary = "当前数据中，" + sentence
-            else:
-                summary += "当前数据中，" + sentence
-    else:
-        first_row = rows[0]
-        if isinstance(first_row, dict):
-            pairs = list(first_row.items())
-        elif isinstance(first_row, (list, tuple)):
-            pairs = list(zip(columns, first_row, strict=False))
-        else:
-            pairs = []
-        evidence = [
-            _business_pair_text(column, value, chinese=chinese)
-            for column, value in pairs[:5]
-            if str(column).strip()
-        ]
-        if evidence:
-            summary += " The current data shows: " + ", ".join(evidence) + "."
-    if safe_question:
-        summary += f"原问题：{safe_question}" if chinese else f" Original question: {safe_question}"
-    return summary
-
-
-def _asks_ranked_fact_question(question: str) -> bool:
-    text = str(question or "").lower()
-    return any(marker in text for marker in ("哪个", "哪类", "谁", "最高", "最低", "最多", "最少", "top"))
-
-
 def _localized_system_understanding(intent: dict[str, Any]) -> str:
     parts = []
     metric = _localized_intent_value(intent.get("metric"))
@@ -1223,41 +1342,6 @@ def _first_text(*values: Any) -> str:
     return ""
 
 
-def _headline_from(text: str) -> str:
-    normalized = " ".join(text.split())
-    if not normalized:
-        return ""
-    for index, char in enumerate(normalized):
-        if char == "." and _is_decimal_point(normalized, index):
-            continue
-        if char in "。.!?？":
-            return normalized[: index + 1][:120]
-    return normalized[:120]
-
-
-def _is_decimal_point(text: str, index: int) -> bool:
-    return 0 < index < len(text) - 1 and text[index - 1].isdigit() and text[index + 1].isdigit()
-
-
-def _looks_recommendation_like(text: str) -> bool:
-    normalized = str(text or "").strip().lower()
-    recommendation_markers = (
-        "建议",
-        "推荐",
-        "优先",
-        "加大",
-        "增加",
-        "recommend",
-        "prioritize",
-        "should",
-        "increase",
-        "optimize",
-        "balanced approach",
-        "might be to",
-    )
-    return normalized.startswith(recommendation_markers) or any(marker in normalized for marker in recommendation_markers)
-
-
 def _looks_like_raw_parameter_dump(text: str) -> bool:
     lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
     if not lines:
@@ -1265,10 +1349,25 @@ def _looks_like_raw_parameter_dump(text: str) -> bool:
     dump_lines = 0
     for line in lines:
         stripped = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line)
-        assignments = re.findall(r"\b[A-Za-z_][\w. -]*\s*=", stripped)
+        assignments = [
+            key
+            for key in re.findall(r"\b([A-Za-z_][A-Za-z0-9_. -]*)\s*=", stripped)
+            if _looks_like_raw_assignment_key(key)
+        ]
         if len(assignments) >= 2 or (assignments and "," in stripped):
             dump_lines += 1
     return dump_lines >= max(1, len(lines) // 2)
+
+
+def _looks_like_raw_assignment_key(key: str) -> bool:
+    token = str(key or "").strip().split()[-1] if str(key or "").strip() else ""
+    if not token:
+        return False
+    if token.upper() in _KNOWN_METRIC_ACRONYMS:
+        return False
+    if token.isupper() and len(token) <= 5:
+        return False
+    return True
 
 
 def _looks_like_mechanical_row_evidence(text: str) -> bool:
@@ -1407,12 +1506,12 @@ def _provider_metadata(raw: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "question_understanding",
         "clarification_result",
+        "evidence_planning",
         "sql_planning",
         "llm_sql_enhancement",
         "schema_repair",
         "analysis_plan",
-        "insight",
-        "claim_typing_result",
+        "business_answer_generation",
         "visualization_trace",
     )
     return {key: raw[key] for key in keys if isinstance(raw.get(key), dict)}

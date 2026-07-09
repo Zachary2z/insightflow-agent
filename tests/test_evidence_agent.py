@@ -98,6 +98,34 @@ def test_evidence_agent_builds_question_evidence_pack_from_reviewed_execution(tm
         "sql_execution",
     ]
     assert "sql" not in pack.to_result_evidence()
+    ledger = result["question_evidence_ledger"]
+    assert ledger["facts"]
+    assert ledger["facts"][0]["source_columns"] == ["store_name", "total_sales"]
+    assert ledger["facts"][0]["evidence_ref"]
+    assert ledger["tool_calls"]
+    assert "SELECT" not in str(ledger).upper()
+
+
+def test_evidence_agent_validates_reviewed_execution_before_answer_generation(tmp_path):
+    db_path = _sales_db(tmp_path)
+
+    result = run_evidence_agent_question_mode(
+        _base_state(
+            db_path,
+            initial_sql=(
+                "SELECT store_name, SUM(sales_amount) AS total_sales "
+                "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 20"
+            ),
+        )
+    )
+
+    trace_nodes = [event.get("node") for event in result.get("trace") or []]
+
+    assert result["execution_result"]["success"] is True
+    assert result["evidence_result"]["success"] is True
+    assert result["evidence_result"]["validation_status"] == "validated"
+    assert "evidence_validator_agent" in trace_nodes
+    assert trace_nodes.index("evidence_validator_agent") > trace_nodes.index("sql_executor_node")
 
 
 def test_evidence_agent_does_not_execute_sql_when_review_rejects(tmp_path):
@@ -115,6 +143,36 @@ def test_evidence_agent_does_not_execute_sql_when_review_rejects(tmp_path):
     assert "SQL contains a dangerous keyword" in result["review_result"]["issues"]
     assert "sql_execution" not in _tool_names(pack)
     assert not any(event.get("node") == "sql_executor_node" for event in result["trace"])
+    assert result["question_evidence_ledger"]["facts"] == []
+    assert result["question_evidence_ledger"]["data_limits"]
+
+
+def test_evidence_agent_emits_question_evidence_ledger_for_fast_fact_and_standard_paths(tmp_path):
+    db_path = _sales_db(tmp_path)
+
+    fast = run_evidence_agent_question_mode(
+        _base_state(
+            db_path,
+            initial_sql=(
+                "SELECT store_name, SUM(sales_amount) AS total_sales "
+                "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 20"
+            ),
+        )
+    )
+    standard_state = _base_state(
+        db_path,
+        initial_sql=(
+            "SELECT store_name, SUM(sales_amount) AS total_sales "
+            "FROM store_sales GROUP BY store_name ORDER BY total_sales DESC LIMIT 20"
+        ),
+    )
+    standard_state["analysis_route"] = {"route": "standard_analysis"}
+    standard = run_evidence_agent_question_mode(standard_state)
+
+    assert fast["analysis_route"]["route"] == "fast_fact"
+    assert fast["question_evidence_ledger"]["facts"]
+    assert standard["analysis_route"]["route"] == "standard_analysis"
+    assert standard["question_evidence_ledger"]["facts"]
 
 
 def test_evidence_agent_schema_repair_candidate_must_be_reviewed_before_execution(tmp_path):
@@ -284,8 +342,11 @@ def test_business_answer_agent_outputs_p16_answer_and_audit_boundary():
         "caveats",
         "confidence",
     }
-    assert "上海旗舰店" in answer_text
-    assert "300000" in answer_text
+    assert "业务回答生成失败" in answer_text
+    assert "上海旗舰店" not in answer_text
+    assert "300000" not in answer_text
+    assert result["business_answer_generation"]["fallback_used"] is True
+    assert result["business_answer_generation"]["source"] == "provider_unavailable"
     assert "SELECT" not in answer_text.upper()
     assert "raw_rows" not in answer_text
     assert "provider_metadata" not in answer_text

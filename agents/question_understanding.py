@@ -39,6 +39,7 @@ def run_question_understanding_agent(
         },
         "coordinator_decision": coordinator_decision.to_dict(),
         "analysis_task_contract": analysis_task.to_dict(),
+        "evidence_task_plan": analysis_task.evidence_task_plan,
         "question_understanding": result,
         "analysis_task": coordination.get("analysis_task_dict") or result.get("analysis_task", {}),
         "analysis_route": analysis_route,

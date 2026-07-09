@@ -9,9 +9,9 @@ from agents.visualization_agent import run_visualization_agent
 from tools.trace_logger import append_trace, save_trace
 from workspaces.context_pack_builder import build_fast_fact_context_pack
 from workspaces.business_answer_agent import run_business_answer_agent
-from workspaces.evidence_auditor import run_evidence_auditor_agent
 from workspaces.evidence_agent import run_evidence_agent_question_mode
-from workspaces.fast_fact_composer import build_fast_fact_claims, compose_fast_fact_answer
+from workspaces.evidence_task_runner import run_evidence_task_plan
+from workspaces.fast_fact_claims import build_fast_fact_claims
 from workspaces.product_result_builder import build_evidence
 
 from graph.state import AgentState
@@ -33,13 +33,17 @@ def clarification_node(state: AgentState, provider=None) -> AgentState:
 def evidence_agent_node(
     state: AgentState,
     sql_planning_provider=None,
-    analysis_planner_provider=None,
     sql_candidate_provider=None,
 ) -> AgentState:
+    if _should_run_evidence_task_runner(state):
+        return run_evidence_task_plan(
+            dict(state),
+            sql_planning_provider=sql_planning_provider,
+            sql_candidate_provider=sql_candidate_provider,
+        )
     return run_evidence_agent_question_mode(
         dict(state),
         sql_planning_provider=sql_planning_provider,
-        analysis_planner_provider=analysis_planner_provider,
         sql_candidate_provider=sql_candidate_provider,
     )
 
@@ -105,39 +109,26 @@ def fast_fact_node(state: AgentState) -> AgentState:
         execution_result=state.get("execution_result") or {},
         metric_registry=state.get("metric_registry") or state.get("metric_context") or {},
     )
-    business_answer = compose_fast_fact_answer(
-        user_question=state.get("user_question", ""),
-        analysis_route=state.get("analysis_route") or {},
-        analysis_task=state.get("analysis_task") or {},
-        execution_result=state.get("execution_result") or {},
-        evidence_result=evidence_result,
-        fact_payload=fact_payload,
-        context_pack=fast_fact_context_pack,
-    )
-    final_answer = business_answer.get("direct_answer") or business_answer.get("headline") or ""
     updated = {
         **validated,
-        "status": "completed",
+        "status": "executed",
         "data_used": True,
-        "business_answer": business_answer,
-        "final_answer": final_answer,
         "fast_fact_context_pack": fast_fact_context_pack,
         "fast_fact_result": {
             "success": True,
-            "business_answer": business_answer,
             "fact_payload": fact_payload,
             "context_pack": fast_fact_context_pack,
             "claims_to_validate": claims,
+            "answer_contract": "provider_or_llm_from_question_evidence_ledger",
         },
     }
-    updated = run_evidence_auditor_agent(updated)
     return append_trace(
         updated,
         {
-            "node": "fast_fact_composer",
+            "node": "fast_fact_evidence_preparer",
             "tool_name": "",
             "tool_input_summary": f"route={(state.get('analysis_route') or {}).get('route', '')}",
-            "tool_output_summary": final_answer[:200],
+            "tool_output_summary": "prepared fast-fact evidence for ledger-only answer generation",
             "status": "success",
             "latency_ms": 0,
             "provider_called": False,
@@ -149,16 +140,10 @@ def fast_fact_node(state: AgentState) -> AgentState:
 def business_answer_node(
     state: AgentState,
     provider=None,
-    answer_reviewer_provider=None,
-    final_answer_composer_provider=None,
-    evidence_auditor_provider=None,
 ) -> AgentState:
     updated = run_business_answer_agent(
         dict(state),
         provider=provider,
-        answer_reviewer_provider=answer_reviewer_provider,
-        final_answer_composer_provider=final_answer_composer_provider,
-        evidence_auditor_provider=evidence_auditor_provider,
     )
     return updated
 
@@ -166,11 +151,36 @@ def business_answer_node(
 def visualization_agent_node(state: AgentState, provider=None) -> AgentState:
     if state.get("status") != "completed":
         return dict(state)
-    return run_visualization_agent(dict(state), provider=provider, output_dir=_artifact_dir(state, "charts"))
+    try:
+        return run_visualization_agent(dict(state), provider=provider, output_dir=_artifact_dir(state, "charts"))
+    except Exception as exc:
+        return append_trace(
+            {
+                **dict(state),
+                "chart_warning": str(exc),
+                "visualization_delivery_result": {},
+                "visualization_trace": {},
+            },
+            {
+                "node": "visualization_agent",
+                "tool_name": "external_visualization_tool",
+                "tool_input_summary": "chart generation after business answer",
+                "tool_output_summary": str(exc)[:200],
+                "status": "error",
+                "latency_ms": 0,
+                "error_type": "visualization_delivery_error",
+                "error": str(exc),
+                "provider_called": False,
+                "fallback_used": False,
+            },
+        )
 
 
 def fail_response_node(state: AgentState) -> AgentState:
-    if state.get("review_result") and not state["review_result"].get("approved"):
+    if state.get("evidence_task_results"):
+        answer = state.get("error_message") or "核心证据任务全部失败，当前数据不足以生成可靠业务结论。"
+        error_type = "evidence_task_core_failed"
+    elif state.get("review_result") and not state["review_result"].get("approved"):
         issues = "; ".join(state["review_result"].get("issues", []))
         answer = f"SQL 审核未通过，已停止执行。原因：{issues}"
         error_type = "sql_review_rejected"
@@ -215,7 +225,6 @@ def save_trace_node(state: AgentState) -> AgentState:
             "clarification_question": state.get("clarification_question") or "",
             "clarification_answer": state.get("clarification_answer") or "",
             "resolved_question": state.get("resolved_question") or "",
-            "pending_run_id": state.get("pending_run_id") or "",
             "status": state.get("question_thread_status") or state.get("status", "unknown"),
         },
     )
@@ -237,6 +246,46 @@ def route_after_evidence_agent(state: AgentState) -> str:
     if state.get("evidence_agent_early_response"):
         return "early_response"
     return "fail"
+
+
+def _should_run_evidence_task_runner(state: AgentState) -> bool:
+    if state.get("initial_sql"):
+        return False
+    route = (state.get("analysis_route") or {}).get("route")
+    if route == "fast_fact":
+        return False
+    plan = state.get("evidence_task_plan") if isinstance(state.get("evidence_task_plan"), dict) else {}
+    if not plan:
+        task = state.get("analysis_task") if isinstance(state.get("analysis_task"), dict) else {}
+        plan = task.get("evidence_task_plan") if isinstance(task.get("evidence_task_plan"), dict) else {}
+    tasks = plan.get("tasks") if isinstance(plan, dict) else []
+    if not isinstance(tasks, list):
+        return False
+    core_tasks = [task for task in tasks if isinstance(task, dict) and task.get("purpose") == "core_fact"]
+    if len(core_tasks) < 2:
+        return False
+    source_tables = _core_task_source_tables(state, core_tasks)
+    return len(source_tables) > 1
+
+
+def _core_task_source_tables(state: AgentState, core_tasks: list[dict[str, Any]]) -> set[str]:
+    analysis_task = state.get("analysis_task") if isinstance(state.get("analysis_task"), dict) else {}
+    lens = analysis_task.get("business_lens") if isinstance(analysis_task.get("business_lens"), dict) else {}
+    metric_tables: dict[str, str] = {}
+    for metric in lens.get("metrics") or []:
+        if not isinstance(metric, dict):
+            continue
+        label = str(metric.get("label") or "").strip()
+        table = str(metric.get("source_table") or "").strip()
+        if label and table:
+            metric_tables[label] = table
+    tables: set[str] = set()
+    for task in core_tasks:
+        for metric in task.get("metrics") or []:
+            table = metric_tables.get(str(metric))
+            if table:
+                tables.add(table)
+    return tables
 
 
 def route_after_answer_for_visualization(state: AgentState) -> str:
@@ -281,8 +330,7 @@ def route_after_clarification(state: AgentState) -> str:
 
 def _has_continuation_context(state: AgentState) -> bool:
     return bool(
-        state.get("pending_run_id")
-        and state.get("clarification_answer")
+        state.get("clarification_answer")
         and state.get("resolved_question")
         and not state.get("stop_for_clarification")
     )

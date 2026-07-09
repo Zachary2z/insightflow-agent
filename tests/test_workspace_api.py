@@ -1,6 +1,8 @@
 import sqlite3
 import time
 from io import BytesIO
+from pathlib import Path
+import json
 
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -36,6 +38,21 @@ def _seed_ecommerce_workspace(store: WorkspaceStore, workspace_id: str) -> None:
         conn.executemany("INSERT INTO order_items VALUES (?, ?, ?, ?)", [(1, 1, 2, 100.0), (2, 2, 1, 50.0)])
     profile = profile_workspace_database(store, workspace_id)
     generate_semantic_layer_draft(store, workspace_id, profile)
+
+
+def _write_run(workspace: dict, run_id: str, payload: dict) -> None:
+    run_dir = Path(workspace["root_path"]) / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    body = {
+        "run_id": run_id,
+        "workspace_id": workspace["workspace_id"],
+        "workspace_root": workspace["root_path"],
+        "workspace_run_dir": str(run_dir),
+        "trace_path": str(run_dir / f"{run_id}.json"),
+        "saved_at": "2026-07-06T10:00:00Z",
+        **payload,
+    }
+    (run_dir / f"{run_id}.json").write_text(json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def test_workspace_api_create_profile_semantic_and_run(tmp_path):
@@ -76,59 +93,194 @@ def test_workspace_api_create_profile_semantic_and_run(tmp_path):
     assert detail["product_result"]["technical_details"]["sql"] == detail["result"]["generated_sql"]
 
 
-def test_workspace_api_returns_pending_clarification_and_continues_with_answer(tmp_path):
+def test_workspace_api_follow_up_continues_waiting_clarification_in_same_run(tmp_path, monkeypatch):
     store = WorkspaceStore(tmp_path / "workspaces")
-    app = create_app(workspace_store=store)
-    client = TestClient(app)
-    created = client.post("/api/workspaces", json={"name": "Clarification API Workspace"}).json()
-    workspace_id = created["workspace_id"]
+    workspace = store.create_workspace("Clarification API Workspace")
+    workspace_id = workspace["workspace_id"]
     _seed_ecommerce_workspace(store, workspace_id)
-
-    pending_response = client.post(
-        f"/api/workspaces/{workspace_id}/runs",
-        json={"user_question": "帮我看看销售情况"},
-    )
-    assert pending_response.status_code == 200
-    pending = pending_response.json()
-    assert pending["success"] is True
-    assert pending["status"] == "running"
-    pending = _wait_for_run_status(client, workspace_id, pending["run_id"], {"waiting_for_clarification"})
-    assert pending["product_result"]["status"] == "waiting_for_clarification"
-    pending_run_id = pending["product_result"]["question_thread"]["pending_run_id"]
-    assert pending_run_id.startswith("pending_")
-    assert pending["product_result"]["question_thread"]["clarification_question"]
-
-    continuation_response = client.post(
-        f"/api/workspaces/{workspace_id}/runs",
-        json={
-            "pending_run_id": pending_run_id,
-            "clarification_answer": "按商品，最近 90 天，看 Top 5",
+    _write_run(
+        workspace,
+        "run_thread1",
+        {
+            "status": "waiting_for_clarification",
+            "original_question": "帮我看看销售情况",
+            "analysis_thread_memory": {
+                "thread_id": "run_thread1",
+                "original_question": "帮我看看销售情况",
+                "turns": [
+                    {
+                        "turn_id": "turn_1",
+                        "user_input": "帮我看看销售情况",
+                        "resolved_question": "帮我看看销售情况",
+                        "status": "waiting_for_clarification",
+                        "answer_summary": "需要补充信息后才能继续分析。",
+                        "business_lens": {},
+                        "evidence_refs": [],
+                        "created_at": "2026-07-06T10:00:00Z",
+                    }
+                ],
+                "current_business_lens": {},
+                "evidence_refs": [],
+                "answer_summary": "需要补充信息后才能继续分析。",
+                "pending_clarification": {
+                    "clarification_question": "请补充时间范围，例如最近90天。",
+                    "missing_fields": ["time_range"],
+                },
+                "latest_status": "waiting_for_clarification",
+                "latest_resolved_question": "帮我看看销售情况",
+            },
+            "clarification_question": "请补充时间范围，例如最近90天。",
+            "execution_result": {},
+            "trace": [],
         },
     )
+
+    def completed_workflow(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        assert run_id == "run_thread1"
+        assert "帮我看看销售情况" in user_question
+        assert "按商品，最近 90 天，看 Top 5" in user_question
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {"resolved_question": user_question, "business_lens": {"metrics": [{"label": "销售额"}]}},
+            "business_answer": {
+                "headline": "商品销售额 Top 5 已完成",
+                "direct_answer": "最近 90 天商品销售额 Top 5 已完成。",
+                "why": "证据表返回了商品销售额。",
+                "evidence_bullets": ["已按商品汇总销售额。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["product_name", "revenue"], "rows": [["A", 200.0]]},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", completed_workflow)
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+
+    continuation_response = client.post(
+        f"/api/workspaces/{workspace_id}/runs/run_thread1/follow-ups",
+        json={"message": "按商品，最近 90 天，看 Top 5"},
+    )
+
     assert continuation_response.status_code == 200
     continuation = continuation_response.json()
     assert continuation["success"] is True
     assert continuation["product_result"]["status"] == "completed"
+    assert continuation["run_id"] == "run_thread1"
     thread = continuation["product_result"]["question_thread"]
+    assert thread["thread_id"] == "run_thread1"
     assert thread["original_question"] == "帮我看看销售情况"
     assert thread["clarification_answer"] == "按商品，最近 90 天，看 Top 5"
     assert "最近 90 天" in thread["resolved_question"]
+    assert len(thread["turns"]) == 2
     assert continuation["result"]["execution_result"]["success"] is True
 
 
-def test_workspace_api_returns_4xx_for_missing_pending_clarification_run(tmp_path):
+def test_workspace_api_follow_up_works_for_completed_run(tmp_path, monkeypatch):
+    store = WorkspaceStore(tmp_path / "workspaces")
+    workspace = store.create_workspace("Completed Follow-up API Workspace")
+    workspace_id = workspace["workspace_id"]
+    _seed_ecommerce_workspace(store, workspace_id)
+    _write_run(
+        workspace,
+        "run_done1",
+        {
+            "status": "completed",
+            "original_question": "帮我分析最近90天哪些渠道收益比较好",
+            "analysis_thread_memory": {
+                "thread_id": "run_done1",
+                "original_question": "帮我分析最近90天哪些渠道收益比较好",
+                "turns": [
+                    {
+                        "turn_id": "turn_1",
+                        "user_input": "帮我分析最近90天哪些渠道收益比较好",
+                        "resolved_question": "分析最近 90 天各渠道收益表现。",
+                        "status": "completed",
+                        "answer_summary": "email 渠道收入最高。",
+                        "business_lens": {"business_domain": "channel_performance", "metrics": [{"label": "收入"}]},
+                        "evidence_refs": ["question_evidence_pack"],
+                        "created_at": "2026-07-06T10:00:00Z",
+                    }
+                ],
+                "current_business_lens": {"business_domain": "channel_performance", "metrics": [{"label": "收入"}]},
+                "evidence_refs": ["question_evidence_pack"],
+                "answer_summary": "email 渠道收入最高。",
+                "pending_clarification": None,
+                "latest_status": "completed",
+                "latest_resolved_question": "分析最近 90 天各渠道收益表现。",
+            },
+            "business_answer": {
+                "headline": "email 渠道收入最高",
+                "direct_answer": "email 渠道收入最高。",
+                "why": "证据表显示 email 收入最高。",
+                "evidence_bullets": ["email 收入最高。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["channel"], "rows": [["email"]]},
+            "trace": [],
+        },
+    )
+
+    def follow_up_workflow(*, run_id, user_question, trace_dir, workspace_root, **kwargs):
+        assert run_id == "run_done1"
+        assert "email 渠道收入最高" in user_question
+        assert "为什么 email 渠道收益最好" in user_question
+        return {
+            "status": "completed",
+            "run_id": run_id,
+            "workspace_root": workspace_root,
+            "trace_path": str(trace_dir / f"{run_id}.json"),
+            "analysis_task": {"resolved_question": user_question, "business_lens": {"metrics": [{"label": "客单价"}]}},
+            "business_answer": {
+                "headline": "email 的客单价更高",
+                "direct_answer": "email 渠道收益高主要来自客单价。",
+                "why": "本轮证据补充了客单价比较。",
+                "evidence_bullets": ["email 客单价更高。"],
+                "recommendations": [],
+                "caveats": [],
+                "confidence": "medium",
+            },
+            "execution_result": {"success": True, "columns": ["channel"], "rows": [["email"]]},
+            "trace": [],
+        }
+
+    monkeypatch.setattr("workspaces.analysis_runner.run_workflow", follow_up_workflow)
+    app = create_app(workspace_store=store)
+    client = TestClient(app)
+
+    response = client.post(
+        f"/api/workspaces/{workspace_id}/runs/run_done1/follow-ups",
+        json={"message": "为什么 email 渠道收益最好？"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_id"] == "run_done1"
+    assert payload["product_result"]["business_answer"]["headline"] == "email 的客单价更高"
+    assert len(payload["product_result"]["question_thread"]["turns"]) == 2
+
+
+def test_workspace_api_old_pending_run_id_duplicate_run_behavior_is_removed(tmp_path):
     store = WorkspaceStore(tmp_path / "workspaces")
     app = create_app(workspace_store=store)
     client = TestClient(app)
-    created = client.post("/api/workspaces", json={"name": "Missing Pending API Workspace"}).json()
+    created = client.post("/api/workspaces", json={"name": "Old Pending API Workspace"}).json()
 
     response = client.post(
         f"/api/workspaces/{created['workspace_id']}/runs",
         json={"pending_run_id": "pending_missing", "clarification_answer": "最近 90 天"},
     )
 
-    assert response.status_code == 404
-    assert "pending_missing" in response.json()["detail"]
+    assert response.status_code in {400, 422}
+    history = client.get(f"/api/workspaces/{created['workspace_id']}/runs").json()["runs"]
+    assert history == []
 
 
 def test_workspace_api_rejects_run_without_question_or_clarification_answer(tmp_path):

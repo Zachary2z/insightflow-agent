@@ -2,12 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import {
+  exportWorkspaceReportDocx,
   getWorkspaceArtifactUrl,
   getWorkspaceReport,
+  publishFeishuReport,
   resolveApiUrl,
+  type ExternalPublishResult,
   type ReportDocumentSection,
+  type WorkspaceReportExportResponse,
   type WorkspaceReport,
 } from "../lib/api";
+import ChartArtifactGallery from "./ChartArtifactGallery";
 import ProductCard from "./ProductCard";
 import { StatusPill } from "./ProductStatus";
 import ReportDownloadLink from "./ReportDownloadLink";
@@ -39,6 +44,12 @@ const REPORT_LABELS = {
     missingTitle: "报告不存在",
     missingBody: "没有找到这份报告。",
     downloadMarkdown: "下载 Markdown",
+    exportWord: "导出 Word",
+    exportingWord: "导出中",
+    downloadWord: "下载 Word 文档",
+    exportReady: "Word 文档已生成",
+    publishFeishu: "发布到飞书",
+    publishingFeishu: "发布中",
   },
   en: {
     eyebrow: "Report",
@@ -58,6 +69,12 @@ const REPORT_LABELS = {
     missingTitle: "Report not found",
     missingBody: "This report could not be found.",
     downloadMarkdown: "Download Markdown",
+    exportWord: "Export Word",
+    exportingWord: "Exporting",
+    downloadWord: "Download Word",
+    exportReady: "Word document ready",
+    publishFeishu: "Publish to Feishu",
+    publishingFeishu: "Publishing",
   },
 } as const;
 
@@ -138,7 +155,7 @@ function ReportDocumentBody({
   const document = report.document;
   const sections = reportBodySections(document?.sections ?? []);
   const evidenceTables = report.evidence_pack?.tables ?? [];
-  const evidenceCharts = report.evidence_pack?.charts ?? [];
+  const evidenceCharts = report.chart_artifacts?.length ? [] : report.evidence_pack?.charts ?? [];
   if (!sections.length) {
     return (
       <ProductCard>
@@ -255,7 +272,7 @@ function SectionEvidenceTables({ tables }: { tables: Array<Record<string, unknow
 function ReportArtifactSummary({ report }: { report: WorkspaceReport }) {
   const visibleArtifacts = (report.artifacts ?? []).filter((artifact) => {
     const type = textValue(artifact.artifact_type, "");
-    return ["chart", "markdown_report", "report_document", "future_export"].includes(type);
+    return ["chart", "markdown_report", "report_document", "word_document", "future_export"].includes(type);
   });
   if (!visibleArtifacts.length) {
     return null;
@@ -280,6 +297,7 @@ function artifactTypeLabel(type: string) {
     chart: "图表",
     markdown_report: "Markdown 报告",
     report_document: "报告文档",
+    word_document: "Word 文档",
     future_export: "外部导出准备",
   };
   return labels[type] ?? "报告产物";
@@ -361,6 +379,16 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
   const [report, setReport] = useState<WorkspaceReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exportState, setExportState] = useState<{
+    status: "idle" | "exporting" | "success" | "error";
+    result: WorkspaceReportExportResponse | null;
+    error: string;
+  }>({ status: "idle", result: null, error: "" });
+  const [publishState, setPublishState] = useState<{
+    status: "idle" | "publishing" | "ready" | "error";
+    result: ExternalPublishResult | null;
+    error: string;
+  }>({ status: "idle", result: null, error: "" });
 
   useEffect(() => {
     let isActive = true;
@@ -371,6 +399,11 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
         const response = await getWorkspaceReport(workspaceId, reportId);
         if (isActive) {
           setReport(response.report);
+          setPublishState({
+            status: "idle",
+            result: response.report.external_publish_results?.feishu ?? null,
+            error: "",
+          });
         }
       } catch (err) {
         if (isActive) {
@@ -409,6 +442,47 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
   const language = reportLanguage(report);
   const labels = REPORT_LABELS[language];
 
+  async function handleWordExport() {
+    if (!report) {
+      return;
+    }
+    try {
+      setExportState({ status: "exporting", result: null, error: "" });
+      const result = await exportWorkspaceReportDocx(workspaceId, report.report_id);
+      setExportState({ status: "success", result, error: "" });
+    } catch (err) {
+      setExportState({
+        status: "error",
+        result: null,
+        error: err instanceof Error ? err.message : "导出失败",
+      });
+    }
+  }
+
+  async function handleFeishuPublish() {
+    if (!report) {
+      return;
+    }
+    try {
+      setPublishState({ status: "publishing", result: null, error: "" });
+      const response = await publishFeishuReport(workspaceId, report.report_id);
+      setPublishState({ status: "ready", result: response.publish_result, error: "" });
+      setReport({
+        ...report,
+        external_publish_results: {
+          ...(report.external_publish_results ?? {}),
+          feishu: response.publish_result,
+        },
+      });
+    } catch (err) {
+      setPublishState({
+        status: "error",
+        result: null,
+        error: err instanceof Error ? err.message : "发布到飞书失败",
+      });
+    }
+  }
+
   return (
     <section className="report-viewer">
       <ProductCard className="report-reader-hero">
@@ -428,8 +502,28 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
               <span>{metaText(labels.dataSourcesPrefix, joinText(report.document?.data_sources), language)}</span>
             </div>
           </div>
-          <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} label={labels.downloadMarkdown} />
+          <div className="report-download-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleFeishuPublish}
+              disabled={publishState.status === "publishing"}
+            >
+              {publishState.status === "publishing" ? labels.publishingFeishu : labels.publishFeishu}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleWordExport}
+              disabled={exportState.status === "exporting"}
+            >
+              {exportState.status === "exporting" ? labels.exportingWord : labels.exportWord}
+            </button>
+            <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} label={labels.downloadMarkdown} />
+          </div>
         </div>
+        <FeishuPublishStatus state={publishState} />
+        <WordExportStatus state={exportState} labels={labels} />
         {report.document?.opening_summary ? (
           <section className="report-summary">
             <h3>{labels.openingSummary}</h3>
@@ -438,10 +532,142 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
         ) : null}
       </ProductCard>
       <ReportDocumentBody report={report} language={language} workspaceId={workspaceId} />
+      {report.chart_artifacts?.length ? <ChartArtifactGallery artifacts={report.chart_artifacts} /> : null}
       <ReportArtifactSummary report={report} />
       <TextList title={labels.actionRecommendations} items={report.document?.action_recommendations} />
       <TextList title={labels.dataBoundaries} items={report.document?.data_boundaries} />
       <ReportTechnicalAppendix report={report} />
+    </section>
+  );
+}
+
+function FeishuPublishStatus({
+  state,
+}: {
+  state: {
+    status: "idle" | "publishing" | "ready" | "error";
+    result: ExternalPublishResult | null;
+    error: string;
+  };
+}) {
+  if (state.status === "publishing" || (state.status === "idle" && !state.result)) {
+    return null;
+  }
+  if (state.status === "error") {
+    return (
+      <p className="soft-warning" role="alert">
+        {state.error}
+      </p>
+    );
+  }
+  if (!state.result) {
+    return null;
+  }
+  const warnings = safePublishWarnings(state.result.warnings);
+  const insertedChartCount = nonNegativeNumber(state.result.inserted_chart_count);
+  const failedChartCount = nonNegativeNumber(state.result.failed_chart_count);
+  const visibleWarnings =
+    warnings.length || failedChartCount === 0 ? warnings : ["部分图表未插入飞书文档。"];
+  const chartSummary =
+    insertedChartCount || failedChartCount
+      ? `已插入 ${insertedChartCount} 张图表，${failedChartCount} 张图表未插入。`
+      : "";
+  const isFailed = state.result.status === "failed";
+  const title =
+    state.result.status === "warning"
+      ? "已发布到飞书，存在提醒"
+      : isFailed
+        ? "发布到飞书失败"
+        : "已发布到飞书";
+  const url = typeof state.result.url === "string" && state.result.url.trim() ? state.result.url.trim() : "";
+  return (
+    <section className="report-summary">
+      <h3>{title}</h3>
+      {url && !isFailed ? (
+        <a className="button" href={resolveApiUrl(url)} target="_blank" rel="noreferrer">
+          打开飞书文档
+        </a>
+      ) : null}
+      {chartSummary ? <p>{chartSummary}</p> : null}
+      {visibleWarnings.length ? (
+        <ul>
+          {visibleWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function nonNegativeNumber(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(value));
+}
+
+function safePublishWarnings(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item && !containsPublishSensitiveText(item))
+    .filter((item) => {
+      if (seen.has(item)) {
+        return false;
+      }
+      seen.add(item);
+      return true;
+    });
+}
+
+function containsPublishSensitiveText(value: string) {
+  return /\b(select|with|insert|update|delete|drop|alter|create|pragma)\b/i.test(value) ||
+    /(^|[=/\s])(\/users\/|\/tmp\/|~\/)/i.test(value) ||
+    /\b(raw\s*stdout|raw\s*stderr|stdout|stderr|raw_sql|generated_sql|raw_rows|rows|trace_path|trace_id|provider_metadata|api_key|apikey|access_key|access_token|token|secret|password|database_path|analysis\.db|debug_id|prompt(?:_id|_text|_version)?|completion_tokens|prompt_tokens)\b/i.test(value);
+}
+
+function WordExportStatus({
+  state,
+  labels,
+}: {
+  state: {
+    status: "idle" | "exporting" | "success" | "error";
+    result: WorkspaceReportExportResponse | null;
+    error: string;
+  };
+  labels: (typeof REPORT_LABELS)[ReportLanguage];
+}) {
+  if (state.status === "idle" || state.status === "exporting") {
+    return null;
+  }
+  if (state.status === "error") {
+    return (
+      <p className="soft-warning" role="alert">
+        {state.error}
+      </p>
+    );
+  }
+  if (!state.result) {
+    return null;
+  }
+  const downloadUrl = resolveApiUrl(state.result.download_url);
+  return (
+    <section className="report-summary">
+      <h3>{labels.exportReady}</h3>
+      <a className="button" href={downloadUrl} download={state.result.download_name}>
+        {labels.downloadWord}
+      </a>
+      {state.result.warnings?.length ? (
+        <ul>
+          {state.result.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

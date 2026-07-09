@@ -1,5 +1,7 @@
 # P18 Business Answer Consistency Implementation Plan
 
+Historical / Superseded note: this phase record predates the P33 ledger-only answer path. P33-H2 deleted the old `workspaces/answer_consistency.py` rewrite surface; active Analysis Workbench code must not call `apply_answer_consistency` or generate conclusions from raw rows.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make analysis and report outputs consistent, evidence-bound, and business-usable across general datasets without hardcoding the current sample tables.

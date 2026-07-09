@@ -273,12 +273,31 @@ def _is_current_product_result(product_result: dict[str, Any], result: dict[str,
     answer = product_result.get("business_answer")
     if not isinstance(answer, dict):
         return False
+    if _has_product_result_restore_gap(product_result, result):
+        return False
     return business_answer_is_usable(
         answer,
         _question(result, product_result),
         _execution_context(result, product_result),
         result.get("evidence_result") if isinstance(result.get("evidence_result"), dict) else None,
     )
+
+
+def _has_product_result_restore_gap(product_result: dict[str, Any], result: dict[str, Any]) -> bool:
+    raw_ledger = result.get("question_evidence_ledger") if isinstance(result.get("question_evidence_ledger"), dict) else {}
+    if raw_ledger:
+        product_ledger = product_result.get("question_evidence_ledger") if isinstance(product_result.get("question_evidence_ledger"), dict) else {}
+        evidence = product_result.get("evidence") if isinstance(product_result.get("evidence"), dict) else {}
+        evidence_ledger = evidence.get("ledger_summary") if isinstance(evidence.get("ledger_summary"), dict) else {}
+        if not product_ledger or not product_ledger.get("task_groups"):
+            return True
+        if not evidence_ledger or not evidence_ledger.get("task_groups"):
+            return True
+    raw_charts = result.get("chart_artifacts") if isinstance(result.get("chart_artifacts"), list) else []
+    product_charts = product_result.get("chart_artifacts") if isinstance(product_result.get("chart_artifacts"), list) else []
+    if raw_charts and not product_charts:
+        return True
+    return False
 
 
 def _execution_context(result: dict[str, Any], product_result: dict[str, Any]) -> dict[str, Any] | None:
@@ -325,7 +344,17 @@ def _valid_progress_steps(value: Any) -> bool:
 
 def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
     charts = product_result.get("chart_artifacts")
-    if isinstance(charts, list) and any(isinstance(chart, dict) and (chart.get("path") or chart.get("url")) for chart in charts):
+    if isinstance(charts, list) and any(
+        isinstance(chart, dict)
+        and (
+            chart.get("path")
+            or chart.get("url")
+            or chart.get("image_path")
+            or chart.get("image_url")
+            or chart.get("echarts_option")
+        )
+        for chart in charts
+    ):
         return True
     if result.get("chart_path") or result.get("chart_paths"):
         return True
@@ -338,8 +367,14 @@ def _has_chart(result: dict[str, Any], product_result: dict[str, Any]) -> bool:
     return bool(
         visualization.get("artifact_path")
         or visualization.get("chart_path")
+        or visualization.get("image_path")
+        or visualization.get("image_url")
+        or visualization.get("echarts_option")
         or delivery.get("artifact_path")
         or delivery.get("chart_path")
+        or delivery.get("image_path")
+        or delivery.get("image_url")
+        or delivery.get("echarts_option")
     )
 
 

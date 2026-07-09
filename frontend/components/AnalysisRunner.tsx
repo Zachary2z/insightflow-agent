@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   getWorkspaceRun,
+  followUpAnalysis,
   listWorkspaceRuns,
   runAnalysis,
   type QuestionThread,
@@ -19,8 +20,7 @@ type AnalysisRunnerProps = {
 };
 
 type ContinuePayload = {
-  pendingRunId: string;
-  clarificationAnswer: string;
+  message: string;
 };
 
 type FollowUpPayload = {
@@ -124,20 +124,6 @@ function resultForDisplay(run: WorkspaceRunResponse): Record<string, unknown> {
     return { ...run.result, product_result: run.product_result };
   }
   return run.result;
-}
-
-function buildFollowUpQuestion(thread: QuestionThread, followUpQuestion: string) {
-  const previousQuestion = thread.resolved_question || thread.original_question || "";
-  const originalQuestion = thread.original_question && thread.original_question !== previousQuestion ? thread.original_question : "";
-  return [
-    "基于上一轮分析继续追问。",
-    originalQuestion ? `上一轮用户问题：${originalQuestion}` : "",
-    previousQuestion ? `上一轮整理后问题：${previousQuestion}` : "",
-    `本轮追问：${followUpQuestion}`,
-    "请结合同一工作区数据继续分析，并给出业务结论、证据和必要图表。",
-  ]
-    .filter(Boolean)
-    .join("。");
 }
 
 function runIdForDisplay(run: WorkspaceRunResponse | null) {
@@ -304,14 +290,15 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
     }
   }
 
-  async function handleContinue({ pendingRunId, clarificationAnswer }: ContinuePayload) {
+  async function handleContinue({ message }: ContinuePayload) {
     try {
       setIsContinuing(true);
       setContinuationError("");
-      const response = await runAnalysis(workspaceId, {
-        pendingRunId,
-        clarificationAnswer,
-      });
+      const runId = runIdForDisplay(run);
+      if (!runId) {
+        throw new Error("无法定位当前分析线程");
+      }
+      const response = await followUpAnalysis(workspaceId, runId, { message });
       setCacheCandidate(null);
       handleRunResponse(response);
       await refreshHistory();
@@ -326,13 +313,13 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
     try {
       setIsContinuing(true);
       setContinuationError("");
-      const contextualQuestion = buildFollowUpQuestion(thread, followUpQuestion);
-      const response = await runAnalysis(workspaceId, {
-        userQuestion: contextualQuestion,
-      });
+      const runId = runIdForDisplay(run) || thread.thread_id || "";
+      if (!runId) {
+        throw new Error("无法定位当前分析线程");
+      }
+      const response = await followUpAnalysis(workspaceId, runId, { message: followUpQuestion });
       setCacheCandidate(null);
       handleRunResponse(response);
-      setQuestion(followUpQuestion);
       await refreshHistory();
     } catch (err) {
       setContinuationError(err instanceof Error ? err.message : "无法继续追问");

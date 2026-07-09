@@ -349,7 +349,10 @@ def _select_metrics(
         if isinstance(metric, dict)
     ]
     requested_text = " ".join([*requested, question])
-    if calculation_type == "investment_efficiency" or _contains_any(requested_text, ("roas", "roi", "投产比", "净投放回报")):
+    if calculation_type == "investment_efficiency" or _contains_any(
+        requested_text,
+        ("roas", "roi", "投产比", "投放效率", "投产效率", "广告投入产出比", "净投放回报"),
+    ):
         ordered = [
             metric
             for label in ("收入", "销售额", "投放", "花费", "成本", "广告投入产出比", "净投放回报率", "ROAS")

@@ -8,7 +8,6 @@ from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
 from llm_ops.provider import LLMProvider, LLMRequest
 from llm_ops.structured_output import run_validated_llm_request
 from sql_planning.comparison_scope import widen_sql_for_comparison_scope
-from tools.evidence_tool import validate_evidence
 from tools.sql_validator import validate_sql
 from tools.trace_logger import append_trace
 
@@ -232,111 +231,5 @@ def run_guarded_sql_candidate_agent(
             "error": error or None,
             "provider_called": True,
             "fallback_used": not accepted,
-        },
-    )
-
-
-def _insight_prompt(state: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "task": "guarded_insight_polishing",
-        "user_question": state.get("user_question", ""),
-        "execution_result": state.get("execution_result", {}),
-        "business_context": state.get("business_context", {}),
-        "metric_context": state.get("metric_context", {}),
-        "current_final_answer": state.get("final_answer", ""),
-        "output_schema": {
-            "claims": ["claim that can be checked by Evidence Validator"],
-            "polished_summary": "optional prose; unsupported claims will be ignored",
-        },
-        "must_validate_evidence": True,
-        "must_not_add_unsupported_claims": True,
-    }
-
-
-def _clean_claims(payload: dict[str, Any]) -> list[str]:
-    claims = payload.get("claims", [])
-    if not isinstance(claims, list):
-        return []
-    return [str(claim).strip() for claim in claims if str(claim).strip()]
-
-
-def _summary_from_evidence(evidence_result: dict[str, Any]) -> str:
-    lines = []
-    for item in evidence_result.get("data_supported_findings", []):
-        lines.append(f"- {item.get('claim', '')}")
-    for item in evidence_result.get("hypotheses", []):
-        lines.append(f"- {item.get('claim', '')}")
-    return "\n".join(lines) if lines else ""
-
-
-def _fallback_insight_enhancement(reason: str, provider_called: bool) -> dict[str, Any]:
-    return {
-        "success": True if not provider_called else False,
-        "provider_called": provider_called,
-        "fallback_used": True,
-        "data_supported_findings": [],
-        "hypotheses": [],
-        "unsupported_claims_blocked": [],
-        "guarded_summary": "",
-        "error": reason,
-    }
-
-
-def run_guarded_insight_enhancer_agent(
-    state: dict[str, Any],
-    llm_provider: LLMProvider | None = None,
-) -> dict[str, Any]:
-    if not llm_provider:
-        enhancement = _fallback_insight_enhancement("llm_provider is not configured", provider_called=False)
-        updated = {**state, "llm_insight_enhancement": enhancement}
-        return append_trace(
-            updated,
-            {
-                "node": "guarded_insight_enhancer_agent",
-                "tool_name": "",
-                "tool_input_summary": state.get("user_question", ""),
-                "tool_output_summary": "deterministic insight retained; provider not configured",
-                "status": "success",
-                "latency_ms": 0,
-            },
-        )
-
-    try:
-        payload = _parse_provider_response(llm_provider(_insight_prompt(state)))
-        evidence_result = validate_evidence(
-            claims=_clean_claims(payload),
-            execution_result=state.get("execution_result"),
-            business_context=state.get("business_context"),
-            metric_context=state.get("metric_context"),
-        )
-        enhancement = {
-            "success": evidence_result.get("success", False),
-            "provider_called": True,
-            "fallback_used": False,
-            "data_supported_findings": evidence_result.get("data_supported_findings", []),
-            "hypotheses": evidence_result.get("hypotheses", []),
-            "unsupported_claims_blocked": evidence_result.get("unsupported_claims_blocked", []),
-            "guarded_summary": _summary_from_evidence(evidence_result),
-            "error": evidence_result.get("error", ""),
-        }
-    except Exception as exc:
-        enhancement = _fallback_insight_enhancement(str(exc), provider_called=True)
-
-    updated = {**state, "llm_insight_enhancement": enhancement}
-    return append_trace(
-        updated,
-        {
-            "node": "guarded_insight_enhancer_agent",
-            "tool_name": "llm_insight_provider",
-            "tool_input_summary": state.get("user_question", ""),
-            "tool_output_summary": (
-                f"{len(enhancement.get('data_supported_findings', []))} supported, "
-                f"{len(enhancement.get('hypotheses', []))} hypotheses, "
-                f"{len(enhancement.get('unsupported_claims_blocked', []))} blocked"
-            ),
-            "status": "success" if enhancement.get("success") else "error",
-            "latency_ms": 0,
-            "error_type": None if enhancement.get("success") else "llm_insight_enhancement_error",
-            "error": enhancement.get("error") or None,
         },
     )
