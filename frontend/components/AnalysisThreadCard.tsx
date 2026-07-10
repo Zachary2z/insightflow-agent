@@ -184,7 +184,7 @@ export default function AnalysisThreadCard({
               placeholder="例如：最近 90 天"
             />
             <button type="submit" disabled={isContinuing || !answer.trim()}>
-              {isContinuing ? "继续中..." : "继续分析"}
+              {isContinuing ? "继续中…" : "继续分析"}
             </button>
           </div>
           {continuationError ? <p role="alert">{continuationError}</p> : null}
@@ -202,7 +202,7 @@ export default function AnalysisThreadCard({
               placeholder="例如：为什么 email 渠道收益最好？"
             />
             <button type="submit" disabled={isContinuing || !followUpQuestion.trim()}>
-              {isContinuing ? "追问中..." : "发送追问"}
+              {isContinuing ? "追问中…" : "发送追问"}
             </button>
           </div>
           {continuationError ? <p role="alert">{continuationError}</p> : null}

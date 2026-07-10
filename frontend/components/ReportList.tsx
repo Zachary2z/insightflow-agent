@@ -42,7 +42,7 @@ export default function ReportList({ workspaceId }: ReportListProps) {
   }, [workspaceId]);
 
   if (isLoading) {
-    return <p role="status">正在加载报告</p>;
+    return <p role="status">正在加载报告…</p>;
   }
 
   if (error) {
@@ -108,11 +108,14 @@ function statusLabel(status: string) {
   return labels[status] ?? status;
 }
 
-function statusTone(status: string): "green" | "orange" | "blue" | "neutral" {
+function statusTone(status: string): "green" | "orange" | "red" | "blue" | "neutral" {
   if (status === "completed") {
     return "green";
   }
-  if (status === "failed" || status === "partial") {
+  if (status === "failed") {
+    return "red";
+  }
+  if (status === "partial") {
     return "orange";
   }
   if (status === "running") {
@@ -125,7 +128,13 @@ function formatReportDate(value?: string) {
   if (!value) {
     return "未知";
   }
-  return value.includes("T") ? value.split("T")[0] : value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function reportTimeRange(report: WorkspaceReport) {

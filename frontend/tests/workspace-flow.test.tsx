@@ -1,8 +1,7 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisRunner from "../components/AnalysisRunner";
-import BusinessQAPreview from "../components/BusinessQAPreview";
 import BusinessAnswerCard from "../components/BusinessAnswerCard";
 import ChartArtifactGallery from "../components/ChartArtifactGallery";
 import DataSettings from "../components/DataSettings";
@@ -34,15 +33,19 @@ const echartsMock = vi.hoisted(() => ({
   resize: vi.fn(),
   dispose: vi.fn(),
 }));
-const pushMock = vi.fn();
+const navigationMocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  redirect: vi.fn(),
+}));
 
 vi.mock("echarts", () => ({
   init: echartsMock.init,
 }));
 
 vi.mock("next/navigation", () => ({
+  redirect: navigationMocks.redirect,
   useRouter: () => ({
-    push: pushMock,
+    push: navigationMocks.push,
   }),
 }));
 
@@ -103,7 +106,8 @@ describe("workspace product components", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.resetAllMocks();
-    pushMock.mockReset();
+    navigationMocks.push.mockReset();
+    navigationMocks.redirect.mockReset();
     window.sessionStorage.clear();
     cleanup();
   });
@@ -115,9 +119,9 @@ describe("workspace product components", () => {
 
     render(<WorkspaceList />);
 
-    expect(screen.getByText("正在加载工作区")).toBeTruthy();
+    expect(screen.getByText("正在加载工作区…")).toBeTruthy();
     expect(await screen.findByText("Finance Workspace")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "打开数据源管理" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "打开数据准备" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/datasets",
     );
   });
@@ -160,8 +164,13 @@ describe("workspace product components", () => {
 
     render(await DatasetsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "数据源管理" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "数据准备" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "数据准备" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("navigation", { name: "数据准备内容" })).toBeTruthy();
     expect(await screen.findByText("还没有导入数据源")).toBeTruthy();
   });
 
@@ -264,8 +273,13 @@ describe("workspace product components", () => {
   it("renders the profile route inside the product shell with Chinese copy", async () => {
     render(await ProfilePage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "字段画像" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "数据准备" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "数据准备" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("link", { name: "字段画像" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("button", { name: "生成字段画像" })).toBeTruthy();
   });
 
@@ -293,12 +307,17 @@ describe("workspace product components", () => {
   it("renders the semantic-layer route inside the product shell with Chinese copy", async () => {
     render(await SemanticLayerPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "语义层草稿" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /数据源管理/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "数据准备" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "数据准备" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("link", { name: "业务语义" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("button", { name: "生成语义层草稿" })).toBeTruthy();
   });
 
-  it("renders data settings as a Chinese readiness product page with collapsed technical details", async () => {
+  it("renders compact workspace settings with readiness, model, and safety details", async () => {
     vi.mocked(getWorkspaceSettings).mockResolvedValue({
       workspace_id: "ws_1",
       data_sources: {
@@ -350,23 +369,21 @@ describe("workspace product components", () => {
 
     render(<DataSettings workspaceId="ws_1" />);
 
-    expect(await screen.findByText("数据准备总览")).toBeTruthy();
+    expect(await screen.findByText("工作区概览")).toBeTruthy();
     expect(screen.getByText("数据源")).toBeTruthy();
     expect(screen.getByText("字段画像")).toBeTruthy();
-    expect(screen.getByText("语义层")).toBeTruthy();
+    expect(screen.getByText("业务语义")).toBeTruthy();
     expect(screen.getByText("真实模型模式")).toBeTruthy();
     expect(screen.getByText("安全与审计")).toBeTruthy();
     expect(screen.getAllByText("已准备").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText("orders.csv")).toBeTruthy();
-    expect(screen.getByText("orders")).toBeTruthy();
-    expect(screen.getAllByText("10 行").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("1 张表")).toBeTruthy();
-    expect(screen.getByText("2 个字段")).toBeTruthy();
-    expect(screen.getAllByText(/revenue/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("指标")).toBeTruthy();
-    expect(screen.getByText("维度")).toBeTruthy();
-    expect(screen.getByText("sum_revenue")).toBeTruthy();
-    expect(screen.getAllByText("channel").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 个数据源 / 1 张导入表")).toBeTruthy();
+    expect(screen.getByText("1 张表 / 2 个字段")).toBeTruthy();
+    expect(screen.getByText("1 个指标 / 1 个维度")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开数据准备" }).getAttribute("href")).toBe(
+      "/workspaces/ws_1/datasets",
+    );
+    expect(screen.queryByText("orders.csv")).toBeNull();
+    expect(screen.queryByText("sum_revenue")).toBeNull();
     expect(screen.getAllByText("真实模型已参与").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("DeepSeek / deepseek-chat")).toBeTruthy();
     expect(screen.getByText("问题理解")).toBeTruthy();
@@ -379,16 +396,15 @@ describe("workspace product components", () => {
 
     const disclosure = screen.getByText("技术详情").closest("details");
     expect(disclosure?.hasAttribute("open")).toBe(false);
-    expect(screen.queryByText(/provider metadata/)).toBeNull();
-    expect(screen.queryByText(/raw config/)).toBeNull();
+    expect(screen.queryByText(/Provider 配置/)).toBeNull();
 
     fireEvent.click(screen.getByText("技术详情"));
 
-    expect(screen.getByText(/provider metadata/)).toBeTruthy();
-    expect(screen.getByText(/raw config/)).toBeTruthy();
+    expect(screen.getByText(/Provider 配置/)).toBeTruthy();
+    expect(screen.getByText(/raw_config_policy/)).toBeTruthy();
   });
 
-  it("shows Chinese empty states for settings that are not ready yet", async () => {
+  it("shows compact readiness states when the workspace is not ready yet", async () => {
     vi.mocked(getWorkspaceSettings).mockResolvedValue({
       workspace_id: "ws_1",
       data_sources: { status: "empty", sources: [], source_count: 0, imported_table_count: 0 },
@@ -409,12 +425,12 @@ describe("workspace product components", () => {
 
     render(<DataSettings workspaceId="ws_1" />);
 
-    expect(await screen.findByText("暂无数据源")).toBeTruthy();
-    expect(screen.getByText("先回到数据源管理导入 CSV、Excel 或 SQLite。")).toBeTruthy();
+    expect(await screen.findByText("工作区概览")).toBeTruthy();
     expect(screen.getAllByText("未生成").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("暂无数据").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("真实模型未开启").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/暂无真实模型能力参与/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "打开数据准备" })).toBeTruthy();
   });
 
   it("renders the settings page route", async () => {
@@ -438,10 +454,10 @@ describe("workspace product components", () => {
 
     render(await SettingsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "数据设置" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /数据设置/ }).getAttribute("aria-current")).toBe("page");
-    expect(await screen.findByText("数据准备总览")).toBeTruthy();
-    expect(screen.getByText("暂无数据源")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "工作区设置" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "工作区设置" }).getAttribute("aria-current")).toBe("page");
+    expect(await screen.findByText("工作区概览")).toBeTruthy();
+    expect(screen.getAllByText("暂无数据").length).toBeGreaterThanOrEqual(1);
   });
 
   it("loads analysis history on mount and renders completed failed and clarification runs", async () => {
@@ -484,6 +500,12 @@ describe("workspace product components", () => {
     render(<AnalysisRunner workspaceId="ws_1" />);
 
     await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledWith("ws_1"));
+    expect(screen.queryByRole("dialog", { name: "历史分析" })).toBeNull();
+    const historyButton = screen.getByRole("button", { name: /历史分析/ });
+    historyButton.focus();
+    fireEvent.click(historyButton);
+    expect(screen.getByRole("dialog", { name: "历史分析" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "关闭历史分析" })).toBe(document.activeElement);
     expect(await screen.findByText("历史分析")).toBeTruthy();
     expect(screen.getByText("哪个渠道收入最高？")).toBeTruthy();
     expect(screen.getByText(/email 渠道收入最高/)).toBeTruthy();
@@ -496,6 +518,11 @@ describe("workspace product components", () => {
     expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("失败").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("等待补充").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("2026-06-29 12:00:00")).toBeNull();
+    expect(screen.getAllByText(/2026年6月29日/).length).toBeGreaterThanOrEqual(1);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "历史分析" })).toBeNull();
+    await waitFor(() => expect(historyButton).toBe(document.activeElement));
   });
 
   it("restores a selected history run into the analysis result", async () => {
@@ -540,12 +567,14 @@ describe("workspace product components", () => {
     });
 
     render(<AnalysisRunner workspaceId="ws_1" />);
+    await waitFor(() => expect(listWorkspaceRuns).toHaveBeenCalledWith("ws_1"));
+    fireEvent.click(screen.getByRole("button", { name: /历史分析/ }));
     fireEvent.click(await screen.findByRole("button", { name: /恢复历史问题/ }));
 
     await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_history"));
     expect(await screen.findByText("历史业务结论", { selector: ".answer-headline" })).toBeTruthy();
     expect(screen.getByText("这是从后端历史详情恢复的完整结果。")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /恢复历史问题/ }).getAttribute("aria-current")).toBe("true");
+    expect(screen.queryByRole("dialog", { name: "历史分析" })).toBeNull();
   });
 
   it("shows Chinese history empty and error states", async () => {
@@ -553,12 +582,14 @@ describe("workspace product components", () => {
 
     const { unmount } = render(<AnalysisRunner workspaceId="ws_1" />);
 
+    fireEvent.click(screen.getByRole("button", { name: /历史分析/ }));
     expect(await screen.findByText("还没有历史分析。开始提问后会保存在这里。")).toBeTruthy();
     unmount();
 
     vi.mocked(listWorkspaceRuns).mockRejectedValueOnce(new Error("backend unavailable"));
     render(<AnalysisRunner workspaceId="ws_1" />);
 
+    fireEvent.click(screen.getByRole("button", { name: /历史分析/ }));
     expect(await screen.findByText("历史分析加载失败：backend unavailable")).toBeTruthy();
   });
 
@@ -609,8 +640,10 @@ describe("workspace product components", () => {
       },
     });
 
-    render(<AnalysisRunner workspaceId="ws_1" />);
-    expect(screen.getByText("分析工作台")).toBeTruthy();
+    const { container } = render(<AnalysisRunner workspaceId="ws_1" />);
+    const historyButton = screen.getByRole("button", { name: /历史分析/ });
+    expect(historyButton).toBeTruthy();
+    expect(historyButton.closest(".analysis-page-tools")).toBeTruthy();
     expect(screen.getByText("问一个业务问题")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("业务问题"), {
       target: { value: "哪个渠道收入最高？" },
@@ -628,6 +661,8 @@ describe("workspace product components", () => {
     expect(screen.getByRole("link", { name: "查看本次分析详情" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/runs/run_1",
     );
+    expect(screen.getByRole("link", { name: "查看本次分析详情" }).closest(".analysis-result-header")).toBeTruthy();
+    expect(container.querySelectorAll(".analysis-result-header")).toHaveLength(1);
     expect(
       JSON.parse(window.sessionStorage.getItem("insightflow.run.ws_1.run_1") ?? "{}").result.product_result
         .business_answer.headline,
@@ -1081,8 +1116,12 @@ describe("workspace product components", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "分析详情" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /分析工作台/ }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText("正在加载分析详情")).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "分析" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.getByRole("status").textContent).toBe("正在加载分析详情…");
 
     await waitFor(() => expect(getWorkspaceRun).toHaveBeenCalledWith("ws_1", "run_1"));
     expect(await screen.findByText("Email produced the most revenue.", { selector: ".answer-headline" })).toBeTruthy();
@@ -1111,85 +1150,11 @@ describe("workspace product components", () => {
     expect(screen.queryByText(/当前浏览器会话没有缓存这次分析结果/)).toBeNull();
   });
 
-  it("renders the business Q&A preview route with active navigation and honest preview copy", async () => {
-    render(await BusinessQAPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
+  it("redirects the historical business Q&A preview route to the analysis workspace", async () => {
+    await BusinessQAPage({ params: Promise.resolve({ workspaceId: "ws_1" }) });
 
-    expect(screen.getByRole("heading", { level: 1, name: "业务问答" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /业务问答/ }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: /业务问答/ }).getAttribute("href")).toBe(
-      "/workspaces/ws_1/business-qa",
-    );
-    expect(screen.getByText("业务问答模式")).toBeTruthy();
-    expect(screen.getByText("未来模式预览")).toBeTruthy();
-    expect(screen.getByLabelText("业务问答预览消息")).toBeTruthy();
-    expect(screen.getByText(/最近 90 天哪个渠道应该加预算/)).toBeTruthy();
-    expect(screen.getByText("正在理解问题")).toBeTruthy();
-    expect(screen.getByText("当前上下文")).toBeTruthy();
-    expect(screen.getByText("本轮产物")).toBeTruthy();
-    expect(screen.getByText("业务结论")).toBeTruthy();
-    expect(screen.getByText("证据表")).toBeTruthy();
-    expect(screen.getByText("图表")).toBeTruthy();
-    expect(screen.getByText("报告草稿")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "打开工作台查看完整证据" }).getAttribute("href")).toBe(
-      "/workspaces/ws_1/analysis",
-    );
-    expect(screen.queryByText("完整聊天产品已上线")).toBeNull();
-  });
-
-  it("submits a business Q&A preview question through the existing analysis API", async () => {
-    vi.mocked(runAnalysis).mockResolvedValue({
-      success: true,
-      workspace_id: "ws_1",
-      run_id: "run_qa_1",
-      result: {
-        product_result: {
-          version: "p16.v1",
-          status: "completed",
-          question_thread: {
-            original_question: "下个月预算应该优先投哪个渠道？",
-            system_understanding: "比较渠道表现并给出预算建议",
-            resolved_question: "比较各渠道表现，给出下个月预算优先级建议。",
-          },
-          business_answer: {
-            headline: "优先加码 paid_search，同时观察转化成本。",
-            direct_answer: "paid_search 贡献更高收入，但需要结合成本观察。",
-            why: "当前数据中，channel 为 paid_search，revenue 为 200。",
-            evidence_bullets: ["paid_search revenue is 200"],
-            recommendations: ["先提高 paid_search 预算"],
-            caveats: [],
-            confidence: "medium",
-          },
-          evidence: { table_preview: { columns: ["channel", "revenue"], rows: [["paid_search", 200]] } },
-          chart_artifacts: [],
-          technical_details: {
-            sql: "SELECT channel, SUM(revenue) AS revenue FROM orders GROUP BY channel",
-            raw_rows: [["paid_search", 200]],
-            provider_metadata: { model: "deepseek" },
-          },
-        },
-      },
-    });
-
-    render(<BusinessQAPreview workspaceId="ws_1" />);
-
-    fireEvent.change(screen.getByLabelText("业务问题"), {
-      target: { value: "下个月预算应该优先投哪个渠道？" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "生成预览回答" }));
-
-    await waitFor(() =>
-      expect(runAnalysis).toHaveBeenCalledWith("ws_1", {
-        userQuestion: "下个月预算应该优先投哪个渠道？",
-      }),
-    );
-    expect(await screen.findByText("优先加码 paid_search，同时观察转化成本。")).toBeTruthy();
-    expect(screen.getByText("分析线程")).toBeTruthy();
-    expect(screen.getAllByText("证据表").length).toBeGreaterThanOrEqual(1);
-
-    const disclosure = screen.getByText("技术详情").closest("details");
-    expect(disclosure?.hasAttribute("open")).toBe(false);
-    expect(screen.queryByText(/SELECT channel/)).toBeNull();
-    expect(screen.queryByText(/deepseek/)).toBeNull();
+    expect(navigationMocks.redirect).toHaveBeenCalledWith("/workspaces/ws_1/analysis");
+    expect(screen.queryByText("未来模式预览")).toBeNull();
   });
 
   it("renders profile tables and candidate roles", () => {
@@ -1310,8 +1275,10 @@ describe("workspace product components", () => {
     expect(timeline.textContent).not.toContain("provider");
 
     const text = container.textContent ?? "";
+    expect(text.indexOf("业务结论")).toBeLessThan(text.indexOf("证据表"));
+    expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("分析线程"));
     expect(text.indexOf("分析线程")).toBeLessThan(text.indexOf("分析进度"));
-    expect(text.indexOf("分析进度")).toBeLessThan(text.indexOf("业务结论"));
+    expect(text.indexOf("分析进度")).toBeLessThan(text.indexOf("技术详情"));
     expect(screen.queryByText(/SELECT store_name/)).toBeNull();
     expect(screen.queryByText(/provider_called/)).toBeNull();
     expect(screen.queryByText(/trace.json/)).toBeNull();
@@ -1428,6 +1395,7 @@ describe("workspace product components", () => {
 
     render(<AnalysisRunner workspaceId="ws_1" />);
 
+    fireEvent.click(screen.getByRole("button", { name: /历史分析/ }));
     expect(await screen.findByText("分析商品表现")).toBeTruthy();
     expect(screen.getByText("原因：本轮分析未能执行，请打开详情查看技术信息。")).toBeTruthy();
     expect(screen.queryByText(/Unknown table/)).toBeNull();
@@ -1763,6 +1731,10 @@ describe("workspace product components", () => {
     );
 
     const text = container.textContent ?? "";
+    expect(screen.getByRole("region", { name: "结论与依据" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "继续追问与分析过程" })).toBeTruthy();
+    expect(container.querySelectorAll(".decision-summary")).toHaveLength(1);
+    expect(container.querySelectorAll(".result-process-group")).toHaveLength(1);
     expect(text).toContain("业务结论");
     expect(text.indexOf("先看业务结论")).toBeLessThan(text.indexOf("证据表"));
     expect(text.indexOf("证据表")).toBeLessThan(text.indexOf("技术详情"));
@@ -1792,19 +1764,19 @@ describe("workspace product components", () => {
       />,
     );
 
-    expect(screen.getByText("结论")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "业务结论" })).toBeTruthy();
     expect(screen.getByText("建议优先关注 email 渠道")).toBeTruthy();
-    expect(screen.getByText("直接回答")).toBeTruthy();
     expect(screen.getByText("email 渠道贡献最高收入。")).toBeTruthy();
-    expect(screen.getByText("为什么")).toBeTruthy();
-    expect(screen.getByText("关键证据")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "为什么" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "关键证据" })).toBeTruthy();
     expect(screen.getByText("建议动作")).toBeTruthy();
     expect(screen.getByText("限制说明")).toBeTruthy();
-    expect(screen.getByText("置信度 high")).toBeTruthy();
+    expect(screen.getByText("置信度 高")).toBeTruthy();
+    expect(container.querySelector(".decision-support-grid")).toBeTruthy();
 
     const text = container.textContent ?? "";
-    expect(text.indexOf("结论")).toBeLessThan(text.indexOf("直接回答"));
-    expect(text.indexOf("直接回答")).toBeLessThan(text.indexOf("为什么"));
+    expect(text.indexOf("建议优先关注 email 渠道")).toBeLessThan(text.indexOf("email 渠道贡献最高收入。"));
+    expect(text.indexOf("email 渠道贡献最高收入。")).toBeLessThan(text.indexOf("为什么"));
     expect(text.indexOf("为什么")).toBeLessThan(text.indexOf("关键证据"));
     expect(text.indexOf("关键证据")).toBeLessThan(text.indexOf("建议动作"));
     expect(text.indexOf("建议动作")).toBeLessThan(text.indexOf("限制说明"));
@@ -2009,7 +1981,7 @@ describe("workspace product components", () => {
 
     render(<ReportList workspaceId="ws_1" />);
 
-    expect(screen.getByText("正在加载报告")).toBeTruthy();
+    expect(screen.getByText("正在加载报告…")).toBeTruthy();
     expect(await screen.findByText("还没有生成报告")).toBeTruthy();
     expect(screen.getByText("生成第一份管理层复盘，之后会在这里按创建时间展示。")).toBeTruthy();
     expect(screen.queryByText("Report Library")).toBeNull();
@@ -2037,11 +2009,16 @@ describe("workspace product components", () => {
     render(<ReportGenerator workspaceId="ws_1" />);
     expect(screen.getByText("新建报告")).toBeTruthy();
     expect(screen.queryByText("Create Report")).toBeNull();
-    expect(screen.getByText("生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。")).toBeTruthy();
-    expect(screen.getByText("生成一份管理层经营简报，重点看渠道效率、商品表现和客户分群。")).toBeTruthy();
-    expect(screen.getByText("生成一份最近90天收入趋势变化报告。")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "经营复盘 收入、客户、商品、渠道与建议" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "管理层简报 渠道效率、商品表现与客户分群" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "收入趋势 最近90天收入变化" })).toBeTruthy();
     expect(screen.queryByLabelText("报告类型")).toBeNull();
-    fireEvent.change(screen.getByLabelText("报告目标"), {
+    const reportGoalInput = screen.getByLabelText("报告目标") as HTMLTextAreaElement;
+    expect(reportGoalInput.style.resize).toBe("none");
+    expect(reportGoalInput.className).toContain("report-goal-input");
+    expect(reportGoalInput.closest(".report-generator-composer")).toBeTruthy();
+    expect(screen.getByText("新建报告").closest(".report-generator-guidance")).toBeTruthy();
+    fireEvent.change(reportGoalInput, {
       target: { value: "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。" },
     });
     fireEvent.click(screen.getByRole("button", { name: "生成报告" }));
@@ -2051,7 +2028,7 @@ describe("workspace product components", () => {
         reportGoal: "生成一份最近90天经营复盘报告，包含收入、客户、商品、渠道投放表现和建议。",
       }),
     );
-    expect(pushMock).toHaveBeenCalledWith("/workspaces/ws_1/reports/report_1");
+    expect(navigationMocks.push).toHaveBeenCalledWith("/workspaces/ws_1/reports/report_1");
   });
 
   it("renders generated report list items", async () => {
@@ -2092,10 +2069,36 @@ describe("workspace product components", () => {
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.queryByText("报告类型：经营复盘")).toBeNull();
     expect(screen.getByText("摘要：Revenue grew.")).toBeTruthy();
-    expect(screen.getByText("更新时间：2026-06-23")).toBeTruthy();
+    expect(screen.getByText("更新时间：2026/06/23")).toBeTruthy();
     expect(screen.getByRole("link", { name: "打开报告" }).getAttribute("href")).toBe(
       "/workspaces/ws_1/reports/report_1",
     );
+  });
+
+  it("renders failed report status in the red error tone", async () => {
+    vi.mocked(listWorkspaceReports).mockResolvedValue({
+      workspace_id: "ws_1",
+      reports: [
+        {
+          report_id: "report_failed",
+          workspace_id: "ws_1",
+          report_type: "business_review",
+          report_goal: "生成管理层经营简报",
+          title: "当前数据管理层经营简报",
+          status: "failed",
+          markdown_path: "workspaces/ws_1/reports/report_failed/report.md",
+          json_path: "workspaces/ws_1/reports/report_failed/report.json",
+          trace_path: "workspaces/ws_1/reports/report_failed/trace.json",
+          artifact_dir: "workspaces/ws_1/reports/report_failed/artifacts",
+          created_at: "2026-07-09T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<ReportList workspaceId="ws_1" />);
+
+    const failedStatus = await screen.findByText("生成状态：失败");
+    expect(failedStatus.className).toContain("status-pill-red");
   });
 
   it("renders the report center route with active product navigation", async () => {
@@ -2103,8 +2106,12 @@ describe("workspace product components", () => {
 
     render(await ReportsPage({ params: Promise.resolve({ workspaceId: "ws_1" }) }));
 
-    expect(screen.getByRole("heading", { level: 1, name: "报告中心" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "报告" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "报告" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
     expect(await screen.findByText("还没有生成报告")).toBeTruthy();
     expect(screen.getByText("新建报告")).toBeTruthy();
   });
@@ -2284,6 +2291,13 @@ describe("workspace product components", () => {
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
+    const deliveryToolbar = screen.getByRole("group", { name: "报告交付操作" });
+    expect(within(deliveryToolbar).getByRole("button", { name: "发布到飞书" })).toBeTruthy();
+    expect(within(deliveryToolbar).getByRole("button", { name: "导出 Word" })).toBeTruthy();
+    const moreActions = within(deliveryToolbar).getByText("更多操作").closest("details");
+    expect(moreActions?.hasAttribute("open")).toBe(false);
+    fireEvent.click(within(moreActions as HTMLElement).getByText("更多操作"));
+    expect(within(moreActions as HTMLElement).getByRole("link", { name: "下载 Markdown" })).toBeTruthy();
     expect(screen.getByText("生成状态：已完成")).toBeTruthy();
     expect(screen.getByText("生成时间：2026-07-02")).toBeTruthy();
     expect(screen.getByText("时间范围：最近90天")).toBeTruthy();
@@ -2485,8 +2499,9 @@ describe("workspace product components", () => {
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
+    const deliveryToolbar = await screen.findByRole("group", { name: "报告交付操作" });
     fireEvent.click(await screen.findByRole("button", { name: "发布到飞书" }));
-    expect(screen.getByRole("button", { name: "发布中" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "发布中…" })).toBeTruthy();
     resolvePublish({
       success: true,
       workspace_id: "ws_1",
@@ -2510,7 +2525,11 @@ describe("workspace product components", () => {
     await waitFor(() => expect(publishFeishuReport).toHaveBeenCalledWith("ws_1", "report_1"));
     const link = await screen.findByRole("link", { name: "打开飞书文档" });
     expect(link.getAttribute("href")).toBe("https://example.feishu.cn/docx/doccn123");
-    expect(screen.getByRole("link", { name: "打开飞书表格" }).getAttribute("href")).toBe(
+    expect(screen.getAllByRole("link", { name: "打开飞书文档" })).toHaveLength(1);
+    expect(within(deliveryToolbar).getByRole("link", { name: "打开飞书文档" })).toBeTruthy();
+    const moreActions = within(deliveryToolbar).getByText("更多操作").closest("details");
+    fireEvent.click(within(moreActions as HTMLElement).getByText("更多操作"));
+    expect(within(moreActions as HTMLElement).getByRole("link", { name: "打开飞书表格" }).getAttribute("href")).toBe(
       "https://example.feishu.cn/sheets/shtcn123",
     );
     expect(screen.getByText("已写入 2 个数据表，已创建 1 个原生图表。")).toBeTruthy();
@@ -3009,8 +3028,12 @@ describe("workspace product components", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: "报告中心" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /报告中心/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("heading", { level: 1, name: "报告" })).toBeTruthy();
+    expect(
+      within(screen.getByRole("navigation", { name: "产品导航" }))
+        .getByRole("link", { name: "报告" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
     expect(await screen.findByText("管理层收入复盘报告")).toBeTruthy();
     expect(screen.getByText("收入增长稳定。")).toBeTruthy();
     expect(screen.getByText("报告正文显示收入保持增长。")).toBeTruthy();
@@ -3056,7 +3079,11 @@ describe("workspace product components", () => {
 
     render(<ReportViewer workspaceId="ws_1" reportId="report_1" />);
 
-    expect(await screen.findByText(`生成状态：${label}`)).toBeTruthy();
+    const statusPill = await screen.findByText(`生成状态：${label}`);
+    expect(statusPill).toBeTruthy();
+    if (status === "failed") {
+      expect(statusPill.className).toContain("status-pill-red");
+    }
     expect(screen.getByText(progress)).toBeTruthy();
   });
 

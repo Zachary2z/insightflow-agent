@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,10 +8,10 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P36 Feishu Document Publishing |
-| Current task | P36-H7 Feishu Sheet companion for editable evidence and native charts complete |
+| Current phase | Post-P36 frontend UI consolidation |
+| Current task | Approved decision-desk interface implemented and verified |
 | Next planned task | Post-P36 follow-up planning |
-| Last completed task | P36-H7 Feishu Sheet Companion For Editable Evidence And Native Charts |
+| Last completed task | 2026-07-10 frontend UI consolidation |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs`; same-thread follow-ups use `POST /api/workspaces/{workspace_id}/runs/{run_id}/follow-ups` |
@@ -51,6 +51,7 @@ This is the concise current status surface for InsightFlow Agent.
 | P34 | `[x]` Complete | H1-H4 complete; Report Center can trigger backend Word export and download real `.docx` files without report rewriting or simulated SaaS connectors |
 | P35 | `[x]` Complete | Analysis Workbench evidence planning and chart reliability: H1 grouped ledger, H2 grouped-answer/audit, H3 deterministic grouped-chart implementation, and H4 live-closeout repair are complete |
 | P36 | `[x]` Complete | Feishu document publishing: H1-H7 complete; Feishu Docs remain the primary report surface, with an optional companion Feishu Sheet for editable evidence tables and safe native sheet charts |
+| UI consolidation | `[x]` Complete | Three-entry decision-desk shell, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement; APIs and Analysis/Report separation preserved; 83 frontend tests, production build, 55 focused backend tests, browser QA, and diff check passed |
 
 P34 planning is recorded in `docs/product/plans/2026-07-07-p34-real-export-tooling.md`. The core rule is: generated report content follows `ReportDocument`; export tools provide stable layout and real file generation only. Word export does not call the LLM, rewrite conclusions, force fixed business chapters, stitch Analysis Workbench answers into reports, or restore simulated SaaS/action/chart paths. Report Center now has the first visible export UI; Analysis Workbench keeps safe export package support for later connectors.
 

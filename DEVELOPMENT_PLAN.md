@@ -23,6 +23,7 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-07-07-p34-real-export-tooling.md`
 - `docs/product/plans/2026-07-07-p35-analysis-chart-and-ledger-reliability.md`
 - `docs/product/plans/2026-07-08-p36-feishu-document-publishing.md`
+- `docs/product/plans/2026-07-10-frontend-ui-consolidation.md`
 
 ## Current Product Direction
 
@@ -57,6 +58,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P34 is complete as the first real export tooling phase. `workspaces.export_package` exposes the P34 unified safe output contract for Report Center and Analysis Workbench, chart artifacts can be projected to safe static assets for document insertion, Report Center export packages render into real local Word `.docx` files, and the Report Center UI can trigger/download Word export through the backend API. Report content structure follows the generated `ReportDocument`; export tools only provide stable document layout and file generation. P34 does not re-plan, rewrite, or template report content, and does not restore simulated SaaS/action/chart paths.
 - P35 is complete as the Analysis Workbench evidence-planning and chart-reliability phase before deeper external-tool work. Analysis Workbench now plans question-level evidence first, keeps evidence grouped by business purpose/dimension/metric/grain/source, lets the model write from an answer-safe grouped ledger, preserves valid model-written answers during audit, selects charts from coherent evidence groups/subsets, and deletes/narrows old broad ledger/chart/row-derived answer paths.
 - P36 is complete as the first real external platform publishing phase. H1-H6 proved that existing Report Center `ReportDocument` output can be published to real Feishu Docs through the open-source `lark-cli`, using `p34.export_package.v1` and P30/P34 chart static assets as the handoff. The Feishu body avoids a duplicate top-level report title, keeps evidence tables near their sections without flooding the Feishu outline, and inserts PNG/JPEG/GIF chart images at matching anchors. H7 adds an optional companion Feishu Sheet from the same export package for editable evidence tables and native Feishu sheet charts when a safe bar/line mapping exists. The publisher remains a delivery tool only: it does not call the LLM, rewrite reports, stitch Analysis Workbench answers, introduce fixed report templates, generate chart data, run Sheet-side re-analysis, query databases directly for Sheet export, or restore simulated SaaS/action paths. P36 keeps the interface ready for a later direct Feishu OpenAPI publisher while proving the product can call real business document/spreadsheet tools now.
+- The 2026-07-10 frontend consolidation applies the approved decision-desk design to the active Next.js product: global navigation is now 数据准备、分析、报告; profile and semantic work are tabs inside 数据准备; settings is compact and secondary; analysis output is answer-first while keeping thread/history/progress/technical detail; Report Center remains independent; the retired Business Q&A preview redirects to Analysis Workbench.
 
 Current runtime chain:
 
@@ -118,6 +120,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P34 | Real export tooling: safe export packages, static chart assets, backend Word export API, frontend download flow, and real local `.docx` export without report rewriting or simulated SaaS connectors | Complete; H1-H4 complete |
 | P35 | Analysis Workbench evidence planning and chart reliability: add question-level evidence plans, grouped ledgers, grouped answer generation/audit, coherent chart selection, ECharts polish, and delete conflicting old broad-projection/template paths | Complete; H1-H4 complete |
 | P36 | Feishu document publishing: publish existing Report Center reports to real Feishu Docs through `lark-cli`, insert safe chart static assets, persist publish artifacts, polish Feishu document layout/section chart placement, and add an optional companion Feishu Sheet for editable evidence/native charts while keeping old simulated connector/template paths deleted | Complete; H1-H7 complete |
+| UI consolidation (2026-07-10) | Approved decision-desk frontend, three-entry navigation, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement without API changes | Complete; final verification recorded in the dated plan |
 
 ## P16 Business Answer Contract
 

@@ -43,13 +43,15 @@ export default function WorkspaceNewForm({ onCreated }: WorkspaceNewFormProps) {
         <label htmlFor="workspace-name">工作区名称</label>
         <input
           id="workspace-name"
+          name="workspace-name"
           type="text"
+          autoComplete="off"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="收入复盘工作区"
+          placeholder="例如：收入复盘工作区…"
         />
         <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "创建中..." : "创建工作区"}
+          {isSubmitting ? "创建中…" : "创建工作区"}
         </button>
       </form>
       {error ? <p role="alert">{error}</p> : null}

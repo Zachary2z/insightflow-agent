@@ -5,6 +5,19 @@ import React, { useEffect, useState } from "react";
 import { listWorkspaces, type Workspace } from "../lib/api";
 import ProductCard from "./ProductCard";
 
+function formatWorkspaceDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export default function WorkspaceList() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +50,7 @@ export default function WorkspaceList() {
   }, []);
 
   if (isLoading) {
-    return <p role="status">正在加载工作区</p>;
+    return <p role="status">正在加载工作区…</p>;
   }
 
   if (error) {
@@ -65,10 +78,10 @@ export default function WorkspaceList() {
           <div>
             <h2>{workspace.name}</h2>
             <p>{workspace.workspace_id}</p>
-            {workspace.updated_at ? <p>更新时间：{workspace.updated_at}</p> : null}
+            {workspace.updated_at ? <p>更新时间：{formatWorkspaceDate(workspace.updated_at)}</p> : null}
           </div>
           <Link className="button" href={`/workspaces/${workspace.workspace_id}/datasets`}>
-            打开数据源管理
+            打开数据准备
           </Link>
         </ProductCard>
       ))}

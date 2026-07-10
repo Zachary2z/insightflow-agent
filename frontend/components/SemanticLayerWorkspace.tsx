@@ -36,7 +36,7 @@ export default function SemanticLayerWorkspace({ workspaceId }: SemanticLayerWor
           <p className="panel-help">根据字段画像生成指标、维度、实体和时间字段建议。</p>
         </div>
         <button type="button" onClick={handleDraft} disabled={isLoading}>
-          {isLoading ? "生成中..." : "生成语义层草稿"}
+          {isLoading ? "生成中…" : "生成语义层草稿"}
         </button>
       </ProductCard>
       {error ? <p role="alert">{error}</p> : null}

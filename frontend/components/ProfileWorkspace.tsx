@@ -36,7 +36,7 @@ export default function ProfileWorkspace({ workspaceId }: ProfileWorkspaceProps)
           <p className="panel-help">读取当前工作区数据库，生成表、字段、行数和候选角色信息。</p>
         </div>
         <button type="button" onClick={handleCreateProfile} disabled={isLoading}>
-          {isLoading ? "生成中..." : "生成字段画像"}
+          {isLoading ? "生成中…" : "生成字段画像"}
         </button>
       </ProductCard>
       {error ? <p role="alert">{error}</p> : null}

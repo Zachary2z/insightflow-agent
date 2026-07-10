@@ -15,7 +15,7 @@ type PillState = {
 
 function pillState(modelMode?: WorkspaceSettings["model_mode"]): PillState {
   if (!modelMode) {
-    return { label: "模型状态检查中", tone: "neutral" };
+    return { label: "模型状态检查中…", tone: "neutral" };
   }
   if (modelMode.product_live_mode) {
     return { label: "真实模型已开启", tone: "green" };
@@ -47,5 +47,5 @@ export default function ModelModePill({ workspaceId }: ModelModePillProps) {
     };
   }, [workspaceId]);
 
-  return <StatusPill tone={state.tone}>{state.label}</StatusPill>;
+  return <StatusPill tone={state.tone} aria-live="polite">{state.label}</StatusPill>;
 }

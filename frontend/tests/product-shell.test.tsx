@@ -1,6 +1,8 @@
 import React from "react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { metadata } from "../app/layout";
+import ProductEntryShell from "../components/ProductEntryShell";
 import ProductShell from "../components/ProductShell";
 
 function mockWorkspaceSettings(modelMode: Record<string, unknown>) {
@@ -19,7 +21,7 @@ describe("ProductShell", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the shared InsightFlow product chrome and active Chinese navigation", () => {
+  it("renders the approved decision-desk chrome with three primary destinations", () => {
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}) as Promise<Response>);
 
     render(
@@ -29,30 +31,37 @@ describe("ProductShell", () => {
     );
 
     expect(screen.getByText("InsightFlow")).toBeTruthy();
-    expect(screen.getByText("通用业务数据分析工作台")).toBeTruthy();
+    expect(screen.getByText("把数据变成下一步行动")).toBeTruthy();
     expect(screen.getByText("ws_revenue")).toBeTruthy();
-    expect(screen.getByText("模型状态检查中")).toBeTruthy();
+    expect(screen.getByText("模型状态检查中…").getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("link", { name: "跳到主要内容" }).getAttribute("href")).toBe("#main-content");
 
     const navigation = screen.getByRole("navigation", { name: "产品导航" });
-    expect(within(navigation).getByRole("link", { name: /数据源管理/ }).getAttribute("href")).toBe(
+    expect(within(navigation).getByRole("link", { name: "数据准备" }).getAttribute("href")).toBe(
       "/workspaces/ws_revenue/datasets",
     );
-    expect(within(navigation).getByRole("link", { name: /分析工作台/ }).getAttribute("href")).toBe(
+    expect(within(navigation).getByRole("link", { name: "分析" }).getAttribute("href")).toBe(
       "/workspaces/ws_revenue/analysis",
     );
-    expect(within(navigation).getByRole("link", { name: /报告中心/ }).getAttribute("href")).toBe(
+    expect(within(navigation).getByRole("link", { name: "报告" }).getAttribute("href")).toBe(
       "/workspaces/ws_revenue/reports",
     );
-    expect(within(navigation).getByRole("link", { name: /数据设置/ }).getAttribute("href")).toBe(
+    expect(within(navigation).queryByRole("link", { name: /业务问答/ })).toBeNull();
+    expect(within(navigation).getAllByRole("link")).toHaveLength(3);
+
+    expect(within(navigation).getByRole("link", { name: "分析" }).getAttribute("aria-current")).toBe("page");
+    const topActions = document.querySelector(".decision-top-actions");
+    expect(topActions).toBeTruthy();
+    const topSettingsLink = within(topActions as HTMLElement).getByRole("link", { name: "打开工作区设置" });
+    expect(topSettingsLink.textContent).toContain("工作区设置");
+    expect(topSettingsLink.className).toContain("decision-settings-link");
+    expect(topSettingsLink.getAttribute("href")).toBe(
       "/workspaces/ws_revenue/settings",
     );
-    expect(within(navigation).getByRole("link", { name: /业务问答/ }).getAttribute("href")).toBe(
-      "/workspaces/ws_revenue/business-qa",
-    );
 
-    expect(within(navigation).getByRole("link", { name: /分析工作台/ }).getAttribute("aria-current")).toBe(
-      "page",
-    );
+    const mobileNavigation = screen.getByRole("navigation", { name: "移动端产品导航" });
+    expect(within(mobileNavigation).getAllByRole("link")).toHaveLength(3);
+    expect(within(mobileNavigation).getByRole("link", { name: "分析" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("页面内容")).toBeTruthy();
   });
 
@@ -106,22 +115,31 @@ describe("ProductShell", () => {
     expect(screen.queryByText("真实模型已开启")).toBeNull();
   });
 
-  it("marks the business Q&A preview navigation item active", () => {
+  it("keeps settings outside the primary navigation", () => {
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}) as Promise<Response>);
 
     render(
-      <ProductShell workspaceId="ws_1" active="business-qa">
-        <p>业务问答内容</p>
+      <ProductShell workspaceId="ws_1" active="settings">
+        <p>设置内容</p>
       </ProductShell>,
     );
 
     const navigation = screen.getByRole("navigation", { name: "产品导航" });
-    expect(within(navigation).getByRole("link", { name: /业务问答/ }).getAttribute("href")).toBe(
-      "/workspaces/ws_1/business-qa",
+    expect(within(navigation).queryByRole("link", { current: "page" })).toBeNull();
+    expect(screen.getByRole("link", { name: "工作区设置" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("设置内容")).toBeTruthy();
+  });
+
+  it("gives entry pages a skip link and descriptive document metadata", () => {
+    render(
+      <ProductEntryShell>
+        <p>入口内容</p>
+      </ProductEntryShell>,
     );
-    expect(within(navigation).getByRole("link", { name: /业务问答/ }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-    expect(within(navigation).getByRole("link", { name: /分析工作台/ }).getAttribute("aria-current")).toBeNull();
+
+    expect(screen.getByRole("link", { name: "跳到主要内容" }).getAttribute("href")).toBe("#main-content");
+    expect(document.querySelector("main")?.id).toBe("main-content");
+    expect(metadata.title).toBe("InsightFlow · 数据决策工作台");
+    expect(metadata.description).toBe("从数据准备到业务分析与报告交付的一体化决策工作台。");
   });
 });

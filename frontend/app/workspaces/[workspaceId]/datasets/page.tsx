@@ -1,5 +1,6 @@
 import React from "react";
 import DatasetManager from "@/components/DatasetManager";
+import DataPreparationTabs from "@/components/DataPreparationTabs";
 import ProductPageHeader from "@/components/ProductPageHeader";
 import ProductShell from "@/components/ProductShell";
 
@@ -11,12 +12,13 @@ export default async function DatasetsPage({ params }: DatasetsPageProps) {
   const { workspaceId } = await params;
 
   return (
-    <ProductShell workspaceId={workspaceId} active="sources">
+    <ProductShell workspaceId={workspaceId} active="prepare">
       <ProductPageHeader
-        eyebrow="数据导入"
-        title="数据源管理"
-        description="先把真实业务文件导入工作区，再生成数据画像、语义层和可分析问题。"
+        eyebrow="Workspace readiness"
+        title="数据准备"
+        description="把文件、字段和业务口径集中在一处。先连接真实业务数据，再完成字段画像与业务语义。"
       />
+      <DataPreparationTabs workspaceId={workspaceId} active="sources" />
       <DatasetManager workspaceId={workspaceId} />
     </ProductShell>
   );

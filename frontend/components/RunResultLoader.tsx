@@ -55,7 +55,7 @@ export default function RunResultLoader({ workspaceId, runId }: RunResultLoaderP
     return (
       <section className="panel">
         <h2>分析结果</h2>
-        <p>正在加载分析详情</p>
+        <p role="status">正在加载分析详情…</p>
       </section>
     );
   }

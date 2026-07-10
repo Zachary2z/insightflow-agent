@@ -422,7 +422,7 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
   }, [workspaceId, reportId]);
 
   if (isLoading) {
-    return <p role="status">正在加载报告</p>;
+    return <p role="status">正在加载报告…</p>;
   }
 
   if (error) {
@@ -441,6 +441,10 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
 
   const language = reportLanguage(report);
   const labels = REPORT_LABELS[language];
+  const publishedDocumentUrl =
+    publishState.result?.status === "failed" ? "" : safeExternalResultUrl(publishState.result?.url);
+  const publishedSheetUrl =
+    publishState.result?.status === "failed" ? "" : safeExternalResultUrl(publishState.result?.sheet_url);
 
   async function handleWordExport() {
     if (!report) {
@@ -502,24 +506,49 @@ export default function ReportViewer({ workspaceId, reportId }: ReportViewerProp
               <span>{metaText(labels.dataSourcesPrefix, joinText(report.document?.data_sources), language)}</span>
             </div>
           </div>
-          <div className="report-download-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleFeishuPublish}
-              disabled={publishState.status === "publishing"}
-            >
-              {publishState.status === "publishing" ? labels.publishingFeishu : labels.publishFeishu}
-            </button>
+          <div className="report-delivery-toolbar" role="group" aria-label="报告交付操作">
+            {publishedDocumentUrl ? (
+              <a
+                className="button report-primary-action"
+                href={publishedDocumentUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开飞书文档
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={handleFeishuPublish}
+                disabled={publishState.status === "publishing"}
+              >
+                {publishState.status === "publishing" ? `${labels.publishingFeishu}…` : labels.publishFeishu}
+              </button>
+            )}
             <button
               type="button"
               className="secondary-button"
               onClick={handleWordExport}
               disabled={exportState.status === "exporting"}
             >
-              {exportState.status === "exporting" ? labels.exportingWord : labels.exportWord}
+              {exportState.status === "exporting" ? `${labels.exportingWord}…` : labels.exportWord}
             </button>
-            <ReportDownloadLink workspaceId={workspaceId} reportId={report.report_id} label={labels.downloadMarkdown} />
+            <details className="report-more-actions">
+              <summary>更多操作</summary>
+              <div className="report-more-actions-menu">
+                <ReportDownloadLink
+                  workspaceId={workspaceId}
+                  reportId={report.report_id}
+                  label={labels.downloadMarkdown}
+                  className="report-more-action"
+                />
+                {publishedSheetUrl ? (
+                  <a className="report-more-action" href={publishedSheetUrl} target="_blank" rel="noreferrer">
+                    打开飞书表格
+                  </a>
+                ) : null}
+              </div>
+            </details>
           </div>
         </div>
         <FeishuPublishStatus state={publishState} />
@@ -555,7 +584,7 @@ function FeishuPublishStatus({
   }
   if (state.status === "error") {
     return (
-      <p className="soft-warning" role="alert">
+      <p className="report-delivery-status soft-warning" role="alert">
         {state.error}
       </p>
     );
@@ -586,41 +615,38 @@ function FeishuPublishStatus({
       : isFailed
         ? "发布到飞书失败"
         : "已发布到飞书";
-  const url = typeof state.result.url === "string" && state.result.url.trim() ? state.result.url.trim() : "";
-  const sheetUrl =
-    typeof state.result.sheet_url === "string" && state.result.sheet_url.trim()
-      ? state.result.sheet_url.trim()
-      : "";
+  const combinedWarnings = [...visibleWarnings, ...sheetWarnings];
   return (
-    <section className="report-summary">
-      <h3>{title}</h3>
-      {url && !isFailed ? (
-        <a className="button" href={resolveApiUrl(url)} target="_blank" rel="noreferrer">
-          打开飞书文档
-        </a>
-      ) : null}
-      {sheetUrl && !isFailed ? (
-        <a className="secondary-button" href={resolveApiUrl(sheetUrl)} target="_blank" rel="noreferrer">
-          打开飞书表格
-        </a>
-      ) : null}
-      {chartSummary ? <p>{chartSummary}</p> : null}
-      {sheetSummary ? <p>{sheetSummary}</p> : null}
-      {visibleWarnings.length ? (
-        <ul>
-          {visibleWarnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      ) : null}
-      {sheetWarnings.length ? (
-        <ul>
-          {sheetWarnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      ) : null}
+    <section className="report-delivery-status" aria-live="polite">
+      <div className="report-delivery-status-heading">
+        <p className="product-eyebrow">交付状态</p>
+        <h3>{title}</h3>
+      </div>
+      <div className="report-delivery-facts">
+        {chartSummary ? <span>{chartSummary}</span> : null}
+        {sheetSummary ? <span>{sheetSummary}</span> : null}
+      </div>
+      <PublishWarnings warnings={combinedWarnings} />
     </section>
+  );
+}
+
+function PublishWarnings({ warnings }: { warnings: string[] }) {
+  if (!warnings.length) {
+    return null;
+  }
+  if (warnings.length === 1) {
+    return <p className="report-delivery-warning">{warnings[0]}</p>;
+  }
+  return (
+    <details className="report-delivery-warning-details">
+      <summary>查看 {warnings.length} 条交付提醒</summary>
+      <ul>
+        {warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -670,7 +696,7 @@ function WordExportStatus({
   }
   if (state.status === "error") {
     return (
-      <p className="soft-warning" role="alert">
+      <p className="report-delivery-status soft-warning" role="alert">
         {state.error}
       </p>
     );
@@ -680,8 +706,11 @@ function WordExportStatus({
   }
   const downloadUrl = resolveApiUrl(state.result.download_url);
   return (
-    <section className="report-summary">
-      <h3>{labels.exportReady}</h3>
+    <section className="report-delivery-status" aria-live="polite">
+      <div className="report-delivery-status-heading">
+        <p className="product-eyebrow">Word 导出</p>
+        <h3>{labels.exportReady}</h3>
+      </div>
       <a className="button" href={downloadUrl} download={state.result.download_name}>
         {labels.downloadWord}
       </a>
@@ -696,11 +725,14 @@ function WordExportStatus({
   );
 }
 
-function statusTone(status: string): "green" | "orange" | "blue" | "neutral" {
+function statusTone(status: string): "green" | "orange" | "red" | "blue" | "neutral" {
   if (status === "completed") {
     return "green";
   }
-  if (status === "failed" || status === "partial") {
+  if (status === "failed") {
+    return "red";
+  }
+  if (status === "partial") {
     return "orange";
   }
   if (status === "running") {
@@ -720,4 +752,16 @@ function formatReportDate(value?: string) {
 function joinText(items?: string[]) {
   const visible = items?.filter((item) => item.trim()) ?? [];
   return visible.length ? visible.join("、") : "当前工作区数据";
+}
+
+function safeExternalResultUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
 }

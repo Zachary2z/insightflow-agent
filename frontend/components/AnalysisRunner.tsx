@@ -13,7 +13,6 @@ import {
 } from "../lib/api";
 import AnalysisHistoryPanel from "./AnalysisHistoryPanel";
 import RunResult from "./RunResult";
-import WorkspaceReadinessHeader from "./WorkspaceReadinessHeader";
 
 type AnalysisRunnerProps = {
   workspaceId: string;
@@ -161,6 +160,7 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
   const [cacheCandidate, setCacheCandidate] = useState<CacheCandidate | null>(null);
   const [historyRuns, setHistoryRuns] = useState<WorkspaceRunSummary[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
   const [error, setError] = useState("");
@@ -336,6 +336,7 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
       setCacheCandidate(null);
       setRun(response);
       cacheRun(response);
+      setIsHistoryOpen(false);
       if (isActiveRunStatus(responseStatus(response))) {
         rememberActiveRun(response);
         void pollRun(historyRun.run_id);
@@ -390,17 +391,17 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
 
   return (
     <section className="analysis-workbench">
-      <div className="workbench-local-heading">
-        <p className="product-eyebrow">Analysis Workbench</p>
-        <h2>分析工作台</h2>
+      <div className="analysis-page-tools">
+        <button className="secondary-button" type="button" onClick={() => setIsHistoryOpen(true)}>
+          历史分析{historyRuns.length ? ` · ${historyRuns.length}` : ""}
+        </button>
       </div>
-      <WorkspaceReadinessHeader workspaceId={workspaceId} />
       <div className="analysis-main-grid">
         <div className="analysis-primary-column">
           <article className="product-card question-panel">
             <div className="section-heading">
               <div>
-                <p className="product-eyebrow">Ask</p>
+                <p className="product-eyebrow">Ask a business question</p>
                 <h2>问一个业务问题</h2>
                 <p className="product-lead">输入自然语言问题；如果缺少时间范围或口径，系统会在同一条分析线程里追问。</p>
               </div>
@@ -409,10 +410,12 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
               <label htmlFor="analysis-question">业务问题</label>
               <textarea
                 id="analysis-question"
+                name="analysis-question"
+                autoComplete="off"
                 rows={4}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                placeholder="例如：帮我分析最近 90 天哪个渠道应该加预算"
+                placeholder="例如：帮我分析最近 90 天哪个渠道应该加预算…"
               />
               <details className="advanced-options">
                 <summary>高级选项：SQL 起点</summary>
@@ -420,15 +423,18 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
                   <label htmlFor="initial-sql">初始 SQL</label>
                   <textarea
                     id="initial-sql"
+                    name="initial-sql"
+                    autoComplete="off"
+                    spellCheck={false}
                     rows={3}
                     value={initialSql}
                     onChange={(event) => setInitialSql(event.target.value)}
-                    placeholder="可选：只在需要指定已审核 SQL 起点时填写"
+                    placeholder="可选：只在需要指定已审核 SQL 起点时填写…"
                   />
                 </div>
               </details>
               <button type="submit" disabled={isRunning}>
-                {isRunning ? "分析中..." : "开始分析"}
+                {isRunning ? "分析中…" : "开始分析"}
               </button>
             </form>
           </article>
@@ -447,19 +453,26 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
                   查看历史结果
                 </button>
                 <button type="button" className="secondary-button" onClick={handleForceReanalysis} disabled={isRunning}>
-                  {isRunning ? "重新分析中..." : "重新分析"}
+                  {isRunning ? "重新分析中…" : "重新分析"}
                 </button>
               </div>
             </article>
           ) : null}
           {run ? (
             <article className="run-shell">
-              <div className="section-heading">
+              <div className="section-heading analysis-result-header">
                 <div>
                   <p className="product-eyebrow">Analysis Flow</p>
                   <h2>分析线程与结果</h2>
                 </div>
-                {selectedRunId ? <span className="status-chip">{selectedRunId}</span> : null}
+                {selectedRunId ? (
+                  <div className="analysis-result-actions">
+                    <span className="status-chip">{selectedRunId}</span>
+                    <Link className="analysis-detail-link" href={`/workspaces/${workspaceId}/runs/${selectedRunId}`}>
+                      查看本次分析详情
+                    </Link>
+                  </div>
+                ) : null}
               </div>
               {shouldRenderCompactTask(run) ? (
                 <RunTaskCard run={run} workspaceId={workspaceId} />
@@ -472,11 +485,6 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
                   continuationError={continuationError}
                 />
               )}
-              {selectedRunId ? (
-                <Link className="button secondary-button" href={`/workspaces/${workspaceId}/runs/${selectedRunId}`}>
-                  查看本次分析详情
-                </Link>
-              ) : null}
             </article>
           ) : null}
         </div>
@@ -486,6 +494,8 @@ export default function AnalysisRunner({ workspaceId }: AnalysisRunnerProps) {
           isLoading={isHistoryLoading}
           error={historyError}
           onSelectRun={handleSelectHistoryRun}
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
         />
       </div>
     </section>

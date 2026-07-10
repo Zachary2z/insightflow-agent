@@ -1,0 +1,1776 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173f35" />
+    <title>InsightFlow 界面收敛原型</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #eef3f1;
+        --surface: #fbfcfb;
+        --surface-strong: #ffffff;
+        --ink: #14231d;
+        --muted: #66736e;
+        --line: #d7e0dc;
+        --line-strong: #c4d0cb;
+        --brand: #1e5d4c;
+        --brand-dark: #173f35;
+        --brand-soft: #dff0e8;
+        --blue: #3156d9;
+        --blue-soft: #e9edff;
+        --amber: #b96b12;
+        --amber-soft: #fff0d8;
+        --red: #a63d3d;
+        --red-soft: #fbe7e5;
+        --shadow: 0 22px 60px rgba(27, 55, 45, 0.08);
+        --display: "Songti SC", "STSong", "Noto Serif SC", serif;
+        --body: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        --utility: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 82% 0%, rgba(49, 86, 217, 0.08), transparent 28rem),
+          var(--canvas);
+        color: var(--ink);
+        font-family: var(--body);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.58;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      :focus-visible {
+        outline: 3px solid rgba(49, 86, 217, 0.38);
+        outline-offset: 3px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .skip-link {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 100;
+        transform: translateY(-160%);
+        border-radius: 10px;
+        background: var(--ink);
+        color: white;
+        padding: 10px 14px;
+        text-decoration: none;
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 248px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--brand-dark);
+        color: white;
+        padding: 24px 18px 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 0 8px;
+      }
+
+      .brand-mark {
+        position: relative;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 12px 5px 12px 5px;
+        background: #f7fbf8;
+      }
+
+      .brand-mark::before,
+      .brand-mark::after {
+        position: absolute;
+        content: "";
+        border-radius: 999px;
+      }
+
+      .brand-mark::before {
+        width: 24px;
+        height: 24px;
+        left: -5px;
+        bottom: -3px;
+        background: #4f72eb;
+      }
+
+      .brand-mark::after {
+        width: 19px;
+        height: 19px;
+        top: -3px;
+        right: -3px;
+        background: #70be9d;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .brand span {
+        display: block;
+        margin-top: 2px;
+        color: #a9c3b9;
+        font-size: 11px;
+      }
+
+      .workspace-card {
+        margin: 30px 6px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 13px;
+      }
+
+      .workspace-card small {
+        color: #a9c3b9;
+        font-size: 11px;
+      }
+
+      .workspace-card strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 14px;
+      }
+
+      .workspace-health {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 11px;
+        color: #d5e8df;
+        font-size: 12px;
+      }
+
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #72d2a5;
+        box-shadow: 0 0 0 4px rgba(114, 210, 165, 0.12);
+      }
+
+      .side-nav {
+        display: grid;
+        gap: 7px;
+        margin-top: 8px;
+      }
+
+      .side-nav button,
+      .bottom-nav button {
+        border: 0;
+        background: transparent;
+      }
+
+      .nav-item {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 48px;
+        border-radius: 12px;
+        color: #b8ccc4;
+        padding: 10px 12px;
+        text-align: left;
+        transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+      }
+
+      .nav-item:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .nav-item[aria-current="page"] {
+        color: var(--brand-dark);
+        background: #eff8f3;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+      }
+
+      .nav-glyph {
+        display: grid;
+        width: 25px;
+        height: 25px;
+        place-items: center;
+        border: 1px solid currentColor;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .nav-label {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .side-foot {
+        margin-top: auto;
+        padding: 16px 8px 4px;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .quiet-button {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        border: 0;
+        border-radius: 10px;
+        color: #b8ccc4;
+        background: transparent;
+        padding: 10px;
+        text-align: left;
+      }
+
+      .quiet-button:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .mobile-header,
+      .bottom-nav {
+        display: none;
+      }
+
+      .mobile-actions {
+        display: flex;
+        gap: 7px;
+      }
+
+      .main-shell {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 72px;
+        border-bottom: 1px solid rgba(196, 208, 203, 0.78);
+        background: rgba(238, 243, 241, 0.9);
+        padding: 12px clamp(24px, 4vw, 54px);
+        backdrop-filter: blur(16px);
+      }
+
+      .breadcrumb {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .breadcrumb strong {
+        color: var(--ink);
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .status-text {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-right: 4px;
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .icon-button,
+      .button,
+      .soft-button,
+      .chip-button {
+        border: 1px solid transparent;
+        transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
+      }
+
+      .icon-button {
+        display: inline-grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border-color: var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink);
+      }
+
+      .icon-button:hover,
+      .soft-button:hover,
+      .chip-button:hover {
+        border-color: var(--line-strong);
+        background: white;
+      }
+
+      .content {
+        width: min(1280px, 100%);
+        margin: 0 auto;
+        padding: 34px clamp(24px, 4vw, 54px) 72px;
+      }
+
+      .page {
+        display: none;
+      }
+
+      .page.active {
+        display: block;
+        animation: page-in 260ms ease both;
+      }
+
+      @keyframes page-in {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .page-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 28px;
+        margin-bottom: 24px;
+      }
+
+      .page-heading h1 {
+        margin: 0;
+        font-family: var(--display);
+        font-size: clamp(34px, 5vw, 54px);
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 1.08;
+        text-wrap: balance;
+      }
+
+      .page-heading p {
+        max-width: 680px;
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.7;
+        text-wrap: pretty;
+      }
+
+      .page-context {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-family: var(--utility);
+        font-size: 11px;
+        text-align: right;
+      }
+
+      .question-composer {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        border: 1px solid var(--line-strong);
+        border-radius: 18px;
+        background: var(--surface-strong);
+        padding: 8px 8px 8px 18px;
+        box-shadow: var(--shadow);
+      }
+
+      .question-composer input {
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--ink);
+        font-size: 16px;
+      }
+
+      .question-composer input::placeholder,
+      textarea::placeholder {
+        color: #8d9994;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-color: var(--brand);
+        border-radius: 12px;
+        background: var(--brand);
+        color: white;
+        padding: 10px 17px;
+        font-weight: 750;
+      }
+
+      .button:hover {
+        background: #164a3c;
+        transform: translateY(-1px);
+      }
+
+      .button.blue {
+        border-color: var(--blue);
+        background: var(--blue);
+      }
+
+      .button.blue:hover {
+        background: #2446c0;
+      }
+
+      .soft-button {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border-color: var(--line);
+        border-radius: 11px;
+        background: rgba(255, 255, 255, 0.64);
+        color: var(--ink);
+        padding: 9px 13px;
+        font-weight: 700;
+      }
+
+      .decision-track {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        margin: 18px 0;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--line);
+      }
+
+      .track-step {
+        position: relative;
+        min-height: 76px;
+        background: rgba(251, 252, 251, 0.88);
+        padding: 14px 16px 13px 40px;
+      }
+
+      .track-step::before {
+        position: absolute;
+        top: 17px;
+        left: 16px;
+        width: 12px;
+        height: 12px;
+        border: 2px solid white;
+        border-radius: 50%;
+        background: var(--brand);
+        box-shadow: 0 0 0 1px var(--brand);
+        content: "";
+      }
+
+      .track-step.active::before {
+        background: var(--blue);
+        box-shadow: 0 0 0 1px var(--blue), 0 0 0 5px var(--blue-soft);
+      }
+
+      .track-step small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .track-step strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .analysis-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 310px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .result-card,
+      .panel,
+      .report-composer,
+      .report-library,
+      .readiness-hero {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+      }
+
+      .result-card {
+        position: relative;
+        overflow: hidden;
+        padding: 26px 28px 28px 36px;
+        box-shadow: var(--shadow);
+      }
+
+      .result-card::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 7px;
+        background: linear-gradient(180deg, var(--blue) 0 34%, #77a5f5 34% 62%, var(--brand) 62% 100%);
+        content: "";
+      }
+
+      .result-topline,
+      .panel-heading,
+      .library-heading,
+      .source-row,
+      .report-row-top,
+      .sheet-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .label {
+        color: var(--muted);
+        font-family: var(--utility);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .result-card h2 {
+        max-width: 760px;
+        margin: 14px 0 12px;
+        font-family: var(--display);
+        font-size: clamp(25px, 3vw, 36px);
+        line-height: 1.35;
+      }
+
+      .result-summary {
+        max-width: 800px;
+        margin: 0;
+        color: #45534d;
+        line-height: 1.75;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand);
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .status-pill.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .status-pill.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .status-pill.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .evidence-chart {
+        margin-top: 24px;
+        border-top: 1px solid var(--line);
+        padding-top: 22px;
+      }
+
+      .chart-row {
+        display: grid;
+        grid-template-columns: 92px minmax(80px, 1fr) 88px;
+        align-items: center;
+        gap: 12px;
+        margin: 13px 0;
+        font-size: 13px;
+      }
+
+      .chart-row strong {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .bar-track {
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e6ece9;
+      }
+
+      .bar {
+        height: 100%;
+        border-radius: inherit;
+        background: var(--brand);
+      }
+
+      .chart-row:first-of-type .bar {
+        background: var(--blue);
+      }
+
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 24px;
+      }
+
+      .side-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel h3,
+      .report-composer h2,
+      .report-library h2,
+      .readiness-hero h2 {
+        margin: 5px 0 0;
+        font-size: 17px;
+      }
+
+      .evidence-list,
+      .boundary-list,
+      .source-list,
+      .report-list {
+        list-style: none;
+        margin: 16px 0 0;
+        padding: 0;
+      }
+
+      .evidence-list li {
+        position: relative;
+        margin: 12px 0;
+        padding-left: 23px;
+        color: #3e4d47;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .evidence-list li::before {
+        position: absolute;
+        top: 3px;
+        left: 0;
+        display: grid;
+        width: 15px;
+        height: 15px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--brand-soft);
+        color: var(--brand);
+        content: "✓";
+        font-size: 9px;
+        font-weight: 900;
+      }
+
+      .boundary-list li {
+        border-top: 1px solid var(--line);
+        padding: 11px 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .boundary-list li:first-child {
+        border-top: 0;
+      }
+
+      .readiness-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+        gap: 28px;
+        margin-bottom: 18px;
+        padding: 26px;
+        box-shadow: var(--shadow);
+      }
+
+      .readiness-copy p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .readiness-score {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+      }
+
+      .score-ring {
+        display: grid;
+        width: 84px;
+        height: 84px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: conic-gradient(var(--brand) 0 88%, #dce5e1 88% 100%);
+      }
+
+      .score-ring,
+      .quality-row strong,
+      .report-date {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .score-ring::before {
+        display: grid;
+        width: 66px;
+        height: 66px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--surface);
+        content: "88%";
+        font-family: var(--utility);
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .score-copy strong,
+      .score-copy span {
+        display: block;
+      }
+
+      .score-copy span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .prep-tabs {
+        display: flex;
+        gap: 6px;
+        width: fit-content;
+        margin: 0 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.5);
+        padding: 4px;
+      }
+
+      .prep-tab {
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--muted);
+        padding: 9px 13px;
+        font-weight: 750;
+      }
+
+      .prep-tab[aria-selected="true"] {
+        background: white;
+        color: var(--ink);
+        box-shadow: 0 5px 16px rgba(27, 55, 45, 0.08);
+      }
+
+      .prep-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .source-list {
+        margin-top: 10px;
+      }
+
+      .source-row {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        padding: 15px 0;
+      }
+
+      .source-row:first-child {
+        border-top: 0;
+      }
+
+      .source-main {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        align-items: center;
+        gap: 11px;
+      }
+
+      .file-icon {
+        display: grid;
+        width: 34px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: white;
+        color: var(--brand);
+        font-family: var(--utility);
+        font-size: 9px;
+        font-weight: 800;
+      }
+
+      .source-main strong,
+      .source-main small {
+        display: block;
+      }
+
+      .source-main strong {
+        overflow: hidden;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .source-main small {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .quality-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        padding: 13px 0;
+        font-size: 13px;
+      }
+
+      .quality-row:first-of-type {
+        margin-top: 12px;
+        border-top: 0;
+      }
+
+      .quality-row span {
+        color: var(--muted);
+      }
+
+      .semantic-groups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .semantic-group {
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: white;
+        padding: 14px;
+      }
+
+      .semantic-group strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .tag {
+        border-radius: 999px;
+        background: #eef3f1;
+        color: #4a5953;
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+
+      .reports-grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .report-composer,
+      .report-library {
+        padding: 22px;
+      }
+
+      .report-composer {
+        position: sticky;
+        top: 96px;
+        box-shadow: var(--shadow);
+      }
+
+      .report-composer p,
+      .report-library p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .goal-input {
+        width: 100%;
+        min-height: 126px;
+        resize: vertical;
+        margin-top: 14px;
+        border: 1px solid var(--line-strong);
+        border-radius: 13px;
+        background: white;
+        color: var(--ink);
+        padding: 13px;
+        line-height: 1.6;
+      }
+
+      .goal-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin: 11px 0 16px;
+      }
+
+      .chip-button {
+        border-color: var(--line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        padding: 7px 10px;
+        font-size: 11px;
+      }
+
+      .report-list {
+        margin-top: 12px;
+      }
+
+      .report-list li {
+        border-top: 1px solid var(--line);
+        padding: 16px 0;
+      }
+
+      .report-list li:first-child {
+        border-top: 0;
+      }
+
+      .report-title {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .report-date {
+        color: var(--muted);
+        font-family: var(--utility);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .report-summary {
+        display: -webkit-box;
+        overflow: hidden;
+        margin: 8px 0 11px !important;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .report-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .report-meta small {
+        color: var(--muted);
+      }
+
+      .text-button {
+        border: 0;
+        background: transparent;
+        color: var(--blue);
+        padding: 4px 0;
+        font-weight: 750;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: grid;
+        justify-items: end;
+        background: rgba(15, 29, 24, 0.34);
+        backdrop-filter: blur(4px);
+      }
+
+      .sheet {
+        width: min(480px, 100%);
+        height: 100%;
+        overflow-y: auto;
+        background: var(--surface-strong);
+        padding: 26px;
+        box-shadow: -24px 0 60px rgba(15, 29, 24, 0.16);
+        overscroll-behavior: contain;
+        animation: sheet-in 220ms ease both;
+      }
+
+      @keyframes sheet-in {
+        from {
+          transform: translateX(24px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .sheet-heading {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 18px;
+      }
+
+      .sheet-heading h2 {
+        margin: 0;
+        font-family: var(--display);
+        font-size: 28px;
+      }
+
+      .history-item {
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: transparent;
+        padding: 16px 0;
+        text-align: left;
+      }
+
+      .history-item strong {
+        display: -webkit-box;
+        overflow: hidden;
+        margin: 7px 0;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .history-item small {
+        color: var(--muted);
+      }
+
+      .setting-block {
+        border-bottom: 1px solid var(--line);
+        padding: 18px 0;
+      }
+
+      .setting-block h3 {
+        margin: 0 0 7px;
+        font-size: 14px;
+      }
+
+      .setting-block p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 80;
+        max-width: 360px;
+        border: 1px solid #b8d6c8;
+        border-radius: 13px;
+        background: #effaf4;
+        color: var(--brand-dark);
+        padding: 13px 16px;
+        box-shadow: var(--shadow);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      @media (max-width: 1040px) {
+        .app-shell {
+          grid-template-columns: 210px minmax(0, 1fr);
+        }
+
+        .analysis-layout,
+        .prep-grid {
+          grid-template-columns: minmax(0, 1fr) 280px;
+        }
+
+        .reports-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .report-composer {
+          position: static;
+        }
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding-bottom: calc(72px + env(safe-area-inset-bottom));
+        }
+
+        .app-shell {
+          display: block;
+        }
+
+        .sidebar,
+        .topbar {
+          display: none;
+        }
+
+        .mobile-header {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          min-height: 64px;
+          border-bottom: 1px solid var(--line);
+          background: rgba(238, 243, 241, 0.94);
+          padding: 10px 16px;
+          backdrop-filter: blur(14px);
+        }
+
+        .mobile-header .brand {
+          padding: 0;
+        }
+
+        .mobile-header .brand span {
+          display: none;
+        }
+
+        .mobile-header .brand-mark {
+          width: 34px;
+          height: 34px;
+        }
+
+        .bottom-nav {
+          position: fixed;
+          right: 10px;
+          bottom: calc(10px + env(safe-area-inset-bottom));
+          left: 10px;
+          z-index: 40;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 16px;
+          background: rgba(23, 63, 53, 0.96);
+          padding: 5px;
+          box-shadow: 0 18px 50px rgba(15, 29, 24, 0.26);
+          backdrop-filter: blur(16px);
+        }
+
+        .bottom-nav button {
+          min-height: 50px;
+          border-radius: 11px;
+          color: #b8ccc4;
+          font-size: 12px;
+          font-weight: 750;
+        }
+
+        .bottom-nav button[aria-current="page"] {
+          background: white;
+          color: var(--brand-dark);
+        }
+
+        .content {
+          padding: 24px 16px 44px;
+        }
+
+        .page-heading {
+          display: block;
+          margin-bottom: 18px;
+        }
+
+        .page-heading h1 {
+          font-size: 38px;
+        }
+
+        .page-context {
+          display: none;
+        }
+
+        .question-composer {
+          grid-template-columns: 1fr;
+          padding: 12px;
+        }
+
+        .question-composer input {
+          min-height: 44px;
+        }
+
+        .decision-track {
+          grid-template-columns: 1fr;
+        }
+
+        .track-step {
+          min-height: auto;
+        }
+
+        .analysis-layout,
+        .prep-grid,
+        .readiness-hero {
+          grid-template-columns: 1fr;
+        }
+
+        .result-card {
+          padding: 22px 18px 22px 26px;
+        }
+
+        .result-topline,
+        .panel-heading,
+        .library-heading,
+        .source-row {
+          align-items: flex-start;
+        }
+
+        .chart-row {
+          grid-template-columns: 74px minmax(60px, 1fr) 70px;
+          gap: 8px;
+        }
+
+        .side-stack {
+          grid-template-columns: 1fr;
+        }
+
+        .readiness-score {
+          justify-content: flex-start;
+        }
+
+        .prep-tabs {
+          width: 100%;
+          overflow-x: auto;
+        }
+
+        .prep-tab {
+          flex: 1 0 auto;
+        }
+
+        .semantic-groups {
+          grid-template-columns: 1fr;
+        }
+
+        .reports-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .report-composer,
+        .report-library,
+        .panel {
+          padding: 18px;
+        }
+
+        .toast {
+          right: 16px;
+          bottom: 82px;
+          left: 16px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="产品导航">
+        <div class="brand" aria-label="InsightFlow">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <strong>InsightFlow</strong>
+            <span>把数据变成下一步行动</span>
+          </div>
+        </div>
+
+        <div class="workspace-card">
+          <small>当前工作区</small>
+          <strong>云桥科技 · 经营分析</strong>
+          <div class="workspace-health"><span class="live-dot" aria-hidden="true"></span>数据已更新至 7 月 9 日</div>
+        </div>
+
+        <nav class="side-nav">
+          <button class="nav-item" type="button" data-page-target="prepare">
+            <span class="nav-glyph" aria-hidden="true">数</span>
+            <span class="nav-label">数据准备</span>
+          </button>
+          <button class="nav-item" type="button" data-page-target="analysis" aria-current="page">
+            <span class="nav-glyph" aria-hidden="true">析</span>
+            <span class="nav-label">分析</span>
+          </button>
+          <button class="nav-item" type="button" data-page-target="reports">
+            <span class="nav-glyph" aria-hidden="true">报</span>
+            <span class="nav-label">报告</span>
+          </button>
+        </nav>
+
+        <div class="side-foot">
+          <button class="quiet-button" type="button" data-open-sheet="settings">
+            <span aria-hidden="true">⚙</span>
+            <span>工作区设置</span>
+          </button>
+          <button class="quiet-button" type="button">
+            <span aria-hidden="true">↗</span>
+            <span>返回工作区列表</span>
+          </button>
+        </div>
+      </aside>
+
+      <div class="main-shell">
+        <header class="mobile-header">
+          <div class="brand" aria-label="InsightFlow">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <div><strong>InsightFlow</strong></div>
+          </div>
+          <div class="mobile-actions">
+            <button class="icon-button" type="button" aria-label="打开历史分析" data-open-sheet="history">↺</button>
+            <button class="icon-button" type="button" aria-label="打开工作区设置" data-open-sheet="settings">⚙</button>
+          </div>
+        </header>
+
+        <header class="topbar">
+          <div class="breadcrumb">云桥科技&nbsp; / &nbsp;<strong id="current-page-name">分析</strong></div>
+          <div class="top-actions">
+            <span class="status-text"><span class="live-dot" aria-hidden="true"></span>真实模型已开启</span>
+            <button class="soft-button" type="button" data-open-sheet="history">历史分析</button>
+            <button class="icon-button" type="button" aria-label="打开工作区设置" data-open-sheet="settings">⚙</button>
+          </div>
+        </header>
+
+        <main class="content" id="main-content" tabindex="-1">
+          <section class="page" id="page-prepare" aria-labelledby="prepare-title" hidden>
+            <header class="page-heading">
+              <div>
+                <h1 id="prepare-title">数据准备</h1>
+                <p>把文件、字段和业务口径集中在一处。这里只显示是否可以分析，以及仍需处理的关键问题。</p>
+              </div>
+              <div class="page-context">4 SOURCES · 35 FIELDS<br />LAST SYNC 09:24</div>
+            </header>
+
+            <section class="readiness-hero" aria-label="数据准备状态">
+              <div class="readiness-copy">
+                <span class="label">Workspace readiness</span>
+                <h2>当前数据可以支持收入、渠道、商品与客服分析</h2>
+                <p>4 个数据源已经完成字段画像和业务语义识别。若要评估利润和 ROI，需要继续补充成本口径。</p>
+              </div>
+              <div class="readiness-score">
+                <div class="score-ring" aria-label="准备度 88%"></div>
+                <div class="score-copy"><strong>可开始分析</strong><span>1 项非阻塞提醒</span></div>
+              </div>
+            </section>
+
+            <div class="prep-tabs" role="tablist" aria-label="数据准备内容">
+              <button class="prep-tab" type="button" role="tab" aria-selected="true" data-prep-target="sources">数据源</button>
+              <button class="prep-tab" type="button" role="tab" aria-selected="false" data-prep-target="profile">字段画像</button>
+              <button class="prep-tab" type="button" role="tab" aria-selected="false" data-prep-target="semantic">业务语义</button>
+            </div>
+
+            <div class="prep-panel" data-prep-panel="sources">
+              <div class="prep-grid">
+                <section class="panel">
+                  <div class="panel-heading">
+                    <div><span class="label">Connected sources</span><h3>已连接 4 个数据源</h3></div>
+                    <button class="button" type="button" data-toast="原型提示：这里会打开文件上传面板。">添加数据</button>
+                  </div>
+                  <ul class="source-list">
+                    <li class="source-row">
+                      <div class="source-main"><span class="file-icon">CSV</span><div><strong>orders_订单明细.csv</strong><small>1,800 行 · 11 个字段</small></div></div>
+                      <span class="status-pill">可分析</span>
+                    </li>
+                    <li class="source-row">
+                      <div class="source-main"><span class="file-icon">CSV</span><div><strong>marketing_spend_营销投放.csv</strong><small>1,086 行 · 7 个字段</small></div></div>
+                      <span class="status-pill">可分析</span>
+                    </li>
+                    <li class="source-row">
+                      <div class="source-main"><span class="file-icon">CSV</span><div><strong>customers_客户资料.csv</strong><small>160 行 · 8 个字段</small></div></div>
+                      <span class="status-pill">可分析</span>
+                    </li>
+                    <li class="source-row">
+                      <div class="source-main"><span class="file-icon">CSV</span><div><strong>support_tickets_客服反馈.csv</strong><small>460 行 · 9 个字段</small></div></div>
+                      <span class="status-pill">可分析</span>
+                    </li>
+                  </ul>
+                </section>
+
+                <aside class="panel">
+                  <span class="label">Quality signals</span>
+                  <h3>质量检查</h3>
+                  <div class="quality-row"><span>时间字段覆盖</span><strong>4 / 4</strong></div>
+                  <div class="quality-row"><span>业务主键识别</span><strong>完整</strong></div>
+                  <div class="quality-row"><span>敏感字段</span><strong>0 个</strong></div>
+                  <div class="quality-row"><span>成本口径</span><strong style="color:var(--amber)">待补充</strong></div>
+                </aside>
+              </div>
+            </div>
+
+            <div class="prep-panel" data-prep-panel="profile" hidden>
+              <section class="panel">
+                <div class="panel-heading"><div><span class="label">Field profile</span><h3>35 个字段已完成角色识别</h3></div><span class="status-pill">已更新</span></div>
+                <div class="semantic-groups">
+                  <div class="semantic-group"><strong>订单明细 · 11 个字段</strong><div class="tag-list"><span class="tag">订单日期 · 时间</span><span class="tag">收入 · 指标</span><span class="tag">渠道 · 维度</span><span class="tag">商品 · 维度</span></div></div>
+                  <div class="semantic-group"><strong>营销投放 · 7 个字段</strong><div class="tag-list"><span class="tag">投放日期 · 时间</span><span class="tag">花费 · 指标</span><span class="tag">曝光 · 指标</span><span class="tag">渠道 · 维度</span></div></div>
+                  <div class="semantic-group"><strong>客户资料 · 8 个字段</strong><div class="tag-list"><span class="tag">客户编号 · 实体</span><span class="tag">分群 · 维度</span><span class="tag">区域 · 维度</span></div></div>
+                  <div class="semantic-group"><strong>客服反馈 · 9 个字段</strong><div class="tag-list"><span class="tag">工单日期 · 时间</span><span class="tag">满意度 · 指标</span><span class="tag">问题类型 · 维度</span></div></div>
+                </div>
+              </section>
+            </div>
+
+            <div class="prep-panel" data-prep-panel="semantic" hidden>
+              <section class="panel">
+                <div class="panel-heading"><div><span class="label">Business semantics</span><h3>业务口径集中管理</h3></div><button class="soft-button" type="button" data-toast="原型提示：这里会进入口径编辑模式。">编辑口径</button></div>
+                <div class="semantic-groups">
+                  <div class="semantic-group"><strong>指标 · 9</strong><div class="tag-list"><span class="tag">订单收入</span><span class="tag">毛利额</span><span class="tag">投放花费</span><span class="tag">满意度</span></div></div>
+                  <div class="semantic-group"><strong>维度 · 16</strong><div class="tag-list"><span class="tag">渠道</span><span class="tag">商品品类</span><span class="tag">客户分群</span><span class="tag">区域</span></div></div>
+                  <div class="semantic-group"><strong>实体 · 5</strong><div class="tag-list"><span class="tag">订单</span><span class="tag">客户</span><span class="tag">客服工单</span></div></div>
+                  <div class="semantic-group"><strong>需要补充</strong><div class="tag-list"><span class="tag" style="background:var(--amber-soft);color:var(--amber)">完整成本口径</span><span class="tag" style="background:var(--amber-soft);color:var(--amber)">利润率定义</span></div></div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="page active" id="page-analysis" aria-labelledby="analysis-title">
+            <header class="page-heading">
+              <div>
+                <h1 id="analysis-title">分析</h1>
+                <p>提出一个业务问题，InsightFlow 会把问题、证据和建议保留在同一条分析线程里。</p>
+              </div>
+              <div class="page-context">THREAD A-072<br />3 EVIDENCE TASKS</div>
+            </header>
+
+            <form class="question-composer" id="analysis-form">
+              <input id="analysis-question" name="analysis-question" autocomplete="off" aria-label="业务问题" value="最近 90 天哪个渠道应该优先增加预算？" />
+              <button class="button blue" type="submit">重新分析</button>
+            </form>
+
+            <div class="decision-track" aria-label="本轮分析轨道">
+              <div class="track-step"><small>问题范围</small><strong>最近 90 天 · 渠道预算</strong></div>
+              <div class="track-step"><small>证据覆盖</small><strong>收入 · 投放 · 客服，共 3 组</strong></div>
+              <div class="track-step active"><small>决策状态</small><strong>结论已生成，可继续追问</strong></div>
+            </div>
+
+            <div class="analysis-layout">
+              <article class="result-card">
+                <div class="result-topline"><span class="label">Business answer</span><span class="status-pill blue">证据已核对</span></div>
+                <h2>优先增加微信私域预算，但先用小步增量验证边际回报。</h2>
+                <p class="result-summary">微信私域近 90 天收入最高，占渠道收入约 25.3%；抖音信息流排名第二。现有数据可以支持收入规模判断，但缺少完整获客成本与利润口径，因此不建议一次性大幅调整预算。</p>
+
+                <div class="evidence-chart" aria-label="近 90 天渠道收入对比">
+                  <span class="label">近 90 天渠道收入</span>
+                  <div class="chart-row"><span>微信私域</span><div class="bar-track"><div class="bar" style="width:100%"></div></div><strong>97.7 万</strong></div>
+                  <div class="chart-row"><span>抖音信息流</span><div class="bar-track"><div class="bar" style="width:76%"></div></div><strong>74.0 万</strong></div>
+                  <div class="chart-row"><span>搜索广告</span><div class="bar-track"><div class="bar" style="width:63%"></div></div><strong>61.5 万</strong></div>
+                  <div class="chart-row"><span>小红书种草</span><div class="bar-track"><div class="bar" style="width:49%"></div></div><strong>48.2 万</strong></div>
+                </div>
+
+                <div class="result-actions">
+                  <button class="button" type="button" data-toast="已创建同线程追问输入区。">继续追问</button>
+                  <button class="soft-button" type="button" data-page-target="reports">整理成报告</button>
+                  <button class="soft-button" type="button" data-toast="证据详情默认折叠，原型不展开技术 SQL。">查看证据详情</button>
+                </div>
+              </article>
+
+              <aside class="side-stack">
+                <section class="panel">
+                  <div class="panel-heading"><div><span class="label">Evidence coverage</span><h3>本轮依据</h3></div><strong>3 / 3</strong></div>
+                  <ul class="evidence-list">
+                    <li>渠道收入排名与占比</li>
+                    <li>渠道投放规模对比</li>
+                    <li>渠道客服投诉分布</li>
+                  </ul>
+                </section>
+                <section class="panel">
+                  <span class="label">Data boundary</span>
+                  <h3>判断边界</h3>
+                  <ul class="boundary-list">
+                    <li>支持比较收入规模和渠道结构。</li>
+                    <li>缺少完整成本，暂不能判断真实 ROI。</li>
+                    <li>建议按 10%–15% 增量做两周验证。</li>
+                  </ul>
+                </section>
+              </aside>
+            </div>
+          </section>
+
+          <section class="page" id="page-reports" aria-labelledby="reports-title" hidden>
+            <header class="page-heading">
+              <div>
+                <h1 id="reports-title">报告</h1>
+                <p>从报告目标开始生成独立的管理层文档。报告不会由分析问答拼接，也不会重写已有结果。</p>
+              </div>
+              <div class="page-context">8 REPORTS<br />5 COMPLETED</div>
+            </header>
+
+            <div class="reports-grid">
+              <section class="report-composer">
+                <span class="label">Create report</span>
+                <h2>新建报告</h2>
+                <p>描述这份报告要帮助谁做什么决策。</p>
+                <textarea class="goal-input" id="report-goal" name="report-goal" autocomplete="off" aria-label="报告目标" placeholder="例如：生成最近 90 天经营复盘，重点说明渠道表现与风险…"></textarea>
+                <div class="goal-suggestions" aria-label="报告目标建议">
+                  <button class="chip-button" type="button" data-goal="生成最近 90 天经营复盘，重点说明渠道表现与风险。">经营复盘</button>
+                  <button class="chip-button" type="button" data-goal="生成管理层渠道效率简报，包含建议和数据边界。">渠道简报</button>
+                  <button class="chip-button" type="button" data-goal="生成最近 6 个月收入趋势变化报告。">趋势报告</button>
+                </div>
+                <button class="button" type="button" id="create-report">生成报告</button>
+              </section>
+
+              <section class="report-library">
+                <div class="library-heading"><div><span class="label">Report library</span><h2>最近报告</h2></div><button class="soft-button" type="button" data-toast="原型提示：这里会打开状态与时间筛选。">筛选</button></div>
+                <ul class="report-list">
+                  <li>
+                    <div class="report-row-top"><h3 class="report-title">最近 90 天经营复盘报告</h3><time class="report-date" datetime="2026-07-09">2026-07-09</time></div>
+                    <p class="report-summary">收入结构以微信私域和抖音信息流领先；5 月收入达到阶段峰值，客服满意度仍有提升空间。</p>
+                    <div class="report-meta"><span class="status-pill">已完成</span><button class="text-button" type="button" data-toast="原型提示：这里会打开独立报告阅读页。">打开报告 →</button></div>
+                  </li>
+                  <li>
+                    <div class="report-row-top"><h3 class="report-title">最近 1 个月趋势变化报告</h3><time class="report-date" datetime="2026-07-09">2026-07-09</time></div>
+                    <p class="report-summary">月度收入呈波动增长，当前证据支持渠道和收入趋势分析，但无法完整评价盈利质量。</p>
+                    <div class="report-meta"><span class="status-pill">已完成</span><button class="text-button" type="button" data-toast="原型提示：这里会打开独立报告阅读页。">打开报告 →</button></div>
+                  </li>
+                  <li>
+                    <div class="report-row-top"><h3 class="report-title">管理层经营简报</h3><time class="report-date" datetime="2026-07-08">2026-07-08</time></div>
+                    <p class="report-summary">需要先明确收入分析使用的时间字段，然后才能继续生成报告。</p>
+                    <div class="report-meta"><span class="status-pill amber">等待补充</span><button class="text-button" type="button" data-toast="原型提示：这里会继续补充报告范围。">继续生成 →</button></div>
+                  </li>
+                  <li>
+                    <div class="report-row-top"><h3 class="report-title">渠道收入结构报告</h3><time class="report-date" datetime="2026-07-06">2026-07-06</time></div>
+                    <p class="report-summary">报告生成失败，已归入异常记录，不再与已完成报告争夺主要阅读空间。</p>
+                    <div class="report-meta"><span class="status-pill red">失败</span><button class="text-button" type="button" data-toast="失败报告默认收起，可在异常记录中查看。">查看原因 →</button></div>
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <nav class="bottom-nav" aria-label="移动端产品导航">
+      <button type="button" data-page-target="prepare">数据准备</button>
+      <button type="button" data-page-target="analysis" aria-current="page">分析</button>
+      <button type="button" data-page-target="reports">报告</button>
+    </nav>
+
+    <div class="overlay" id="history-sheet" role="dialog" aria-modal="true" aria-labelledby="history-title" hidden>
+      <section class="sheet">
+        <div class="sheet-heading"><h2 id="history-title">历史分析</h2><button class="icon-button" type="button" aria-label="关闭历史分析" data-close-sheet>×</button></div>
+        <button class="history-item" type="button" data-close-sheet><span class="status-pill">已完成</span><strong>最近 90 天哪个渠道应该优先增加预算？</strong><small>今天 09:24 · 有图表</small></button>
+        <button class="history-item" type="button" data-close-sheet><span class="status-pill">已完成</span><strong>哪个客户分群贡献收入最高？</strong><small>昨天 16:42 · 有图表</small></button>
+        <button class="history-item" type="button" data-close-sheet><span class="status-pill amber">等待补充</span><strong>各渠道投放花费和收入表现怎么样？</strong><small>7 月 8 日 11:20 · 需选择时间字段</small></button>
+        <button class="history-item" type="button" data-close-sheet><span class="status-pill">已完成</span><strong>最近 90 天哪个渠道收入最高？</strong><small>7 月 7 日 13:20 · 关键事实</small></button>
+      </section>
+    </div>
+
+    <div class="overlay" id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <section class="sheet">
+        <div class="sheet-heading"><h2 id="settings-title">工作区设置</h2><button class="icon-button" type="button" aria-label="关闭工作区设置" data-close-sheet>×</button></div>
+        <div class="setting-block"><h3>工作区</h3><p>云桥科技 · 经营分析<br />内部标识：p30-echarts-28ece8e6</p></div>
+        <div class="setting-block"><h3>模型模式</h3><p>DeepSeek / deepseek-v4-flash<br />真实模型已参与问题理解、业务回答、图表建议和报告撰写。</p></div>
+        <div class="setting-block"><h3>安全与审计</h3><p>SQL 审核、敏感字段拦截和 Trace 审计已开启。技术详情默认折叠。</p></div>
+        <div class="setting-block"><h3>高级配置</h3><p>字段原始画像、Provider metadata 和调试信息只在此处按需展开。</p></div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script>
+      const pageNames = { prepare: "数据准备", analysis: "分析", reports: "报告" };
+      const pages = Array.from(document.querySelectorAll(".page"));
+      const pageButtons = Array.from(document.querySelectorAll("[data-page-target]"));
+      const currentPageName = document.getElementById("current-page-name");
+      const toast = document.getElementById("toast");
+      let toastTimer;
+      let activeTrigger = null;
+
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.hidden = false;
+        toastTimer = window.setTimeout(() => {
+          toast.hidden = true;
+        }, 2600);
+      }
+
+      function setPage(pageName) {
+        pages.forEach((page) => {
+          const isActive = page.id === `page-${pageName}`;
+          page.classList.toggle("active", isActive);
+          page.hidden = !isActive;
+        });
+        pageButtons.forEach((button) => {
+          if (button.dataset.pageTarget === pageName) {
+            button.setAttribute("aria-current", "page");
+          } else {
+            button.removeAttribute("aria-current");
+          }
+        });
+        currentPageName.textContent = pageNames[pageName] || "InsightFlow";
+        document.title = `${pageNames[pageName] || "InsightFlow"} · InsightFlow 界面收敛原型`;
+        window.history.replaceState(null, "", `#${pageName}`);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      pageButtons.forEach((button) => {
+        button.addEventListener("click", () => setPage(button.dataset.pageTarget));
+      });
+
+      document.querySelectorAll("[data-prep-target]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.dataset.prepTarget;
+          document.querySelectorAll("[data-prep-target]").forEach((tab) => tab.setAttribute("aria-selected", String(tab === button)));
+          document.querySelectorAll("[data-prep-panel]").forEach((panel) => {
+            panel.hidden = panel.dataset.prepPanel !== target;
+          });
+        });
+      });
+
+      document.querySelectorAll("[data-open-sheet]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeTrigger = button;
+          const sheet = document.getElementById(`${button.dataset.openSheet}-sheet`);
+          sheet.hidden = false;
+          sheet.querySelector("[data-close-sheet]")?.focus();
+        });
+      });
+
+      document.querySelectorAll("[data-close-sheet]").forEach((button) => {
+        button.addEventListener("click", () => {
+          button.closest(".overlay").hidden = true;
+          activeTrigger?.focus();
+        });
+      });
+
+      document.querySelectorAll(".overlay").forEach((overlay) => {
+        overlay.addEventListener("click", (event) => {
+          if (event.target === overlay) {
+            overlay.hidden = true;
+            activeTrigger?.focus();
+          }
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        const openSheet = Array.from(document.querySelectorAll(".overlay")).find((sheet) => !sheet.hidden);
+        if (event.key === "Escape") {
+          if (openSheet) {
+            openSheet.hidden = true;
+            activeTrigger?.focus();
+          }
+        }
+        if (event.key === "Tab" && openSheet) {
+          const focusable = Array.from(openSheet.querySelectorAll("button, [href], input, textarea, [tabindex]:not([tabindex='-1'])"));
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }
+      });
+
+      document.querySelectorAll("[data-toast]").forEach((button) => {
+        button.addEventListener("click", () => showToast(button.dataset.toast));
+      });
+
+      document.querySelectorAll("[data-goal]").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.getElementById("report-goal").value = button.dataset.goal;
+        });
+      });
+
+      document.getElementById("analysis-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        showToast("原型提示：真实产品会在同一线程中重新分析这个问题。");
+      });
+
+      document.getElementById("create-report").addEventListener("click", () => {
+        const value = document.getElementById("report-goal").value.trim();
+        showToast(value ? "报告已加入生成队列。" : "请先填写报告目标。");
+      });
+
+      const initialPage = window.location.hash.slice(1);
+      if (pageNames[initialPage] && initialPage !== "analysis") {
+        setPage(initialPage);
+      }
+    </script>
+  </body>
+</html>

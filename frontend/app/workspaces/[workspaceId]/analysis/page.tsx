@@ -12,8 +12,8 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
   return (
     <ProductShell workspaceId={workspaceId} active="analysis">
       <ProductPageHeader
-        eyebrow="Analysis Workbench"
-        title="分析工作台"
+        eyebrow="Decision workspace"
+        title="分析"
         description="问一个业务问题，在同一条分析线程里补充追问，并查看业务结论、证据、图表和折叠技术详情。"
       />
       <AnalysisRunner workspaceId={workspaceId} />

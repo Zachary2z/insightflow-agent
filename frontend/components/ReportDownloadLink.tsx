@@ -5,11 +5,17 @@ type ReportDownloadLinkProps = {
   workspaceId: string;
   reportId: string;
   label?: string;
+  className?: string;
 };
 
-export default function ReportDownloadLink({ workspaceId, reportId, label = "下载 Markdown" }: ReportDownloadLinkProps) {
+export default function ReportDownloadLink({
+  workspaceId,
+  reportId,
+  label = "下载 Markdown",
+  className = "button",
+}: ReportDownloadLinkProps) {
   return (
-    <a className="button" href={getWorkspaceReportDownloadUrl(workspaceId, reportId)}>
+    <a className={className} href={getWorkspaceReportDownloadUrl(workspaceId, reportId)}>
       {label}
     </a>
   );

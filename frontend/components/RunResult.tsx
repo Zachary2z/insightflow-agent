@@ -102,19 +102,28 @@ export default function RunResult({
 
   return (
     <section className="workbench-result" aria-label="业务分析结果">
-      <AnalysisThreadCard
-        thread={product.question_thread}
-        status={product.status}
-        onContinue={onContinueClarification}
-        onAskFollowUp={onAskFollowUp}
-        isContinuing={isContinuing}
-        continuationError={continuationError}
-      />
-      <AnalysisProgressTimeline steps={product.progress_steps} />
-      <BusinessAnswerCard answer={product.business_answer} />
-      <EvidencePanel evidence={product.evidence} />
-      <ChartArtifactGallery artifacts={product.chart_artifacts} />
-      <TechnicalDetailsDisclosure details={product.technical_details} />
+      <section className="result-evidence-group" aria-label="结论与依据">
+        <BusinessAnswerCard answer={product.business_answer} />
+        <ChartArtifactGallery artifacts={product.chart_artifacts} />
+        <EvidencePanel evidence={product.evidence} />
+      </section>
+      <section className="result-process-group" aria-label="继续追问与分析过程">
+        <div className="result-group-heading">
+          <p className="product-eyebrow">Analysis Continuity</p>
+          <h3>继续追问与分析过程</h3>
+          <p className="panel-help">保留问题口径、追问和执行过程，便于继续分析与复核。</p>
+        </div>
+        <AnalysisThreadCard
+          thread={product.question_thread}
+          status={product.status}
+          onContinue={onContinueClarification}
+          onAskFollowUp={onAskFollowUp}
+          isContinuing={isContinuing}
+          continuationError={continuationError}
+        />
+        <AnalysisProgressTimeline steps={product.progress_steps} />
+        <TechnicalDetailsDisclosure details={product.technical_details} />
+      </section>
     </section>
   );
 }

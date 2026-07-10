@@ -136,6 +136,7 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
               <label htmlFor="source-file">选择 CSV 或 Excel 文件</label>
               <input
                 id="source-file"
+                name="source-file"
                 type="file"
                 accept=".csv,.xlsx,.xls"
                 multiple
@@ -157,10 +158,13 @@ export default function DatasetManager({ workspaceId }: DatasetManagerProps) {
               <label htmlFor="sqlite-path">SQLite 文件路径</label>
               <input
                 id="sqlite-path"
+                name="sqlite-path"
                 type="text"
+                autoComplete="off"
+                spellCheck={false}
                 value={sqlitePath}
                 onChange={(event) => setSqlitePath(event.target.value)}
-                placeholder="/absolute/path/to/source.db"
+                placeholder="例如：/absolute/path/to/source.db…"
               />
               <button type="submit" disabled={isBusy}>
                 导入 SQLite

@@ -7,20 +7,23 @@ type ProductEntryShellProps = {
 
 export default function ProductEntryShell({ children, action }: ProductEntryShellProps) {
   return (
-    <div className="product-shell">
-      <header className="product-topbar">
-        <div className="product-topbar-inner">
-          <div className="product-brand" aria-label="InsightFlow">
-            <div className="product-brand-mark" aria-hidden="true" />
+    <div className="decision-entry-shell">
+      <a className="decision-skip-link" href="#main-content">
+        跳到主要内容
+      </a>
+      <header className="decision-entry-topbar">
+        <div className="decision-entry-topbar-inner">
+          <div className="decision-entry-brand" aria-label="InsightFlow">
+            <span className="decision-brand-mark" aria-hidden="true" />
             <div>
-              <div className="product-brand-title">InsightFlow</div>
-              <div className="product-brand-subtitle">通用业务数据分析工作台</div>
+              <strong>InsightFlow</strong>
+              <span>把数据变成下一步行动</span>
             </div>
           </div>
-          {action ? <div className="product-topbar-meta">{action}</div> : null}
+          {action ? <div className="decision-entry-action">{action}</div> : null}
         </div>
       </header>
-      <main className="product-page">{children}</main>
+      <main className="decision-entry-main" id="main-content">{children}</main>
     </div>
   );
 }
