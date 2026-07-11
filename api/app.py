@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
-from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable
@@ -10,7 +11,15 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+
+from api.health import (
+    LivenessResponse,
+    ReadinessChecker,
+    ReadinessPaths,
+    ReadinessResponse,
+)
+from api.lifecycle import AnalysisExecutor, AnalysisSubmissionClosed
 
 from api.models import (
     WorkspaceCreateRequest,
@@ -56,6 +65,20 @@ from workspaces.store import WorkspaceStore
 ReportRunner = Callable[..., dict[str, Any]]
 
 
+def _cors_origins() -> list[str]:
+    configured = os.getenv(
+        "INSIGHTFLOW_CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+    return list(
+        dict.fromkeys(
+            origin.strip()
+            for origin in configured.split(",")
+            if origin.strip()
+        )
+    )
+
+
 def _workspace_not_found(workspace_id: str) -> HTTPException:
     return HTTPException(status_code=404, detail=f"Workspace not found: {workspace_id}")
 
@@ -93,24 +116,54 @@ def create_app(
     workspace_store: WorkspaceStore | None = None,
     report_runner: ReportRunner | None = None,
     start_background_analysis: bool = True,
+    readiness_checker: ReadinessChecker | None = None,
+    analysis_executor: AnalysisExecutor | None = None,
 ) -> FastAPI:
     store = workspace_store or WorkspaceStore()
     selected_report_runner = report_runner or run_workspace_report
     report_store = WorkspaceReportStore(store)
     run_store = WorkspaceRunStore(store)
-    app = FastAPI(title="InsightFlow Agent API", version="0.1.0")
-    analysis_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="insightflow-analysis")
-    app.state.analysis_executor = analysis_executor
+    selected_analysis_executor = analysis_executor or AnalysisExecutor(max_workers=2)
+    selected_readiness_checker = readiness_checker or ReadinessChecker(
+        ReadinessPaths(
+            workspace_root=store.root_dir,
+            report_root=Path(__file__).resolve().parents[1] / "reports",
+            trace_root=Path(__file__).resolve().parents[1] / "logs" / "traces",
+        )
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        try:
+            yield
+        finally:
+            try:
+                selected_analysis_executor.shutdown()
+            except Exception:
+                raise RuntimeError("Analysis executor shutdown failed") from None
+
+    app = FastAPI(title="InsightFlow Agent API", version="0.1.0", lifespan=lifespan)
+    app.state.analysis_executor = selected_analysis_executor
+    app.state.readiness_checker = selected_readiness_checker
+    app.state.workspace_store = store
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ],
+        allow_origins=_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/health/live", response_model=LivenessResponse)
+    def health_live() -> LivenessResponse:
+        return LivenessResponse()
+
+    @app.get("/health/ready", response_model=ReadinessResponse)
+    def health_ready() -> ReadinessResponse | JSONResponse:
+        result = selected_readiness_checker.check()
+        if result.status == "not_ready":
+            return JSONResponse(status_code=503, content=result.model_dump())
+        return result
 
     @app.post("/api/workspaces", response_model=WorkspaceResponse)
     def create_workspace(request: WorkspaceCreateRequest) -> dict:
@@ -205,14 +258,17 @@ def create_app(
                 force_reanalysis=request.force_reanalysis,
             )
             if start_background_analysis and result.get("status") == "running" and result.get("run_id"):
-                analysis_executor.submit(
-                    execute_workspace_analysis_job,
-                    store,
-                    workspace_id,
-                    str(result["run_id"]),
-                    request.user_question or "",
-                    request.initial_sql,
-                )
+                try:
+                    selected_analysis_executor.submit(
+                        execute_workspace_analysis_job,
+                        store,
+                        workspace_id,
+                        str(result["run_id"]),
+                        request.user_question or "",
+                        request.initial_sql,
+                    )
+                except AnalysisSubmissionClosed as exc:
+                    raise HTTPException(status_code=503, detail="Background analysis is shutting down") from exc
         except FileNotFoundError:
             raise _workspace_not_found(workspace_id)
         except ValueError as exc:

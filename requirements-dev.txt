@@ -1,0 +1,5 @@
+-r requirements.lock
+
+# Development and lock-generation tools. These are not installed in production images.
+pip-tools==7.5.3
+pytest==9.1.1

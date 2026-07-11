@@ -11,5 +11,4 @@ pandas
 openpyxl
 PyYAML
 Pillow
-pytest
 python-docx

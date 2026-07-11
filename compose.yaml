@@ -1,0 +1,65 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: insightflow-backend:p37
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
+    environment:
+      INSIGHTFLOW_PRODUCT_LIVE_MODE: "${INSIGHTFLOW_PRODUCT_LIVE_MODE:-0}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-v4-pro}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      INSIGHTFLOW_CORS_ORIGINS: "${INSIGHTFLOW_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
+    volumes:
+      - workspace-data:/app/workspaces
+      - report-data:/app/reports
+      - trace-data:/app/logs/traces
+    networks:
+      - insightflow-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: "${NEXT_PUBLIC_API_BASE:-http://localhost:8000}"
+    image: insightflow-frontend:p37
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 10s
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          require('http').get('http://127.0.0.1:3000/', response => {
+            response.resume();
+            process.exit(response.statusCode >= 200 && response.statusCode < 400 ? 0 : 1);
+          }).on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - insightflow-network
+
+networks:
+  insightflow-network:
+    driver: bridge
+
+volumes:
+  workspace-data:
+  report-data:
+  trace-data:

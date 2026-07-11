@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,17 +8,17 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | Post-P36 frontend UI consolidation |
-| Current task | Approved decision-desk interface implemented and verified |
-| Next planned task | Post-P36 follow-up planning |
-| Last completed task | 2026-07-10 frontend UI consolidation |
+| Current phase | P37 containerized reproducible deployment complete |
+| Current task | P37-H5 Acceptance, Documentation And Closeout complete |
+| Next planned task | P38-H1 Observability Contract And Correlation Context |
+| Last completed task | P37-H5 Acceptance, Documentation And Closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
 | Active analysis entry | `POST /api/workspaces/{workspace_id}/runs`; same-thread follow-ups use `POST /api/workspaces/{workspace_id}/runs/{run_id}/follow-ups` |
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and coherent Chinese report documents |
-| Out of scope for P36 | DingTalk/WeCom/Tencent Docs/Power BI/Slack/Jira/email/Google Sheets integrations, OAuth UI, RBAC, deployment, scheduled publishing, vector databases, long-term personal memory, fixed-template answer/report rewriting, report re-planning during publish, LLM-generated chart data/options, fake-success SaaS connectors, and merging Report Center into Analysis Workbench |
+| Current engineering boundary | P37 covers single-host Docker/Compose deployment; P38 covers local/portable observability. Kubernetes, cloud infrastructure, TLS/ingress, multi-replica SQLite, RBAC, and multi-tenant isolation remain out of scope |
 
 ## Phase Overview
 
@@ -52,12 +52,97 @@ This is the concise current status surface for InsightFlow Agent.
 | P35 | `[x]` Complete | Analysis Workbench evidence planning and chart reliability: H1 grouped ledger, H2 grouped-answer/audit, H3 deterministic grouped-chart implementation, and H4 live-closeout repair are complete |
 | P36 | `[x]` Complete | Feishu document publishing: H1-H7 complete; Feishu Docs remain the primary report surface, with an optional companion Feishu Sheet for editable evidence tables and safe native sheet charts |
 | UI consolidation | `[x]` Complete | Three-entry decision-desk shell, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement; APIs and Analysis/Report separation preserved; 83 frontend tests, production build, 55 focused backend tests, browser QA, and diff check passed |
+| P37 | `[x]` Complete | H1-H5 production images, health/lifecycle, Compose, product persistence, operations, Smoke/CI readiness, documentation, regression, and hygiene closeout complete |
+| P38 | `[ ]` Planned after P37 | Observability and operations: H1-H6 cover correlation/redaction contracts, JSON logs, trace sinks, Prometheus metrics, Grafana/alerts, failure injection, and runbooks |
 
 P34 planning is recorded in `docs/product/plans/2026-07-07-p34-real-export-tooling.md`. The core rule is: generated report content follows `ReportDocument`; export tools provide stable layout and real file generation only. Word export does not call the LLM, rewrite conclusions, force fixed business chapters, stitch Analysis Workbench answers into reports, or restore simulated SaaS/action/chart paths. Report Center now has the first visible export UI; Analysis Workbench keeps safe export package support for later connectors.
 
 P35 planning is recorded in `docs/product/plans/2026-07-07-p35-analysis-chart-and-ledger-reliability.md`. P35 is complete. Analysis Workbench now has a question-level `QuestionEvidencePlan`, grouped ledger sections by purpose/source/dimension/metric/grain/time policy, answer-safe grouped evidence for Business Answer, non-destructive hard-fact audit, coherent grouped chart candidates, compatible metric-subset chart selection, top-N fast-fact evidence, Product Result answer preservation, source-compatible Business Lens grounding, rank/percentage-aware fact support, and one safe-review LLM rewrite when a provider draft is rejected or scrubbed into an empty answer. This keeps conclusions model-written instead of falling back to deterministic templates. Report Center remains independent on its `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument` path.
 
 P36 planning is recorded in `docs/product/plans/2026-07-08-p36-feishu-document-publishing.md`. P36-H1 through P36-H7 are complete. H1-H6 publish existing Report Center reports to Feishu Docs through the open-source `lark-cli`, using `ReportDocument`, `p34.export_package.v1`, and P30/P34 chart static assets as the source of truth. H7 adds an optional companion Feishu Sheet generated only from the same export package: evidence tables are written as editable sheet data, and native sheet charts are created only when a simple bar/line chart can be safely mapped to existing category and numeric columns. Publishing remains delivery-only: it does not call the LLM, execute SQL, rerun Report Runner, rewrite report content, force fixed report chapters, stitch Analysis Workbench answers, generate chart data, or introduce fake-success SaaS connectors. If the Sheet path fails but the Doc is created, the Doc publish is preserved with safe warnings.
+
+P37 planning is recorded in `docs/product/plans/2026-07-11-p37-containerized-reproducible-deployment.md`. P37 and H1-H5 are complete: final `:p37` images, safe health/lifecycle contracts, health-gated Compose, three persistent volumes, Make operations, expanded no-key product Smoke, CI-ready workflow, deployment guide, full regression, image/repository hygiene, and project-only old-tag cleanup were verified on Linux arm64. The phase does not claim amd64 verification, remote GitHub Actions success, Kubernetes, cloud, TLS, multi-replica SQLite, production Secret Manager, disaster recovery, or production multi-tenancy support.
+
+P38 planning is recorded in `docs/product/plans/2026-07-11-p38-observability-and-operations.md`. P38 is planned after P37 and implementation has not started. H1-H6 preserve the current business trace while adding request/run correlation, allowlisted JSON logs, central redaction, replaceable trace sinks, bounded Prometheus metrics, provisioned Grafana dashboards, actionable alert rules, retention/cardinality policies, failure-injection acceptance, and runbooks. Raw prompts, uploaded rows, SQL results, credentials, provider payloads, local paths, and per-run identifiers in metric labels are prohibited by the plan.
+
+## P37 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P37-H1 | `[x]` Complete | Backend/frontend multi-stage production images, exact Python production lock, `npm ci` standalone build, safe contexts, non-root UID 10001, Linux arm64 builds/startup, and image hygiene verified |
+| P37-H2 | `[x]` Complete | Safe `/health/live` and `/health/ready`, exclusive writable-storage probes, Executor lifespan shutdown, and backend Docker HEALTHCHECK verified |
+| P37-H3 | `[x]` Complete | Backend/frontend Compose services, backend health dependency, frontend health, loopback ports, explicit bridge network, three persistent named volumes, restart/graceful-stop policy, no-key runtime, and documented configuration/secret/Feishu boundaries |
+| P37-H4 | `[x]` Complete | Make/operations commands, bounded no-key smoke tests, health/API/persistence/restart/runtime-hygiene checks, operations contracts, and CI-ready verification |
+| P37-H5 | `[x]` Complete | Final images, full regression, Workspace/Run/Report/Word/chart persistence, deployment docs, CI/static/security checks, and Docker closeout verified |
+
+### P37-H1 Verification
+
+- Images: `insightflow-backend:p37-h1` and `insightflow-frontend:p37-h1`; both built and ran as `linux/arm64` on Apple Silicon. The selected official Python/Node bases are multi-architecture, but amd64 was not built or run.
+- Non-root: backend `uid=10001(insightflow) gid=10001(insightflow)`; frontend `uid=10001(nextjs) gid=10001(nodejs)`. Backend source/config and frontend standalone files are read-only to the runtime user; backend write access is limited to intended workspace/report/trace roots.
+- Runtime: backend imported `api.app` without DeepSeek/Feishu credentials, Uvicorn served OpenAPI on `0.0.0.0:8000`, and the frontend standalone server served `/` on `0.0.0.0:3000`. Polling was bounded to 30 attempts and all temporary containers were removed.
+- Security: synthetic full-context inspection proved `.dockerignore` excludes `.env`, `.git`, local DBs, runtime workspace/report/trace data, caches/tests, host `node_modules`, and `.next`; final images passed filename/content checks and contain no pytest/pip-tools runtime packages.
+- Regression: backend project initialization/runtime provider/product-mode selection `14 passed`; frontend Vitest `84 passed`; frontend production build passed; `pip check` and `git diff --check` passed.
+- Dependency contract: `requirements.txt` is the direct runtime input, `requirements.lock` is the exact Python 3.12 production lock, and `requirements-dev.txt` adds pinned pytest/pip-tools outside production. Exact versions avoid build-time floating resolution; no hashes/platform wheel URLs are used, so only Linux arm64 wheel availability is currently verified.
+- Dependency audit: lock regeneration matched 56 Python pins. `npm audit --omit=dev` reports 3 moderate findings (`echarts`, `next`, transitive `postcss`); npm only offered major-version remediation, so P37-H1 did not apply an unreviewed forced upgrade.
+
+### P37-H2 Verification
+
+- Health API: live returned `200` with only `status=ok` and `service=insightflow-api`; ready returned `200` with `workspace_storage`, `report_storage`, `trace_storage`, and `configuration` all `ok`. Controlled required-storage failure returned `503` with only allowlisted `ok`/`error` states.
+- Lifecycle: FastAPI lifespan stops new Executor submissions, cancels queued work, waits for running work to finish, and releases worker threads. Repeated app create/use/close coverage found no remaining `insightflow-analysis` threads.
+- Image/runtime: `docker build --no-cache -t insightflow-backend:p37-h2 .` passed on Linux arm64; runtime remained `uid=10001(insightflow) gid=10001(insightflow)`. Startup succeeded without model keys, Feishu credentials, or `lark-cli`.
+- Docker health: image inspection found the Python `urllib.request` readiness HEALTHCHECK with 10-second interval, 3-second timeout, 10-second start period, and 3 retries. Bounded polling reached `healthy` within 45 seconds; live and ready both returned `200`.
+- Graceful stop: `docker stop -t 10` completed in about 0.56 seconds with exit code 0; logs showed normal Uvicorn shutdown and the temporary container was deleted.
+- Regression: health/lifecycle `17 passed`; Workspace API/run history/analysis runner/project initialization `82 passed`; frontend Vitest `84 passed`; frontend production build and `git diff --check` passed.
+- Security: health responses, suppressed health-check failure output, and container logs contained none of the tested secret, authorization, `.env`, absolute path, raw exception, SQL, prompt, user-data, trace-path, or provider-response markers.
+- At the H2 verification point, H3 Compose/persistence was still pending; the H3 verification below supersedes that historical status. P37-H4 Make/smoke/CI operations, P37-H5 closeout, amd64 validation, Kubernetes/external-service probes, and all P38 work remain pending.
+
+### P37-H3 Verification
+
+- Compose contract: `docker compose --env-file /dev/null config -q` passed; the isolated `insightflow-p37-h3-audit` project built both Linux arm64 images with existing BuildKit cache and started without DeepSeek/OpenAI keys or `lark-cli`.
+- Runtime health/access: backend and frontend both reached Docker `healthy`; `/health/live`, `/health/ready`, and the redirect-following frontend root returned `200`. The frontend startup dependency is `backend: condition: service_healthy` and contains no fixed sleep.
+- Non-root/storage: backend was `uid=10001(insightflow)`, frontend was `uid=10001(nextjs)`. `workspace-data -> /app/workspaces`, `report-data -> /app/reports`, and `trace-data -> /app/logs/traces` were owned by `10001:10001` and readable/writable by the backend runtime.
+- Persistence: an API-created audit Workspace plus unique report/trace markers survived `docker compose down` and a new `up -d`; Workspace lookup and readiness returned `200`, both markers remained, and volume ownership stayed writable. The ordinary `down` preserved all volumes.
+- Lifecycle: `docker compose restart backend` returned to healthy; `docker compose stop` completed in about 1 second and Uvicorn logged the normal application shutdown sequence; a subsequent start returned both services to healthy.
+- Regression: requested backend/Compose selection `105 passed`; frontend Vitest `84 passed`; Next.js production build passed; `git diff --check` passed.
+- Disk/cleanup: `docker system df` moved from 6 images / 1.4 GB and 5.22 GB cache to 8 images / 1.402 GB and 5.222 GB cache. No prune ran. Audit containers, network, Workspace, markers, and three isolated audit volumes were removed; `insightflow-backend:p37-h3` and `insightflow-frontend:p37-h3` remain for reuse.
+- Boundaries: Compose defaults to loopback ports, one backend instance, SQLite/local files, no Feishu CLI/auth mount, and no production Secret Manager. P37-H4 Makefile/automated smoke/CI is complete; P37-H5 closeout, amd64 verification, Kubernetes/cloud/TLS, multi-replica SQLite, and all P38 work remain pending.
+
+### P37-H4 Verification
+
+- Operations: root `Makefile` defaults to help and exposes `build`, `up`, `down`, `restart`, `ps`, `logs`, `compose-check`, backend/frontend test/build, combined `test`, and `smoke`. Build uses normal cache; ordinary `down` preserves volumes; no destructive clean/prune target exists.
+- Smoke: the final canonical executable script run used isolated project `insightflow-smoke-20260711200440-97583`, backend port 18000, frontend port 13000, an empty temporary env file, bounded health/curl waits, exact final HTTP 200 assertions, and prefix/label-guarded trap cleanup. It did not read the real `.env`.
+- Runtime/API: both services became healthy and served live/ready/frontend 200 responses; all four readiness checks were `ok`; both runtimes were UID 10001; keys were empty and `lark-cli` absent; ports were loopback-only; Docker socket, `.env`, and user Home were not mounted. An isolated Workspace create/get/list plus synthetic CSV upload/profile passed without live provider or Feishu calls.
+- Persistence/lifecycle: all three project-prefixed volumes were mounted at the expected paths and writable by UID 10001. The Workspace and unique report/trace markers survived ordinary `down`/`up`; readiness stayed ready. Backend restart returned healthy and logs showed graceful shutdown, completed application shutdown, and subsequent startup, so the Executor did not block exit.
+- Verification: full backend `788 passed, 15 skipped`; frontend Vitest `84 passed`; production build passed; requested focused selection `112 passed`; `bash -n`, Make help/Compose/test/smoke, contract tests, and diff check passed.
+- Cleanup/disk: no Smoke containers, networks, or volumes remain and no pre-existing Volume was touched. Reusable images/cache remain. Docker usage changed from 8 images / 1.402 GB and 5.222 GB cache to 8 images / 1.486 GB and 5.531 GB cache; no prune ran.
+- CI: `.github/workflows/ci.yml` is configured to run Python 3.12, Node 22, tests/build, Compose validation, syntax check, and the same smoke script with no required secrets. Only local static validation was performed; remote GitHub Actions and amd64 execution were not run.
+- Historical H4 closeout note superseded: P37-H5 is now complete; P38 has not started.
+- Preflight cleanup follow-up: `TEMP_DIR` creation now happens only after Docker/curl/Python/mktemp, Compose, and Engine preflight. EXIT and signal traps are installed before directory creation; INT maps to 130 and TERM to 143; cleanup is safe with no directory, preserves non-zero status, and skips Docker resource cleanup when preflight never succeeded while retaining the existing project/Volume guards for active Smoke resources.
+- Behavioral regression uses an isolated `TMPDIR` and controlled fake commands rather than real user Docker state. Missing Docker returned 127; fake Engine failure returned its original 42; both left zero `insightflow-smoke.*` directories, and the Engine case made only `compose version`/`info` calls. The requested operations/Compose/health selection passed (`32 passed`), final `make smoke` passed, and no Smoke container, network, Volume, or temporary directory remained. This is retained as H4 evidence; H5 has since completed P37.
+
+### P37-H5 Verification
+
+- Final images: `insightflow-backend:p37` and `insightflow-frontend:p37`; the one final no-cache Compose build passed on `linux/arm64`. Both run as UID 10001; keyless backend import, `pip check`, frontend standalone checks, and final-image hygiene passed. amd64 was not tested.
+- Compose/Smoke: both services healthy; live/ready/frontend 200; readiness four checks `ok`; loopback-only ports; no optional key, `lark-cli`, Docker Socket, `.env`, or Home mount; graceful restart passed. Isolated project cleanup left no container, network, or Volume.
+- Product persistence: a synthetic Workspace, CSV profile, semantic draft, Analysis Run/history, ReportRecord, ReportDocument, Evidence Ledger, Markdown, Word `.docx`, and static chart-or-explicit-warning contract survived ordinary `compose down` and a fresh `up`. No real DeepSeek or Feishu call ran, and no fake success was accepted.
+- Boundaries: Analysis Workbench and Report Center remain separate; Product Result Builder only assembles; Business Answer reads the Analysis Evidence Ledger; Report Center keeps `ReportPlan + ReportEvidencePack + EvidenceLedger + ReportDocument`. Health/readiness does not call Word or Feishu tools. Live checks remain explicitly gated and normally skipped.
+- Regression: focused boundaries `127 passed`; H5/operations/Compose `21 passed`; `make test` and separate `python3 -m pytest` each `796 passed, 15 skipped`; frontend Vitest twice `84 passed`; both frontend builds passed; `make compose-check`, `make smoke`, shell syntax, and diff checks passed.
+- CI: workflow is configured and locally statically checked with Python 3.12, Node 22, backend/frontend verification, Compose, and the canonical no-key Smoke. Remote GitHub Actions did not run; no amd64/remote-CI claim is made.
+- Dependency audit: `npm audit --omit=dev` reports 3 moderate findings (`echarts`, `next`, transitive `postcss`); only breaking major-version remediation was offered, so no forced upgrade ran.
+- Hygiene: no tracked real Secret, DB, Workspace/Run/Report, Trace, report/chart, Word, frontend build/dependency, pytest/cache, or Smoke artifact; audited deployment/docs surfaces contain no local user absolute path or real key pattern.
+- Docker usage: 8 images / 1.486 GB and 5.531 GB cache before final build; 10 images / 1.752 GB and 7.444 GB cache before cleanup; 3 images / 783.4 MB and 7.444 GB cache after deleting only unreferenced H1/H1-review/H2/H3 tags. `docker system df` reports 5.935 GB cache reclaimable. No Volume or global cache prune ran. Retained project images are the two final `:p37` tags.
+- P37 is Complete. P38 remains Planned; next planned task is P38-H1 Observability Contract And Correlation Context.
+
+## P38 Task Status
+
+| Task | Status | Notes |
+|---|---|---|
+| P38-H1 | `[ ]` Planned | Observability event/correlation contract, context propagation, allowlists, redaction, and safe identifier rules |
+| P38-H2 | `[ ]` Planned | Structured JSON logging and FastAPI request middleware with normalized routes/errors and correlation headers |
+| P38-H3 | `[ ]` Planned | `TraceSink` refactor preserving local JSON traces and Trace Dashboard, plus safe retention and sink isolation |
+| P38-H4 | `[ ]` Planned | Bounded Prometheus metrics for HTTP, workflow, LLM, SQL/evidence, chart/report/export, and external publishing |
+| P38-H5 | `[ ]` Planned | Compose observability profile, Prometheus/Grafana provisioning, dashboards, retention, recording rules, and alerts |
+| P38-H6 | `[ ]` Planned | Failure injection, leak/cardinality tests, alert verification, runbooks, regression, and documentation closeout |
 
 ## P35 Task Status
 
