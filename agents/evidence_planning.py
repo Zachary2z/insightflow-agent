@@ -27,7 +27,7 @@ def run_evidence_planning_agent(state: dict[str, Any], provider: LLMProvider | N
     else:
         sql_planning = plan_sql_strategy_with_provider({**understanding, "question": question}, provider=provider)
 
-    analysis_plan = plan_analysis(question, provider=None)
+    analysis_plan = plan_analysis(question)
     evidence_planning = _build_evidence_planning(
         state,
         understanding=understanding,

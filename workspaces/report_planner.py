@@ -608,18 +608,6 @@ def _report_style(inferred_intent: str) -> str:
     }.get(inferred_intent, "经营复盘")
 
 
-def _infer_time_range(report_goal: str) -> str:
-    if re.search(r"90|九十", report_goal):
-        return "最近90天"
-    if "最近30天" in report_goal or "近30天" in report_goal:
-        return "最近30天"
-    if "本月" in report_goal:
-        return "本月"
-    if "本周" in report_goal:
-        return "本周"
-    return "最近90天"
-
-
 def _title_time_prefix(time_range: str) -> str:
     if str(time_range or "").startswith("完整数据时间范围"):
         return "完整数据"

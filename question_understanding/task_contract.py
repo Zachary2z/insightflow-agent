@@ -204,6 +204,7 @@ def canonical_metric_id(metric_label: str) -> str:
         "gmv",
         "sales",
         "salesamount",
+        "grossmerchandisevalue",
         "sumsalesamount",
         "totalsales",
         "revenue",

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-from llm_ops.provider import LLMProvider, LLMRequest
+from llm_ops.provider import LLMProvider, LLMRequest, provider_error_fields, provider_failure, provider_metadata
 from llm_ops.structured_output import run_validated_llm_request
 from sql_planning.router import plan_sql_strategy
 
@@ -98,11 +98,7 @@ def _provider_result(content: dict[str, Any], understanding: dict[str, Any], pro
         "fallback_used": False,
         "provider_error": "",
         "validation_error": "",
-        "model": provider_response.get("model", ""),
-        "prompt_id": provider_response.get("prompt_id", "sql_planning_router"),
-        "prompt_version": provider_response.get("prompt_version", ""),
-        "usage": provider_response.get("usage", {}),
-        "latency_ms": provider_response.get("latency_ms", 0),
+        **provider_metadata(provider_response, default_prompt_id="sql_planning_router"),
     }
     if strategy == "llm_candidate":
         result["candidate_policy"] = _candidate_policy()
@@ -133,15 +129,7 @@ def plan_sql_strategy_with_provider(
                 provider_called=False,
                 provider_error=rendered.get("error", ""),
             )
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": False,
-            "fallback_used": False,
-            "provider_error": rendered.get("error", ""),
-            "validation_error": "",
-            "error": rendered.get("error", ""),
-        }
+        return provider_failure(rendered.get("error", ""), provider_called=False)
 
     request = LLMRequest(
         prompt=rendered["prompt"],
@@ -172,17 +160,10 @@ def plan_sql_strategy_with_provider(
     error = provider_response.get("error", "")
     error_type = provider_response.get("error_type", "")
     if not deterministic_fallback:
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": True,
-            "fallback_used": False,
-            "provider_error": error,
-            "validation_error": error if error_type == "llm_schema_validation_error" else "",
-            "error": error,
-            "error_type": error_type,
-        }
+        return provider_failure(error, provider_called=True, error_type=error_type)
 
-    if error_type == "llm_schema_validation_error":
-        return _provider_unavailable_result(question_understanding, provider_called=True, validation_error=error)
-    return _provider_unavailable_result(question_understanding, provider_called=True, provider_error=error)
+    return _provider_unavailable_result(
+        question_understanding,
+        provider_called=True,
+        **provider_error_fields(error, error_type),
+    )

@@ -38,8 +38,8 @@ const navigationMocks = vi.hoisted(() => ({
   redirect: vi.fn(),
 }));
 
-vi.mock("echarts", () => ({
-  init: echartsMock.init,
+vi.mock("../lib/echarts-runtime", () => ({
+  echarts: { init: echartsMock.init },
 }));
 
 vi.mock("next/navigation", () => ({

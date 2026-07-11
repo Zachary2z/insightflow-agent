@@ -3,26 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 
-SPEC_FIELDS = (
-    "chart_type",
-    "title",
-    "x",
-    "y",
-    "y_secondary",
-    "series",
-    "required_columns",
-    "explanation_basis",
-    "provider_called",
-    "fallback_used",
-    "prompt_id",
-    "validation_error",
-    "provider_error",
-    "unit",
-    "value_label",
-    "business_annotation",
-)
-
-
 def normalize_chart_spec(spec: dict[str, Any]) -> dict[str, Any]:
     normalized = {
         "success": bool(spec.get("success", True)),

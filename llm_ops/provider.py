@@ -37,6 +37,37 @@ class MockLLMProvider:
         return self.response
 
 
+def provider_metadata(response: dict[str, Any], *, default_prompt_id: str) -> dict[str, Any]:
+    return {
+        "model": response.get("model", ""),
+        "prompt_id": response.get("prompt_id", default_prompt_id),
+        "prompt_version": response.get("prompt_version", ""),
+        "usage": response.get("usage", {}),
+        "latency_ms": response.get("latency_ms", 0),
+    }
+
+
+def provider_error_fields(error: str, error_type: str = "") -> dict[str, str]:
+    is_validation_error = error_type == "llm_schema_validation_error"
+    return {
+        "provider_error": "" if is_validation_error else error,
+        "validation_error": error if is_validation_error else "",
+    }
+
+
+def provider_failure(error: str, *, provider_called: bool, error_type: str = "") -> dict[str, Any]:
+    return {
+        "success": False,
+        "source": "provider",
+        "provider_called": provider_called,
+        "fallback_used": False,
+        "provider_error": error,
+        "validation_error": error if error_type == "llm_schema_validation_error" else "",
+        "error": error,
+        **({"error_type": error_type} if error_type else {}),
+    }
+
+
 def _token_count(value: Any) -> int:
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
     return max(1, len(text.split()))

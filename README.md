@@ -46,7 +46,7 @@ flowchart TD
 
 ## 技术栈
 
-- **Backend**: FastAPI, Pydantic, pandas, SQLAlchemy, sqlglot, sqlparse
+- **Backend**: FastAPI, Pydantic, pandas, sqlglot, sqlparse
 - **Frontend**: Next.js, React, TypeScript, ECharts, Vitest
 - **LLM**: DeepSeek OpenAI-compatible API
 - **Data / Tools**: SQLite, CSV, Excel, Word export, Feishu `lark-cli`

@@ -105,27 +105,3 @@ def test_sql_planning_llm_candidate_route_never_calls_provider_or_returns_sql():
     assert "llm_response" not in result
     assert "sql" not in result
     assert "generated_sql" not in result
-
-
-def test_sql_planning_agent_writes_state_and_trace_without_sql_generation():
-    from agents.sql_planning_router import run_sql_planning_router_agent
-    from agents.supervisor import initialize_run
-    from question_understanding.router import understand_question
-
-    state = initialize_run(
-        "最近 30 天销售额最高的 5 个商品是什么？",
-        run_id="run_sql_planning_router_test",
-        session_id="session_sql_planning_router_test",
-    )
-    state["question_understanding"] = understand_question(state["user_question"])
-
-    result = run_sql_planning_router_agent(state)
-
-    assert result["sql_planning"]["strategy"] == "template"
-    assert result["sql_planning"]["matched_template"] == "top_products_gmv"
-    assert result["sql_routing_strategy"] == "template"
-    assert result["matched_template"] == "top_products_gmv"
-    assert "generated_sql" not in result
-    assert result["trace"][-1]["node"] == "sql_planning_router_agent"
-    assert result["trace"][-1]["tool_name"] == "sql_planning_router"
-    assert result["trace"][-1]["status"] == "success"

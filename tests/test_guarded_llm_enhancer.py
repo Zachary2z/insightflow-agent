@@ -5,12 +5,24 @@ ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "data" / "ecommerce.db"
 
 
+class _CapturingProvider:
+    model = "mock-free"
+
+    def __init__(self, response, captured):
+        self.response = response
+        self.captured = captured
+
+    def generate(self, request):
+        self.captured["prompt"] = request.prompt
+        return self.response
+
+
 def _prepared_state():
-    from agents.context_retriever import run_context_retriever_agent
     from agents.metric_agent import run_metric_agent
     from agents.schema_agent import run_schema_agent
     from agents.sql_generator import run_sql_generator
     from agents.supervisor import initialize_run
+    from tools.context_tool import retrieve_business_context
 
     state = initialize_run(
         "最近 30 天销售额最高的 5 个商品是什么？",
@@ -20,7 +32,7 @@ def _prepared_state():
     state["db_path"] = DB_PATH
     state = run_schema_agent(state, DB_PATH)
     state = run_metric_agent(state)
-    state = run_context_retriever_agent(state)
+    state["business_context"] = retrieve_business_context(state["user_question"])
     return run_sql_generator(state)
 
 
@@ -29,9 +41,8 @@ def test_guarded_sql_candidate_accepts_only_validated_select_without_execution()
 
     captured = {}
 
-    def mock_sql_provider(prompt):
-        captured["prompt"] = prompt
-        return {
+    provider = _CapturingProvider(
+        {
             "sql_candidates": [
                 {
                     "sql": """
@@ -47,10 +58,12 @@ LIMIT 3
                     "rationale": "Use paid GMV and a smaller Top 3.",
                 }
             ]
-        }
+        },
+        captured,
+    )
 
     state = _prepared_state()
-    result = run_guarded_sql_candidate_agent(state, llm_provider=mock_sql_provider)
+    result = run_guarded_sql_candidate_agent(state, llm_provider=provider)
 
     enhancement = result["llm_sql_enhancement"]
     assert enhancement["success"] is True
@@ -62,11 +75,11 @@ LIMIT 3
     assert "execution_result" not in enhancement
     assert "run_sql" not in enhancement
     assert enhancement["candidates"][0]["review_result"]["approved"] is True
-    assert "schema_text" in captured["prompt"]
-    assert "metric_context" in captured["prompt"]
-    assert "business_context" in captured["prompt"]
-    assert captured["prompt"]["must_validate_sql"] is True
-    assert captured["prompt"]["must_not_execute_sql"] is True
+    assert "Schema:" in captured["prompt"]
+    assert "Metric context:" in captured["prompt"]
+    assert "Business context:" in captured["prompt"]
+    assert "never execute SQL" in captured["prompt"]
+    assert "never bypass validate_sql" in captured["prompt"]
     assert result["trace"][-1]["node"] == "guarded_sql_candidate_agent"
 
 
@@ -75,16 +88,17 @@ def test_guarded_sql_candidate_prompt_includes_workspace_context():
 
     captured = {}
 
-    def mock_sql_provider(prompt):
-        captured["prompt"] = prompt
-        return {
+    provider = _CapturingProvider(
+        {
             "sql_candidates": [
                 {
                     "sql": "SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status LIMIT 5",
                     "rationale": "Use workspace revenue by channel.",
                 }
             ]
-        }
+        },
+        captured,
+    )
 
     state = _prepared_state()
     state["workspace_context"] = {
@@ -92,27 +106,28 @@ def test_guarded_sql_candidate_prompt_includes_workspace_context():
         "guidance": ["Use max order_date for dataset-relative recent windows."],
         "tables": [{"table_name": "orders", "columns": [{"name": "order_date", "value_range": {"max": "2025-12-26"}}]}],
     }
-    result = run_guarded_sql_candidate_agent(state, llm_provider=mock_sql_provider)
+    result = run_guarded_sql_candidate_agent(state, llm_provider=provider)
 
     assert result["llm_sql_enhancement"]["provider_called"] is True
-    assert captured["prompt"]["workspace_context"]["workspace_data_source_selected"] is True
-    assert captured["prompt"]["workspace_context"]["tables"][0]["columns"][0]["value_range"]["max"] == "2025-12-26"
+    assert "workspace_data_source_selected" in captured["prompt"]
+    assert "2025-12-26" in captured["prompt"]
 
 
 def test_guarded_sql_candidate_rejects_unsafe_sql_and_keeps_deterministic_sql():
     from agents.guarded_llm_enhancer import run_guarded_sql_candidate_agent
+    from llm_ops.provider import MockLLMProvider
 
     state = _prepared_state()
     deterministic_sql = state["generated_sql"]
 
     result = run_guarded_sql_candidate_agent(
         state,
-        llm_provider=lambda prompt: {
+        llm_provider=MockLLMProvider({
             "sql_candidates": [
                 {"sql": "DELETE FROM orders WHERE status = 'cancelled'", "rationale": "unsafe"},
                 {"sql": "SELECT email FROM users LIMIT 5", "rationale": "sensitive"},
             ]
-        },
+        }),
     )
 
     enhancement = result["llm_sql_enhancement"]

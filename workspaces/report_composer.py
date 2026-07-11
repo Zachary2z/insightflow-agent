@@ -183,26 +183,6 @@ def _build_prompt(
     )
 
 
-def _safe_evidence_pack(evidence_pack: ReportEvidencePack) -> dict[str, Any]:
-    return {
-        "facts": [fact.to_dict() for fact in evidence_pack.facts],
-        "tables": [
-            {
-                "table_id": table.table_id,
-                "title": table.title,
-                "columns": table.columns,
-                "rows": table.rows[:8],
-                "source_chapter_id": table.source_chapter_id,
-                "description": table.description,
-            }
-            for table in evidence_pack.tables
-        ],
-        "charts": [chart.to_dict() for chart in evidence_pack.charts],
-        "warnings": list(evidence_pack.warnings),
-        "data_limits": list(evidence_pack.data_limits),
-    }
-
-
 def _safe_evidence_ledger(ledger: EvidenceLedger) -> dict[str, Any]:
     data = ledger.to_dict()
     data["technical_refs"] = [

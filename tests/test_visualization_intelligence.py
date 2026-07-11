@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 
 def _execution_result(columns: list[str], rows: list[list[object]]) -> dict:
     return {
@@ -86,6 +88,47 @@ def test_chart_renderer_uses_only_real_execution_rows(tmp_path):
     assert result["chart_type"] == "ranked_bar"
     assert Path(result["chart_path"]).exists()
     assert result["data_row_count"] == 2
+    assert result["rendered_rows"] == execution_result["rows"]
+    assert result["fabricated_data"] is False
+
+
+@pytest.mark.parametrize(
+    ("chart_type", "extra_spec"),
+    [
+        ("line", {}),
+        ("grouped_bar", {"series": "series"}),
+        ("dual_axis_line", {"y_secondary": "secondary"}),
+        ("funnel", {}),
+        ("heatmap", {"series": "series"}),
+        ("scatter", {}),
+        ("risk_matrix", {}),
+    ],
+)
+def test_pillow_renderer_supports_every_registered_chart_type(tmp_path, chart_type, extra_spec):
+    from visualization.chart_renderer import render_chart
+
+    columns = ["x", "y", "series", "secondary"]
+    execution_result = _execution_result(
+        columns,
+        [[1, 12.0, "A", 4.0], [2, 8.0, "B", 7.0], [3, 15.0, "A", 6.0]],
+    )
+    spec = {
+        "chart_type": chart_type,
+        "title": f"{chart_type} test",
+        "x": "x",
+        "y": "y",
+        "y_secondary": "",
+        "series": "",
+        "required_columns": ["x", "y", *extra_spec.values()],
+        "run_id": f"run_{chart_type}",
+        **extra_spec,
+    }
+
+    result = render_chart(execution_result, spec, output_dir=tmp_path)
+
+    assert result["success"] is True
+    assert result["chart_type"] == chart_type
+    assert Path(result["chart_path"]).is_file()
     assert result["rendered_rows"] == execution_result["rows"]
     assert result["fabricated_data"] is False
 

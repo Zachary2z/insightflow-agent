@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-import re
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
 
 from workspaces.chart_static_export import export_chart_static_asset
 from workspaces.models import utc_now_iso
+from workspaces.safe_output import contains_sensitive_text as _contains_sensitive_text
+from workspaces.safe_output import safe_url as _safe_url
+from workspaces.safe_output import safe_workspace_path as _safe_path
 
 
 EXPORT_PACKAGE_VERSION = "p34.export_package.v1"
@@ -529,54 +530,6 @@ def _chart_evidence_refs(chart_artifacts: list[dict[str, Any]]) -> list[str]:
     return refs
 
 
-def _safe_path(value: Any, *, workspace_root: str | Path | None) -> str:
-    text = _text(value)
-    if not text:
-        return ""
-    if _unsafe_relative_path(text):
-        return ""
-    path = Path(text)
-    if not path.is_absolute():
-        return path.as_posix()
-    if not workspace_root:
-        return ""
-    try:
-        return path.resolve().relative_to(Path(workspace_root).resolve()).as_posix()
-    except (OSError, ValueError):
-        return ""
-
-
-def _safe_url(value: Any) -> str:
-    text = _text(value)
-    if not text:
-        return ""
-    if _url_has_secret_marker(text):
-        return ""
-    if text.startswith("/api/") or text.startswith("http://") or text.startswith("https://"):
-        return text
-    return ""
-
-
-def _unsafe_relative_path(value: str) -> bool:
-    text = value.strip()
-    if text.startswith("~"):
-        return True
-    path = Path(text)
-    return any(part == ".." for part in path.parts)
-
-
-def _url_has_secret_marker(value: str) -> bool:
-    secret_keys = {"api_key", "apikey", "access_key", "access_token", "token", "secret", "password", "key"}
-    lower = value.lower()
-    if any(marker in lower for marker in ("api_key=", "access_token=", "token=", "secret=", "password=")):
-        return True
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return True
-    return any(key.lower() in secret_keys for key, _ in parse_qsl(parsed.query, keep_blank_values=True))
-
-
 def _list_of_text(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -619,19 +572,3 @@ def _sanitize_value(value: Any) -> Any:
     if isinstance(value, bool | int | float) or value is None:
         return value
     return ""
-
-
-def _contains_sensitive_text(value: str) -> bool:
-    text = str(value or "").strip()
-    if not text:
-        return False
-    lowered = text.lower()
-    if re.search(r"\b(?:select|with|insert|update|delete|drop|alter|create|pragma)\b", text, re.IGNORECASE):
-        return True
-    if re.search(r"(^|[=/\s])(?:/users/|/tmp/|~[/\\])", lowered):
-        return True
-    if re.search(r"\b(?:raw_sql|generated_sql|raw_rows|trace_path|trace_id|provider_metadata|api_key|apikey|access_key|access_token|secret|password|database_path|analysis\.db|task_id|task_purpose|debug_id|prompt(?:_id|_text|_version)?|completion_tokens|prompt_tokens)\b", lowered):
-        return True
-    if re.search(r"\bsk-[A-Za-z0-9_-]+", text):
-        return True
-    return False

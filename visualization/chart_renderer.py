@@ -1,36 +1,16 @@
 from __future__ import annotations
 
-import os
 import re
-import tempfile
-import warnings
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 from visualization.chart_registry import fallback_chart_type, is_supported_chart_type
 from visualization.chart_validator import validate_chart_spec
+from visualization.static_renderer import render_static_chart_file
 
 
 DEFAULT_ADVANCED_CHART_DIR = Path(__file__).resolve().parents[1] / "reports" / "charts"
-
-os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "insightflow_matplotlib"))
-import matplotlib
-
-matplotlib.use("Agg")
-from matplotlib import pyplot as plt
-from matplotlib import font_manager
-
-
-CJK_FONT_FALLBACKS = [
-    "Noto Sans CJK SC",
-    "Noto Sans CJK JP",
-    "Microsoft YaHei",
-    "PingFang SC",
-    "SimHei",
-    "Arial Unicode MS",
-    "DejaVu Sans",
-]
 
 
 def _safe_filename(value: str) -> str:
@@ -53,54 +33,6 @@ def _numeric_values(columns: list[str], rows: list[list[Any]], column: str) -> l
     return [float(value) for value in _values(columns, rows, column)]
 
 
-def _configure_fonts() -> None:
-    available = {font.name for font in font_manager.fontManager.ttflist}
-    selected = [font for font in CJK_FONT_FALLBACKS if font in available]
-    if "DejaVu Sans" not in selected:
-        selected.append("DejaVu Sans")
-    plt.rcParams["font.sans-serif"] = selected
-    plt.rcParams["font.family"] = "sans-serif"
-    plt.rcParams["axes.unicode_minus"] = False
-
-
-def _y_label(spec: dict[str, Any]) -> str:
-    unit = str(spec.get("unit") or "").strip()
-    return f"{spec['y']} ({unit})" if unit else spec["y"]
-
-
-def _format_value(value: float, unit: str) -> str:
-    label = f"{value:,.0f}" if float(value).is_integer() else f"{value:,.2f}"
-    return f"{label}{unit}" if unit else label
-
-
-def _add_bar_value_labels(bars: Any, values: list[float], unit: str) -> None:
-    axis = plt.gca()
-    max_value = max(values) if values else 0
-    offset = max_value * 0.015 if max_value else 0.05
-    for bar, value in zip(bars, values, strict=False):
-        axis.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + offset,
-            _format_value(value, unit),
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
-
-
-def _add_point_value_labels(x_values: list[Any], y_values: list[float], unit: str) -> None:
-    axis = plt.gca()
-    for x_value, y_value in zip(x_values, y_values, strict=False):
-        axis.annotate(
-            _format_value(y_value, unit),
-            (x_value, y_value),
-            textcoords="offset points",
-            xytext=(0, 6),
-            ha="center",
-            fontsize=8,
-        )
-
-
 def _trace_event(chart_type: str, output: str, status: str, latency_ms: int, error: str = "") -> dict[str, Any]:
     event = {
         "tool_name": "render_visualization_chart",
@@ -113,67 +45,6 @@ def _trace_event(chart_type: str, output: str, status: str, latency_ms: int, err
         event["error_type"] = "visualization_render_error"
         event["error"] = error
     return event
-
-
-def _draw_supported_chart(spec: dict[str, Any], columns: list[str], rows: list[list[Any]]) -> None:
-    chart_type = spec["chart_type"]
-    x_values = [str(value) for value in _values(columns, rows, spec["x"])]
-    y_values = _numeric_values(columns, rows, spec["y"])
-    unit = str(spec.get("unit") or "")
-    show_value_labels = bool(spec.get("value_label", False))
-
-    if chart_type in {"ranked_bar", "funnel"}:
-        bars = plt.bar(x_values, y_values, color="#2563eb")
-        if show_value_labels:
-            _add_bar_value_labels(bars, y_values, unit)
-        plt.xticks(rotation=30, ha="right")
-    elif chart_type == "line":
-        plt.plot(x_values, y_values, marker="o", color="#2563eb")
-        if show_value_labels:
-            _add_point_value_labels(x_values, y_values, unit)
-        plt.xticks(rotation=30, ha="right")
-    elif chart_type == "grouped_bar":
-        series_values = [str(value) for value in _values(columns, rows, spec["series"])]
-        labels = [f"{x}\n{series}" for x, series in zip(x_values, series_values, strict=False)]
-        bars = plt.bar(labels, y_values, color="#2563eb")
-        if show_value_labels:
-            _add_bar_value_labels(bars, y_values, unit)
-        plt.xticks(rotation=30, ha="right")
-    elif chart_type == "dual_axis_line":
-        secondary_values = _numeric_values(columns, rows, spec["y_secondary"])
-        axis = plt.gca()
-        axis.plot(x_values, y_values, marker="o", color="#2563eb", label=spec["y"])
-        if show_value_labels:
-            _add_point_value_labels(x_values, y_values, unit)
-        axis.set_ylabel(_y_label(spec))
-        secondary_axis = axis.twinx()
-        secondary_axis.plot(x_values, secondary_values, marker="s", color="#dc2626", label=spec["y_secondary"])
-        secondary_axis.set_ylabel(spec["y_secondary"])
-        plt.xticks(rotation=30, ha="right")
-    elif chart_type == "heatmap":
-        x_categories = list(dict.fromkeys(x_values))
-        y_categories = list(dict.fromkeys(str(value) for value in _values(columns, rows, spec["series"])))
-        matrix = [[0.0 for _ in x_categories] for _ in y_categories]
-        series_values = [str(value) for value in _values(columns, rows, spec["series"])]
-        for x_value, y_value, metric in zip(x_values, series_values, y_values, strict=False):
-            matrix[y_categories.index(y_value)][x_categories.index(x_value)] = metric
-        plt.imshow(matrix, aspect="auto", cmap="Blues")
-        plt.xticks(range(len(x_categories)), x_categories, rotation=30, ha="right")
-        plt.yticks(range(len(y_categories)), y_categories)
-        plt.colorbar(label=spec["y"])
-    elif chart_type in {"scatter", "risk_matrix"}:
-        x_metric = _numeric_values(columns, rows, spec["x"])
-        y_metric = _numeric_values(columns, rows, spec["y"])
-        color = "#2563eb" if chart_type == "scatter" else "#dc2626"
-        plt.scatter(x_metric, y_metric, color=color)
-        if chart_type == "risk_matrix" and x_metric and y_metric:
-            plt.axvline(sum(x_metric) / len(x_metric), color="#6b7280", linestyle="--", linewidth=1)
-            plt.axhline(sum(y_metric) / len(y_metric), color="#6b7280", linestyle="--", linewidth=1)
-
-    plt.title(spec.get("title") or f"{chart_type.title()} Chart")
-    if chart_type != "dual_axis_line":
-        plt.xlabel(spec["x"])
-        plt.ylabel(_y_label(spec))
 
 
 def _table_fallback(execution_result: dict[str, Any], reason: str, started_at: float) -> dict[str, Any]:
@@ -194,6 +65,30 @@ def _table_fallback(execution_result: dict[str, Any], reason: str, started_at: f
     }
 
 
+def _static_series(spec: dict[str, Any], columns: list[str], rows: list[list[Any]]) -> tuple[list[str], list[dict[str, Any]]]:
+    chart_type = spec["chart_type"]
+    x_values = [str(value) for value in _values(columns, rows, spec["x"])]
+    y_values = _numeric_values(columns, rows, spec["y"])
+    if chart_type in {"grouped_bar", "heatmap"}:
+        series_values = [str(value) for value in _values(columns, rows, spec["series"])]
+        labels = list(dict.fromkeys(x_values))
+        names = list(dict.fromkeys(series_values))
+        values_by_series = {
+            name: {x: value for x, series_name, value in zip(x_values, series_values, y_values, strict=False) if series_name == name}
+            for name in names
+        }
+        return labels, [
+            {"name": name, "values": [values_by_series[name].get(label, 0.0) for label in labels]}
+            for name in names
+        ]
+    if chart_type == "dual_axis_line":
+        return x_values, [
+            {"name": spec["y"], "values": y_values},
+            {"name": spec["y_secondary"], "values": _numeric_values(columns, rows, spec["y_secondary"])},
+        ]
+    return x_values, [{"name": spec["y"], "values": y_values}]
+
+
 def render_chart(
     execution_result: dict[str, Any],
     chart_spec: dict[str, Any],
@@ -203,12 +98,10 @@ def render_chart(
     columns = [str(column) for column in execution_result.get("columns") or []]
     rows = list(execution_result.get("rows") or [])
     raw_chart_type = str(chart_spec.get("chart_type", "")).strip().lower()
-    _configure_fonts()
 
     if not is_supported_chart_type(raw_chart_type):
-        fallback_type = fallback_chart_type(columns, rows)
         reason = f"Unsupported chart_type: {raw_chart_type}"
-        if fallback_type == "table":
+        if fallback_chart_type(columns, rows) == "table":
             return _table_fallback(execution_result, reason, started_at)
         chart_spec = {
             **chart_spec,
@@ -218,7 +111,7 @@ def render_chart(
             "y": chart_spec.get("y") or (columns[1] if len(columns) > 1 else ""),
             "y_secondary": "",
             "series": "",
-            "required_columns": [column for column in [columns[0] if columns else "", columns[1] if len(columns) > 1 else ""] if column],
+            "required_columns": [column for column in columns[:2] if column],
         }
         fallback_used = True
         fallback_reason = reason
@@ -236,19 +129,18 @@ def render_chart(
         run_id = str(validated.get("run_id", "run_unknown"))
         filename = _safe_filename(f"{run_id}_{validated['chart_type']}_{validated['x']}_{validated['y']}") + ".png"
         chart_path = output_path / filename
-        plt.figure(figsize=(8, 5.2))
-        _draw_supported_chart(validated, columns, rows)
-        annotation = str(validated.get("business_annotation") or "").strip()
-        if annotation:
-            plt.figtext(0.08, 0.03, annotation, ha="left", va="bottom", fontsize=9, wrap=True)
-        plt.tight_layout(rect=(0, 0.1, 1, 1) if annotation else None)
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=r".*Glyph .* missing from font.*")
-            warnings.filterwarnings("ignore", message=r".*missing from current font.*")
-            plt.savefig(chart_path, dpi=160)
-        plt.close()
+        labels, series = _static_series(validated, columns, rows)
+        render_static_chart_file(
+            chart_path,
+            title=str(validated.get("title") or f"{validated['chart_type'].title()} Chart"),
+            labels=labels,
+            series=series,
+            chart_type=validated["chart_type"],
+            annotation=str(validated.get("business_annotation") or "").strip(),
+            unit=str(validated.get("unit") or "").strip(),
+            show_value_labels=bool(validated.get("value_label", False)),
+        )
     except Exception as exc:
-        plt.close()
         return _table_fallback(execution_result, str(exc), started_at)
 
     latency_ms = int((perf_counter() - started_at) * 1000)

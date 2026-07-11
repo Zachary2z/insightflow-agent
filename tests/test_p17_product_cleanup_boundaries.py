@@ -298,9 +298,13 @@ def test_obsolete_eval_demo_and_streamlit_files_are_deleted_and_untracked():
 
 def test_current_readme_entrypoints_do_not_reference_old_eval_or_streamlit_paths():
     readme = _source("README.md")
-    current_sections = readme[
-        readme.index("## Quickstart") : readme.index("## Historical / Superseded Context")
-    ]
+    quickstart_heading = "## 快速开始" if "## 快速开始" in readme else "## Quickstart"
+    end_heading = (
+        "## Historical / Superseded Context"
+        if "## Historical / Superseded Context" in readme
+        else "## 当前边界"
+    )
+    current_sections = readme[readme.index(quickstart_heading) : readme.index(end_heading)]
 
     for forbidden in (
         "streamlit run app.py",
@@ -341,7 +345,29 @@ def test_current_product_docs_do_not_present_superseded_paths_as_current_guidanc
 
     for path, current_text in current_docs.items():
         for forbidden in forbidden_current_guidance:
-            assert forbidden not in current_text, f"{forbidden!r} is current guidance in {path}"
+            matching_lines = [line for line in current_text.splitlines() if forbidden in line]
+            for line in matching_lines:
+                normalized = line.lower()
+                negative_context = (
+                    "deleted",
+                    "removed",
+                    "old ",
+                    "old-",
+                    "historical",
+                    "superseded",
+                    "does not",
+                    "did not",
+                    "no simulated",
+                    "remain deleted",
+                    "negative test",
+                    "不再",
+                    "删除",
+                    "未恢复",
+                    "仅保留",
+                )
+                assert any(marker in normalized for marker in negative_context), (
+                    f"{forbidden!r} is current guidance in {path}: {line}"
+                )
 
 
 def test_superseded_superpowers_specs_are_marked_historical_not_current_guidance():

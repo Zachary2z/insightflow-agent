@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from llm_ops.business_text import KNOWN_METRIC_ACRONYMS
 from llm_ops.structured_output import validate_prompt_output
 from workspaces.answer_evidence import (
     contains_cjk,
@@ -66,18 +67,6 @@ _ASCII_STOPWORDS = {
     "validator",
     "which",
     "wins",
-}
-_KNOWN_METRIC_ACRONYMS = {
-    "AOV",
-    "CAC",
-    "CPA",
-    "CPC",
-    "CPM",
-    "CTR",
-    "CVR",
-    "GMV",
-    "ROI",
-    "ROAS",
 }
 _METRIC_ALIASES = {
     "roi": {"roas", "return_on_ad_spend", "net_return"},
@@ -242,7 +231,7 @@ def _is_supported_metric_token(token: str, supported_metric_labels: set[str]) ->
         return False
     upper = normalized.upper()
     lower = normalized.lower()
-    if upper in _KNOWN_METRIC_ACRONYMS:
+    if upper in KNOWN_METRIC_ACRONYMS:
         return True
     if lower in supported_metric_labels:
         return True

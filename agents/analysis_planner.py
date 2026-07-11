@@ -2,24 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-from llm_ops.provider import LLMProvider, LLMRequest
-from llm_ops.structured_output import run_validated_llm_request
 from semantic_layer.loader import load_semantic_layer
 from semantic_layer.retriever import retrieve_semantic_context
-from tools.trace_logger import append_trace
-
-
-SCENARIO_TYPES = {
-    "quick_metric_lookup",
-    "gmv_decline_diagnosis",
-    "marketing_roi_review",
-    "inventory_risk_analysis",
-    "refund_anomaly_analysis",
-    "promotion_review",
-    "customer_segment_analysis",
-    "general_non_template_analysis",
-}
 
 
 _SCENARIO_KEYWORDS = [
@@ -241,13 +225,7 @@ def _semantic_steps(scenario_type: str, semantic_context: dict[str, Any]) -> lis
     return steps
 
 
-def _deterministic_plan(
-    question: str,
-    *,
-    provider_called: bool,
-    provider_error: str = "",
-    validation_error: str = "",
-) -> dict[str, Any]:
+def _deterministic_plan(question: str) -> dict[str, Any]:
     semantic_context = retrieve_semantic_context(question)
     scenario_type = _infer_scenario_type(question, semantic_context)
     return {
@@ -255,118 +233,13 @@ def _deterministic_plan(
         "source": "deterministic",
         "scenario_type": scenario_type,
         "analysis_steps": _semantic_steps(scenario_type, semantic_context),
-        "provider_called": provider_called,
-        "fallback_used": provider_called,
-        "prompt_id": "",
-        "validation_error": validation_error,
-        "provider_error": provider_error,
-    }
-
-
-def _provider_plan(content: dict[str, Any], provider_response: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "success": True,
-        "source": "provider",
-        "scenario_type": content["scenario_type"],
-        "analysis_steps": content["analysis_steps"],
-        "provider_called": True,
+        "provider_called": False,
         "fallback_used": False,
-        "prompt_id": provider_response.get("prompt_id", "analysis_planner"),
-        "prompt_version": provider_response.get("prompt_version", ""),
+        "prompt_id": "",
         "validation_error": "",
         "provider_error": "",
-        "model": provider_response.get("model", ""),
-        "usage": provider_response.get("usage", {}),
-        "latency_ms": provider_response.get("latency_ms", 0),
     }
 
 
-def plan_analysis(
-    question: str,
-    provider: LLMProvider | None = None,
-    deterministic_fallback: bool = True,
-) -> dict[str, Any]:
-    if provider is None:
-        return _deterministic_plan(question, provider_called=False)
-
-    semantic_context = retrieve_semantic_context(question)
-    deterministic = _deterministic_plan(question, provider_called=False)
-    rendered = DEFAULT_PROMPT_REGISTRY.render(
-        "analysis_planner",
-        {
-            "user_question": question,
-            "semantic_context": semantic_context,
-            "deterministic_plan": deterministic,
-            "supported_scenario_types": sorted(SCENARIO_TYPES),
-        },
-    )
-    if not rendered.get("success"):
-        if deterministic_fallback:
-            return _deterministic_plan(question, provider_called=False, provider_error=rendered.get("error", ""))
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": False,
-            "fallback_used": False,
-            "provider_error": rendered.get("error", ""),
-            "validation_error": "",
-            "error": rendered.get("error", ""),
-        }
-
-    request = LLMRequest(
-        prompt=rendered["prompt"],
-        prompt_id=rendered["prompt_id"],
-        prompt_version=rendered["prompt_version"],
-        model=getattr(provider, "model", "unknown"),
-        metadata={"node": "analysis_planner_agent"},
-    )
-    provider_response = run_validated_llm_request(provider, request)
-    if provider_response.get("success"):
-        return _provider_plan(provider_response.get("content", {}), provider_response)
-
-    error = provider_response.get("error", "")
-    error_type = provider_response.get("error_type", "")
-    if not deterministic_fallback:
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": True,
-            "fallback_used": False,
-            "provider_error": error,
-            "validation_error": error if error_type == "llm_schema_validation_error" else "",
-            "error": error,
-            "error_type": error_type,
-        }
-    if error_type == "llm_schema_validation_error":
-        return _deterministic_plan(question, provider_called=True, validation_error=error)
-    return _deterministic_plan(question, provider_called=True, provider_error=error)
-
-
-def run_analysis_planner_agent(state: dict[str, Any], provider: LLMProvider | None = None) -> dict[str, Any]:
-    plan = plan_analysis(state.get("user_question", ""), provider=provider)
-    updated = {
-        **state,
-        "analysis_plan": plan,
-        "scenario_type": plan.get("scenario_type", ""),
-        "analysis_steps": plan.get("analysis_steps", []),
-    }
-    return append_trace(
-        updated,
-        {
-            "node": "analysis_planner_agent",
-            "tool_name": "scenario_analysis_planner",
-            "tool_input_summary": state.get("user_question", ""),
-            "tool_output_summary": (
-                f"scenario_type={plan.get('scenario_type')} steps={len(plan.get('analysis_steps', []))} "
-                f"provider_called={plan.get('provider_called', False)} "
-                f"fallback_used={plan.get('fallback_used', False)}"
-            ),
-            "status": "success" if plan.get("success") else "error",
-            "latency_ms": 0,
-            "error_type": None if plan.get("success") else "analysis_planner_error",
-            "error": plan.get("error") or None,
-            "provider_called": bool(plan.get("provider_called", False)),
-            "fallback_used": bool(plan.get("fallback_used", False)),
-            "prompt_id": plan.get("prompt_id", ""),
-        },
-    )
+def plan_analysis(question: str) -> dict[str, Any]:
+    return _deterministic_plan(question)

@@ -253,21 +253,6 @@ def _quote_field_reference(field: str) -> str:
     return ".".join(f'"{part.replace(chr(34), chr(34) + chr(34))}"' for part in parts)
 
 
-def _first_metric_with_meaning(
-    metrics: list[dict[str, Any]],
-    meanings: tuple[str, ...],
-    *,
-    exclude_meanings: tuple[str, ...] = (),
-) -> dict[str, Any] | None:
-    meaning_set = set(meanings)
-    excluded = set(exclude_meanings)
-    for metric in metrics:
-        metric_meanings = set(metric.get("meanings") or [])
-        if metric.get("formula") and meaning_set & metric_meanings and not (excluded & metric_meanings):
-            return metric
-    return None
-
-
 def _metrics_with_meaning(
     metrics: list[dict[str, Any]],
     meanings: tuple[str, ...],

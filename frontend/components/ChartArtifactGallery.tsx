@@ -29,8 +29,8 @@ function InteractiveChart({ option, title, fallbackUrl }: InteractiveChartProps)
     let removeResize: (() => void) | null = null;
 
     setFailed(false);
-    import("echarts")
-      .then((echarts) => {
+    import("../lib/echarts-runtime")
+      .then(({ echarts }) => {
         if (disposed || !containerRef.current) {
           return;
         }

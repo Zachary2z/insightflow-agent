@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 import os
 from pathlib import Path
 import re
@@ -10,15 +9,21 @@ import subprocess
 import time
 from typing import Any, Protocol
 
+from workspaces.cli_output import build_tool_call
+from workspaces.cli_output import first_text as _first_text
+from workspaces.cli_output import parse_json_object as _parse_json_object
+from workspaces.cli_output import safe_command_name
+from workspaces.cli_output import safe_cli_text as _safe_text
+from workspaces.cli_output import safe_cli_text_list as _safe_text_list
 from workspaces.external_publishing import (
     ExternalPublishResult,
     export_package_to_dict,
     failed_publish_result,
     is_report_export_package,
-    safe_command_name,
     safe_warning,
 )
 from workspaces.models import utc_now_iso
+from workspaces.safe_output import safe_int as _safe_count
 
 
 DEFAULT_LARK_CLI_BIN = "lark-cli"
@@ -565,22 +570,6 @@ def _unique_chart_items(items: list[dict[str, str]]) -> list[dict[str, str]]:
     return list(unique.values())
 
 
-def _parse_json_object(value: str) -> dict[str, Any] | None:
-    try:
-        parsed = json.loads(value or "")
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
-
-
-def _first_text(data: dict[str, Any], *keys: str) -> str:
-    for key in keys:
-        text = _safe_text(data.get(key))
-        if text:
-            return text
-    return ""
-
-
 def _official_document(data: dict[str, Any]) -> dict[str, Any]:
     nested_data = data.get("data") if isinstance(data.get("data"), dict) else {}
     document = nested_data.get("document") if isinstance(nested_data.get("document"), dict) else {}
@@ -621,21 +610,6 @@ def _business_data_source_label(value: str) -> str:
     return ""
 
 
-def _safe_text_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [text for text in (_safe_text(item) for item in value) if text]
-
-
-def _safe_text(value: Any) -> str:
-    text = safe_warning(value)
-    if not text:
-        return ""
-    if "\n" in text:
-        text = " ".join(part.strip() for part in text.splitlines() if part.strip())
-    return text
-
-
 def _chart_anchor_text(title: str) -> str:
     safe_title = _safe_text(title) or "报告图表"
     return f"图表：{safe_title}"
@@ -654,13 +628,14 @@ def _tool_call(
     exit_code: int,
     elapsed_ms: int,
 ) -> dict[str, Any]:
-    return {
-        "operation": operation,
-        "command_name": safe_command_name(command_name) or DEFAULT_LARK_CLI_BIN,
-        "success": success,
-        "elapsed_ms": max(0, int(elapsed_ms or 0)),
-        "exit_code": int(exit_code or 0),
-    }
+    return build_tool_call(
+        operation=operation,
+        command_name=command_name,
+        default_command_name=DEFAULT_LARK_CLI_BIN,
+        success=success,
+        exit_code=exit_code,
+        elapsed_ms=elapsed_ms,
+    )
 
 
 def _merge_sheet_result(result: ExternalPublishResult, sheet_result: dict[str, Any]) -> None:
@@ -677,13 +652,6 @@ def _merge_sheet_result(result: ExternalPublishResult, sheet_result: dict[str, A
             result.tool_calls.append(tool_call)
     if sheet_result.get("status") in {"warning", "failed"} or result.sheet_warnings:
         result.status = "warning" if result.status != "failed" else "failed"
-
-
-def _safe_count(value: Any) -> int:
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
-        return 0
 
 
 def _collect_chart_image_assets(

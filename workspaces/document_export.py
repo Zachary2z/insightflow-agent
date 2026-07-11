@@ -4,10 +4,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urlsplit
 
 from workspaces.export_package import EXPORT_PACKAGE_VERSION, SOURCE_REPORT
 from workspaces.models import utc_now_iso
+from workspaces.safe_output import contains_sensitive_text
+from workspaces.safe_output import safe_relative_path as _safe_relative_path
+from workspaces.safe_output import unsafe_relative_path as _unsafe_relative_path
 
 
 DEFAULT_DOCUMENT_EXPORT_DIR = "exports/documents"
@@ -462,50 +464,7 @@ def _safe_text(value: Any) -> str:
     if value is None:
         return ""
     text = str(value).strip()
-    return "" if _contains_sensitive_text(text) else text
-
-
-def _safe_relative_path(value: Any) -> str:
-    text = _safe_text(value)
-    if not text:
-        return ""
-    if "://" in text or text.startswith("/api/"):
-        return ""
-    if _unsafe_relative_path(text):
-        return ""
-    path = Path(text)
-    if path.is_absolute():
-        return ""
-    return path.as_posix()
-
-
-def _unsafe_relative_path(value: str) -> bool:
-    text = str(value or "").strip()
-    if text.startswith("~"):
-        return True
-    return any(part == ".." for part in Path(text).parts)
-
-
-def _contains_sensitive_text(value: str) -> bool:
-    text = str(value or "").strip()
-    if not text:
-        return False
-    lowered = text.lower()
-    if re.search(r"\b(?:select|with|insert|update|delete|drop|alter|create|pragma)\b", text, re.IGNORECASE):
-        return True
-    if re.search(r"(^|[=/\s])(?:/users/|/tmp/|~[/\\])", lowered):
-        return True
-    if re.search(
-        r"\b(?:raw_sql|generated_sql|raw_rows|trace_path|trace_id|provider_metadata|api_key|apikey|access_key|access_token|secret|password|database_path|analysis\.db|task_id|task_purpose|debug_id|prompt(?:_id|_text|_version)?|completion_tokens|prompt_tokens)\b",
-        lowered,
-    ):
-        return True
-    if re.search(r"\bsk-[A-Za-z0-9_-]+", text):
-        return True
-    parsed_path = urlsplit(text).path.lower()
-    if lowered == "trace.json" or parsed_path.endswith((".db", "/trace.json")):
-        return True
-    return False
+    return "" if contains_sensitive_text(text, block_artifact_files=True) else text
 
 
 def _safe_filename(value: str) -> str:

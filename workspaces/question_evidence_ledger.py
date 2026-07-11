@@ -616,29 +616,6 @@ def ledger_supported_fact_texts(ledger: dict[str, Any] | None) -> list[str]:
     return _unique(texts)
 
 
-def _chart_entries(ledger: dict[str, Any]) -> list[dict[str, Any]]:
-    entries: list[dict[str, Any]] = []
-    for item in [*(ledger.get("facts") or []), *(ledger.get("derived_metrics") or [])]:
-        if not isinstance(item, dict):
-            continue
-        value = _to_number(item.get("value"))
-        if value is None:
-            continue
-        label = str(item.get("label") or item.get("metric_id") or "").strip()
-        if not label or _looks_internal_text(label):
-            continue
-        entity = _chart_entity(item.get("dimension") if isinstance(item.get("dimension"), dict) else {})
-        entries.append(
-            {
-                "entity": entity,
-                "label": label,
-                "value": value,
-                "unit": str(item.get("unit") or "").strip(),
-            }
-        )
-    return entries
-
-
 def _chart_entries_from_group(group: dict[str, Any]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     facts = [item for item in group.get("facts") or [] if isinstance(item, dict)]

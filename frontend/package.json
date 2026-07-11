@@ -7,7 +7,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/react-table": "^8.20.5",
     "echarts": "^5.5.1",
     "next": "^15.0.0",
     "react": "^19.0.0",

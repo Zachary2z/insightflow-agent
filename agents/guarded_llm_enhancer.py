@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-from collections.abc import Callable
 from typing import Any
 
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
@@ -10,41 +8,6 @@ from llm_ops.structured_output import run_validated_llm_request
 from sql_planning.comparison_scope import widen_sql_for_comparison_scope
 from tools.sql_validator import validate_sql
 from tools.trace_logger import append_trace
-
-
-LegacyCallableProvider = Callable[[dict[str, Any]], dict[str, Any] | str]
-
-
-def _parse_provider_response(response: dict[str, Any] | str) -> dict[str, Any]:
-    if isinstance(response, str):
-        return json.loads(response)
-    if isinstance(response, dict):
-        return response
-    raise ValueError("provider response must be a dict or JSON string")
-
-
-def _sql_prompt(state: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "task": "guarded_sql_candidate_generation",
-        "user_question": state.get("user_question", ""),
-        "schema_text": state.get("schema_text", ""),
-        "workspace_context": state.get("workspace_context", {}),
-        "metric_context": state.get("metric_context", {}),
-        "business_context": state.get("business_context", {}),
-        "current_deterministic_sql": state.get("generated_sql", ""),
-        "output_schema": {
-            "sql_candidates": [
-                {
-                    "sql": "single SELECT statement only",
-                    "rationale": "short reason grounded in schema and metric context",
-                }
-            ]
-        },
-        "must_validate_sql": True,
-        "must_not_execute_sql": True,
-        "must_not_access_sensitive_fields": True,
-        "must_not_use_dml_or_ddl": True,
-    }
 
 
 def _sql_prompt_variables(state: dict[str, Any]) -> dict[str, Any]:
@@ -58,7 +21,7 @@ def _sql_prompt_variables(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _provider_payload_from_llm_provider(state: dict[str, Any], provider: LLMProvider) -> dict[str, Any]:
+def _provider_payload(state: dict[str, Any], provider: LLMProvider) -> dict[str, Any]:
     rendered = DEFAULT_PROMPT_REGISTRY.render("guarded_sql_candidate", _sql_prompt_variables(state))
     if not rendered.get("success"):
         return {
@@ -75,16 +38,10 @@ def _provider_payload_from_llm_provider(state: dict[str, Any], provider: LLMProv
         model=getattr(provider, "model", "unknown"),
         metadata={"node": "guarded_sql_candidate_agent"},
     )
-    return run_validated_llm_request(provider, request)
-
-
-def _provider_payload(state: dict[str, Any], provider: LLMProvider | LegacyCallableProvider) -> dict[str, Any]:
-    if hasattr(provider, "generate"):
-        result = _provider_payload_from_llm_provider(state, provider)
-        if not result.get("success"):
-            raise ValueError(result.get("error", "provider request failed"))
-        return result.get("content", {})
-    return _parse_provider_response(provider(_sql_prompt(state)))
+    result = run_validated_llm_request(provider, request)
+    if not result.get("success"):
+        raise ValueError(result.get("error", "provider request failed"))
+    return result.get("content", {})
 
 
 def _fallback_sql_enhancement(reason: str, provider_called: bool) -> dict[str, Any]:
@@ -129,7 +86,7 @@ def _is_schema_mismatch_review(review_result: dict[str, Any]) -> bool:
 
 def run_guarded_sql_candidate_agent(
     state: dict[str, Any],
-    llm_provider: LLMProvider | LegacyCallableProvider | None = None,
+    llm_provider: LLMProvider | None = None,
 ) -> dict[str, Any]:
     deterministic_sql = state.get("generated_sql", "")
     if not llm_provider:

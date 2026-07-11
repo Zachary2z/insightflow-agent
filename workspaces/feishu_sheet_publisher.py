@@ -6,13 +6,18 @@ import math
 import os
 import re
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal
 
+from workspaces.cli_output import build_tool_call
+from workspaces.cli_output import first_text as _first_text
+from workspaces.cli_output import parse_json_object as _parse_json_object
+from workspaces.cli_output import safe_command_name
+from workspaces.cli_output import safe_cli_text as _safe_text
+from workspaces.cli_output import safe_cli_text_list as _safe_text_list
+from workspaces.cli_output import safe_tool_call as _safe_tool_call
 from workspaces.external_publishing import (
     export_package_to_dict,
     is_report_export_package,
-    safe_command_name,
-    safe_warning,
 )
 from workspaces.feishu_publisher import (
     DEFAULT_LARK_CLI_BIN,
@@ -21,31 +26,12 @@ from workspaces.feishu_publisher import (
     SubprocessCommandRunner,
 )
 from workspaces.models import utc_now_iso
+from workspaces.safe_output import safe_int as _safe_int
+from workspaces.safe_output import safe_url
 
 
 SheetPublishStatus = Literal["published", "warning", "failed"]
 MAX_SHEET_TABLE_ROWS = 500
-
-
-@dataclass
-class SheetTableWriteResult:
-    table_id: str
-    title: str
-    range: str
-    row_count: int
-    column_count: int
-    success: bool
-    warning: str = ""
-
-
-@dataclass
-class SheetChartCreateResult:
-    chart_id: str
-    title: str
-    chart_type: str
-    table_id: str
-    success: bool
-    warning: str = ""
 
 
 @dataclass
@@ -74,11 +60,6 @@ class SheetPublishResult:
         data["warnings"] = _safe_text_list(data.get("warnings"))
         data["tool_calls"] = [_safe_tool_call(item) for item in data.get("tool_calls") or [] if isinstance(item, dict)]
         return data
-
-
-class FeishuSheetPublisher(Protocol):
-    def publish_sheet(self, package: Any) -> SheetPublishResult:
-        ...
 
 
 class CliFeishuSheetPublisher:
@@ -548,26 +529,10 @@ def _package_title(package: dict[str, Any]) -> str:
     return _safe_text(package.get("title")) or _safe_text(document.get("title")) or "InsightFlow 报告"
 
 
-def _parse_json_object(value: str) -> dict[str, Any] | None:
-    try:
-        parsed = json.loads(value or "")
-    except json.JSONDecodeError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
-
-
 def _official_spreadsheet(data: dict[str, Any]) -> dict[str, Any]:
     nested_data = data.get("data") if isinstance(data.get("data"), dict) else {}
     spreadsheet = nested_data.get("spreadsheet") if isinstance(nested_data.get("spreadsheet"), dict) else {}
     return spreadsheet
-
-
-def _first_text(data: dict[str, Any], *keys: str) -> str:
-    for key in keys:
-        text = _safe_text(data.get(key))
-        if text:
-            return text
-    return ""
 
 
 def _numeric_value(value: Any) -> float | None:
@@ -582,52 +547,8 @@ def _numeric_value(value: Any) -> float | None:
         return None
 
 
-def _safe_text(value: Any) -> str:
-    text = safe_warning(value)
-    if "\n" in text:
-        text = " ".join(part.strip() for part in text.splitlines() if part.strip())
-    return text
-
-
-def _safe_text_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [text for text in (_safe_text(item) for item in value) if text]
-
-
 def _safe_url(value: Any) -> str | None:
-    text = _safe_text(value)
-    if not text:
-        return None
-    if re.search(r"(?i)(api_key=|access_token=|token=|secret=|password=)", text):
-        return None
-    if text.startswith("http://") or text.startswith("https://"):
-        return text
-    return None
-
-
-def _safe_int(value: Any) -> int:
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _safe_tool_call(value: dict[str, Any]) -> dict[str, Any]:
-    cleaned: dict[str, Any] = {}
-    for key in {"operation", "command_name", "success", "elapsed_ms", "exit_code"}:
-        if key not in value:
-            continue
-        item = value.get(key)
-        if key == "success":
-            cleaned[key] = bool(item)
-        elif key in {"elapsed_ms", "exit_code"}:
-            cleaned[key] = _safe_int(item)
-        else:
-            safe = safe_command_name(item) if key == "command_name" else _safe_text(item)
-            if safe:
-                cleaned[key] = safe
-    return cleaned
+    return safe_url(value, allow_api=False, strict_cli=True) or None
 
 
 def _tool_call(
@@ -638,13 +559,14 @@ def _tool_call(
     exit_code: int,
     elapsed_ms: int,
 ) -> dict[str, Any]:
-    return {
-        "operation": operation,
-        "command_name": safe_command_name(command_name) or DEFAULT_LARK_CLI_BIN,
-        "success": success,
-        "elapsed_ms": max(0, int(elapsed_ms or 0)),
-        "exit_code": int(exit_code or 0),
-    }
+    return build_tool_call(
+        operation=operation,
+        command_name=command_name,
+        default_command_name=DEFAULT_LARK_CLI_BIN,
+        success=success,
+        exit_code=exit_code,
+        elapsed_ms=elapsed_ms,
+    )
 
 
 def _chart_skip_warning(title: str) -> str:

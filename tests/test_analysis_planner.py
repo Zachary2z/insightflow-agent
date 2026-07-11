@@ -66,27 +66,6 @@ def test_deterministic_planner_uses_semantic_metrics_dimensions_and_tables():
     assert "inventory_snapshots" in steps["inventory_pressure"]["candidate_tables"]
 
 
-def test_analysis_planner_agent_writes_state_and_trace_without_sql():
-    from agents.analysis_planner import run_analysis_planner_agent
-    from agents.supervisor import initialize_run
-
-    state = initialize_run(
-        "为什么 Cameras 最近 GMV 下滑？",
-        run_id="run_analysis_planner_agent_test",
-        session_id="session_analysis_planner_agent_test",
-    )
-
-    result = run_analysis_planner_agent(state)
-
-    assert result["analysis_plan"]["scenario_type"] == "gmv_decline_diagnosis"
-    assert result["analysis_steps"] == result["analysis_plan"]["analysis_steps"]
-    assert "generated_sql" not in result
-    assert result["trace"][-1]["node"] == "analysis_planner_agent"
-    assert result["trace"][-1]["tool_name"] == "scenario_analysis_planner"
-    assert result["trace"][-1]["provider_called"] is False
-    assert result["trace"][-1]["fallback_used"] is False
-
-
 def test_core_workflow_adds_evidence_planning_trace_without_bypassing_sql_boundaries(tmp_path):
     from graph.workflow import run_workflow
 

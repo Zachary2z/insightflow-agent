@@ -3,10 +3,22 @@ from __future__ import annotations
 from typing import Any
 
 from llm_ops.prompt_registry import DEFAULT_PROMPT_REGISTRY
-from llm_ops.provider import LLMProvider, LLMRequest
+from llm_ops.provider import (
+    LLMProvider,
+    LLMRequest,
+    provider_error_fields,
+    provider_failure,
+    provider_metadata,
+)
 from llm_ops.structured_output import run_validated_llm_request
 from question_understanding.router import understand_question
-from question_understanding.task_contract import build_clarification_questions, normalize_analysis_task, strategy_for_task
+from question_understanding.task_contract import (
+    build_clarification_questions,
+    canonical_dimension_id,
+    canonical_metric_id,
+    normalize_analysis_task,
+    strategy_for_task,
+)
 
 
 _BLOCKED_FIELDS = {"sql", "generated_sql", "matched_template", "confidence", "selected_tables"}
@@ -14,61 +26,6 @@ _UNSAFE_TERMS = ("删除", "更新", "写入", "插入", "drop", "delete", "upda
 _SENSITIVE_TERMS = ("手机号", "电话", "邮箱", "email", "phone", "地址", "身份证", "payment")
 _BULK_TERMS = ("导出所有", "全部用户", "所有用户", "批量导出")
 _SAFETY_RISK_FLAGS = {"unsafe_operation", "sensitive_field", "bulk_export", "external_action"}
-_METRIC_ALIASES = {
-    "roas": "roas",
-    "ROAS": "roas",
-    "roi": "roi",
-    "ROI": "roi",
-    "net_return": "net_return",
-    "net return": "net_return",
-    "net_roi": "net_return",
-    "net roi": "net_return",
-    "netroi": "net_return",
-    "净投放回报率": "net_return",
-    "净回报率": "net_return",
-    "净投放回报": "net_return",
-    "销售额": "gmv",
-    "成交额": "gmv",
-    "收入": "gmv",
-    "gmv": "gmv",
-    "sales": "gmv",
-    "sales amount": "gmv",
-    "revenue": "gmv",
-    "sales_amount": "gmv",
-    "gross_merchandise_value": "gmv",
-    "订单量": "order_count",
-    "订单数": "order_count",
-    "订单数量": "order_count",
-    "order_count": "order_count",
-    "客单价": "aov",
-    "平均订单金额": "aov",
-    "aov": "aov",
-    "复购率": "repurchase_rate",
-    "复购": "repurchase_rate",
-    "repurchase_rate": "repurchase_rate",
-    "销量": "product_sales",
-    "销售量": "product_sales",
-    "product_sales": "product_sales",
-}
-_DIMENSION_ALIASES = {
-    "商品": "product",
-    "产品": "product",
-    "product": "product",
-    "品类": "category",
-    "类别": "category",
-    "category": "category",
-    "城市": "city",
-    "city": "city",
-    "用户": "user",
-    "客户": "user",
-    "user": "user",
-    "渠道": "channel",
-    "channel": "channel",
-    "门店": "store",
-    "店铺": "store",
-    "store": "store",
-    "store name": "store",
-}
 _OPERATION_ALIASES = {
     "最高": "top_n",
     "最多": "top_n",
@@ -125,8 +82,8 @@ def _normalize_provider_content(
 ) -> dict[str, Any]:
     normalized = dict(content)
     intent = dict(normalized.get("intent", {}))
-    intent["metric"] = _normalize_slot(intent.get("metric"), _METRIC_ALIASES)
-    intent["dimension"] = _normalize_slot(intent.get("dimension"), _DIMENSION_ALIASES)
+    intent["metric"] = canonical_metric_id(str(intent.get("metric") or "").strip())
+    intent["dimension"] = canonical_dimension_id(str(intent.get("dimension") or "").strip())
     intent["operation"] = _normalize_slot(intent.get("operation"), _OPERATION_ALIASES)
     if "risk_flags" not in intent or intent.get("risk_flags") is None:
         intent["risk_flags"] = []
@@ -263,11 +220,7 @@ def _provider_result(
         "fallback_used": False,
         "provider_error": "",
         "validation_error": "",
-        "model": provider_response.get("model", ""),
-        "prompt_id": provider_response.get("prompt_id", "question_understanding"),
-        "prompt_version": provider_response.get("prompt_version", ""),
-        "usage": provider_response.get("usage", {}),
-        "latency_ms": provider_response.get("latency_ms", 0),
+        **provider_metadata(provider_response, default_prompt_id="question_understanding"),
     }
 
 
@@ -299,15 +252,7 @@ def understand_question_with_provider(
                 workspace_context=workspace_context,
                 provider_error=rendered.get("error", ""),
             )
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": False,
-            "fallback_used": False,
-            "provider_error": rendered.get("error", ""),
-            "validation_error": "",
-            "error": rendered.get("error", ""),
-        }
+        return provider_failure(rendered.get("error", ""), provider_called=False)
 
     request = LLMRequest(
         prompt=rendered["prompt"],
@@ -328,17 +273,6 @@ def understand_question_with_provider(
     error = provider_response.get("error", "")
     error_type = provider_response.get("error_type", "")
     if not deterministic_fallback:
-        return {
-            "success": False,
-            "source": "provider",
-            "provider_called": True,
-            "fallback_used": False,
-            "provider_error": error,
-            "validation_error": error if error_type == "llm_schema_validation_error" else "",
-            "error": error,
-            "error_type": error_type,
-        }
+        return provider_failure(error, provider_called=True, error_type=error_type)
 
-    if error_type == "llm_schema_validation_error":
-        return _provider_unavailable_result(provider_called=True, validation_error=error)
-    return _provider_unavailable_result(provider_called=True, provider_error=error)
+    return _provider_unavailable_result(provider_called=True, **provider_error_fields(error, error_type))

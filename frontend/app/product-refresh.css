@@ -492,17 +492,17 @@ button:disabled {
 }
 
 .decision-content .button,
-.decision-content button:not(.history-card):not(.text-button) {
+.decision-content button:not(.history-card) {
   border-radius: 12px;
 }
 
 .decision-content .button,
-.decision-content button:not(.secondary-button):not(.history-card):not(.text-button):not(.chip-button) {
+.decision-content button:not(.secondary-button):not(.history-card) {
   background: var(--decision-brand);
 }
 
 .decision-content .button:hover,
-.decision-content button:not(.secondary-button):not(.history-card):not(.text-button):not(.chip-button):hover {
+.decision-content button:not(.secondary-button):not(.history-card):hover {
   background: #164a3c;
 }
 
@@ -555,11 +555,6 @@ button:disabled {
   z-index: 2;
   display: flex;
   justify-content: flex-end;
-}
-
-.decision-content .workbench-local-heading,
-.decision-content .workbench-readiness-card {
-  display: none;
 }
 
 .decision-content .analysis-main-grid {
@@ -795,8 +790,7 @@ button:disabled {
   background: #f5f8f6;
 }
 
-.decision-content .history-time,
-.decision-content .report-date {
+.decision-content .history-time {
   font-variant-numeric: tabular-nums;
 }
 
@@ -843,15 +837,12 @@ button:disabled {
 }
 
 .decision-content .settings-overview-grid,
-.decision-content .settings-card-grid,
-.decision-content .settings-grid {
+.decision-content .settings-card-grid {
   gap: 12px;
 }
 
 .decision-content .settings-summary-card,
-.decision-content .settings-detail-card,
-.decision-content .settings-semantic-group,
-.decision-content .settings-table-profile {
+.decision-content .settings-detail-card {
   border-color: var(--decision-line);
   border-radius: 13px;
   background: white;
@@ -1168,10 +1159,6 @@ button:disabled {
   border-radius: 16px;
 }
 
-.decision-content .report-download-actions {
-  gap: 7px;
-}
-
 .decision-content .item-row {
   border-color: var(--decision-line);
   background: var(--decision-surface-strong);
@@ -1319,8 +1306,6 @@ button:disabled {
   .decision-content .dataset-action-grid,
   .decision-content .settings-overview-grid,
   .decision-content .settings-card-grid,
-  .decision-content .settings-grid,
-  .decision-content .settings-metric-row,
   .decision-content .report-center {
     grid-template-columns: 1fr;
   }
@@ -1375,7 +1360,6 @@ button:disabled {
 
   .decision-content .report-list-item,
   .decision-content .report-reader-head,
-  .decision-content .source-row,
   .decision-content .item-row {
     display: grid;
   }

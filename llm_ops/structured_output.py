@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from llm_ops.business_text import looks_like_raw_parameter_dump as _looks_like_raw_parameter_dump
 from llm_ops.provider import LLMProvider, LLMRequest, run_llm_request
 
 
@@ -28,20 +29,6 @@ def _ok(prompt_id: str, content: dict[str, Any]) -> dict[str, Any]:
 
 def _contains_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in str(text or ""))
-
-
-_KNOWN_METRIC_ACRONYMS = {
-    "AOV",
-    "CAC",
-    "CPA",
-    "CPC",
-    "CPM",
-    "CTR",
-    "CVR",
-    "GMV",
-    "ROI",
-    "ROAS",
-}
 
 
 def _requires_cjk_response(schema_context: dict[str, Any]) -> bool:
@@ -340,34 +327,6 @@ def _candidate_claim_list(value: Any, field_name: str) -> tuple[bool, list[Any],
             normalized_item["category"] = category
         normalized.append(normalized_item)
     return True, normalized, ""
-
-
-def _looks_like_raw_parameter_dump(text: str) -> bool:
-    lines = [line.strip() for line in str(text or "").splitlines() if line.strip()]
-    if not lines:
-        return False
-    dump_lines = 0
-    for line in lines:
-        stripped = re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line)
-        assignments = [
-            key
-            for key in re.findall(r"\b([A-Za-z_][A-Za-z0-9_. -]*)\s*=", stripped)
-            if _looks_like_raw_assignment_key(key)
-        ]
-        if len(assignments) >= 2 or (assignments and "," in stripped):
-            dump_lines += 1
-    return dump_lines >= max(1, len(lines) // 2)
-
-
-def _looks_like_raw_assignment_key(key: str) -> bool:
-    token = str(key or "").strip().split()[-1] if str(key or "").strip() else ""
-    if not token:
-        return False
-    if token.upper() in _KNOWN_METRIC_ACRONYMS:
-        return False
-    if token.isupper() and len(token) <= 5:
-        return False
-    return True
 
 
 def _contains_technical_leak(text: str) -> bool:
@@ -747,97 +706,6 @@ def _validate_sql_planning_router(content: Any) -> dict[str, Any]:
     )
 
 
-def _validate_analysis_planner(content: Any) -> dict[str, Any]:
-    prompt_id = "analysis_planner"
-    if not isinstance(content, dict):
-        return _error(prompt_id, "analysis_planner output must be an object")
-
-    blocked_fields = {
-        "sql",
-        "generated_sql",
-        "sql_candidates",
-        "candidate_sql",
-        "final_claims",
-        "claims",
-        "final_answer",
-        "action_payload",
-        "actions",
-        "created_actions",
-        "approval_status",
-    }
-    leaked = sorted(blocked_fields & set(content))
-    if leaked:
-        return _error(prompt_id, f"analysis_planner must not return blocked fields: {', '.join(leaked)}")
-
-    scenario_type = str(content.get("scenario_type", "")).strip()
-    allowed_scenario_types = {
-        "quick_metric_lookup",
-        "gmv_decline_diagnosis",
-        "marketing_roi_review",
-        "inventory_risk_analysis",
-        "refund_anomaly_analysis",
-        "promotion_review",
-        "customer_segment_analysis",
-        "general_non_template_analysis",
-    }
-    if scenario_type not in allowed_scenario_types:
-        return _error(prompt_id, f"scenario_type is not supported: {scenario_type}")
-
-    analysis_steps = content.get("analysis_steps", [])
-    if not isinstance(analysis_steps, list) or not analysis_steps:
-        return _error(prompt_id, "analysis_steps must be a non-empty list")
-
-    normalized_steps = []
-    for index, step in enumerate(analysis_steps):
-        if not isinstance(step, dict):
-            return _error(prompt_id, f"analysis_steps[{index}] must be an object")
-        leaked = sorted(blocked_fields & set(step))
-        if leaked:
-            return _error(prompt_id, f"analysis_steps[{index}] must not return blocked fields: {', '.join(leaked)}")
-
-        step_id = str(step.get("step_id", "")).strip()
-        question = str(step.get("question", "")).strip()
-        if not step_id:
-            return _error(prompt_id, f"analysis_steps[{index}].step_id is required")
-        if not question:
-            return _error(prompt_id, f"analysis_steps[{index}].question is required")
-
-        metrics_ok, required_metrics, message = _string_list(
-            step.get("required_metrics", []),
-            f"analysis_steps[{index}].required_metrics",
-        )
-        if not metrics_ok:
-            return _error(prompt_id, message)
-        dimensions_ok, required_dimensions, message = _string_list(
-            step.get("required_dimensions", []),
-            f"analysis_steps[{index}].required_dimensions",
-        )
-        if not dimensions_ok:
-            return _error(prompt_id, message)
-        tables_ok, candidate_tables, message = _string_list(
-            step.get("candidate_tables", []),
-            f"analysis_steps[{index}].candidate_tables",
-        )
-        if not tables_ok:
-            return _error(prompt_id, message)
-        if not required_metrics:
-            return _error(prompt_id, f"analysis_steps[{index}].required_metrics must not be empty")
-        if not candidate_tables:
-            return _error(prompt_id, f"analysis_steps[{index}].candidate_tables must not be empty")
-
-        normalized_steps.append(
-            {
-                "step_id": step_id,
-                "question": question,
-                "required_metrics": required_metrics,
-                "required_dimensions": required_dimensions,
-                "candidate_tables": candidate_tables,
-            }
-        )
-
-    return _ok(prompt_id, {"scenario_type": scenario_type, "analysis_steps": normalized_steps})
-
-
 def _validate_visualization_chart_spec(content: Any, schema_context: dict[str, Any]) -> dict[str, Any]:
     prompt_id = "visualization_agent"
     if not isinstance(content, dict):
@@ -1021,8 +889,6 @@ def validate_prompt_output(
         return _validate_clarification_router(content)
     if prompt_id == "sql_planning_router":
         return _validate_sql_planning_router(content)
-    if prompt_id == "analysis_planner":
-        return _validate_analysis_planner(content)
     if prompt_id == "visualization_agent":
         return _validate_visualization_agent(content, context)
     return _error(prompt_id, f"unknown prompt schema: {prompt_id}")

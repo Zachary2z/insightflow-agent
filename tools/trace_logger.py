@@ -11,21 +11,6 @@ from typing import Any
 DEFAULT_TRACE_DIR = Path(__file__).resolve().parents[1] / "logs" / "traces"
 
 
-TRACE_FIELDS = (
-    "run_id",
-    "session_id",
-    "node",
-    "tool_name",
-    "tool_input_summary",
-    "tool_output_summary",
-    "status",
-    "latency_ms",
-    "error_type",
-    "retry_count",
-    "timestamp",
-)
-
-
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
