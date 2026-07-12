@@ -37,9 +37,10 @@ export default function WorkspaceNewForm({ onCreated }: WorkspaceNewFormProps) {
   }
 
   return (
-    <ProductCard>
+    <ProductCard className="workspace-create-card">
       <h2>工作区信息</h2>
-      <form className="form-grid" onSubmit={handleSubmit}>
+      <p className="workspace-create-help">先为这次分析命名；创建后即可导入数据并配置业务口径。</p>
+      <form className="form-grid workspace-create-form" onSubmit={handleSubmit}>
         <label htmlFor="workspace-name">工作区名称</label>
         <input
           id="workspace-name"

@@ -421,6 +421,65 @@ button:disabled {
   box-shadow: none;
 }
 
+.decision-entry-main .workspace-create-card {
+  display: grid;
+  width: min(760px, 100%);
+  justify-self: center;
+  gap: 12px;
+  border-color: var(--decision-line-strong);
+  box-shadow: inset 4px 0 0 var(--decision-brand), var(--decision-shadow);
+  padding: 28px;
+}
+
+.workspace-create-card h2 {
+  margin: 0;
+  font-family: var(--decision-display);
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+
+.workspace-create-help {
+  margin: 0;
+  color: var(--decision-muted);
+  line-height: 1.65;
+}
+
+.workspace-create-form {
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.workspace-create-form label {
+  color: var(--decision-ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.decision-entry-main .workspace-create-form input {
+  min-height: 48px;
+  border-color: var(--decision-line-strong);
+  border-radius: 12px;
+  background: #f8fbf9;
+  color: var(--decision-ink);
+}
+
+.decision-entry-main .workspace-create-form input:focus {
+  border-color: var(--decision-brand);
+  outline: 3px solid rgba(30, 93, 76, 0.16);
+  outline-offset: 1px;
+}
+
+.decision-entry-main .workspace-create-form button {
+  min-height: 46px;
+  border-radius: 12px;
+  background: var(--decision-brand);
+  box-shadow: 0 8px 18px rgba(30, 93, 76, 0.18);
+}
+
+.decision-entry-main .workspace-create-form button:hover:not(:disabled) {
+  background: var(--decision-brand-dark);
+}
+
 .decision-entry-main .item-row {
   align-items: center;
 }
