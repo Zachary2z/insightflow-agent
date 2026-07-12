@@ -93,7 +93,13 @@ make ps
 make down
 ```
 
-该命令会停止容器并保留数据 Volume。基础 Compose 仅启动 backend 和 frontend，端口默认只绑定本机回环地址。
+基础 Compose 使用 `insightflow-backend:p37` 与 `insightflow-frontend:p37` 镜像，仅启动 backend 和 frontend，端口默认只绑定本机回环地址。`make down` 会停止容器并保留 `workspace-data`、`report-data`、`trace-data` 三个业务 Volume。
+
+可用以下命令验证无密钥 Compose 配置：
+
+```bash
+docker compose --env-file /dev/null config -q
+```
 
 ### 可选监控
 
@@ -200,11 +206,12 @@ POST /api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu
 - 未配置 DeepSeek Key 时，项目仍可启动并走本地 fallback；真实业务回答和报告质量不代表最终体验。
 - 基础 Compose 不安装 `lark-cli`，因此容器内飞书发布会安全失败或给出警告；本机非容器模式可使用已登录的 CLI。
 
-## 当前限制
+## 当前边界
 
 - 当前优先面向中文业务数据分析场景。
 - Compose 当前为单后端实例配合本地 SQLite/Workspace 文件，不支持多副本、Kubernetes、云部署、TLS、正式 Secret Manager 或灾备。
 - 尚未实现真实 SaaS 鉴权、RBAC、多租户隔离、Alertmanager、OpenTelemetry/OTLP、外部 Observability SaaS 或前端遥测。
+- P38 observability and operations 已完成 H1-H6；下一阶段尚未指定，后续扩展需要建立独立计划。
 
 ## 文档
 
