@@ -26,14 +26,17 @@ def _volume_targets(service: dict) -> dict[str, str]:
     return targets
 
 
-def test_compose_parses_and_defines_only_final_p37_services():
+def test_compose_parses_and_defines_product_plus_optional_observability_services():
     compose = _compose()
 
-    assert set(compose["services"]) == {"backend", "frontend"}
+    assert set(compose["services"]) == {"backend", "frontend", "prometheus", "grafana"}
     assert compose["services"]["backend"]["image"] == "insightflow-backend:p37"
     assert compose["services"]["frontend"]["image"] == "insightflow-frontend:p37"
     assert "version" not in compose
-    assert not ({"prometheus", "grafana"} & set(compose["services"]))
+    assert compose["services"]["prometheus"]["profiles"] == ["observability"]
+    assert compose["services"]["grafana"]["profiles"] == ["observability"]
+    assert "profiles" not in compose["services"]["backend"]
+    assert "profiles" not in compose["services"]["frontend"]
 
 
 def test_service_build_and_health_dependency_contract():
@@ -51,7 +54,21 @@ def test_service_build_and_health_dependency_contract():
     assert "sleep" not in COMPOSE_PATH.read_text(encoding="utf-8").lower()
 
 
-def test_backend_uses_three_explicit_persistent_volumes():
+def test_backend_disables_raw_uvicorn_access_urls_in_container_logs():
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert '"--no-access-log"' in dockerfile
+
+
+def test_backend_trace_sink_and_retention_configuration_is_fixed_and_volume_neutral():
+    environment = _compose()["services"]["backend"]["environment"]
+
+    assert environment["INSIGHTFLOW_TRACE_SINKS"] == "${INSIGHTFLOW_TRACE_SINKS:-local}"
+    assert environment["INSIGHTFLOW_TRACE_DIR"] == "/app/logs/traces"
+    assert environment["INSIGHTFLOW_TRACE_RETENTION_DAYS"] == "${INSIGHTFLOW_TRACE_RETENTION_DAYS:-}"
+    assert environment["INSIGHTFLOW_TRACE_RETENTION_MAX_BYTES"] == "${INSIGHTFLOW_TRACE_RETENTION_MAX_BYTES:-}"
+
+
+def test_business_volumes_are_preserved_and_observability_volumes_are_isolated():
     compose = _compose()
     expected = {
         "workspace-data": "/app/workspaces",
@@ -59,8 +76,10 @@ def test_backend_uses_three_explicit_persistent_volumes():
         "trace-data": "/app/logs/traces",
     }
 
-    assert set(compose["volumes"]) == set(expected)
+    assert set(compose["volumes"]) == set(expected) | {"prometheus-data", "grafana-data"}
     assert _volume_targets(compose["services"]["backend"]) == expected
+    assert _volume_targets(compose["services"]["prometheus"])["prometheus-data"] == "/prometheus"
+    assert _volume_targets(compose["services"]["grafana"])["grafana-data"] == "/var/lib/grafana"
 
 
 def test_runtime_security_and_restart_contract():
@@ -86,6 +105,8 @@ def test_ports_network_and_browser_api_defaults_are_safe():
 
     assert backend["ports"] == ["127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"]
     assert frontend["ports"] == ["127.0.0.1:${FRONTEND_HOST_PORT:-3000}:3000"]
+    assert compose["services"]["prometheus"]["ports"] == ["127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090"]
+    assert compose["services"]["grafana"]["ports"] == ["127.0.0.1:${GRAFANA_HOST_PORT:-3001}:3000"]
     assert set(backend["networks"]) == {"insightflow-network"}
     assert set(frontend["networks"]) == {"insightflow-network"}
     assert compose["networks"]["insightflow-network"]["driver"] == "bridge"

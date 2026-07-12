@@ -8,6 +8,8 @@ from typing import Any
 import sqlglot
 from sqlglot import exp
 import sqlparse
+from observability.metrics import normalize_error_type, safely_get_metrics, safely_inc, safely_observe
+from observability.logging import emit_observability_event, safely_emit
 
 
 def _trace_event(sql: str, status: str, latency_ms: int, summary: str, error: str | None = None) -> dict[str, Any]:
@@ -26,7 +28,8 @@ def _trace_event(sql: str, status: str, latency_ms: int, summary: str, error: st
 
 def _failure(sql: str, error: str, started_at: float) -> dict[str, Any]:
     execution_time_ms = int((perf_counter() - started_at) * 1000)
-    return {
+    status = "timeout" if "interrupt" in error.lower() or "timeout" in error.lower() else "error"
+    result = {
         "success": False,
         "columns": [],
         "rows": [],
@@ -36,6 +39,18 @@ def _failure(sql: str, error: str, started_at: float) -> dict[str, Any]:
         "execution_time_ms": execution_time_ms,
         "trace_event": _trace_event(sql, "error", execution_time_ms, error, error),
     }
+    metrics = safely_get_metrics()
+    safely_inc(metrics, "sql_executions", {"status": status, "error_type": normalize_error_type("timeout" if status == "timeout" else "sql_execution")})
+    safely_observe(metrics, "sql_duration", execution_time_ms / 1000, {"status": status})
+    safely_emit(
+        emit_observability_event,
+        "sql_execution_completed",
+        operation="sql_execution",
+        status=status,
+        error_type="timeout" if status == "timeout" else "execution",
+        latency_ms=execution_time_ms,
+    )
+    return result
 
 
 def _is_single_select(sql: str) -> tuple[bool, str | None]:
@@ -92,7 +107,7 @@ def run_sql(
 
     execution_time_ms = int((perf_counter() - started_at) * 1000)
     row_count = len(rows)
-    return {
+    result = {
         "success": True,
         "columns": columns,
         "rows": rows,
@@ -101,3 +116,14 @@ def run_sql(
         "execution_time_ms": execution_time_ms,
         "trace_event": _trace_event(sql, "success", execution_time_ms, f"{row_count} rows returned"),
     }
+    metrics = safely_get_metrics()
+    safely_inc(metrics, "sql_executions", {"status": "success", "error_type": "none"})
+    safely_observe(metrics, "sql_duration", execution_time_ms / 1000, {"status": "success"})
+    safely_emit(
+        emit_observability_event,
+        "sql_execution_completed",
+        operation="sql_execution",
+        status="success",
+        latency_ms=execution_time_ms,
+    )
+    return result

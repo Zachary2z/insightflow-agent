@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
-from time import perf_counter
 from typing import Any
+
+from observability.trace_sink import (
+    TraceDocument,
+    TracePersistRequest,
+    TraceSink,
+    TraceSinkResult,
+    default_trace_sink,
+    local_result,
+)
+from observability.redaction import classify_error
 
 
 DEFAULT_TRACE_DIR = Path(__file__).resolve().parents[1] / "logs" / "traces"
@@ -13,11 +21,6 @@ DEFAULT_TRACE_DIR = Path(__file__).resolve().parents[1] / "logs" / "traces"
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _safe_run_id(run_id: str) -> str:
-    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in run_id.strip())
-    return safe or "run_unknown"
 
 
 def _summary(value: Any) -> str:
@@ -78,41 +81,43 @@ def save_trace(
     user_question: str | None = None,
     status: str = "success",
     question_thread: dict[str, Any] | None = None,
+    sink: TraceSink | None = None,
 ) -> dict[str, Any]:
-    started_at = perf_counter()
-    safe_run_id = _safe_run_id(run_id)
-    path = Path(trace_dir) / f"{safe_run_id}.json"
-    payload = {
-        "run_id": run_id,
-        "session_id": session_id,
-        "user_question": user_question,
-        "status": status,
-        "question_thread": question_thread or {},
-        "event_count": len(trace),
-        "trace": trace,
-        "saved_at": _now_iso(),
-    }
-
+    document = TraceDocument(
+        run_id=run_id,
+        trace=tuple(trace),
+        saved_at=_now_iso(),
+        session_id=session_id,
+        user_question=user_question,
+        status=status,
+        question_thread=question_thread or {},
+    )
+    selected_sink = sink or default_trace_sink(trace_dir)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        result = selected_sink.persist(TracePersistRequest(document=document))
     except Exception as exc:
-        latency_ms = int((perf_counter() - started_at) * 1000)
-        error = f"Failed to save trace: {exc}"
+        result = TraceSinkResult(
+            sink_name=getattr(selected_sink, "name", "unknown"),
+            success=False,
+            latency_ms=0,
+            event_count=len(trace),
+            error_type=classify_error(exc) or "internal_error",
+        )
+    compatibility = local_result(result)
+    if not compatibility.success:
+        error = f"Failed to save trace ({compatibility.error_type or 'internal_error'})."
         return {
             "success": False,
             "run_id": run_id,
             "trace_path": "",
             "event_count": len(trace),
             "error": error,
-            "trace_event": _trace_event(run_id, "error", latency_ms, error, error),
+            "trace_event": _trace_event(run_id, "error", compatibility.latency_ms, error, error),
         }
-
-    latency_ms = int((perf_counter() - started_at) * 1000)
     return {
         "success": True,
         "run_id": run_id,
-        "trace_path": str(path),
+        "trace_path": compatibility.trace_path,
         "event_count": len(trace),
-        "trace_event": _trace_event(run_id, "success", latency_ms, f"{len(trace)} events saved"),
+        "trace_event": _trace_event(run_id, "success", compatibility.latency_ms, f"{len(trace)} events saved"),
     }

@@ -1,0 +1,206 @@
+rule_files:
+  - /rules/recording-rules.yml
+  - /rules/alert-rules.yml
+
+# Unit-test time advances synthetically; no wall-clock waiting is required.
+evaluation_interval: 1m
+group_eval_order:
+  - insightflow-recording
+  - insightflow-alerts
+
+tests:
+  - name: sustained bounded failures fire every alert and recording rule
+    interval: 1m
+    input_series:
+      - series: 'up{job="insightflow-backend",instance="backend:8000"}'
+        values: '0x20'
+      - series: 'insightflow_http_requests_total{job="insightflow-backend",method="GET",route="/health/ready",status_class="5xx"}'
+        values: '0+10x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="0.005"}'
+        values: '0x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="2.5"}'
+        values: '0x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="5"}'
+        values: '0+10x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="10"}'
+        values: '0+10x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="+Inf"}'
+        values: '0+10x20'
+      - series: 'insightflow_llm_requests_total{provider="deepseek",operation="business_answer",status="timeout"}'
+        values: '0+2x20'
+      - series: 'insightflow_sql_executions_total{status="error",error_type="execution"}'
+        values: '0+2x20'
+      - series: 'insightflow_evidence_validations_total{status="rejected",reason_category="validation"}'
+        values: '0+2x20'
+      - series: 'insightflow_external_publishes_total{platform="feishu",status="error"}'
+        values: '0+1x20'
+      - series: 'insightflow_runtime_storage_usage_ratio'
+        values: '0.9x20'
+    promql_expr_test:
+      - expr: 'insightflow:http_requests:rate5m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:http_requests:rate5m",job="insightflow-backend"}'
+            value: 0.16666666666666666
+      - expr: 'insightflow:http_5xx_ratio:rate5m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:http_5xx_ratio:rate5m",job="insightflow-backend"}'
+            value: 1
+      - expr: 'insightflow:http_p95_latency_seconds:rate5m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:http_p95_latency_seconds:rate5m",job="insightflow-backend"}'
+            value: 4.875
+      - expr: 'insightflow:llm_error_ratio:rate10m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:llm_error_ratio:rate10m"}'
+            value: 1
+      - expr: 'insightflow:sql_execution_error_ratio:rate10m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:sql_execution_error_ratio:rate10m"}'
+            value: 1
+      - expr: 'insightflow:evidence_failure_ratio:rate10m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:evidence_failure_ratio:rate10m"}'
+            value: 1
+      - expr: 'insightflow:external_publish_failure_ratio:rate10m'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{__name__="insightflow:external_publish_failure_ratio:rate10m"}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BackendUnavailable
+        exp_alerts:
+          - exp_labels:
+              instance: backend:8000
+              job: insightflow-backend
+              severity: critical
+            exp_annotations:
+              summary: InsightFlow 后端不可用
+              description: Prometheus 已连续一分钟无法抓取后端指标。
+              dashboard: System Health / Backend up
+              runbook: docs/operations/observability-alerts.md#backendunavailable
+      - eval_time: 12m
+        alertname: HighHttp5xxRate
+        exp_alerts:
+          - exp_labels:
+              job: insightflow-backend
+              severity: warning
+            exp_annotations:
+              summary: HTTP 5xx 比率超过 5%
+              description: 最近五分钟请求量达到门槛且后端 5xx 比率持续偏高。
+              dashboard: System Health / HTTP 4xx/5xx
+              runbook: docs/operations/observability-alerts.md#highhttp5xxrate
+      - eval_time: 20m
+        alertname: HighApiLatency
+        exp_alerts:
+          - exp_labels:
+              job: insightflow-backend
+              severity: warning
+            exp_annotations:
+              summary: API P95 延迟超过 2 秒
+              description: 有效流量下的 HTTP P95 延迟已持续十分钟超过阈值。
+              dashboard: System Health / HTTP P95 延迟
+              runbook: docs/operations/observability-alerts.md#highapilatency
+      - eval_time: 20m
+        alertname: HighLlmFailureRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: LLM 失败率超过 10%
+              description: LLM error/timeout 比率在有效请求量下持续偏高。
+              dashboard: Provider And Tool / LLM 错误与超时
+              runbook: docs/operations/observability-alerts.md#highllmfailurerate
+      - eval_time: 20m
+        alertname: HighSqlFailureRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: SQL 执行失败率超过 10%
+              description: SQL execution error/timeout/failed 比率持续偏高。
+              dashboard: Provider And Tool / SQL Execution
+              runbook: docs/operations/observability-alerts.md#highsqlfailurerate
+      - eval_time: 20m
+        alertname: HighEvidenceFailureRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Evidence 校验失败率超过 10%
+              description: Evidence error/rejected/failed 比率持续偏高。
+              dashboard: Analysis Workflow / Evidence Task 状态
+              runbook: docs/operations/observability-alerts.md#highevidencefailurerate
+      - eval_time: 12m
+        alertname: ExternalPublishFailureBurst
+        exp_alerts:
+          - exp_labels:
+              platform: feishu
+              severity: warning
+              status: error
+            exp_annotations:
+              summary: 飞书发布出现连续失败
+              description: 十分钟内至少三次 Feishu publish 失败。
+              dashboard: Delivery / Feishu Publish
+              runbook: docs/operations/observability-alerts.md#externalpublishfailureburst
+      - eval_time: 17m
+        alertname: RuntimeStorageHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Runtime 存储文件系统使用率超过 80%
+              description: Trace 挂载所在文件系统的聚合使用率持续偏高；指标不扫描文件内容。
+              dashboard: System Health / Runtime Storage
+              runbook: docs/operations/observability-alerts.md#runtimestoragehigh
+
+  - name: low traffic transients and unsustained conditions do not alert
+    interval: 1m
+    input_series:
+      - series: 'up{job="insightflow-backend",instance="backend:8000"}'
+        values: '1x20'
+      - series: 'insightflow_http_requests_total{job="insightflow-backend",method="GET",route="/health/ready",status_class="5xx"}'
+        values: '0+1x20'
+      - series: 'insightflow_http_request_duration_seconds_bucket{job="insightflow-backend",method="GET",route="/health/ready",le="+Inf"}'
+        values: '0+1x20'
+      - series: 'insightflow_llm_requests_total{provider="deepseek",operation="business_answer",status="error"}'
+        values: '0+1x20'
+      - series: 'insightflow_sql_executions_total{status="error",error_type="execution"}'
+        values: '0+1x20'
+      - series: 'insightflow_evidence_validations_total{status="error",reason_category="validation"}'
+        values: '0+1x20'
+      - series: 'insightflow_external_publishes_total{platform="feishu",status="error"}'
+        values: '0 0 1 1 2x16'
+      - series: 'insightflow_runtime_storage_usage_ratio'
+        values: '0.5x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BackendUnavailable
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HighHttp5xxRate
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HighApiLatency
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HighLlmFailureRate
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HighSqlFailureRate
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: HighEvidenceFailureRate
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ExternalPublishFailureBurst
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: RuntimeStorageHigh
+        exp_alerts: []

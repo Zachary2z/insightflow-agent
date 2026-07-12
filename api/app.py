@@ -4,14 +4,17 @@ import os
 import shutil
 import sqlite3
 from contextlib import asynccontextmanager
+from functools import wraps
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import perf_counter
 from typing import Any, Callable
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
+from prometheus_client import CollectorRegistry
 
 from api.health import (
     LivenessResponse,
@@ -42,6 +45,12 @@ from api.models import (
     WorkspaceSqliteSourceRequest,
 )
 from llm_ops.runtime_provider import build_report_composer_provider
+from observability.middleware import CorrelationMiddleware
+from observability.http import HttpObservabilityMiddleware
+from observability.logging import EventEmitter, configure_observability_logging, emit_observability_event, safely_emit
+from observability.metrics import InsightFlowMetrics, create_metrics, safely_inc, safely_observe
+from observability.context import correlation_scope, get_correlation_context
+from observability.redaction import classify_error, safe_identifier
 from workspaces.analysis_runner import (
     execute_workspace_analysis_job,
     run_workspace_analysis_follow_up,
@@ -63,6 +72,37 @@ from workspaces.store import WorkspaceStore
 
 
 ReportRunner = Callable[..., dict[str, Any]]
+
+
+def _record_delivery_metric(metrics: InsightFlowMetrics, operation: str, status: str, duration_seconds: float) -> None:
+    try:
+        if operation == "report_generation":
+            safely_inc(metrics, "report_generations", {"status": status})
+        elif operation == "document_export":
+            safely_inc(metrics, "document_exports", {"format": "docx", "status": status})
+        elif operation == "external_publish":
+            labels = {"platform": "feishu", "status": status}
+            safely_inc(metrics, "external_publishes", labels)
+            safely_observe(metrics, "external_publish_duration", duration_seconds, labels)
+    except BaseException:
+        return
+
+
+def _delivery_metric_status(operation: str, result: object, succeeded: bool) -> str:
+    try:
+        if type(result) is not dict:
+            return "success" if succeeded else "error"
+        if operation == "report_generation":
+            report = result.get("report") if type(result.get("report")) is dict else {}
+            if report.get("status") == "waiting_for_clarification":
+                return "clarification"
+        if operation == "external_publish":
+            publish = result.get("publish_result") if type(result.get("publish_result")) is dict else {}
+            if publish.get("status") == "warning":
+                return "warning"
+        return "success" if succeeded else "error"
+    except BaseException:
+        return "unknown"
 
 
 def _cors_origins() -> list[str]:
@@ -118,12 +158,17 @@ def create_app(
     start_background_analysis: bool = True,
     readiness_checker: ReadinessChecker | None = None,
     analysis_executor: AnalysisExecutor | None = None,
+    event_emitter: EventEmitter = emit_observability_event,
+    metrics: InsightFlowMetrics | None = None,
+    metrics_registry: CollectorRegistry | None = None,
 ) -> FastAPI:
+    configure_observability_logging()
     store = workspace_store or WorkspaceStore()
     selected_report_runner = report_runner or run_workspace_report
     report_store = WorkspaceReportStore(store)
     run_store = WorkspaceRunStore(store)
     selected_analysis_executor = analysis_executor or AnalysisExecutor(max_workers=2)
+    selected_metrics = metrics or create_metrics(metrics_registry)
     selected_readiness_checker = readiness_checker or ReadinessChecker(
         ReadinessPaths(
             workspace_root=store.root_dir,
@@ -131,6 +176,59 @@ def create_app(
             trace_root=Path(__file__).resolve().parents[1] / "logs" / "traces",
         )
     )
+
+    def observed_business_event(event_name: str, operation: str):
+        def decorate(function):
+            @wraps(function)
+            def observed(*args, **kwargs):
+                started_at = perf_counter()
+                workspace_id = kwargs.get("workspace_id")
+                report_id = kwargs.get("report_id")
+                safe_workspace_id = safe_identifier(workspace_id)
+                safe_report_id = safe_identifier(report_id)
+                with correlation_scope(workspace_id=safe_workspace_id, report_id=safe_report_id):
+                    try:
+                        result = function(*args, **kwargs)
+                    except Exception as exc:
+                        elapsed_seconds = max(0.0, perf_counter() - started_at)
+                        context = get_correlation_context()
+                        safely_emit(
+                            event_emitter,
+                            event_name,
+                            request_id=context.get("request_id"),
+                            workspace_id=context.get("workspace_id"),
+                            report_id=context.get("report_id"),
+                            operation=operation,
+                            status="error",
+                            error_type=classify_error(exc),
+                            latency_ms=max(0, int(elapsed_seconds * 1000)),
+                        )
+                        _record_delivery_metric(selected_metrics, operation, "error", elapsed_seconds)
+                        raise
+                    resolved_report_id = safe_report_id
+                    if isinstance(result, dict):
+                        resolved_report_id = safe_identifier(result.get("report_id")) or resolved_report_id
+                    context = get_correlation_context()
+                    succeeded = not isinstance(result, dict) or result.get("success") is not False
+                    metric_status = _delivery_metric_status(operation, result, succeeded)
+                    elapsed_seconds = max(0.0, perf_counter() - started_at)
+                    safely_emit(
+                        event_emitter,
+                        event_name,
+                        request_id=context.get("request_id"),
+                        workspace_id=context.get("workspace_id"),
+                        report_id=resolved_report_id,
+                        operation=operation,
+                        status="success" if succeeded else "error",
+                        error_type=None if succeeded else f"{operation}_failed",
+                        latency_ms=max(0, int(elapsed_seconds * 1000)),
+                    )
+                    _record_delivery_metric(selected_metrics, operation, metric_status, elapsed_seconds)
+                    return result
+
+            return observed
+
+        return decorate
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -146,6 +244,7 @@ def create_app(
     app.state.analysis_executor = selected_analysis_executor
     app.state.readiness_checker = selected_readiness_checker
     app.state.workspace_store = store
+    app.state.metrics = selected_metrics
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),
@@ -153,6 +252,8 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(HttpObservabilityMiddleware, event_emitter=event_emitter, metrics=selected_metrics)
+    app.add_middleware(CorrelationMiddleware)
 
     @app.get("/health/live", response_model=LivenessResponse)
     def health_live() -> LivenessResponse:
@@ -164,6 +265,17 @@ def create_app(
         if result.status == "not_ready":
             return JSONResponse(status_code=503, content=result.model_dump())
         return result
+
+    @app.get("/metrics", include_in_schema=False)
+    def prometheus_metrics() -> Response:
+        try:
+            payload = selected_metrics.exposition()
+            content_type = selected_metrics.content_type
+            if type(payload) is not bytes or type(content_type) is not str:
+                raise RuntimeError("invalid metrics exposition")
+        except BaseException:
+            return Response(content=b"metrics unavailable\n", status_code=503, media_type="text/plain")
+        return Response(content=payload, headers={"Content-Type": content_type})
 
     @app.post("/api/workspaces", response_model=WorkspaceResponse)
     def create_workspace(request: WorkspaceCreateRequest) -> dict:
@@ -259,14 +371,17 @@ def create_app(
             )
             if start_background_analysis and result.get("status") == "running" and result.get("run_id"):
                 try:
-                    selected_analysis_executor.submit(
-                        execute_workspace_analysis_job,
-                        store,
-                        workspace_id,
-                        str(result["run_id"]),
-                        request.user_question or "",
-                        request.initial_sql,
-                    )
+                    with correlation_scope(workspace_id=workspace_id, run_id=str(result["run_id"])):
+                        selected_analysis_executor.submit(
+                            execute_workspace_analysis_job,
+                            store,
+                            workspace_id,
+                            str(result["run_id"]),
+                            request.user_question or "",
+                            request.initial_sql,
+                            event_emitter=event_emitter,
+                            metrics=selected_metrics,
+                        )
                 except AnalysisSubmissionClosed as exc:
                     raise HTTPException(status_code=503, detail="Background analysis is shutting down") from exc
         except FileNotFoundError:
@@ -298,6 +413,8 @@ def create_app(
                 workspace_id=workspace_id,
                 run_id=run_id,
                 message=request.message,
+                event_emitter=event_emitter,
+                metrics=selected_metrics,
             )
         except RunNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -353,6 +470,7 @@ def create_app(
         return FileResponse(artifact_path)
 
     @app.post("/api/workspaces/{workspace_id}/reports", response_model=WorkspaceReportCreateResponse)
+    @observed_business_event("report_generation_completed", "report_generation")
     def create_workspace_report(workspace_id: str, request: WorkspaceReportCreateRequest) -> dict:
         try:
             report_composer_provider = build_report_composer_provider()
@@ -402,6 +520,7 @@ def create_app(
         "/api/workspaces/{workspace_id}/reports/{report_id}/export",
         response_model=WorkspaceReportExportResponse,
     )
+    @observed_business_event("document_export_completed", "document_export")
     def export_workspace_report(workspace_id: str, report_id: str) -> dict:
         try:
             workspace = store.get_workspace(workspace_id)
@@ -481,6 +600,7 @@ def create_app(
         "/api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu",
         response_model=WorkspaceReportPublishResponse,
     )
+    @observed_business_event("external_publish_completed", "external_publish")
     def publish_workspace_report_to_feishu(workspace_id: str, report_id: str) -> dict:
         try:
             workspace = store.get_workspace(workspace_id)

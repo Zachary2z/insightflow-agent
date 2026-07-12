@@ -1,0 +1,13 @@
+{
+  "annotations": {"list": []},
+  "description": "Report、Word Export 与 Feishu External Publish 的交付结果与延迟。",
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Report Generation", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (status) (rate(insightflow_report_generations_total[5m]))", "legendFormat": "{{status}}"}]},
+    {"id": 2, "title": "Word Export", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (format, status) (rate(insightflow_document_exports_total[5m]))", "legendFormat": "{{format}} / {{status}}"}]},
+    {"id": 3, "title": "Feishu Publish", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9}, "targets": [{"refId": "A", "expr": "sum by (platform, status) (rate(insightflow_external_publishes_total[5m]))", "legendFormat": "{{platform}} / {{status}}"}]},
+    {"id": 4, "title": "External Publish P95 延迟与失败率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (platform, le) (rate(insightflow_external_publish_duration_seconds_bucket[10m])))", "legendFormat": "P95 / {{platform}}"}, {"refId": "B", "expr": "insightflow:external_publish_failure_ratio:rate10m", "legendFormat": "失败率"}]}
+  ],
+  "refresh": "30s", "schemaVersion": 41, "tags": ["insightflow", "delivery"], "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"}, "timezone": "browser", "title": "Delivery", "uid": "insightflow-delivery", "version": 1
+}

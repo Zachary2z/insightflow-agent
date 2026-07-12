@@ -62,7 +62,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - P36 is complete as the first real external platform publishing phase. H1-H6 proved that existing Report Center `ReportDocument` output can be published to real Feishu Docs through the open-source `lark-cli`, using `p34.export_package.v1` and P30/P34 chart static assets as the handoff. The Feishu body avoids a duplicate top-level report title, keeps evidence tables near their sections without flooding the Feishu outline, and inserts PNG/JPEG/GIF chart images at matching anchors. H7 adds an optional companion Feishu Sheet from the same export package for editable evidence tables and native Feishu sheet charts when a safe bar/line mapping exists. The publisher remains a delivery tool only: it does not call the LLM, rewrite reports, stitch Analysis Workbench answers, introduce fixed report templates, generate chart data, run Sheet-side re-analysis, query databases directly for Sheet export, or restore simulated SaaS/action paths. P36 keeps the interface ready for a later direct Feishu OpenAPI publisher while proving the product can call real business document/spreadsheet tools now.
 - The 2026-07-10 frontend consolidation applies the approved decision-desk design to the active Next.js product: global navigation is now 数据准备、分析、报告; profile and semantic work are tabs inside 数据准备; settings is compact and secondary; analysis output is answer-first while keeping thread/history/progress/technical detail; Report Center remains independent; the retired Business Q&A preview redirects to Analysis Workbench.
 - P37 is complete. H1-H4 established reproducible multi-stage images, non-root runtimes, health/lifecycle contracts, health-gated Compose orchestration, three persistent volumes, safe operations, isolated no-key Smoke, and a CI-ready workflow. H5 completed the final Linux arm64 no-cache build, Workspace/Run/Report/Markdown/Word/chart persistence acceptance, product-boundary regression, deployment documentation, repository hygiene, and project-only old-image cleanup. Analysis Workbench, Report Center, Word export, chart artifacts, and optional Feishu CLI semantics remain intact without baking credentials or generated data into images.
-- P38 follows P37 and establishes an operations-ready observability layer. It preserves the existing business execution trace while adding request/run correlation, allowlisted structured JSON logs, a replaceable trace-sink boundary, Prometheus metrics, Grafana dashboards, actionable alerts, retention/cardinality rules, and deterministic security/observability tests. It must not log raw uploaded rows, prompts, SQL results, credentials, provider payloads, or unbounded identifiers as metric labels.
+- P38 is complete. H1-H4 established correlation/redaction, structured events, TraceSink/retention, and bounded application metrics; H5 added the optional Prometheus/Grafana Compose Profile, provisioned repository Dashboards, recording/alert rules, and safe aggregate Runtime storage usage; H6 added deterministic rule tests, Failure Injection, complete Runbooks, isolated Profile acceptance, and Closeout. No Alertmanager, OpenTelemetry, frontend telemetry, or external Metrics SaaS exists.
 
 Current runtime chain:
 
@@ -126,7 +126,7 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | P36 | Feishu document publishing: publish existing Report Center reports to real Feishu Docs through `lark-cli`, insert safe chart static assets, persist publish artifacts, polish Feishu document layout/section chart placement, and add an optional companion Feishu Sheet for editable evidence/native charts while keeping old simulated connector/template paths deleted | Complete; H1-H7 complete |
 | UI consolidation (2026-07-10) | Approved decision-desk frontend, three-entry navigation, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement without API changes | Complete; final verification recorded in the dated plan |
 | P37 | Containerized reproducible deployment: multi-stage non-root images, Compose orchestration, health contracts, persistent runtime data, environment/secrets boundaries, one-command operations, smoke tests, and CI-ready image verification | Complete; H1-H5 complete |
-| P38 | Observability and operations: correlation context, safe structured logging, trace sinks, Prometheus metrics, Grafana dashboards, alert rules, retention/cardinality policy, and failure-injection acceptance | Planned after P37; H1-H6 pending |
+| P38 | Observability and operations: correlation context, safe structured logging, trace sinks, Prometheus metrics, Grafana dashboards, alert rules, retention/cardinality policy, and failure-injection acceptance | Complete; H1-H6 complete |
 
 ## P16 Business Answer Contract
 
@@ -381,20 +381,102 @@ P37-H5 Acceptance, Documentation And Closeout completed on 2026-07-11:
 - CI is configured for Python 3.12, Node 22, backend/frontend tests/build, Compose validation, syntax check, and the canonical no-key Smoke without push/deploy. GitHub Actions was not remotely run; only local static/workflow-contract validation passed.
 - Repository/image hygiene found no tracked Secret, database, Workspace Run/Report, Trace JSON, generated report/chart, `.docx`, `.next`, `node_modules`, pytest cache, or Smoke artifact, and no real key/local-user path in the audited deployment surfaces.
 - Docker usage: before final no-cache build, 8 images / 1.486 GB and 5.531 GB cache; after acceptance before cleanup, 10 images / 1.752 GB and 7.444 GB cache; after removing only unreferenced P37 H1/H1-review/H2/H3 tags, 3 images / 783.4 MB and 7.444 GB cache, with 5.935 GB reclaimable reported by `docker system df`. No Volume or global BuildKit prune ran.
-- Retained project images: `insightflow-backend:p37` and `insightflow-frontend:p37`. No H5/Smoke container, network, or Volume remains. Next planned task is P38-H1 Observability Contract And Correlation Context; P38 remains Planned.
+- Historical P37-H5 closeout state: retained project images were `insightflow-backend:p37` and `insightflow-frontend:p37`, no H5/Smoke container, network, or Volume remained, and P38-H1 was then the next planned task. P38-H1 through H4 have since completed.
 
 ## P38 Task Status
 
 Detailed plan: `docs/product/plans/2026-07-11-p38-observability-and-operations.md`.
 
+Current state: P38 is Complete; H1-H6 are Complete. No next phase is designated; expansion requires a separate plan.
+
 | Task | Status | Notes |
 |---|---|---|
-| P38-H1 | `[ ]` Planned | Observability contract, correlation context, event taxonomy, allowlisted fields, redaction policy, and bounded identifiers |
-| P38-H2 | `[ ]` Planned | Structured JSON application logs and FastAPI request middleware with request/run/workspace correlation and safe error normalization |
-| P38-H3 | `[ ]` Planned | `TraceSink` abstraction that preserves local business trace files and the current trace dashboard while enabling additional sinks |
-| P38-H4 | `[ ]` Planned | Prometheus HTTP, workflow, provider, SQL, report, chart, and external-publish metrics with bounded label cardinality |
-| P38-H5 | `[ ]` Planned | Prometheus/Grafana Compose services, provisioned dashboards, recording/alert rules, and local retention/resource defaults |
-| P38-H6 | `[ ]` Planned | Redaction/cardinality/failure-injection acceptance, alert verification, operational runbooks, regression, and documentation closeout |
+| P38-H1 | `[x]` Complete | `ContextVar` correlation, safe Request ID middleware/header, typed event taxonomy/allowlist, central redaction, bounded identifiers, and adversarial concurrency/security tests |
+| P38-H2 | `[x]` Complete | Idempotent JSON/text stdout logger, safe HTTP started/completed middleware, normalized route/method/status/latency, background context propagation, and major lifecycle events |
+| P38-H3 | `[x]` Complete | Typed TraceSink boundary, compatible atomic local JSON, compact structured trace events, failure isolation, safe configuration, and dry-run age/size retention |
+| P38-H4 | `[x]` Complete | Central explicit CollectorRegistry/Recorder, `/metrics`, bounded HTTP/workflow/node/LLM/SQL/evidence/delivery metrics, fixed Label allowlists, cardinality tests, complete failure isolation, retry delta cap, and `trace_save_failed` as Node error |
+| P38-H5 | `[x]` Complete | Optional Prometheus/Grafana Compose Profile, provisioned data source/four dashboards, recording/alert rules, Runtime Storage Gauge, retention/resources, and Alert Reference |
+| P38-H6 | `[x]` Complete | Failure injection, correlation/leak/cardinality acceptance, deterministic tests for seven recording rules and eight alerts, complete Runbooks, regression, isolated Profile verification, and documentation closeout |
+
+## Latest P38-H6 Result
+
+P38-H6 Failure Injection, Runbooks, Acceptance, And Closeout completed on 2026-07-12:
+
+- Added safe completion events for LLM, SQL validation/execution, Evidence validation, and Chart generation, using the same central correlation/redaction boundary as HTTP, Workflow, Delivery, and Trace. Dynamic IDs remain log/trace correlation only and never become metric Labels.
+- Credential-free failure injection covers backend unavailable alerts, handler 5xx, Provider timeout/fallback, SQL rejection/execution failure, Evidence failure, Chart/Report/Export failure, Feishu missing/failure, local Trace write isolation, randomized IDs, and hostile sensitive content. Existing Report/Export/Feishu mocks and Trace Dashboard compatibility are part of the acceptance target.
+- `observability/tests/rule-tests.yml` deterministically verifies all seven recording rules and all eight alert rules at synthetic evaluation times, plus representative low-traffic/non-sustained no-fire behavior. `make observability-alert-tests`, `make observability-check`, and `make observability-acceptance` are safe, repeatable, credential-free entry points.
+- `docs/operations/observability-alerts.md` is now a complete runbook with per-alert triggers, Dashboard routing, allowed checks, explicit prohibitions, recovery, escalation, daily operations, monitoring-only cleanup, and business-Volume preservation.
+- Verification passed: backend `992 passed, 15 skipped`; H6 observability acceptance `134 passed`; frontend production build; base Docker Smoke; Prometheus config/rules and rule tests; Grafana provisioning; `git diff --check`; and artifact hygiene. An isolated temporary Profile proved backend/Prometheus/Grafana health, backend target up, 15 loaded rules, datasource, four dashboards, and complete project cleanup with no business-Volume impact.
+- No live DeepSeek or Feishu call, Git commit/push, Alertmanager, OTLP, external SaaS, Docker socket, cloud credential, frontend telemetry, default Grafana password, or business-Volume deletion occurred.
+
+## Latest P38-H5 Result
+
+P38-H5 Prometheus, Grafana, Provisioned Dashboards And Alerts completed on 2026-07-12:
+
+- Base Compose still selects backend/frontend only. The explicit `observability` Profile adds only Prometheus and Grafana, with loopback ports 9090/3001, health checks, fixed images, conservative CPU/memory bounds, and dedicated `prometheus-data`/`grafana-data` Volumes.
+- Prometheus uses a repository config, scrapes `backend:8000/metrics` every 15 seconds, evaluates every 30 seconds, and limits storage to 7 days/2 GB. Grafana provisions the fixed Prometheus UID and four repository Dashboards without manual import.
+- Seven recording rules cover HTTP rate/5xx/P95 plus LLM, SQL, Evidence, and External Publish failure ratios. Eight alerts cover backend availability, HTTP 5xx/latency, LLM/SQL/Evidence failures, Feishu publish bursts, and Runtime storage.
+- Runtime storage is a label-free Gauge derived only from Trace-mount `statvfs`; it never scans files, and failures safely retain exposition availability. Alert annotations point to the H5 Alert Reference Stub.
+- Grafana has no password default, refuses Profile startup without local/Secret injection, and disables anonymous access/signup. Monitoring configuration is read-only and no Docker socket, home, `.env`, business Volume, Alertmanager, OpenTelemetry, frontend telemetry, or external SaaS was added.
+- Verification passed: requested focused backend `73 passed`; full backend `982 passed, 15 skipped`; frontend `84 passed`; production build, both Compose configurations, `promtool`, provisioning/dashboard checks, base Docker Smoke, isolated Observability acceptance, cleanup audit, and `git diff --check` passed.
+- Historical H5 boundary: H6 was not yet started. H6 has since completed P38 closeout.
+
+## Latest P38-H4 Result
+
+P38-H4 Prometheus Metrics completed on 2026-07-12:
+
+- Added the official `prometheus-client` runtime dependency and regenerated the CPython 3.12 production lock from `requirements.txt`.
+- Added `InsightFlowMetrics`, which owns an explicit independent `CollectorRegistry`, all collectors, bounded normalization, safe recording helpers, and injectable per-App/per-test registries without default-registry duplication.
+- Added `GET /metrics` with Prometheus text exposition and the official compatible Content-Type. It reads no Workspace, Report, Trace, SQL, provider, or external-service content.
+- HTTP metrics cover request count, status class, fixed-bucket duration, and in-progress requests. Route Labels come only from registered FastAPI/Starlette Route Templates; unmatched and unsafe resolution use fixed fallbacks, and `/metrics` excludes itself from HTTP metrics.
+- Workflow/Node, LLM, SQL validation/execution, Evidence validation/tasks, Chart, Report, Word Export, and External Publish boundaries expose bounded counters/histograms without changing ProductResult, Trace, API, tool, provider, persistence, or fallback contracts.
+- Every Label uses a central finite allowlist. Unknown values collapse to `unknown` or `other`; analysis routes map to `fast`, `standard`, `deep`, `clarification`, or `unknown`.
+- Actual Prometheus exposition cardinality tests cover randomized IDs, raw paths, SQL, prompts, model names, exceptions, and business values. Sensitive inputs do not appear and cannot create linearly growing series.
+- Metrics lookup, ContextVar scope, normalization, Counter, Histogram, and Gauge failures are isolated from business execution. HTTP status/body/Request ID/log counts, workflow returns/exceptions, SQL/LLM/Evidence/Chart results, and Report/Export/Publish response plus persistence remain unchanged under injected Metrics failures.
+- Retry/status auxiliary parsing accepts only exact native types. Strings, floats, bools, and hostile objects are not coerced or rendered and safely produce zero/`unknown` behavior.
+- A single Node execution records at most 10 new retries, using one bounded Counter increment and a fixed Node-to-operation mapping rather than an unbounded loop or dynamic operation Label.
+- `trace_save_failed` is classified as Node `error`; the exposition contains no corresponding Node success sample.
+- `/metrics` has no application-layer authentication. Local Compose remains loopback-only; production must restrict the endpoint to internal scraping at the Ingress/reverse-proxy boundary and must not expose it publicly.
+- At H4 closeout, H5-H6 remained Planned and H4 itself added no Prometheus/Grafana Compose service, Dashboard, recording/alert rule, Alertmanager, Runbook, OpenTelemetry, external Metrics SaaS, frontend telemetry, or Metrics Volume. H5 has since completed; H6 remains Planned.
+- Final verification: focused H4 review `179 passed`; full backend `973 passed, 15 skipped`; frontend Vitest `84 passed`; Next.js production build, Compose validation, in-container Prometheus parser, and Docker Smoke passed. Smoke left no container, network, or Volume residue, while the three main-project Volumes (`workspace-data`, `report-data`, `trace-data`) were preserved.
+
+## Latest P38-H3 Result
+
+P38-H3 Business Trace Sink Refactor completed on 2026-07-11:
+
+- Added `TraceDocument`, `TracePersistRequest`, `TraceSinkResult`, and injectable `TraceSink`, with Local JSON, structured log, and ordered composite implementations. The protocol does not require a local path and remains the extension point for future OTLP.
+- `save_trace` remains stable and adapts the local sink result to the existing return surface. Local JSON/dashboard fields, Workspace Run persistence, ProductResult, business answers, and `save_trace_node` semantics remain compatible.
+- Local writes are contained, symlink-safe, and atomic. Structured trace events contain only safe IDs, operation/status/error category, latency, and event count; no Trace content, question/thread, SQL, Prompt, Rows, provider payload, exception text, or path is emitted.
+- Auxiliary failures and thrown exceptions do not prevent later sinks or change successful local/business results. Local failure retains the prior `trace_save_failed` behavior.
+- Default `INSIGHTFLOW_TRACE_SINKS=local`; only `local,structured` opts into the auxiliary event sink. Unknown values fall back local-only. Retention is a standalone dry-run-by-default command with deterministic age/size selection and active-run protection, limited to direct non-symlink final JSON files under the specified root.
+- H3 retention scope repair verification passed: requested focused backend `108 passed`; full backend `939 passed, 15 skipped`; frontend `84 passed`; production build, Compose validation, isolated Smoke, manual Workspace-root misconfiguration reproduction, and diff checks passed. The reproduction preserved the expired `workspace.json` and emitted only a safe validation category. Smoke left no isolated resources and preserved the three main-project Volumes.
+- Historical H3 closeout state: H4-H6 were still Planned, and H3 itself added no `/metrics`, Prometheus, Grafana, alerts, failure-injection runbook, OpenTelemetry/OTLP, external logging platform, frontend telemetry, service, or Volume. H4-H5 have since completed; H6 remains Planned.
+
+## Latest P38-H2 Result
+
+P38-H2 Structured Application Logs And HTTP Middleware completed on 2026-07-11:
+
+- Added an isolated, idempotent `insightflow.observability` logger. `INSIGHTFLOW_LOG_FORMAT=json|text` and `INSIGHTFLOW_LOG_LEVEL=DEBUG|INFO|WARNING|ERROR|CRITICAL` use fixed allowlists; unsafe values fall back to JSON/INFO. Container defaults are JSON/INFO, output is one event per stdout line, no log file or log Volume was added, and third-party/root logger configuration is untouched.
+- Extended the H1 scalar event schema with controlled `http_method`, route template, 100-599 `status_code`, and `1xx`-`5xx` `status_class`. Events are still built only through `build_observability_event` and the central fail-closed sanitizer; arbitrary dictionaries, nested payloads, exception messages, request/response bodies, Query, Headers, SQL, Prompt, Rows, provider payloads, URLs, CLI output, and local paths are excluded.
+- Added HTTP started/completed events inside the outer correlation boundary. Completion uses Starlette's matched route template, `unmatched` for a true 404, non-negative latency, success/rejected/error status, and exactly one completion even on downstream exceptions. An exception before response start records `500/5xx`, `status=error`, and `classify_error(type(exc))`; an exception after response start preserves the already-sent status code/class but still records `status=error` plus the normalized error category. The original exception is re-raised, its message/repr/traceback is never logged, and Streaming/FileResponse and CORS remain streaming/pass-through. Production Uvicorn access logging is disabled so raw URLs and Query strings cannot bypass the structured application contract; startup/error logs remain independent text.
+- `AnalysisExecutor` now captures only the validated correlation dictionary and binds/resets it around each thread-pool job. The API binds known workspace/run IDs before submit; sequential jobs and no-HTTP jobs start clean. Workflow started/completed events carry safe request/run/workspace context without changing ProductResult or business answers.
+- Added `report_generation_completed`, `document_export_completed`, and `external_publish_completed` at existing API lifecycle boundaries with safe operation/status/error category/latency and correlation IDs. Logging/emitter failures are swallowed and do not change analysis, report, export, publish, response, or executor shutdown semantics.
+- Verification after the HTTP exception-classification repair: requested focused regression `118 passed`; full backend `888 passed, 15 skipped`; frontend Vitest `84 passed`; Next.js production build, `docker compose config --quiet`, and `make smoke` passed. Tests cover normal 200/4xx/handled 5xx, pre-response RuntimeError, post-start streaming TimeoutError, original-exception propagation, exact started/completed counts, and emitter failure isolation. Exception fixtures containing synthetic Token, SQL, raw ID, and local paths did not enter events. No Live DeepSeek or Live Feishu ran.
+- Docker moved from 3 images / 783.4 MB, 0 volumes, and 3.767 GB Build Cache to 3 images / 783.4 MB, 3 intentionally preserved main-project volumes / 733.4 kB, and 3.999 GB Build Cache after the H2 repair Smoke. There are zero containers; Smoke left no isolated containers, networks, volumes, or temporary files. No prune or volume deletion ran.
+- Historical H2 closeout state: P38-H3 was the next planned task and H3-H6 were still Planned; H2 itself added no TraceSink refactor, `/metrics`, Prometheus, Grafana, alerts, failure-injection Runbook, OpenTelemetry/OTLP, external log platform, or frontend telemetry. H3-H6 have since completed.
+
+## Latest P38-H1 Result
+
+P38-H1 Observability Contract And Correlation Context completed on 2026-07-11:
+
+- Added `observability.context` with bounded opaque IDs and stable get/bind/reset/scope interfaces for request, run, session, workspace, and report correlation. Nested scopes, exception exits, asyncio tasks, threads, and HTTP request completion restore context correctly; no context object was added to AgentState or API bodies.
+- Added a correlation-only FastAPI ASGI middleware. A single safe `X-Request-ID` is preserved; missing, duplicate, invalid-character, whitespace/control, path/HTML, SQL-like, secret-like, or over-64-character values are replaced by `req_<uuid hex>`. Health, readiness, OpenAPI, Workspace, 404, and business 4xx responses return the safe header while existing bodies/statuses remain unchanged.
+- Added an allowlisted typed event builder for timestamp, level, event, correlation IDs, node/tool/operation/provider/status/error category, non-negative latency, and retry count. It generates UTC ISO 8601, merges current context, rejects controlled-vocabulary/numeric violations, prevents unsafe ID override, drops unknown fields, and serializes to JSON primitives.
+- Added central schema-driven, scalar-only fail-closed redaction with controlled exception classification and hostile-object protection. IDs, categories, UTC timestamp, and non-negative integers have distinct validators; lists, mappings, arbitrary objects, and scalar subclasses are not valid event field values. SQL-like text, `.env`, Prompt/messages, raw rows, provider payloads, synthetic secrets, embedded Unix/Windows/file URI paths, and exception messages did not leak.
+- Closed the post-acceptance nested-value bypass: the original `operation=[SELECT..., path=/Users..., .env contents]` reproduction now keeps only the safe scalar status, and nested mappings cannot reuse allowlisted keys. No hostile `str` or `repr` is called.
+- Verification: 62 contract tests passed; requested focused regression `89 passed`; full backend `858 passed, 15 skipped`; frontend Vitest `84 passed`; Next.js production build, Compose validation, P37 no-key Smoke, and diff checks passed. Smoke cleanup left no containers, networks, or volumes.
+- Docker usage moved from 3 images / 783.4 MB and 3.274 GB Build Cache to 3 images / 783.4 MB and 3.764 GB Build Cache. No global prune ran.
+- Historical H1 closeout state: structured logging, TraceSink, `/metrics`, Prometheus/Grafana, alerts, failure-injection runbooks, and OpenTelemetry were then unimplemented. H2-H5 have since completed; H6 remains Planned for failure injection and full runbook closeout.
 
 ## Latest P36-H7 Result
 

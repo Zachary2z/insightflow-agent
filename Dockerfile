@@ -30,6 +30,7 @@ COPY --chown=root:root agents ./agents
 COPY --chown=root:root graph ./graph
 COPY --chown=root:root llm_ops ./llm_ops
 COPY --chown=root:root mcp_servers ./mcp_servers
+COPY --chown=root:root observability ./observability
 COPY --chown=root:root question_understanding ./question_understanding
 COPY --chown=root:root semantic_layer ./semantic_layer
 COPY --chown=root:root sql_planning ./sql_planning
@@ -46,4 +47,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD ["python", "-c", "import urllib.request; exec(\"try:\\n response = urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)\\nexcept Exception:\\n raise SystemExit(1)\\nraise SystemExit(0 if response.status == 200 else 1)\")"]
 
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

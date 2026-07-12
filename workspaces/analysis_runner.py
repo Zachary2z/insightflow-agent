@@ -3,9 +3,14 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
 from uuid import uuid4
 
 from graph.workflow import run_workflow
+from observability.context import correlation_scope, get_correlation_context
+from observability.logging import EventEmitter, emit_observability_event, safely_emit
+from observability.metrics import InsightFlowMetrics, normalize_analysis_route, safe_metrics_scope, safely_get_metrics, safely_inc, safely_observe
+from observability.redaction import classify_error
 from question_understanding.resolved_question import build_resolved_question
 from workspaces.analysis_thread_memory import (
     build_completed_follow_up_question,
@@ -14,6 +19,29 @@ from workspaces.analysis_thread_memory import (
 from workspaces.product_result_builder import build_product_analysis_result
 from workspaces.run_store import WorkspaceRunStore, normalize_question_for_reuse
 from workspaces.store import WorkspaceStore
+
+
+def _record_workflow_metric(
+    metrics: InsightFlowMetrics,
+    route: object,
+    status: str,
+    duration_seconds: float,
+) -> None:
+    try:
+        labels = {"route": normalize_analysis_route(route), "status": status}
+        safely_inc(metrics, "runs", labels)
+        safely_observe(metrics, "run_duration", duration_seconds, labels)
+        if status == "clarification":
+            safely_inc(metrics, "clarifications", {"reason_category": "missing_context"})
+    except BaseException:
+        return
+
+
+def _safe_analysis_route(result: object) -> object:
+    try:
+        return result.get("analysis_route") if type(result) is dict else None
+    except BaseException:
+        return None
 
 
 def submit_workspace_analysis_run(
@@ -86,6 +114,71 @@ def create_workspace_analysis_run_shell(
 
 
 def execute_workspace_analysis_job(
+    store: WorkspaceStore,
+    workspace_id: str,
+    run_id: str,
+    user_question: str,
+    initial_sql: str | None = None,
+    providers: dict | None = None,
+    event_emitter: EventEmitter = emit_observability_event,
+    metrics: InsightFlowMetrics | None = None,
+) -> dict:
+    started_at = perf_counter()
+    selected_metrics = safely_get_metrics(metrics)
+    with safe_metrics_scope(selected_metrics), correlation_scope(workspace_id=workspace_id, run_id=run_id):
+        context = get_correlation_context()
+        safely_emit(
+            event_emitter,
+            "workflow_run_started",
+            request_id=context.get("request_id"),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            operation="analysis",
+            status="started",
+        )
+        try:
+            result = _execute_workspace_analysis_job(
+                store=store,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                user_question=user_question,
+                initial_sql=initial_sql,
+                providers=providers,
+            )
+        except Exception as exc:
+            elapsed_seconds = max(0.0, perf_counter() - started_at)
+            safely_emit(
+                event_emitter,
+                "workflow_run_completed",
+                request_id=context.get("request_id"),
+                workspace_id=workspace_id,
+                run_id=run_id,
+                operation="analysis",
+                status="error",
+                error_type=classify_error(exc),
+                latency_ms=max(0, int(elapsed_seconds * 1000)),
+            )
+            _record_workflow_metric(selected_metrics, None, "error", elapsed_seconds)
+            raise
+        succeeded = result.get("status") != "failed"
+        metric_status = "clarification" if result.get("status") == "waiting_for_clarification" else ("success" if succeeded else "error")
+        elapsed_seconds = max(0.0, perf_counter() - started_at)
+        safely_emit(
+            event_emitter,
+            "workflow_run_completed",
+            request_id=context.get("request_id"),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            operation="analysis",
+            status="success" if succeeded else "error",
+            error_type=None if succeeded else "workflow_failed",
+            latency_ms=max(0, int(elapsed_seconds * 1000)),
+        )
+        _record_workflow_metric(selected_metrics, _safe_analysis_route(result), metric_status, elapsed_seconds)
+        return result
+
+
+def _execute_workspace_analysis_job(
     store: WorkspaceStore,
     workspace_id: str,
     run_id: str,
@@ -260,6 +353,69 @@ def run_workspace_analysis(
 
 
 def run_workspace_analysis_follow_up(
+    store: WorkspaceStore,
+    workspace_id: str,
+    run_id: str,
+    message: str,
+    providers: dict | None = None,
+    event_emitter: EventEmitter = emit_observability_event,
+    metrics: InsightFlowMetrics | None = None,
+) -> dict:
+    started_at = perf_counter()
+    selected_metrics = safely_get_metrics(metrics)
+    with safe_metrics_scope(selected_metrics), correlation_scope(workspace_id=workspace_id, run_id=run_id):
+        context = get_correlation_context()
+        safely_emit(
+            event_emitter,
+            "workflow_run_started",
+            request_id=context.get("request_id"),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            operation="analysis_follow_up",
+            status="started",
+        )
+        try:
+            result = _run_workspace_analysis_follow_up(
+                store=store,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                message=message,
+                providers=providers,
+            )
+        except Exception as exc:
+            elapsed_seconds = max(0.0, perf_counter() - started_at)
+            safely_emit(
+                event_emitter,
+                "workflow_run_completed",
+                request_id=context.get("request_id"),
+                workspace_id=workspace_id,
+                run_id=run_id,
+                operation="analysis_follow_up",
+                status="error",
+                error_type=classify_error(exc),
+                latency_ms=max(0, int(elapsed_seconds * 1000)),
+            )
+            _record_workflow_metric(selected_metrics, None, "error", elapsed_seconds)
+            raise
+        succeeded = result.get("status") != "failed"
+        metric_status = "clarification" if result.get("status") == "waiting_for_clarification" else ("success" if succeeded else "error")
+        elapsed_seconds = max(0.0, perf_counter() - started_at)
+        safely_emit(
+            event_emitter,
+            "workflow_run_completed",
+            request_id=context.get("request_id"),
+            workspace_id=workspace_id,
+            run_id=run_id,
+            operation="analysis_follow_up",
+            status="success" if succeeded else "error",
+            error_type=None if succeeded else "workflow_failed",
+            latency_ms=max(0, int(elapsed_seconds * 1000)),
+        )
+        _record_workflow_metric(selected_metrics, _safe_analysis_route(result), metric_status, elapsed_seconds)
+        return result
+
+
+def _run_workspace_analysis_follow_up(
     store: WorkspaceStore,
     workspace_id: str,
     run_id: str,

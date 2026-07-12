@@ -25,7 +25,7 @@ from workspaces.store import WorkspaceStore
 SUPPORTED_REPORT_TYPES = {"business_review", "channel_performance", "revenue_trend"}
 
 
-def _client_with_fake_report_runner(tmp_path):
+def _client_with_fake_report_runner(tmp_path, *, metrics=None):
     store = WorkspaceStore(tmp_path / "workspaces")
     calls = []
 
@@ -175,7 +175,7 @@ def _client_with_fake_report_runner(tmp_path):
             "report": saved.to_dict(),
         }
 
-    app = create_app(workspace_store=store, report_runner=fake_report_runner)
+    app = create_app(workspace_store=store, report_runner=fake_report_runner, metrics=metrics)
     return TestClient(app), store, calls
 
 
@@ -378,6 +378,24 @@ def test_export_report_word_docx_returns_safe_download_metadata(tmp_path):
         assert term not in response_text
 
 
+def test_broken_metrics_do_not_change_word_export_response_or_persistence(tmp_path):
+    class BrokenMetrics:
+        def __getattribute__(self, _name):
+            raise RuntimeError("metrics unavailable")
+
+    client, _, _ = _client_with_fake_report_runner(tmp_path, metrics=BrokenMetrics())
+    workspace_id = _create_workspace(client)
+    created = _create_report(client, workspace_id)
+    response = client.post(f"/api/workspaces/{workspace_id}/reports/{created['report_id']}/export")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    document_path = tmp_path / "workspaces" / workspace_id / payload["document_path"]
+    assert document_path.is_file()
+    detail = client.get(f"/api/workspaces/{workspace_id}/reports/{created['report_id']}").json()
+    assert any(item["artifact_type"] == "word_document" for item in detail["report"]["artifacts"])
+
+
 def test_export_report_word_docx_returns_svg_placeholder_warning(tmp_path):
     client, _, _ = _client_with_fake_report_runner(tmp_path)
     workspace_id = _create_workspace(client)
@@ -505,6 +523,35 @@ def test_publish_report_to_feishu_returns_result_and_persists_safe_artifact(tmp_
         str(tmp_path),
     ]:
         assert forbidden not in saved_text
+
+
+def test_broken_metrics_do_not_change_publish_response_or_persistence(tmp_path, monkeypatch):
+    import api.app as api_app
+    from workspaces.external_publishing import ExternalPublishResult
+
+    class BrokenMetrics:
+        def __getattribute__(self, _name):
+            raise RuntimeError("metrics unavailable")
+
+    class FakePublisher:
+        def publish_report(self, _package):
+            return ExternalPublishResult(
+                platform="feishu",
+                status="published",
+                title="Safe report",
+                url="https://example.feishu.cn/docx/doc_metrics_safe",
+                document_id="doc_metrics_safe",
+            )
+
+    monkeypatch.setattr(api_app, "_build_feishu_publisher", lambda **_kwargs: FakePublisher())
+    client, _, _ = _client_with_fake_report_runner(tmp_path, metrics=BrokenMetrics())
+    workspace_id = _create_workspace(client)
+    created = _create_report(client, workspace_id)
+    response = client.post(f"/api/workspaces/{workspace_id}/reports/{created['report_id']}/publish/feishu")
+    assert response.status_code == 200
+    assert response.json()["publish_result"]["document_id"] == "doc_metrics_safe"
+    detail = client.get(f"/api/workspaces/{workspace_id}/reports/{created['report_id']}").json()
+    assert detail["report"]["external_publish_results"]["feishu"]["document_id"] == "doc_metrics_safe"
 
 
 def test_p36_acceptance_report_center_publishes_existing_report_to_feishu_with_png_chart(tmp_path, monkeypatch):

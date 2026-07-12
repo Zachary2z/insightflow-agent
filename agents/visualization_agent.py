@@ -14,6 +14,9 @@ from visualization_delivery.policy import validate_delivery_tool
 from visualization_delivery.tool_catalog import DELIVERY_TOOL_CATALOG
 from workspaces.answer_evidence import business_field_label
 from workspaces.question_evidence_ledger import build_grouped_chart_candidate
+from observability.metrics import normalize_chart_type, safely_get_metrics, safely_inc
+from observability.logging import emit_observability_event, safely_emit
+from observability.redaction import classify_error
 
 
 PROMPT_ID = "visualization_agent"
@@ -566,7 +569,7 @@ def _with_echarts_payload(
     return updated
 
 
-def run_visualization_agent(
+def _run_visualization_agent(
     state: dict[str, Any],
     provider: LLMProvider | None = None,
     output_dir: str | Path = Path("reports/charts"),
@@ -689,3 +692,52 @@ def run_visualization_agent(
         **visualization_trace,
     }
     return append_trace(updated, trace_event)
+
+
+def run_visualization_agent(
+    state: dict[str, Any],
+    provider: LLMProvider | None = None,
+    output_dir: str | Path = Path("reports/charts"),
+) -> dict[str, Any]:
+    try:
+        result = _run_visualization_agent(state, provider=provider, output_dir=output_dir)
+    except BaseException as exc:
+        safely_inc(safely_get_metrics(), "chart_generations", {"chart_type": "other", "status": "error"})
+        safely_emit(
+            emit_observability_event,
+            "chart_generation_completed",
+            operation="visualization",
+            status="error",
+            error_type=classify_error(exc),
+        )
+        raise
+    _record_chart_metric(result)
+    return result
+
+
+def _record_chart_metric(result: Any) -> None:
+    try:
+        chart_result = result.get("chart_result") if type(result) is dict and type(result.get("chart_result")) is dict else {}
+        chart_spec = result.get("visualization_plan") if type(result) is dict and type(result.get("visualization_plan")) is dict else {}
+        if not chart_result:
+            status = "skipped"
+        elif chart_result.get("success") is True:
+            status = "success"
+        elif chart_result.get("status") == "skipped" or chart_result.get("rendering_status") == "skipped" or chart_result.get("skipped") is True:
+            status = "skipped"
+        else:
+            status = "error"
+        safely_inc(
+            safely_get_metrics(),
+            "chart_generations",
+            {"chart_type": normalize_chart_type(chart_spec.get("chart_type") or chart_result.get("chart_type")), "status": status},
+        )
+        safely_emit(
+            emit_observability_event,
+            "chart_generation_completed",
+            operation="visualization",
+            status=status,
+            error_type="internal_error" if status == "error" else None,
+        )
+    except BaseException:
+        return

@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from llm_ops.business_text import looks_like_raw_parameter_dump as _looks_like_raw_parameter_dump
-from llm_ops.provider import LLMProvider, LLMRequest, run_llm_request
+from llm_ops.provider import LLMProvider, LLMRequest, record_llm_fallback, record_llm_metrics, run_llm_request
 
 
 def _error(prompt_id: str, message: str) -> dict[str, Any]:
@@ -899,12 +899,15 @@ def run_validated_llm_request(
     request: LLMRequest,
     schema_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    provider_result = run_llm_request(provider, request)
+    provider_result = run_llm_request(provider, request, record_metrics=False)
     if not provider_result.get("success"):
+        status = "timeout" if "timeout" in str(provider_result.get("error_type") or "").lower() else "error"
+        record_llm_metrics(provider, request, status, int(provider_result.get("latency_ms") or 0))
         return provider_result
 
     validation = validate_prompt_output(request.prompt_id, provider_result.get("content"), schema_context)
     if validation.get("success"):
+        record_llm_metrics(provider, request, "success", int(provider_result.get("latency_ms") or 0))
         return {**provider_result, "content": validation["content"], "error_type": ""}
 
     trace_event = dict(provider_result["trace_event"])
@@ -916,7 +919,7 @@ def run_validated_llm_request(
             "tool_output_summary": validation["error"],
         }
     )
-    return {
+    result = {
         **provider_result,
         "success": False,
         "content": None,
@@ -924,3 +927,6 @@ def run_validated_llm_request(
         "error_type": validation["error_type"],
         "trace_event": trace_event,
     }
+    record_llm_metrics(provider, request, "error", int(provider_result.get("latency_ms") or 0))
+    record_llm_fallback(provider, request, validation.get("error_type"))
+    return result

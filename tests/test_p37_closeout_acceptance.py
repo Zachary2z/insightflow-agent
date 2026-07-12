@@ -25,7 +25,7 @@ def test_final_p37_images_and_h1_h4_contracts_remain_present():
     assert "AS builder" in _read("Dockerfile") and "USER insightflow:insightflow" in _read("Dockerfile")
     assert "AS builder" in _read("frontend/Dockerfile") and "USER nextjs:nodejs" in _read("frontend/Dockerfile")
     assert "/health/live" in _read("api/app.py") and "/health/ready" in _read("api/app.py")
-    assert set(compose["volumes"]) == {"workspace-data", "report-data", "trace-data"}
+    assert {"workspace-data", "report-data", "trace-data"}.issubset(compose["volumes"])
 
 
 def test_make_smoke_and_ci_share_one_stable_acceptance_entry():
@@ -63,14 +63,64 @@ def test_readme_and_deployment_document_no_key_live_and_volume_boundaries():
     assert "正式 Secret Manager" in deployment
 
 
-def test_p38_is_not_implemented_early_and_ci_stays_secretless():
+def test_p38_h1_through_h6_are_complete_and_keep_external_boundaries():
     compose = yaml.safe_load(_read("compose.yaml"))
-    assert not ({"prometheus", "grafana"} & set(compose["services"]))
+    assert {"prometheus", "grafana"}.issubset(compose["services"])
     ci = _read(".github/workflows/ci.yml").lower()
     assert "docker push" not in ci and "deploy" not in ci
     assert "deepseek_api_key" not in ci and "lark_cli" not in ci
     status = _read("DEVELOPMENT_STATUS.md")
-    assert "P38 | `[ ]` Planned" in status
+    assert "P38 | `[x]` Complete" in status
+    assert "P38-H1 | `[x]` Complete" in status
+    assert "P38-H2 | `[x]` Complete" in status
+    assert "P38-H3 | `[x]` Complete" in status
+    assert "P38-H4 | `[x]` Complete" in status
+    assert "P38-H5 | `[x]` Complete" in status
+    assert "P38-H6 | `[x]` Complete" in status
+    assert Path(ROOT / "observability" / "metrics.py").is_file()
+    assert Path(ROOT / "observability" / "tests" / "rule-tests.yml").is_file()
+    assert Path(ROOT / "docs" / "operations" / "observability-alerts.md").is_file()
+    assert '@app.get("/metrics"' in _read("api/app.py")
+
+
+def test_p38_h6_closeout_status_is_consistent_across_project_documents():
+    plan = _read("DEVELOPMENT_PLAN.md")
+    status = _read("DEVELOPMENT_STATUS.md")
+    product_plan = _read("docs/product/plans/2026-07-11-p38-observability-and-operations.md")
+    readme = _read("README.md")
+
+    plan_tasks = plan.split("## P38 Task Status", 1)[1].split("## Latest P38-H6 Result", 1)[0]
+    status_tasks = status.split("## P38 Task Status", 1)[1].split("### P38-H6 Verification", 1)[0]
+    product_h4 = product_plan.split("### P38-H4: Prometheus Metrics", 1)[1].split("### P38-H5:", 1)[0]
+    product_h5 = product_plan.split("### P38-H5: Prometheus, Grafana, Dashboards, And Alerts", 1)[1].split("### P38-H6:", 1)[0]
+    product_h6 = product_plan.split("### P38-H6: Failure Injection, Runbooks, Acceptance, And Closeout", 1)[1]
+
+    assert "Complete; H1-H6 complete" in plan
+    assert "| P38-H4 | `[x]` Complete |" in plan_tasks
+    assert "| P38-H5 | `[x]` Complete |" in plan_tasks
+    assert "| P38-H6 | `[x]` Complete |" in plan_tasks
+    assert "P38-H4 | `[ ]` Planned" not in plan_tasks
+    assert "No next phase is designated" in plan
+
+    assert "| P38 | `[x]` Complete |" in status
+    assert "| P38-H4 | `[x]` Complete |" in status_tasks
+    assert "| P38-H5 | `[x]` Complete |" in status_tasks
+    assert "| P38-H6 | `[x]` Complete |" in status_tasks
+    assert "P38-H4 | `[ ]` Planned" not in status_tasks
+    assert "| Next planned task | Not designated; create a separate phase plan before expanding scope |" in status
+
+    assert "Status: Complete; H1-H6 complete" in product_plan
+    assert "Next planned task: not designated" in product_plan
+    assert "Status: Complete" in product_h4
+    assert "Status: Complete" in product_h5
+    assert "Status: Complete" in product_h6
+
+    assert "P38 observability and operations 已完成 H1-H6" in readme
+    assert "下一阶段尚未指定" in readme
+    assert "H6 尚未实施" not in readme
+
+    compose = yaml.safe_load(_read("compose.yaml"))
+    assert set(compose["services"]) == {"backend", "frontend", "prometheus", "grafana"}
 
 
 def test_current_product_boundaries_were_not_rewritten_by_containerization():

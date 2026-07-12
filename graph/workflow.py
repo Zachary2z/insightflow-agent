@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from functools import wraps
+from time import perf_counter
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -22,6 +24,7 @@ from graph.nodes import (
 )
 from graph.state import AgentState
 from llm_ops.provider import LLMProvider
+from observability.metrics import get_metrics, normalize_error_type, safely_inc, safely_observe
 from llm_ops.runtime_provider import (
     build_clarification_provider,
     build_business_answer_provider,
@@ -30,6 +33,126 @@ from llm_ops.runtime_provider import (
     build_sql_candidate_provider,
     build_sql_planning_provider,
 )
+
+
+MAX_RETRY_DELTA_PER_NODE = 10
+RETRY_OPERATION_BY_NODE = {
+    "question_understanding": "analysis",
+    "clarification": "clarification",
+    "evidence_agent": "sql_execution",
+    "fast_fact": "sql_execution",
+    "business_answer": "business_answer",
+    "visualization_agent": "visualization",
+    "fail": "analysis",
+    "early_response": "analysis",
+    "save_trace": "other",
+}
+
+
+def safe_retry_count(value: Any) -> int:
+    """Read a retry count without coercing model-produced or hostile values."""
+    try:
+        return value if type(value) is int and value >= 0 else 0
+    except BaseException:
+        return 0
+
+
+def _retry_total(state: Any) -> int:
+    try:
+        if type(state) is not dict:
+            return 0
+        return safe_retry_count(state.get("retry_count")) + safe_retry_count(state.get("review_retry_count"))
+    except BaseException:
+        return 0
+
+
+def _node_result_status(result: Any) -> str:
+    try:
+        if type(result) is not dict:
+            return "success"
+        if result.get("success") is False:
+            return "error"
+        raw_status = result.get("status")
+        if raw_status is None:
+            return "success"
+        if type(raw_status) is not str:
+            return "unknown"
+        status = raw_status.lower()
+        if status in {"failed", "error", "trace_save_failed"}:
+            return "error"
+        if status == "waiting_for_clarification":
+            return "clarification"
+        if status in {"success", "completed", "executed", "running"}:
+            return "success"
+        return "unknown"
+    except BaseException:
+        return "unknown"
+
+
+def _safe_started_at() -> float | None:
+    try:
+        return perf_counter()
+    except BaseException:
+        return None
+
+
+def _safe_node_metrics() -> Any:
+    try:
+        return get_metrics()
+    except BaseException:
+        return None
+
+
+def _safe_duration(started_at: float | None) -> float:
+    try:
+        return max(0.0, perf_counter() - started_at) if type(started_at) is float else 0.0
+    except BaseException:
+        return 0.0
+
+
+def _record_node_metrics(metrics: Any, name: Any, status: str, started_at: float | None) -> None:
+    labels = {"node": name, "status": status}
+    safely_inc(metrics, "node_executions", labels)
+    safely_observe(metrics, "node_duration", _safe_duration(started_at), labels)
+
+
+def _record_retry_metrics(metrics: Any, name: Any, before_retries: int, result: Any) -> None:
+    try:
+        after_retries = _retry_total(result)
+        if after_retries <= before_retries:
+            return
+        delta = min(after_retries - before_retries, MAX_RETRY_DELTA_PER_NODE)
+        operation = RETRY_OPERATION_BY_NODE.get(name, "other") if type(name) is str else "other"
+        error_value = result.get("error_type") if type(result) is dict else None
+        safely_inc(
+            metrics,
+            "retries",
+            {"operation": operation, "error_type": normalize_error_type(error_value)},
+            delta,
+        )
+    except BaseException:
+        return
+
+
+def _observed_node(name: str, function):
+    @wraps(function)
+    def observed(state):
+        metrics = _safe_node_metrics()
+        before_retries = _retry_total(state)
+        started_at = _safe_started_at()
+        try:
+            result = function(state)
+        except TimeoutError:
+            _record_node_metrics(metrics, name, "timeout", started_at)
+            raise
+        except BaseException:
+            _record_node_metrics(metrics, name, "error", started_at)
+            raise
+        status = _node_result_status(result)
+        _record_retry_metrics(metrics, name, before_retries, result)
+        _record_node_metrics(metrics, name, status, started_at)
+        return result
+    return observed
 
 
 def build_workflow(
@@ -43,42 +166,42 @@ def build_workflow(
     workflow = StateGraph(AgentState)
     workflow.add_node(
         "question_understanding",
-        lambda state: run_question_understanding_agent(
+        _observed_node("question_understanding", lambda state: run_question_understanding_agent(
             dict(state),
             provider=question_understanding_provider,
             clarification_provider=clarification_provider,
-        ),
+        )),
     )
     workflow.add_node(
         "clarification",
-        lambda state: clarification_node(dict(state), provider=clarification_provider),
+        _observed_node("clarification", lambda state: clarification_node(dict(state), provider=clarification_provider)),
     )
     workflow.add_node(
         "evidence_agent",
-        lambda state: evidence_agent_node(
+        _observed_node("evidence_agent", lambda state: evidence_agent_node(
             dict(state),
             sql_planning_provider=sql_planning_provider,
             sql_candidate_provider=sql_candidate_provider,
-        ),
+        )),
     )
-    workflow.add_node("fast_fact", fast_fact_node)
+    workflow.add_node("fast_fact", _observed_node("fast_fact", fast_fact_node))
     workflow.add_node(
         "business_answer",
-        lambda state: business_answer_node(
+        _observed_node("business_answer", lambda state: business_answer_node(
             dict(state),
             provider=business_answer_provider or build_business_answer_provider(),
-        ),
+        )),
     )
     workflow.add_node(
         "visualization_agent",
-        lambda state: visualization_agent_node(
+        _observed_node("visualization_agent", lambda state: visualization_agent_node(
             dict(state),
             provider=visualization_agent_provider or build_visualization_agent_provider(),
-        ),
+        )),
     )
-    workflow.add_node("fail", fail_response_node)
-    workflow.add_node("early_response", early_response_node)
-    workflow.add_node("save_trace", save_trace_node)
+    workflow.add_node("fail", _observed_node("fail", fail_response_node))
+    workflow.add_node("early_response", _observed_node("early_response", early_response_node))
+    workflow.add_node("save_trace", _observed_node("save_trace", save_trace_node))
 
     workflow.add_edge(START, "question_understanding")
     workflow.add_edge("question_understanding", "clarification")

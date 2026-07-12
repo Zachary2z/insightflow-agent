@@ -1,0 +1,91 @@
+groups:
+  - name: insightflow-alerts
+    interval: 30s
+    rules:
+      - alert: BackendUnavailable
+        expr: up{job="insightflow-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: InsightFlow 后端不可用
+          description: Prometheus 已连续一分钟无法抓取后端指标。
+          dashboard: System Health / Backend up
+          runbook: docs/operations/observability-alerts.md#backendunavailable
+
+      - alert: HighHttp5xxRate
+        expr: insightflow:http_requests:rate5m{job="insightflow-backend"} >= 0.1 and insightflow:http_5xx_ratio:rate5m{job="insightflow-backend"} > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: HTTP 5xx 比率超过 5%
+          description: 最近五分钟请求量达到门槛且后端 5xx 比率持续偏高。
+          dashboard: System Health / HTTP 4xx/5xx
+          runbook: docs/operations/observability-alerts.md#highhttp5xxrate
+
+      - alert: HighApiLatency
+        expr: insightflow:http_requests:rate5m{job="insightflow-backend"} >= 0.1 and insightflow:http_p95_latency_seconds:rate5m{job="insightflow-backend"} > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: API P95 延迟超过 2 秒
+          description: 有效流量下的 HTTP P95 延迟已持续十分钟超过阈值。
+          dashboard: System Health / HTTP P95 延迟
+          runbook: docs/operations/observability-alerts.md#highapilatency
+
+      - alert: HighLlmFailureRate
+        expr: sum(rate(insightflow_llm_requests_total[10m])) >= 0.02 and insightflow:llm_error_ratio:rate10m > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: LLM 失败率超过 10%
+          description: LLM error/timeout 比率在有效请求量下持续偏高。
+          dashboard: Provider And Tool / LLM 错误与超时
+          runbook: docs/operations/observability-alerts.md#highllmfailurerate
+
+      - alert: HighSqlFailureRate
+        expr: sum(rate(insightflow_sql_executions_total[10m])) >= 0.02 and insightflow:sql_execution_error_ratio:rate10m > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: SQL 执行失败率超过 10%
+          description: SQL execution error/timeout/failed 比率持续偏高。
+          dashboard: Provider And Tool / SQL Execution
+          runbook: docs/operations/observability-alerts.md#highsqlfailurerate
+
+      - alert: HighEvidenceFailureRate
+        expr: sum(rate(insightflow_evidence_validations_total[10m])) >= 0.02 and insightflow:evidence_failure_ratio:rate10m > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Evidence 校验失败率超过 10%
+          description: Evidence error/rejected/failed 比率持续偏高。
+          dashboard: Analysis Workflow / Evidence Task 状态
+          runbook: docs/operations/observability-alerts.md#highevidencefailurerate
+
+      - alert: ExternalPublishFailureBurst
+        expr: increase(insightflow_external_publishes_total{platform="feishu",status=~"error|failed"}[10m]) >= 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 飞书发布出现连续失败
+          description: 十分钟内至少三次 Feishu publish 失败。
+          dashboard: Delivery / Feishu Publish
+          runbook: docs/operations/observability-alerts.md#externalpublishfailureburst
+
+      - alert: RuntimeStorageHigh
+        expr: insightflow_runtime_storage_usage_ratio > 0.80
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Runtime 存储文件系统使用率超过 80%
+          description: Trace 挂载所在文件系统的聚合使用率持续偏高；指标不扫描文件内容。
+          dashboard: System Health / Runtime Storage
+          runbook: docs/operations/observability-alerts.md#runtimestoragehigh

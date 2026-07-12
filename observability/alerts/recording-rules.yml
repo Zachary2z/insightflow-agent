@@ -1,0 +1,18 @@
+groups:
+  - name: insightflow-recording
+    interval: 30s
+    rules:
+      - record: insightflow:http_requests:rate5m
+        expr: sum by (job) (rate(insightflow_http_requests_total[5m]))
+      - record: insightflow:http_5xx_ratio:rate5m
+        expr: sum by (job) (rate(insightflow_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum by (job) (rate(insightflow_http_requests_total[5m])), 0.001)
+      - record: insightflow:http_p95_latency_seconds:rate5m
+        expr: histogram_quantile(0.95, sum by (job, le) (rate(insightflow_http_request_duration_seconds_bucket[5m])))
+      - record: insightflow:llm_error_ratio:rate10m
+        expr: sum(rate(insightflow_llm_requests_total{status=~"error|timeout"}[10m])) / clamp_min(sum(rate(insightflow_llm_requests_total[10m])), 0.001)
+      - record: insightflow:sql_execution_error_ratio:rate10m
+        expr: sum(rate(insightflow_sql_executions_total{status=~"error|timeout|failed"}[10m])) / clamp_min(sum(rate(insightflow_sql_executions_total[10m])), 0.001)
+      - record: insightflow:evidence_failure_ratio:rate10m
+        expr: sum(rate(insightflow_evidence_validations_total{status=~"error|rejected|failed"}[10m])) / clamp_min(sum(rate(insightflow_evidence_validations_total[10m])), 0.001)
+      - record: insightflow:external_publish_failure_ratio:rate10m
+        expr: sum(rate(insightflow_external_publishes_total{status=~"error|failed"}[10m])) / clamp_min(sum(rate(insightflow_external_publishes_total[10m])), 0.001)

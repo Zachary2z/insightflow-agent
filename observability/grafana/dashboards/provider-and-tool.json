@@ -1,0 +1,17 @@
+{
+  "annotations": {"list": []},
+  "description": "LLM、SQL、Evidence Validation 与 Chart Generation 的受控聚合信号。",
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "LLM 请求量与状态", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (provider, operation, status) (rate(insightflow_llm_requests_total[5m]))", "legendFormat": "{{provider}} / {{operation}} / {{status}}"}]},
+    {"id": 2, "title": "LLM 错误与 timeout", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (provider, status) (rate(insightflow_llm_requests_total{status=~\"error|timeout\"}[5m]))", "legendFormat": "{{provider}} / {{status}}"}]},
+    {"id": 3, "title": "LLM P95 延迟", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (provider, operation, le) (rate(insightflow_llm_duration_seconds_bucket[5m])))", "legendFormat": "{{provider}} / {{operation}}"}], "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}},
+    {"id": 4, "title": "LLM Token 与 fallback", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}, "targets": [{"refId": "A", "expr": "sum by (token_type) (rate(insightflow_llm_tokens_total[5m]))", "legendFormat": "token / {{token_type}}"}, {"refId": "B", "expr": "sum(rate(insightflow_llm_fallbacks_total[5m]))", "legendFormat": "fallback"}]},
+    {"id": 5, "title": "SQL Validation accepted / rejected", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}, "targets": [{"refId": "A", "expr": "sum by (status, risk_level) (rate(insightflow_sql_validations_total[5m]))", "legendFormat": "{{status}} / {{risk_level}}"}]},
+    {"id": 6, "title": "SQL Execution success / error / timeout", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}, "targets": [{"refId": "A", "expr": "sum by (status, error_type) (rate(insightflow_sql_executions_total[5m]))", "legendFormat": "{{status}} / {{error_type}}"}]},
+    {"id": 7, "title": "Evidence Validation 状态", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}, "targets": [{"refId": "A", "expr": "sum by (status, reason_category) (rate(insightflow_evidence_validations_total[5m]))", "legendFormat": "{{status}} / {{reason_category}}"}]},
+    {"id": 8, "title": "Chart Generation 状态", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}, "targets": [{"refId": "A", "expr": "sum by (chart_type, status) (rate(insightflow_chart_generations_total[5m]))", "legendFormat": "{{chart_type}} / {{status}}"}]}
+  ],
+  "refresh": "30s", "schemaVersion": 41, "tags": ["insightflow", "provider", "tool"], "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"}, "timezone": "browser", "title": "Provider And Tool", "uid": "insightflow-provider-tool", "version": 1
+}

@@ -134,6 +134,48 @@ docker build \
 
 后端提供两个独立合同：`GET /health/live` 只确认 API 进程能够响应；`GET /health/ready` 检查实际 Workspace 根目录、项目级 reports、`logs/traces` 和基础配置是否可用。readiness 使用唯一、排他、立即清理的短暂探针，不读取现有 Workspace 内容，也不依赖 DeepSeek、飞书、外部网络或已有业务数据。生产后端镜像的 Docker HEALTHCHECK 每 10 秒调用一次 `http://127.0.0.1:8000/health/ready`，超时 3 秒、启动宽限 10 秒、失败重试 3 次。
 
+P38-H1 为所有 HTTP API 增加 `X-Request-ID` 和集中 correlation/redaction 合同。P38-H2 在该合同上增加安全的应用 stdout 事件：容器默认每行一个 JSON；每个请求记录 started/completed，完成事件使用 FastAPI/Starlette 匹配后的 Route Template（真正未匹配的 404 为 `unmatched`）、HTTP Method、状态码/类别和耗时。线程池分析任务显式传播并 reset 安全 request/workspace/run context，Workflow、Report、Word Export 和 External Publish 记录受控生命周期事件。请求/响应正文、Query、Headers、异常原文、SQL、Prompt、Rows、Provider payload、发布 URL/Token/CLI 输出和本地路径不会进入应用事件。
+
+P38-H3 将业务 Trace 持久化放到可注入的 `TraceSink` 边界后。默认 Local JSON Sink 保留现有 JSON、Trace Dashboard 和 Workspace Run 兼容性，并用同目录临时文件原子替换；可选 Structured Log Sink 只输出安全紧凑的 `trace_persist_completed`。Composite 按序隔离失败：辅助日志失败不会丢失本地 Trace 或改变业务答案，本地失败仍保持原有 `trace_save_failed` 语义。
+
+日志配置只接受固定值；未知值安全回退为 JSON/INFO：
+
+```env
+INSIGHTFLOW_LOG_FORMAT=json  # json 或显式本地调试 text
+INSIGHTFLOW_LOG_LEVEL=INFO   # DEBUG/INFO/WARNING/ERROR/CRITICAL
+INSIGHTFLOW_TRACE_SINKS=local # 可选 local,structured；未知值回退 local
+INSIGHTFLOW_TRACE_DIR=logs/traces # Retention 的代码级可信根
+```
+
+Trace 清理只通过显式维护命令运行，默认预览、不自动删除：
+
+```bash
+python3 -m observability.trace_retention --trace-dir logs/traces --max-age-days 30
+python3 -m observability.trace_retention --trace-dir logs/traces --max-age-days 30 --max-total-bytes 1073741824 --delete
+```
+
+可重复传入 `--active-run-id <run_id>` 保护活动 Run。`INSIGHTFLOW_TRACE_DIR` 是独立的可信 Trace 根；`--trace-dir` 只能选择该根本身或其安全子目录，越界、Workspace/Report 根及符号链接路径会在扫描前拒绝。即使位于授权根内，最终 `*.json` 也必须通过 Local JSON `TraceDocument` 身份校验（run id/文件名、trace/event count、UTC saved time 及兼容字段类型）才可能成为候选；普通、损坏、Workspace Run、Report、Evidence/cache JSON 永不删除。目录、临时文件、Markdown、Word、Chart、`.env` 和源码也不进入删除集合。年龄/容量可由 `INSIGHTFLOW_TRACE_RETENTION_DAYS` 与 `INSIGHTFLOW_TRACE_RETENTION_MAX_BYTES` 提供，但仍须 `--delete` 才会删除，默认始终 dry-run。
+
+P38-H4 提供 `GET /metrics` Prometheus 文本端点和集中、失败隔离的 process-local Registry。它覆盖 HTTP、Workflow/Node、LLM、SQL/Evidence、Chart、Report、Word Export 与 Feishu Publish 聚合指标；所有 Label 都使用有限 allowlist 和 `unknown`/`other` fallback，绝不使用 request/run/workspace/report ID、Query、SQL、Prompt、路径、模型字符串或异常原文。HTTP route 只取 Starlette Route Template；`/metrics` 自身不计入，live/ready 计入。当前无应用层认证：本地 Compose 依靠网络边界，生产必须在 Ingress/反向代理限制为内部抓取，禁止直接暴露公网。
+
+P38-H5 增加可选 `observability` Profile；默认 `docker compose up -d` 仍只启动 backend/frontend。先在忽略提交的 `.env` 或部署 Secret 中设置非空 `GRAFANA_ADMIN_PASSWORD`，再运行：
+
+```bash
+make observability-up
+make observability-ps
+make observability-logs
+make observability-down
+make observability-alert-tests
+make observability-check
+make observability-acceptance
+```
+
+Prometheus 为 <http://127.0.0.1:9090>，Grafana 为 <http://127.0.0.1:3001>；可用 `PROMETHEUS_HOST_PORT`、`GRAFANA_HOST_PORT` 与 `GRAFANA_ADMIN_USER` 覆盖。Grafana 禁用匿名访问和自助注册，密码没有仓库默认值，缺失时会明确拒绝启动。Prometheus 每 15 秒抓取 `backend:8000/metrics`、每 30 秒评估规则，数据最多保留 7 天或 2 GB；Grafana 自动 Provision `prometheus` Data Source 和 System Health、Analysis Workflow、Provider And Tool、Delivery 四个 Dashboard。镜像固定为 `prom/prometheus:v3.5.0` 与 `grafana/grafana:12.1.0`，避免 `latest` 漂移并保持本阶段验收可复现。
+
+监控数据只写 `prometheus-data` 和 `grafana-data`。日常停止保留全部 Volume；`make observability-down-v` 是危险的监控数据清理命令，但只删除这两个显式命名的监控 Volume，不删除 `workspace-data`、`report-data`、`trace-data`。生产不得把 Prometheus/Grafana 或 `/metrics` 直接暴露公网，应置于内部网络并由反向代理/Ingress 进一步限制。
+
+P38-H6 增加无外部依赖的 Failure Injection Closeout。LLM、SQL validation/execution、Evidence 和 Chart 边界现在与 HTTP/Workflow/Report/Export/Publish/Trace 一样发出集中脱敏的完成事件；指标仍只使用有限 Label。`make observability-alert-tests` 用合成时间序列验证 7 条 recording rules、全部 8 条 alerts 的 firing，以及低流量/未满足持续时间时不误报；`make observability-acceptance` 汇总规则、失败隔离、correlation、redaction、cardinality、Report/Export/Feishu mock 和 Trace Dashboard 验收，不调用真实 DeepSeek，不登录或发布 Feishu，也不删除 Volume。完整安全排查与恢复步骤见 `docs/operations/observability-alerts.md`。
+
 不要把 DeepSeek、飞书或其他私密后端配置放入任何 `NEXT_PUBLIC_*`。镜像构建、基础启动和 readiness 不需要 `DEEPSEEK_API_KEY`、飞书凭证或 `lark-cli`；这些能力只能在运行时显式配置。
 
 基础产品可在无密钥环境直接通过 Compose 构建并启动：
@@ -164,6 +206,8 @@ docker compose down
 | `workspace-data` | `/app/workspaces` | Workspace 元数据、导入数据、分析运行历史和 Workspace 内导出产物 |
 | `report-data` | `/app/reports` | 项目级报告和图表目录 |
 | `trace-data` | `/app/logs/traces` | 当前本地 JSON Trace |
+| `prometheus-data` | `/prometheus` | 可选 Profile 的 Prometheus TSDB；7 天或 2 GB 上限 |
+| `grafana-data` | `/var/lib/grafana` | 可选 Profile 的 Grafana 本地状态；Dashboard 源文件仍在仓库 |
 
 可用 `docker volume ls` 查看卷，用 `docker volume inspect <实际卷名>` 查看详情。不要把 `--volumes` 或 `-v` 加到日常停止命令；`docker compose down -v` 会永久删除该 Compose project 的上述持久化数据。执行前必须先确认 project name 和卷名，避免误删其他环境数据。P37-H3 不包含自动备份。
 
@@ -321,7 +365,7 @@ git diff --check
 ## 当前边界
 
 - 当前产品优先面向中文业务数据分析场景。
-- 真实 SaaS 鉴权、RBAC、多租户隔离仍未进入当前实现范围。P37 已完成生产镜像、健康/生命周期合同、Docker Compose、产品持久化、统一操作命令、自动 Smoke、CI-ready 工作流和部署文档。结构化日志、Prometheus/Grafana 和告警运维闭环属于仍为 Planned 的 P38。
+- 真实 SaaS 鉴权、RBAC、多租户隔离仍未进入当前实现范围。P37 已完成容器化部署；P38-H1-H6 已完成关联/脱敏、结构化事件、TraceSink/Retention、有限基数 Metrics、可选 Prometheus/Grafana/Dashboards/Alerts、确定性告警测试、Failure Injection 和完整 Runbook Closeout。
 - 非容器启动的飞书发布依赖本机 `lark-cli` 登录状态；基础 Compose 不包含该 CLI。图表会以静态图片形式插入飞书文档。
 - 大模型不会直接执行 SQL 或写外部系统；执行、校验和发布都走受控工具边界。
 
@@ -333,4 +377,4 @@ git diff --check
 - `DEVELOPMENT_STATUS.md`
 - `docs/product/plans/`
 
-当前主线已完成 P37 容器化可复现部署与 P37-H5 收口。下一步计划任务是 P38-H1 Observability Contract And Correlation Context；P38 仍为 Planned，尚未开始。
+P38 observability and operations 已完成 H1-H6；下一阶段尚未指定，开始新阶段前应先建立独立计划。

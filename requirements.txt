@@ -12,3 +12,4 @@ openpyxl
 PyYAML
 Pillow
 python-docx
+prometheus-client

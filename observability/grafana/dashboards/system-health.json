@@ -1,0 +1,23 @@
+{
+  "annotations": {"list": []},
+  "description": "InsightFlow API、Prometheus target 与 Runtime 存储的本地运行健康视图。无数据表示尚未产生对应样本。",
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Backend up", "description": "Prometheus 是否成功抓取 backend。", "type": "stat", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}, "targets": [{"refId": "A", "expr": "up{job=\"insightflow-backend\"}"}]},
+    {"id": 2, "title": "HTTP 请求速率", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 9, "x": 6, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (status_class) (rate(insightflow_http_requests_total[5m]))", "legendFormat": "{{status_class}}"}]},
+    {"id": 3, "title": "HTTP 4xx / 5xx", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 9, "x": 15, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (status_class) (rate(insightflow_http_requests_total{status_class=~\"4xx|5xx\"}[5m]))", "legendFormat": "{{status_class}}"}]},
+    {"id": 4, "title": "HTTP P95 延迟", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(insightflow_http_request_duration_seconds_bucket[5m])))"}], "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}},
+    {"id": 5, "title": "HTTP in-progress", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}, "targets": [{"refId": "A", "expr": "sum by (method) (insightflow_http_requests_in_progress)", "legendFormat": "{{method}}"}]},
+    {"id": 6, "title": "Prometheus target health", "type": "stat", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 4, "x": 16, "y": 8}, "targets": [{"refId": "A", "expr": "min(up)"}]},
+    {"id": 7, "title": "Runtime Storage", "description": "Trace 挂载所在文件系统的聚合使用率；不扫描文件内容，不含路径 Label。", "type": "gauge", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 4, "x": 20, "y": 8}, "targets": [{"refId": "A", "expr": "insightflow_runtime_storage_usage_ratio"}], "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []}}
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["insightflow", "observability"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "System Health",
+  "uid": "insightflow-system-health",
+  "version": 1
+}

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+from contextvars import copy_context
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
 from llm_ops.provider import LLMProvider
+from observability.metrics import normalize_analysis_route, safely_get_metrics, safely_inc
 from tools.trace_logger import append_trace
 from workspaces.analysis_contracts import AnalysisTask, QuestionEvidencePack, WorkbenchToolCall
 from workspaces.evidence_agent import run_evidence_agent_question_mode
@@ -72,6 +74,7 @@ def _run_tasks(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(
+                copy_context().run,
                 _run_one_task,
                 state,
                 task,
@@ -148,6 +151,10 @@ def _merge_task_runs(
     trace = _merged_trace(state, runs)
     failed_core = bool([run for run in runs if run.task.purpose == "core_fact"]) and not successful_core
     status = "failed" if failed_core or not successful else "executed"
+    metrics = safely_get_metrics()
+    metric_route = normalize_analysis_route(plan.route)
+    for run in runs:
+        safely_inc(metrics, "evidence_tasks", {"status": "success" if run.result.status == "executed" else "error", "route": metric_route})
     updated = {
         **state,
         "status": status,
@@ -187,6 +194,7 @@ def _merge_task_runs(
 def _without_tasks(state: dict[str, Any], plan: EvidenceTaskPlan) -> dict[str, Any]:
     task = _analysis_task(state)
     limits = plan.data_limits or ["当前问题没有可执行的证据任务。"]
+    safely_inc(safely_get_metrics(), "evidence_tasks", {"status": "skipped", "route": normalize_analysis_route(plan.route)})
     return append_trace(
         {
             **state,

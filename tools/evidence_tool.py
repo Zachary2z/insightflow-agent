@@ -6,6 +6,8 @@ from typing import Any
 
 from workspaces.time_range_defaults import full_range_default_note
 from workspaces.answer_evidence import business_field_label
+from observability.metrics import safely_get_metrics, safely_inc
+from observability.logging import emit_observability_event, safely_emit
 
 
 MISSING_DATA_TERMS = {
@@ -82,7 +84,7 @@ def _trace_event(
 
 def _failure(started_at: float, claim_count: int, error: str) -> dict[str, Any]:
     latency_ms = int((perf_counter() - started_at) * 1000)
-    return {
+    result = {
         "success": False,
         "data_supported_findings": [],
         "hypotheses": [],
@@ -91,6 +93,16 @@ def _failure(started_at: float, claim_count: int, error: str) -> dict[str, Any]:
         "error": error,
         "trace_event": _trace_event(claim_count, 0, 0, 0, "error", latency_ms, error),
     }
+    safely_inc(safely_get_metrics(), "evidence_validations", {"status": "error", "reason_category": "validation"})
+    safely_emit(
+        emit_observability_event,
+        "evidence_validation_completed",
+        operation="evidence_validation",
+        status="error",
+        error_type="validation",
+        latency_ms=latency_ms,
+    )
+    return result
 
 
 def _clean_claims(claims: list[str] | None) -> list[str]:
@@ -882,7 +894,8 @@ def validate_evidence(
         unsupported_claims_blocked.append(claim)
 
     latency_ms = int((perf_counter() - started_at) * 1000)
-    return {
+    metric_status = "success" if not unsupported_claims_blocked else "rejected"
+    result = {
         "success": True,
         "data_supported_findings": data_supported_findings,
         "hypotheses": hypotheses,
@@ -897,3 +910,17 @@ def validate_evidence(
             latency_ms,
         ),
     }
+    safely_inc(
+        safely_get_metrics(),
+        "evidence_validations",
+        {"status": metric_status, "reason_category": "validation" if unsupported_claims_blocked else "not_required"},
+    )
+    safely_emit(
+        emit_observability_event,
+        "evidence_validation_completed",
+        operation="evidence_validation",
+        status=metric_status,
+        error_type="validation" if unsupported_claims_blocked else None,
+        latency_ms=latency_ms,
+    )
+    return result

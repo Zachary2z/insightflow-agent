@@ -1,0 +1,17 @@
+{
+  "annotations": {"list": []},
+  "description": "Analysis Workflow 的 Run、Node、Retry、Clarification 与 Evidence Task 聚合指标。",
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Workflow Run 总量与状态", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (route, status) (rate(insightflow_runs_total[5m]))", "legendFormat": "{{route}} / {{status}}"}]},
+    {"id": 2, "title": "Workflow 成功 / 失败 / clarification 比例", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}, "targets": [{"refId": "A", "expr": "sum by (status) (rate(insightflow_runs_total[10m])) / clamp_min(sum(rate(insightflow_runs_total[10m])), 0.001)", "legendFormat": "{{status}}"}], "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []}},
+    {"id": 3, "title": "Workflow 耗时分位数", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(insightflow_run_duration_seconds_bucket[10m])))", "legendFormat": "P50"}, {"refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(insightflow_run_duration_seconds_bucket[10m])))", "legendFormat": "P95"}], "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}},
+    {"id": 4, "title": "Node 执行次数与错误", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}, "targets": [{"refId": "A", "expr": "sum by (node, status) (rate(insightflow_node_executions_total[5m]))", "legendFormat": "{{node}} / {{status}}"}]},
+    {"id": 5, "title": "Node P95 耗时", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (node, le) (rate(insightflow_node_duration_seconds_bucket[5m])))", "legendFormat": "{{node}}"}], "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}},
+    {"id": 6, "title": "Retry 数", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}, "targets": [{"refId": "A", "expr": "sum by (operation, error_type) (increase(insightflow_retries_total[10m]))", "legendFormat": "{{operation}} / {{error_type}}"}]},
+    {"id": 7, "title": "Clarification", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}, "targets": [{"refId": "A", "expr": "sum by (reason_category) (increase(insightflow_clarifications_total[10m]))", "legendFormat": "{{reason_category}}"}]},
+    {"id": 8, "title": "Evidence Task 状态", "type": "timeseries", "datasource": {"type": "prometheus", "uid": "prometheus"}, "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}, "targets": [{"refId": "A", "expr": "sum by (route, status) (rate(insightflow_evidence_tasks_total[5m]))", "legendFormat": "{{route}} / {{status}}"}]}
+  ],
+  "refresh": "30s", "schemaVersion": 41, "tags": ["insightflow", "workflow"], "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"}, "timezone": "browser", "title": "Analysis Workflow", "uid": "insightflow-analysis-workflow", "version": 1
+}

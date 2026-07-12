@@ -8,6 +8,8 @@ from typing import Any
 import sqlglot
 from sqlglot import exp
 import sqlparse
+from observability.metrics import safely_get_metrics, safely_inc
+from observability.logging import emit_observability_event, safely_emit
 
 
 DANGEROUS_KEYWORDS = {
@@ -29,7 +31,7 @@ DEFAULT_LIMIT = 100
 
 
 def _base_checks() -> dict[str, bool]:
-    return {
+    result = {
         "select_only": False,
         "no_dangerous_keywords": True,
         "single_statement": False,
@@ -42,6 +44,7 @@ def _base_checks() -> dict[str, bool]:
         "paid_filter_included": True,
         "sqlite_compatible": True,
     }
+    return result
 
 
 def _trace_event(sql: str, approved: bool, risk_level: str, latency_ms: int) -> dict[str, Any]:
@@ -282,7 +285,7 @@ def validate_sql(
     risk_level = "low" if approved else "high"
     latency_ms = int((perf_counter() - started_at) * 1000)
 
-    return {
+    result = {
         "approved": approved,
         "risk_level": risk_level,
         "issues": issues,
@@ -290,3 +293,17 @@ def validate_sql(
         "normalized_sql": normalized_sql,
         "trace_event": _trace_event(sql, approved, risk_level, latency_ms),
     }
+    safely_inc(
+        safely_get_metrics(),
+        "sql_validations",
+        {"status": "success" if approved else "rejected", "risk_level": risk_level},
+    )
+    safely_emit(
+        emit_observability_event,
+        "sql_validation_completed",
+        operation="sql_validation",
+        status="success" if approved else "rejected",
+        error_type=None if approved else "validation",
+        latency_ms=latency_ms,
+    )
+    return result
