@@ -1,6 +1,6 @@
 # InsightFlow Agent Development Status
 
-Last updated: 2026-07-12
+Last updated: 2026-07-15
 
 This is the concise current status surface for InsightFlow Agent.
 
@@ -8,9 +8,9 @@ This is the concise current status surface for InsightFlow Agent.
 
 | Field | Status |
 |---|---|
-| Current phase | P38 observability and operations complete |
-| Current task | P38-H6 Failure Injection, Runbooks, Acceptance, And Closeout complete |
-| Next planned task | Not designated; create a separate phase plan before expanding scope |
+| Current phase | P39 planned; implementation has not started |
+| Current task | P39-P44 roadmap and tracker documented; no implementation task active |
+| Next planned task | P39-H1 Sensitive Data Policy And Validated Query Contract |
 | Last completed task | P38-H6 Failure Injection, Runbooks, Acceptance, And Closeout |
 | Active backend | FastAPI in `api/app.py` |
 | Active frontend | Next.js + React + TypeScript in `frontend/` |
@@ -18,7 +18,7 @@ This is the concise current status surface for InsightFlow Agent.
 | Active report entry | `POST /api/workspaces/{workspace_id}/reports` |
 | Current answer contract | P16 `business_answer`: `headline`, `direct_answer`, `why`, `evidence_bullets`, `recommendations`, `caveats`, `confidence` |
 | Main product target | Chinese-first general business data-analysis multi-agent product with data profiling, semantic layer, task routing, SQL/calculation/chart/report tool calls, evidence validation, Chinese business answers, and coherent Chinese report documents |
-| Current engineering boundary | P37 covers single-host Docker/Compose deployment; P38 covers local/portable observability. Kubernetes, cloud infrastructure, TLS/ingress, multi-replica SQLite, RBAC, and multi-tenant isolation remain out of scope |
+| Current engineering boundary | P37 covers single-host Docker/Compose deployment and P38 covers local/portable observability. P39-P44 is planned only: data-readiness, typed analysis contracts, durable jobs, RBAC, tenant isolation, evaluation, Kubernetes, cloud infrastructure, and TLS/ingress are not implemented by this documentation change |
 
 ## Phase Overview
 
@@ -54,6 +54,12 @@ This is the concise current status surface for InsightFlow Agent.
 | UI consolidation | `[x]` Complete | Three-entry decision-desk shell, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement; APIs and Analysis/Report separation preserved; 83 frontend tests, production build, 55 focused backend tests, browser QA, and diff check passed |
 | P37 | `[x]` Complete | H1-H5 production images, health/lifecycle, Compose, product persistence, operations, Smoke/CI readiness, documentation, regression, and hygiene closeout complete |
 | P38 | `[x]` Complete | H1-H6 correlation/redaction, structured events, TraceSink/retention, bounded metrics, Prometheus/Grafana/dashboards/alerts, deterministic rule tests, failure injection, Runbooks, and closeout complete |
+| P39 | `[ ]` Planned | Safety, correctness, portfolio truth, dependency baseline, and P40 handoff; H1-H6 not started |
+| P40 | `[ ]` Planned | ImportContract, data quality, SemanticModel, JoinGraph, DataReadiness, cross-domain acceptance; H1-H6 not started |
+| P41 | `[ ]` Planned | AnalysisSpec, CapabilityGate, five core Operators, EvidenceGateway, conclusion levels; H1-H6 not started |
+| P42 | `[ ]` Planned | Typed architecture, two reasoning Agents, graph lifecycle, LLM Runtime, legacy deletion; H1-H6 not started |
+| P43 | `[ ]` Planned | Durable control plane/jobs, tenant/RBAC, row/column policy, audit and recovery; H1-H6 not started |
+| P44 | `[ ]` Planned | Cross-domain evaluation, security/E2E, GenAI observability, public docs and release; H1-H6 not started |
 
 P34 planning is recorded in `docs/product/plans/2026-07-07-p34-real-export-tooling.md`. The core rule is: generated report content follows `ReportDocument`; export tools provide stable layout and real file generation only. Word export does not call the LLM, rewrite conclusions, force fixed business chapters, stitch Analysis Workbench answers into reports, or restore simulated SaaS/action/chart paths. Report Center now has the first visible export UI; Analysis Workbench keeps safe export package support for later connectors.
 
@@ -64,6 +70,19 @@ P36 planning is recorded in `docs/product/plans/2026-07-08-p36-feishu-document-p
 P37 planning is recorded in `docs/product/plans/2026-07-11-p37-containerized-reproducible-deployment.md`. P37 and H1-H5 are complete: final `:p37` images, safe health/lifecycle contracts, health-gated Compose, three persistent volumes, Make operations, expanded no-key product Smoke, CI-ready workflow, deployment guide, full regression, image/repository hygiene, and project-only old-tag cleanup were verified on Linux arm64. The phase does not claim amd64 verification, remote GitHub Actions success, Kubernetes, cloud, TLS, multi-replica SQLite, production Secret Manager, disaster recovery, or production multi-tenancy support.
 
 P38 planning is recorded in `docs/product/plans/2026-07-11-p38-observability-and-operations.md`. P38 is complete: H1-H4 added correlation/redaction, structured events, TraceSink/retention, and bounded application metrics; H5 added the optional Prometheus/Grafana Profile, provisioned Dashboards, recording/alert rules, and safe Runtime storage Gauge; H6 added deterministic rule tests, failure injection, complete Runbooks, isolated Profile acceptance, and closeout.
+
+P39-P44 planning is recorded in `docs/product/plans/2026-07-15-p39-p44-enterprise-analysis-evolution.md`, with live execution state in `docs/product/plans/2026-07-15-p39-p44-development-tracker.md`. All six phases and all H tasks remain Planned. P39-H1 is the next planned task; no sensitive-data rewrite, new import/readiness contract, analysis operator, architecture cutover, durable job, RBAC/tenant control, or new evaluation release has been implemented by the roadmap documentation work.
+
+## P39-P44 Program Status
+
+| Phase | Status | Current capability statement |
+|---|---|---|
+| P39 | `[ ]` Planned | Current P38 product behavior remains; confirmed safety/demo-truth gaps are not yet closed |
+| P40 | `[ ]` Planned | No general DataReadinessReport or SemanticModel v1 is implemented yet |
+| P41 | `[ ]` Planned | No unified AnalysisSpec/CapabilityGate/core Operator release is implemented yet |
+| P42 | `[ ]` Planned | Current broad state and existing Agent/module organization remain active |
+| P43 | `[ ]` Planned | Current local stores and process-local background execution remain active; no RBAC/tenant baseline |
+| P44 | `[ ]` Planned | Current tests remain the baseline; release-grade cross-domain quality metrics are not yet available |
 
 ## P37 Task Status
 

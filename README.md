@@ -211,7 +211,7 @@ POST /api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu
 - 当前优先面向中文业务数据分析场景。
 - Compose 当前为单后端实例配合本地 SQLite/Workspace 文件，不支持多副本、Kubernetes、云部署、TLS、正式 Secret Manager 或灾备。
 - 尚未实现真实 SaaS 鉴权、RBAC、多租户隔离、Alertmanager、OpenTelemetry/OTLP、外部 Observability SaaS 或前端遥测。
-- P38 observability and operations 已完成 H1-H6；下一阶段尚未指定，后续扩展需要建立独立计划。
+- P38 observability and operations 已完成 H1-H6。P39-P44 企业分析演进计划已经建立，但所有实现任务仍为 Planned；下一项计划任务是 P39-H1 敏感数据策略与 ValidatedQuery 契约。
 
 ## 文档
 
@@ -223,6 +223,8 @@ POST /api/workspaces/{workspace_id}/reports/{report_id}/publish/feishu
 | [开发状态](DEVELOPMENT_STATUS.md) | 已完成能力与验证记录 |
 | [P37 部署计划](docs/product/plans/2026-07-11-p37-containerized-reproducible-deployment.md) | 容器化部署的详细实现和验收 |
 | [P38 可观测性计划](docs/product/plans/2026-07-11-p38-observability-and-operations.md) | 可观测性与运维的详细实现和验收 |
+| [P39-P44 企业分析演进计划](docs/product/plans/2026-07-15-p39-p44-enterprise-analysis-evolution.md) | 数据准备度、语义模型、分析内核、Agent 收缩、企业运行与评测的完整计划 |
+| [P39-P44 开发阶段跟进](docs/product/plans/2026-07-15-p39-p44-development-tracker.md) | Phase/H 任务状态、能力变化、风险、决策与实际验证记录 |
 
 ## 提交前检查
 

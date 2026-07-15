@@ -26,6 +26,8 @@ This document tracks the active product direction, not the full historical build
 - `docs/product/plans/2026-07-10-frontend-ui-consolidation.md`
 - `docs/product/plans/2026-07-11-p37-containerized-reproducible-deployment.md`
 - `docs/product/plans/2026-07-11-p38-observability-and-operations.md`
+- `docs/product/plans/2026-07-15-p39-p44-enterprise-analysis-evolution.md`
+- `docs/product/plans/2026-07-15-p39-p44-development-tracker.md`
 
 ## Current Product Direction
 
@@ -63,6 +65,7 @@ InsightFlow is a Chinese business data-analysis product with:
 - The 2026-07-10 frontend consolidation applies the approved decision-desk design to the active Next.js product: global navigation is now 数据准备、分析、报告; profile and semantic work are tabs inside 数据准备; settings is compact and secondary; analysis output is answer-first while keeping thread/history/progress/technical detail; Report Center remains independent; the retired Business Q&A preview redirects to Analysis Workbench.
 - P37 is complete. H1-H4 established reproducible multi-stage images, non-root runtimes, health/lifecycle contracts, health-gated Compose orchestration, three persistent volumes, safe operations, isolated no-key Smoke, and a CI-ready workflow. H5 completed the final Linux arm64 no-cache build, Workspace/Run/Report/Markdown/Word/chart persistence acceptance, product-boundary regression, deployment documentation, repository hygiene, and project-only old-image cleanup. Analysis Workbench, Report Center, Word export, chart artifacts, and optional Feishu CLI semantics remain intact without baking credentials or generated data into images.
 - P38 is complete. H1-H4 established correlation/redaction, structured events, TraceSink/retention, and bounded application metrics; H5 added the optional Prometheus/Grafana Compose Profile, provisioned repository Dashboards, recording/alert rules, and safe aggregate Runtime storage usage; H6 added deterministic rule tests, Failure Injection, complete Runbooks, isolated Profile acceptance, and Closeout. No Alertmanager, OpenTelemetry, frontend telemetry, or external Metrics SaaS exists.
+- P39-P44 is the next planned enterprise-analysis evolution program. It first closes confirmed security/demo-truth gaps, then rebuilds import readiness and semantic contracts, adds `AnalysisSpec`/`CapabilityGate`/deterministic operators, consolidates the codebase around two reasoning Agents, adds durable runtime/RBAC/tenant controls, and finishes with cross-domain evaluation and a portfolio release. The program is Planned; no P39 implementation task has started. P39-H1 is the next planned task.
 
 Current runtime chain:
 
@@ -127,6 +130,12 @@ LLM/provider-backed components may understand intent, plan, draft guarded candid
 | UI consolidation (2026-07-10) | Approved decision-desk frontend, three-entry navigation, grouped data preparation, answer-first analysis result, compact settings, responsive/accessibility polish, and Business Q&A preview retirement without API changes | Complete; final verification recorded in the dated plan |
 | P37 | Containerized reproducible deployment: multi-stage non-root images, Compose orchestration, health contracts, persistent runtime data, environment/secrets boundaries, one-command operations, smoke tests, and CI-ready image verification | Complete; H1-H5 complete |
 | P38 | Observability and operations: correlation context, safe structured logging, trace sinks, Prometheus metrics, Grafana dashboards, alert rules, retention/cardinality policy, and failure-injection acceptance | Complete; H1-H6 complete |
+| P39 | Safety, correctness, and portfolio truth: sensitive-data policy, validated query execution, safe atomic import, approval/idempotency, clean demo, dependency baseline, and closeout | Planned; H1-H6 not started |
+| P40 | Heterogeneous data understanding: ImportContract, DataQualityReport, SemanticModel, JoinGraph, DataReadinessReport, confirmation UX, and cross-domain acceptance | Planned; H1-H6 not started |
+| P41 | General business analysis kernel: AnalysisSpec, CapabilityGate, five core operators, EvidenceGateway, conclusion levels, and unsupported/clarification UX | Planned; H1-H6 not started |
+| P42 | Agent and code architecture consolidation: application/domain boundaries, typed state, two reasoning Agents, graph lifecycle, LLM Runtime, and legacy deletion | Planned; H1-H6 not started |
+| P43 | Enterprise runtime and access control: PostgreSQL control plane, durable jobs/checkpoints, tenant/RBAC, row/column policies, retention/approval, and recovery acceptance | Planned; H1-H6 not started |
+| P44 | Evaluation and portfolio release: cross-domain quality metrics, adversarial security, E2E/recovery, GenAI observability, public docs, and release closeout | Planned; H1-H6 not started |
 
 ## P16 Business Answer Contract
 
@@ -383,11 +392,26 @@ P37-H5 Acceptance, Documentation And Closeout completed on 2026-07-11:
 - Docker usage: before final no-cache build, 8 images / 1.486 GB and 5.531 GB cache; after acceptance before cleanup, 10 images / 1.752 GB and 7.444 GB cache; after removing only unreferenced P37 H1/H1-review/H2/H3 tags, 3 images / 783.4 MB and 7.444 GB cache, with 5.935 GB reclaimable reported by `docker system df`. No Volume or global BuildKit prune ran.
 - Historical P37-H5 closeout state: retained project images were `insightflow-backend:p37` and `insightflow-frontend:p37`, no H5/Smoke container, network, or Volume remained, and P38-H1 was then the next planned task. P38-H1 through H4 have since completed.
 
+## P39-P44 Program Status
+
+Detailed planning lives in `docs/product/plans/2026-07-15-p39-p44-enterprise-analysis-evolution.md`. Execution status, risk, decisions, verification, and closeout evidence must be recorded in `docs/product/plans/2026-07-15-p39-p44-development-tracker.md`.
+
+This documentation change designates the roadmap only. It does not implement P39, start P39-H1, add the target contracts, or claim any enterprise/runtime/evaluation capability as complete.
+
+| Phase | Status | Next boundary |
+|---|---|---|
+| P39 | `[ ]` Planned | Start with P39-H1 focused failing tests for sensitive-column, `SELECT *`, and validator/executor substitution bypasses |
+| P40 | `[ ]` Planned | Wait for P39 closeout; rebuild import/readiness/semantic contracts |
+| P41 | `[ ]` Planned | Wait for P40 closeout; add AnalysisSpec, CapabilityGate, and five core Operators |
+| P42 | `[ ]` Planned | Wait for P41 contracts; cut over architecture and delete old paths |
+| P43 | `[ ]` Planned | Wait for P42 typed boundaries; add durable runtime and access control |
+| P44 | `[ ]` Planned | Accumulate evaluation assets earlier, but close only after P39-P43 |
+
 ## P38 Task Status
 
 Detailed plan: `docs/product/plans/2026-07-11-p38-observability-and-operations.md`.
 
-Current state: P38 is Complete; H1-H6 are Complete. No next phase is designated; expansion requires a separate plan.
+Current state: P38 is Complete; H1-H6 are Complete. The separate P39-P44 program is now designated and remains Planned; P39-H1 is the next planned task.
 
 | Task | Status | Notes |
 |---|---|---|

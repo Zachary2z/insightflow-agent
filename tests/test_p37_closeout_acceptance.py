@@ -100,14 +100,14 @@ def test_p38_h6_closeout_status_is_consistent_across_project_documents():
     assert "| P38-H5 | `[x]` Complete |" in plan_tasks
     assert "| P38-H6 | `[x]` Complete |" in plan_tasks
     assert "P38-H4 | `[ ]` Planned" not in plan_tasks
-    assert "No next phase is designated" in plan
+    assert "The separate P39-P44 program is now designated" in plan
 
     assert "| P38 | `[x]` Complete |" in status
     assert "| P38-H4 | `[x]` Complete |" in status_tasks
     assert "| P38-H5 | `[x]` Complete |" in status_tasks
     assert "| P38-H6 | `[x]` Complete |" in status_tasks
     assert "P38-H4 | `[ ]` Planned" not in status_tasks
-    assert "| Next planned task | Not designated; create a separate phase plan before expanding scope |" in status
+    assert "| Next planned task | P39-H1" in status
 
     assert "Status: Complete; H1-H6 complete" in product_plan
     assert "Next planned task: not designated" in product_plan
@@ -116,7 +116,7 @@ def test_p38_h6_closeout_status_is_consistent_across_project_documents():
     assert "Status: Complete" in product_h6
 
     assert "P38 observability and operations 已完成 H1-H6" in readme
-    assert "下一阶段尚未指定" in readme
+    assert "P39-H1" in readme
     assert "H6 尚未实施" not in readme
 
     compose = yaml.safe_load(_read("compose.yaml"))
